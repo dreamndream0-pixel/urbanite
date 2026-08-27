@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createBrowserSupabase } from '@/lib/supabase/client';
-import type { Order, Product } from '@/lib/types';
+import type { Category, Order, Product } from '@/lib/types';
 
 const formatter = new Intl.NumberFormat('zh-TW', {
   style: 'currency',
@@ -14,15 +14,6 @@ const formatter = new Intl.NumberFormat('zh-TW', {
 
 const ORDER_STATUSES = ['待出貨', '備貨中', '已出貨', '已取消'];
 const PRODUCT_STATUSES = ['上架中', '加購品', '已下架'];
-const CATEGORY_OPTIONS = [
-  { key: '', label: '未分類' },
-  { key: 'new', label: '新品' },
-  { key: 'spring', label: '春 Spring' },
-  { key: 'summer', label: '夏 Summer' },
-  { key: 'autumn', label: '秋 Autumn' },
-  { key: 'winter', label: '冬 Winter' },
-  { key: 'acc', label: '飾品 Acc' },
-];
 
 type Draft = {
   id: string;
@@ -65,15 +56,19 @@ function toDraft(p: Product): Draft {
 export default function AdminDashboard({
   initialProducts,
   initialOrders,
+  initialCategories,
   userEmail,
 }: {
   initialProducts: Product[];
   initialOrders: Order[];
+  initialCategories: Category[];
   userEmail: string;
 }) {
   const router = useRouter();
   const [products, setProducts] = useState<Product[]>(initialProducts);
   const [orders, setOrders] = useState<Order[]>(initialOrders);
+  const [categories, setCategories] = useState<Category[]>(initialCategories);
+  const [newCat, setNewCat] = useState({ slug: '', name: '', en: '' });
   const [editing, setEditing] = useState<Draft | null>(null);
   const [isNew, setIsNew] = useState(false);
 
@@ -157,6 +152,53 @@ export default function AdminDashboard({
     const res = await fetch(`/api/products/${id}`, { method: 'DELETE' });
     if (res.ok) {
       setProducts((list) => list.filter((p) => p.id !== id));
+    } else {
+      alert('刪除失敗');
+    }
+  }
+
+  async function saveNewCategory() {
+    const slug = newCat.slug.trim().toLowerCase();
+    if (!slug || !newCat.name.trim()) {
+      alert('請填寫代碼(英文)與名稱');
+      return;
+    }
+    const res = await fetch('/api/categories', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        slug,
+        name: newCat.name.trim(),
+        en: newCat.en.trim() || slug.toUpperCase(),
+        sort_order: categories.length + 1,
+      }),
+    });
+    const data = await res.json();
+    if (res.ok) {
+      setCategories((list) => [...list, data as Category]);
+      setNewCat({ slug: '', name: '', en: '' });
+    } else {
+      alert(data.error ?? '新增失敗(代碼可能重複)');
+    }
+  }
+
+  async function patchCategory(
+    id: string,
+    patch: Partial<Pick<Category, 'name' | 'en' | 'sort_order'>>,
+  ) {
+    setCategories((list) => list.map((c) => (c.id === id ? { ...c, ...patch } : c)));
+    await fetch(`/api/categories/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(patch),
+    });
+  }
+
+  async function deleteCategory(id: string) {
+    if (!confirm('確定刪除這個分類嗎?(商品不會被刪,只是失去這個分類標籤)')) return;
+    const res = await fetch(`/api/categories/${id}`, { method: 'DELETE' });
+    if (res.ok) {
+      setCategories((list) => list.filter((c) => c.id !== id));
     } else {
       alert('刪除失敗');
     }
@@ -312,12 +354,102 @@ export default function AdminDashboard({
             </div>
           </Panel>
         </div>
+
+        <div className="mt-6">
+          <Panel title="分類管理(首頁分類選單)">
+            <div className="space-y-2">
+              {categories.map((c) => (
+                <div
+                  key={c.id}
+                  className="flex flex-wrap items-center gap-2 rounded-lg border border-[#ead8d1] bg-white p-3"
+                >
+                  <input
+                    value={c.en}
+                    onChange={(e) =>
+                      setCategories((l) =>
+                        l.map((x) => (x.id === c.id ? { ...x, en: e.target.value } : x)),
+                      )
+                    }
+                    onBlur={() =>
+                      patchCategory(c.id, { name: c.name, en: c.en, sort_order: c.sort_order })
+                    }
+                    placeholder="EN"
+                    className="w-20 rounded border border-[#ead8d1] px-2 py-1 text-sm"
+                  />
+                  <input
+                    value={c.name}
+                    onChange={(e) =>
+                      setCategories((l) =>
+                        l.map((x) => (x.id === c.id ? { ...x, name: e.target.value } : x)),
+                      )
+                    }
+                    onBlur={() =>
+                      patchCategory(c.id, { name: c.name, en: c.en, sort_order: c.sort_order })
+                    }
+                    placeholder="名稱"
+                    className="min-w-24 flex-1 rounded border border-[#ead8d1] px-2 py-1 text-sm"
+                  />
+                  <span className="text-xs text-[#a99e8f]">{c.slug}</span>
+                  <input
+                    type="number"
+                    value={c.sort_order}
+                    onChange={(e) =>
+                      setCategories((l) =>
+                        l.map((x) =>
+                          x.id === c.id ? { ...x, sort_order: Number(e.target.value) } : x,
+                        ),
+                      )
+                    }
+                    onBlur={() =>
+                      patchCategory(c.id, { name: c.name, en: c.en, sort_order: c.sort_order })
+                    }
+                    className="w-14 rounded border border-[#ead8d1] px-2 py-1 text-sm"
+                  />
+                  <button
+                    onClick={() => deleteCategory(c.id)}
+                    className="rounded-full border border-[#e0b4b4] px-3 py-1 text-sm font-semibold text-[#c0392b]"
+                  >
+                    刪除
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-[#ead8d1] pt-4">
+              <input
+                value={newCat.slug}
+                onChange={(e) => setNewCat({ ...newCat, slug: e.target.value })}
+                placeholder="代碼(英文,如 dress)"
+                className="w-44 rounded border border-[#ead8d1] px-2 py-1.5 text-sm"
+              />
+              <input
+                value={newCat.name}
+                onChange={(e) => setNewCat({ ...newCat, name: e.target.value })}
+                placeholder="名稱(如 洋裝)"
+                className="w-32 rounded border border-[#ead8d1] px-2 py-1.5 text-sm"
+              />
+              <input
+                value={newCat.en}
+                onChange={(e) => setNewCat({ ...newCat, en: e.target.value })}
+                placeholder="EN(可空)"
+                className="w-24 rounded border border-[#ead8d1] px-2 py-1.5 text-sm"
+              />
+              <button
+                onClick={saveNewCategory}
+                className="rounded-full bg-[#251b1f] px-4 py-1.5 text-sm font-semibold text-white"
+              >
+                新增分類
+              </button>
+            </div>
+          </Panel>
+        </div>
       </section>
 
       {editing && (
         <ProductModal
           draft={editing}
           isNew={isNew}
+          categories={categories}
           onChange={setEditing}
           onClose={() => setEditing(null)}
           onSave={saveProduct}
@@ -350,12 +482,14 @@ function Panel({
 function ProductModal({
   draft,
   isNew,
+  categories,
   onChange,
   onClose,
   onSave,
 }: {
   draft: Draft;
   isNew: boolean;
+  categories: Category[];
   onChange: (d: Draft) => void;
   onClose: () => void;
   onSave: () => void;
@@ -440,9 +574,10 @@ function ProductModal({
               value={draft.category}
               onChange={(e) => set('category', e.target.value)}
             >
-              {CATEGORY_OPTIONS.map((o) => (
-                <option key={o.key} value={o.key}>
-                  {o.label}
+              <option value="">未分類</option>
+              {categories.map((c) => (
+                <option key={c.id} value={c.slug}>
+                  {c.name}
                 </option>
               ))}
             </select>

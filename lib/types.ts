@@ -17,6 +17,15 @@ export type Product = {
   created_at?: string;
 };
 
+export type Category = {
+  id: string;
+  slug: string;
+  name: string;
+  en: string;
+  sort_order: number;
+  created_at?: string;
+};
+
 export type OrderItem = {
   name: string;
   variant: string;

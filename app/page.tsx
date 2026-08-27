@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import type { Product } from '@/lib/types';
+import type { Product, Category } from '@/lib/types';
 
 type CartItem = {
   id: string;
@@ -21,18 +21,13 @@ const formatter = new Intl.NumberFormat('zh-TW', {
   maximumFractionDigits: 0,
 });
 
-const CATEGORIES = [
-  { key: 'all', label: '全部商品', en: 'ALL', zh: '全部' },
-  { key: 'new', label: '新品', en: 'NEW', zh: '新品' },
-  { key: 'spring', label: '春 Spring', en: 'SPRING', zh: '春' },
-  { key: 'summer', label: '夏 Summer', en: 'SUMMER', zh: '夏' },
-  { key: 'autumn', label: '秋 Autumn', en: 'AUTUMN', zh: '秋' },
-  { key: 'winter', label: '冬 Winter', en: 'WINTER', zh: '冬' },
-  { key: 'acc', label: '飾品 Acc', en: 'ACC', zh: '飾品' },
-];
+// 前台分類 tab 用的型別(虛擬的「全部」也用同一形狀)
+type CategoryTab = { slug: string; name: string; en: string };
+const ALL_TAB: CategoryTab = { slug: 'all', name: '全部', en: 'ALL' };
 
 export default function Home() {
   const [products, setProducts] = useState<Product[]>([]);
+  const [dbCategories, setDbCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [category, setCategory] = useState('all');
   const [menuOpen, setMenuOpen] = useState(false);
@@ -48,7 +43,17 @@ export default function Home() {
       .then((data: Product[]) => setProducts(data))
       .catch(() => setProducts([]))
       .finally(() => setLoading(false));
+
+    fetch('/api/categories')
+      .then((res) => (res.ok ? res.json() : []))
+      .then((data: Category[]) => setDbCategories(data))
+      .catch(() => setDbCategories([]));
   }, []);
+
+  const categoryTabs: CategoryTab[] = [
+    ALL_TAB,
+    ...dbCategories.map((c) => ({ slug: c.slug, name: c.name, en: c.en || c.slug.toUpperCase() })),
+  ];
 
   const liveProducts = products.filter((p) => p.status !== '已下架');
 
@@ -69,7 +74,7 @@ export default function Home() {
   const shipping = subtotal >= 2000 ? 0 : 120;
   const total = subtotal + shipping;
 
-  const activeCategory = CATEGORIES.find((c) => c.key === category) ?? CATEGORIES[0];
+  const activeCategory = categoryTabs.find((c) => c.slug === category) ?? ALL_TAB;
 
   function addToCart(product: Product) {
     const color = product.colors[0] ?? '';
@@ -182,24 +187,24 @@ export default function Home() {
       <section className="mx-auto max-w-7xl px-4 pb-4 pt-10 text-center sm:px-6 sm:pt-14">
         <p className="text-xs font-semibold tracking-[0.3em] text-[#8a7f72]">SHOP</p>
         <h1 className="mt-3 text-4xl font-semibold tracking-[0.15em] sm:text-5xl">
-          {activeCategory.label}
+          {activeCategory.slug === 'all' ? '全部商品' : activeCategory.name}
         </h1>
       </section>
 
       {/* 分類篩選列 */}
       <div className="mx-auto max-w-7xl px-4 sm:px-6">
         <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 border-b border-[#e5ded4] pb-4">
-          {CATEGORIES.map((c) => (
+          {categoryTabs.map((c) => (
             <button
-              key={c.key}
-              onClick={() => setCategory(c.key)}
+              key={c.slug}
+              onClick={() => setCategory(c.slug)}
               className={`text-sm tracking-wide transition ${
-                category === c.key
+                category === c.slug
                   ? 'font-semibold text-[#1f1b19]'
                   : 'text-[#8a7f72] hover:text-[#1f1b19]'
               }`}
             >
-              {c.en} <span className="ml-0.5">{c.zh}</span>
+              {c.en} <span className="ml-0.5">{c.name}</span>
             </button>
           ))}
         </div>
@@ -229,6 +234,7 @@ export default function Home() {
       {/* 左側分類選單 */}
       <SideMenu
         open={menuOpen}
+        categories={categoryTabs}
         onClose={() => setMenuOpen(false)}
         current={category}
         onSelect={(key) => {
@@ -316,11 +322,13 @@ function ProductCard({
 
 function SideMenu({
   open,
+  categories,
   onClose,
   current,
   onSelect,
 }: {
   open: boolean;
+  categories: CategoryTab[];
   onClose: () => void;
   current: string;
   onSelect: (key: string) => void;
@@ -345,16 +353,16 @@ function SideMenu({
           </button>
         </div>
         <nav className="flex-1 overflow-auto px-5 py-6">
-          {CATEGORIES.map((c) => (
+          {categories.map((c) => (
             <button
-              key={c.key}
-              onClick={() => onSelect(c.key)}
+              key={c.slug}
+              onClick={() => onSelect(c.slug)}
               className={`block w-full border-b border-[#efe8dd] py-4 text-left transition ${
-                current === c.key ? 'text-[#1f1b19]' : 'text-[#6b6156] hover:text-[#1f1b19]'
+                current === c.slug ? 'text-[#1f1b19]' : 'text-[#6b6156] hover:text-[#1f1b19]'
               }`}
             >
               <span className="block text-[11px] tracking-[0.2em] text-[#a99e8f]">{c.en}</span>
-              <span className="mt-0.5 block text-lg font-medium">{c.label}</span>
+              <span className="mt-0.5 block text-lg font-medium">{c.name}</span>
             </button>
           ))}
         </nav>
