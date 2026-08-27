@@ -2,8 +2,25 @@ import type { Metadata } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Goodnight Girls | LOVE LOVE LOVE',
-  description: 'A boutique shopping cart and admin demo for LOVE LOVE LOVE gift sets.',
+  metadataBase: new URL('https://urbanite-tw.vercel.app'),
+  title: {
+    default: 'Urbanite',
+    template: '%s | Urbanite',
+  },
+  description: 'Urbanite 線上選品商店,提供流行服飾、配件與會員訂單查詢服務。',
+  openGraph: {
+    title: 'Urbanite',
+    description: 'Urbanite 線上選品商店,提供流行服飾、配件與會員訂單查詢服務。',
+    url: 'https://urbanite-tw.vercel.app',
+    siteName: 'Urbanite',
+    locale: 'zh_TW',
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary',
+    title: 'Urbanite',
+    description: 'Urbanite 線上選品商店,提供流行服飾、配件與會員訂單查詢服務。',
+  },
 };
 
 export default function RootLayout({
