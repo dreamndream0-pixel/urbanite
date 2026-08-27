@@ -500,9 +500,10 @@ function ProductCard({
           </div>
           <button
             onClick={onAdd}
-            className="rounded-full bg-[#1f1b19] px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-[#3a322e]"
+            aria-label={`將 ${product.name} 加入購物車`}
+            className="flex h-9 w-9 items-center justify-center rounded-full bg-[#1f1b19] text-white transition hover:bg-[#3a322e]"
           >
-            加入
+            <IconCart />
           </button>
         </div>
       </div>
@@ -821,6 +822,16 @@ function IconBag() {
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
       <path d="M6 8h12l-1 12H7L6 8z" strokeLinejoin="round" />
       <path d="M9 8V6a3 3 0 016 0v2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function IconCart() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+      <circle cx="9" cy="20" r="1.6" />
+      <circle cx="18" cy="20" r="1.6" />
+      <path d="M3 4h2l2.4 11.2a2 2 0 0 0 2 1.6h7.8a2 2 0 0 0 1.9-1.4L21 8H7" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }
