@@ -1,5 +1,5 @@
 {
-  "name": "goodnight-girls-shop",
+  "name": "urbanite",
   "version": "0.1.0",
   "private": true,
   "engines": {
@@ -12,6 +12,8 @@
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next"
   },
   "dependencies": {
+    "@supabase/ssr": "^0.12.5",
+    "@supabase/supabase-js": "^2.112.4",
     "next": "16.2.6",
     "react": "19.2.6",
     "react-dom": "19.2.6"
