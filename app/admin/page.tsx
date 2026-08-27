@@ -1,7 +1,6 @@
 import { redirect } from 'next/navigation';
 import { getAdminUser, getSessionUser } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
-import LoginPanel from './LoginPanel';
 import AdminDashboard from './AdminDashboard';
 import type { Category, Customer, Discount, Order, Product } from '@/lib/types';
 
@@ -20,9 +19,9 @@ export default async function AdminPage() {
     redirect('/');
   }
 
-  // 未設定 Supabase,或尚未登入 → 顯示登入畫面
+  // 未設定 Supabase,或尚未登入 → 使用共用登入頁
   if (!user) {
-    return <LoginPanel configured={configured} />;
+    redirect('/login?next=/admin');
   }
 
   // 已是管理員 → 讀取初始資料並顯示後台

@@ -1,3 +1,4 @@
+import { redirect } from 'next/navigation';
 import { getSessionUser } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import AccountClient from './AccountClient';
@@ -10,6 +11,10 @@ export default async function AccountPage() {
     process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
   );
   const user = configured ? await getSessionUser() : null;
+
+  if (!user) {
+    redirect('/login?next=/account');
+  }
 
   let orders: Order[] = [];
   if (user) {
@@ -30,8 +35,6 @@ export default async function AccountPage() {
 
   return (
     <AccountClient
-      configured={configured}
-      userEmail={user?.email ?? null}
       userName={name}
       orders={orders}
     />

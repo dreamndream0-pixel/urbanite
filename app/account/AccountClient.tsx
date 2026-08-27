@@ -2,7 +2,6 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
 import { createBrowserSupabase } from '@/lib/supabase/client';
 import type { Order } from '@/lib/types';
 
@@ -13,60 +12,17 @@ const formatter = new Intl.NumberFormat('zh-TW', {
 });
 
 export default function AccountClient({
-  configured,
-  userEmail,
   userName,
   orders,
 }: {
-  configured: boolean;
-  userEmail: string | null;
   userName: string;
   orders: Order[];
 }) {
   const router = useRouter();
-  const [busy, setBusy] = useState(false);
-
-  async function signIn() {
-    setBusy(true);
-    const supabase = createBrowserSupabase();
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: { redirectTo: `${window.location.origin}/auth/callback?next=/account` },
-    });
-    if (error) setBusy(false);
-  }
 
   async function signOut() {
     await createBrowserSupabase().auth.signOut();
     router.refresh();
-  }
-
-  // 未登入畫面
-  if (!userEmail) {
-    return (
-      <main className="flex min-h-screen items-center justify-center bg-[#f6f2ec] px-4 text-[#1f1b19]">
-        <div className="w-full max-w-md rounded-2xl border border-[#e5ded4] bg-white p-8 text-center shadow-sm">
-          <h1 className="text-2xl font-semibold">會員登入</h1>
-          <p className="mt-2 text-sm text-[#6b6156]">登入後即可查看你的訂單紀錄。</p>
-          {configured ? (
-            <button
-              onClick={signIn}
-              disabled={busy}
-              className="mt-6 w-full rounded-full border border-[#d7c9bd] bg-white px-5 py-3 font-semibold transition hover:bg-[#f2ebe3] disabled:opacity-60"
-            >
-              {busy ? '前往 Google…' : '使用 Google 登入'}
-            </button>
-          ) : (
-            <p className="mt-6 rounded-lg bg-[#fdf3e7] p-4 text-sm text-[#9a6a1f]">
-              登入服務尚未設定完成。
-            </p>
-          )}
-          <Link href="/" className="mt-6 inline-block text-sm font-semibold text-[#6b6156]">
-            ← 回到商店首頁
-          </Link>
-        </div>
-      </main>
-    );
   }
 
   // 已登入:會員中心
