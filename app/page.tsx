@@ -202,7 +202,7 @@ export default function Home() {
               aria-label="收藏"
               className="hidden rounded-md p-2 hover:bg-[#efe8dd] sm:block"
             >
-              <IconHeart filled={favorites.size > 0} />
+              <IconStar filled={favorites.size > 0} />
             </button>
             <div className="relative">
               <button
@@ -299,20 +299,22 @@ export default function Home() {
 
       {/* 分類篩選列 */}
       <div className="mx-auto max-w-7xl px-4 sm:px-6">
-        <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 border-b border-[#e5ded4] pb-4">
-          {categoryTabs.map((c) => (
-            <button
-              key={c.slug}
-              onClick={() => setCategory(c.slug)}
-              className={`text-sm tracking-wide transition ${
-                category === c.slug
-                  ? 'font-semibold text-[#1f1b19]'
-                  : 'text-[#8a7f72] hover:text-[#1f1b19]'
-              }`}
-            >
-              {c.en} <span className="ml-0.5">{c.name}</span>
-            </button>
-          ))}
+        <div className="-mx-4 overflow-x-auto border-b border-[#e5ded4] px-4 pb-4 sm:mx-0 sm:px-0">
+          <div className="flex w-max min-w-full items-center gap-7 whitespace-nowrap sm:justify-center">
+            {categoryTabs.map((c) => (
+              <button
+                key={c.slug}
+                onClick={() => setCategory(c.slug)}
+                className={`shrink-0 text-sm tracking-wide transition ${
+                  category === c.slug
+                    ? 'font-semibold text-[#1f1b19]'
+                    : 'text-[#8a7f72] hover:text-[#1f1b19]'
+                }`}
+              >
+                {c.en} <span className="ml-0.5">{c.name}</span>
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -404,7 +406,7 @@ function ProductCard({
           aria-label="加入收藏"
           className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full bg-white/90 shadow-sm"
         >
-          <IconHeart filled={favorited} small />
+          <IconStar filled={favorited} small />
         </button>
       </div>
       <div className="mt-3 flex flex-1 flex-col">
@@ -723,11 +725,11 @@ function IconSearch() {
     </svg>
   );
 }
-function IconHeart({ filled = false, small = false }: { filled?: boolean; small?: boolean }) {
+function IconStar({ filled = false, small = false }: { filled?: boolean; small?: boolean }) {
   const s = small ? 16 : 20;
   return (
-    <svg width={s} height={s} viewBox="0 0 24 24" fill={filled ? '#c84767' : 'none'} stroke={filled ? '#c84767' : 'currentColor'} strokeWidth="1.6">
-      <path d="M12 21s-7-4.35-9.5-8.5C1 9 2.5 5.5 6 5.5c2 0 3.2 1.2 4 2.3.8-1.1 2-2.3 4-2.3 3.5 0 5 3.5 3.5 7C19 16.65 12 21 12 21z" />
+    <svg width={s} height={s} viewBox="0 0 24 24" fill={filled ? '#f5c542' : 'none'} stroke={filled ? '#d89a00' : 'currentColor'} strokeWidth="1.8" strokeLinejoin="round">
+      <path d="m12 2 3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21 7 14.2l-5-4.9 6.9-1L12 2Z" />
     </svg>
   );
 }

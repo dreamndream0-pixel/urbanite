@@ -1,8 +1,10 @@
 'use client';
 
 import Link from 'next/link';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { Product } from '@/lib/types';
+
+const STORE_NAME = process.env.NEXT_PUBLIC_STORE_NAME || 'URBANITE';
 
 const formatter = new Intl.NumberFormat('zh-TW', {
   style: 'currency',
@@ -16,6 +18,17 @@ export default function ProductDetailClient({ product }: { product: Product }) {
   const [quantity, setQuantity] = useState(1);
   const [tab, setTab] = useState<'description' | 'shipping'>('shipping');
   const [message, setMessage] = useState('');
+  const [favorite, setFavorite] = useState(false);
+  const [logoUrl, setLogoUrl] = useState('');
+
+  useEffect(() => {
+    fetch('/api/settings')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((settings) => {
+        if (settings?.logo_url) setLogoUrl(settings.logo_url);
+      })
+      .catch(() => {});
+  }, []);
 
   const variantLabel = useMemo(
     () => [selectedColor, selectedSize].filter(Boolean).join(' / ') || '標準款',
@@ -32,21 +45,38 @@ export default function ProductDetailClient({ product }: { product: Product }) {
 
   return (
     <main className="min-h-screen bg-white text-[#2c2826]">
-      <header className="sticky top-0 z-30 border-b border-[#e8e2dc] bg-white/95 backdrop-blur">
-        <nav className="mx-auto grid max-w-5xl grid-cols-[1fr_auto_1fr] items-center px-5 py-4">
-          <Link href="/" className="justify-self-start text-3xl font-semibold tracking-[0.12em]">
-            URBANITE
+      <header className="sticky top-0 z-30 border-b border-[#e5ded4] bg-[#faf7f2]/95 backdrop-blur">
+        <nav className="mx-auto grid max-w-7xl grid-cols-[1fr_auto_1fr] items-center px-4 py-4 sm:px-6">
+          <div className="flex items-center gap-3">
+            <Link href="/" aria-label="回到選單" className="rounded-md p-1 text-[#1f1b19] hover:bg-[#efe8dd]">
+              <IconMenu />
+            </Link>
+          </div>
+
+          <Link href="/" className="justify-self-center px-2 text-center">
+            {logoUrl ? (
+              <img
+                src={logoUrl}
+                alt={STORE_NAME}
+                className="mx-auto h-8 w-auto object-contain sm:h-10"
+              />
+            ) : (
+              <span className="font-serif text-2xl italic tracking-wide sm:text-3xl">
+                {STORE_NAME}
+              </span>
+            )}
           </Link>
-          <div className="hidden text-xs tracking-[0.25em] text-[#8a7f72] sm:block">SHOP</div>
-          <div className="flex items-center justify-end gap-4 text-2xl">
-            <Link href="/" aria-label="搜尋">
-              ⌕
+
+          <div className="flex items-center justify-end gap-1 sm:gap-2">
+            <Link href="/" aria-label="搜尋" className="rounded-md p-2 hover:bg-[#efe8dd]">
+              <IconSearch />
             </Link>
-            <Link href="/account" aria-label="帳號">
-              ●
+            <Link href="/account" aria-label="我的帳號" className="rounded-md p-2 hover:bg-[#efe8dd]">
+              <IconUser />
             </Link>
-            <span aria-hidden>▣</span>
-            <span aria-hidden>☰</span>
+            <button aria-label="購物車" className="rounded-md p-2 hover:bg-[#efe8dd]">
+              <IconBag />
+            </button>
           </div>
         </nav>
       </header>
@@ -152,8 +182,11 @@ export default function ProductDetailClient({ product }: { product: Product }) {
             </button>
           </div>
 
-          <button className="mx-auto mt-6 block text-sm font-semibold text-[#5d5652]">
-            ♡ 加入追蹤清單
+          <button
+            onClick={() => setFavorite((value) => !value)}
+            className="mx-auto mt-6 flex items-center justify-center gap-2 text-sm font-semibold text-[#5d5652]"
+          >
+            <IconStar filled={favorite} /> 收藏
           </button>
 
           {message && (
@@ -199,5 +232,48 @@ export default function ProductDetailClient({ product }: { product: Product }) {
         </section>
       </section>
     </main>
+  );
+}
+
+function IconMenu() {
+  return (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
+      <path d="M4 7h16M4 12h16M4 17h16" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function IconSearch() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
+      <circle cx="11" cy="11" r="7" />
+      <path d="M21 21l-4-4" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function IconUser() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
+      <circle cx="12" cy="8" r="4" />
+      <path d="M4 21c0-4 3.5-6 8-6s8 2 8 6" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function IconBag() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
+      <path d="M6 8h12l-1 12H7L6 8z" strokeLinejoin="round" />
+      <path d="M9 8V6a3 3 0 016 0v2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function IconStar({ filled = false }: { filled?: boolean }) {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill={filled ? '#f5c542' : 'none'} stroke={filled ? '#d89a00' : 'currentColor'} strokeWidth="1.8" strokeLinejoin="round">
+      <path d="m12 2 3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21 7 14.2l-5-4.9 6.9-1L12 2Z" />
+    </svg>
   );
 }
