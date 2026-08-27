@@ -33,6 +33,14 @@ export type Discount = {
   created_at?: string;
 };
 
+export type Customer = {
+  id: string;
+  user_id: string;
+  email: string;
+  name: string;
+  created_at?: string;
+};
+
 export type Category = {
   id: string;
   slug: string;
@@ -62,5 +70,6 @@ export type Order = {
   total: number;
   status: string;
   paid: boolean;
+  user_id?: string | null;
   created_at?: string;
 };

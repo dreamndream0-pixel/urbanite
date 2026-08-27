@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createBrowserSupabase } from '@/lib/supabase/client';
-import type { Category, Discount, Order, Product } from '@/lib/types';
+import type { Category, Customer, Discount, Order, Product } from '@/lib/types';
 
 const formatter = new Intl.NumberFormat('zh-TW', {
   style: 'currency',
@@ -16,14 +16,14 @@ const ORDER_STATUSES = ['待出貨', '備貨中', '已出貨', '已取消'];
 const PRODUCT_STATUSES = ['上架中', '加購品', '已下架'];
 
 const NAV = [
-  { key: 'overview', label: '總覽', icon: '📊' },
-  { key: 'orders', label: '訂單管理', icon: '🧾' },
-  { key: 'products', label: '商品及分類', icon: '🛍️' },
-  { key: 'inventory', label: '庫存管理', icon: '📦' },
-  { key: 'customers', label: '顧客管理', icon: '👥' },
-  { key: 'promotions', label: '促銷管理', icon: '🎁' },
-  { key: 'reports', label: '報表及分析', icon: '📈' },
-  { key: 'settings', label: '系統設定', icon: '⚙️' },
+  { key: 'overview', label: '總覽', Icon: IconGrid },
+  { key: 'orders', label: '訂單管理', Icon: IconReceipt },
+  { key: 'products', label: '商品及分類', Icon: IconTag },
+  { key: 'inventory', label: '庫存管理', Icon: IconBox },
+  { key: 'customers', label: '顧客管理', Icon: IconUsers },
+  { key: 'promotions', label: '促銷管理', Icon: IconGift },
+  { key: 'reports', label: '報表及分析', Icon: IconChart },
+  { key: 'settings', label: '系統設定', Icon: IconGear },
 ] as const;
 
 type SectionKey = (typeof NAV)[number]['key'];
@@ -71,6 +71,7 @@ export default function AdminDashboard({
   initialOrders,
   initialCategories,
   initialDiscounts,
+  initialCustomers,
   initialLogoUrl,
   userEmail,
 }: {
@@ -78,6 +79,7 @@ export default function AdminDashboard({
   initialOrders: Order[];
   initialCategories: Category[];
   initialDiscounts: Discount[];
+  initialCustomers: Customer[];
   initialLogoUrl: string;
   userEmail: string;
 }) {
@@ -87,6 +89,7 @@ export default function AdminDashboard({
   const [orders, setOrders] = useState<Order[]>(initialOrders);
   const [categories, setCategories] = useState<Category[]>(initialCategories);
   const [discounts, setDiscounts] = useState<Discount[]>(initialDiscounts);
+  const [customers] = useState<Customer[]>(initialCustomers);
   const [newCat, setNewCat] = useState({ slug: '', name: '', en: '' });
   const [newDiscount, setNewDiscount] = useState({ code: '', type: 'percent', value: 0, min_spend: 0 });
   const [logoUrl, setLogoUrl] = useState(initialLogoUrl);
@@ -95,29 +98,26 @@ export default function AdminDashboard({
   const [isNew, setIsNew] = useState(false);
 
   // ---- 衍生資料 ----
-  const customers = useMemo(() => {
-    const map = new Map<
-      string,
-      { email: string; name: string; count: number; total: number; last: string }
-    >();
+  // 顧客列表:以「登入建檔的顧客」為主,合併其訂單統計
+  const customerRows = useMemo(() => {
+    const stat = new Map<string, { count: number; total: number; last: string }>();
     for (const o of orders) {
-      const ex = map.get(o.email);
-      if (ex) {
-        ex.count += 1;
-        ex.total += o.total;
-        if (o.created_at && o.created_at > ex.last) ex.last = o.created_at;
-      } else {
-        map.set(o.email, {
-          email: o.email,
-          name: o.customer_name,
-          count: 1,
-          total: o.total,
-          last: o.created_at ?? '',
-        });
-      }
+      if (!o.user_id) continue;
+      const ex = stat.get(o.user_id) ?? { count: 0, total: 0, last: '' };
+      ex.count += 1;
+      ex.total += o.total;
+      if (o.created_at && o.created_at > ex.last) ex.last = o.created_at;
+      stat.set(o.user_id, ex);
     }
-    return [...map.values()].sort((a, b) => b.total - a.total);
-  }, [orders]);
+    return customers
+      .map((c) => ({
+        email: c.email,
+        name: c.name,
+        joined: c.created_at ?? '',
+        ...(stat.get(c.user_id) ?? { count: 0, total: 0, last: '' }),
+      }))
+      .sort((a, b) => b.total - a.total);
+  }, [customers, orders]);
 
   const report = useMemo(() => {
     const totalRevenue = orders.reduce((s, o) => s + o.total, 0);
@@ -318,7 +318,7 @@ export default function AdminDashboard({
                   : 'text-[#6b6156] hover:bg-[#f3ede4]'
               }`}
             >
-              <span>{n.icon}</span>
+              <n.Icon />
               <span className="whitespace-nowrap">{n.label}</span>
             </button>
           ))}
@@ -354,7 +354,7 @@ export default function AdminDashboard({
                 <StatCard label="今日營收" value={formatter.format(todayRevenue)} />
                 <StatCard label="待出貨訂單" value={String(pendingCount)} />
                 <StatCard label="總訂單" value={String(orders.length)} />
-                <StatCard label="顧客數" value={String(customers.length)} />
+                <StatCard label="會員數" value={String(customers.length)} />
                 <StatCard label="商品數" value={String(products.length)} />
                 <StatCard label="低庫存(≤10)" value={String(lowStock)} />
                 <StatCard label="折扣碼" value={String(discounts.filter((d) => d.active).length)} />
@@ -624,22 +624,23 @@ export default function AdminDashboard({
 
           {/* ===== 顧客管理 ===== */}
           {section === 'customers' && (
-            <Card title={`顧客(${customers.length})`}>
-              {customers.length === 0 ? (
-                <Empty>還沒有顧客下單。</Empty>
+            <Card title={`會員(${customerRows.length})`}>
+              {customerRows.length === 0 ? (
+                <Empty>還沒有會員登入。客人用 Google 登入後就會自動建檔。</Empty>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b border-[#e5ded4] text-left text-[#8a7f72]">
-                        <th className="py-2 pr-4">顧客</th>
+                        <th className="py-2 pr-4">會員</th>
                         <th className="py-2 pr-4">訂單數</th>
                         <th className="py-2 pr-4">總消費</th>
-                        <th className="py-2">最近下單</th>
+                        <th className="py-2 pr-4">最近下單</th>
+                        <th className="py-2">加入日</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {customers.map((c) => (
+                      {customerRows.map((c) => (
                         <tr key={c.email} className="border-b border-[#efe8dd]">
                           <td className="py-3 pr-4">
                             <p className="font-semibold">{c.name}</p>
@@ -647,8 +648,11 @@ export default function AdminDashboard({
                           </td>
                           <td className="py-3 pr-4">{c.count}</td>
                           <td className="py-3 pr-4 font-semibold">{formatter.format(c.total)}</td>
-                          <td className="py-3 text-[#6b6156]">
+                          <td className="py-3 pr-4 text-[#6b6156]">
                             {c.last ? new Date(c.last).toLocaleDateString('zh-TW') : '-'}
+                          </td>
+                          <td className="py-3 text-[#6b6156]">
+                            {c.joined ? new Date(c.joined).toLocaleDateString('zh-TW') : '-'}
                           </td>
                         </tr>
                       ))}
@@ -1024,5 +1028,85 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
       <span className="mb-1 block text-sm font-semibold text-[#8a7f72]">{label}</span>
       {children}
     </label>
+  );
+}
+
+/* ---------- 側邊欄圖示(SVG 線條) ---------- */
+const svgProps = {
+  width: 18,
+  height: 18,
+  viewBox: '0 0 24 24',
+  fill: 'none',
+  stroke: 'currentColor',
+  strokeWidth: 1.6,
+  strokeLinecap: 'round' as const,
+  strokeLinejoin: 'round' as const,
+};
+function IconGrid() {
+  return (
+    <svg {...svgProps}>
+      <rect x="3" y="3" width="7" height="7" rx="1" />
+      <rect x="14" y="3" width="7" height="7" rx="1" />
+      <rect x="3" y="14" width="7" height="7" rx="1" />
+      <rect x="14" y="14" width="7" height="7" rx="1" />
+    </svg>
+  );
+}
+function IconReceipt() {
+  return (
+    <svg {...svgProps}>
+      <path d="M6 2h12v20l-3-2-3 2-3-2-3 2V2z" />
+      <path d="M9 7h6M9 11h6" />
+    </svg>
+  );
+}
+function IconTag() {
+  return (
+    <svg {...svgProps}>
+      <path d="M20.6 12.6 12 21l-9-9V3h9l8.6 8.6a1 1 0 0 1 0 1z" />
+      <circle cx="7" cy="7" r="1.3" />
+    </svg>
+  );
+}
+function IconBox() {
+  return (
+    <svg {...svgProps}>
+      <path d="M12 2 3 7v10l9 5 9-5V7z" />
+      <path d="M3 7l9 5 9-5M12 12v10" />
+    </svg>
+  );
+}
+function IconUsers() {
+  return (
+    <svg {...svgProps}>
+      <circle cx="9" cy="8" r="3.2" />
+      <path d="M3 20c0-3.4 2.7-5 6-5s6 1.6 6 5" />
+      <path d="M16 5.5a3.2 3.2 0 0 1 0 6M21.5 20c0-2.7-1.6-4.3-3.6-4.9" />
+    </svg>
+  );
+}
+function IconGift() {
+  return (
+    <svg {...svgProps}>
+      <rect x="3" y="8" width="18" height="13" rx="1" />
+      <path d="M3 12h18M12 8v13" />
+      <path d="M12 8S9.5 3.5 7 4.8 8.5 8 12 8zM12 8s2.5-4.5 5-3.2S15.5 8 12 8z" />
+    </svg>
+  );
+}
+function IconChart() {
+  return (
+    <svg {...svgProps}>
+      <path d="M3 3v18h18" />
+      <path d="M7 14l3-4 3 2 4-6" />
+    </svg>
+  );
+}
+function IconGear() {
+  return (
+    <svg {...svgProps}>
+      <circle cx="12" cy="12" r="3.2" />
+      <path d="M12 2v2.6M12 19.4V22M4.2 4.2l1.9 1.9M17.9 17.9l1.9 1.9M2 12h2.6M19.4 12H22M4.2 19.8l1.9-1.9M17.9 6.1l1.9-1.9" />
+    </svg>
   );
 }

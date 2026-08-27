@@ -15,7 +15,7 @@ export default function LoginPanel({ configured }: { configured: boolean }) {
       const supabase = createBrowserSupabase();
       const { error } = await supabase.auth.signInWithOAuth({
         provider,
-        options: { redirectTo: `${window.location.origin}/auth/callback` },
+        options: { redirectTo: `${window.location.origin}/auth/callback?next=/admin` },
       });
       if (error) {
         setError(error.message);
