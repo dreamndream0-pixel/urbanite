@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { Fragment, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createBrowserSupabase } from '@/lib/supabase/client';
@@ -96,8 +96,15 @@ export default function AdminDashboard({
   const [uploading, setUploading] = useState(false);
   const [editing, setEditing] = useState<Draft | null>(null);
   const [isNew, setIsNew] = useState(false);
+  const [expandedUser, setExpandedUser] = useState<string | null>(null);
 
   // ---- 衍生資料 ----
+  // user_id → 會員檔案,用來把訂單對照回會員
+  const customerByUser = useMemo(
+    () => new Map(customers.map((c) => [c.user_id, c])),
+    [customers],
+  );
+
   // 顧客列表:以「登入建檔的顧客」為主,合併其訂單統計
   const customerRows = useMemo(() => {
     const stat = new Map<string, { count: number; total: number; last: string }>();
@@ -111,6 +118,7 @@ export default function AdminDashboard({
     }
     return customers
       .map((c) => ({
+        user_id: c.user_id,
         email: c.email,
         name: c.name,
         joined: c.created_at ?? '',
@@ -398,7 +406,20 @@ export default function AdminDashboard({
                         <div>
                           <p className="font-semibold">{order.order_no}</p>
                           <p className="text-sm text-[#8a7f72]">
-                            {order.customer_name} · {order.email}
+                            {(order.user_id && customerByUser.get(order.user_id)?.name) ||
+                              order.customer_name}{' '}
+                            ·{' '}
+                            {(order.user_id && customerByUser.get(order.user_id)?.email) ||
+                              order.email}
+                            {order.user_id && customerByUser.has(order.user_id) ? (
+                              <span className="ml-2 rounded-full bg-[#eef3ec] px-2 py-0.5 text-xs font-semibold text-[#4a7a44]">
+                                會員
+                              </span>
+                            ) : (
+                              <span className="ml-2 rounded-full bg-[#f3ede4] px-2 py-0.5 text-xs font-semibold text-[#8a7f72]">
+                                訪客
+                              </span>
+                            )}
                           </p>
                         </div>
                         <span className="font-semibold">{formatter.format(order.total)}</span>
@@ -640,22 +661,61 @@ export default function AdminDashboard({
                       </tr>
                     </thead>
                     <tbody>
-                      {customerRows.map((c) => (
-                        <tr key={c.email} className="border-b border-[#efe8dd]">
-                          <td className="py-3 pr-4">
-                            <p className="font-semibold">{c.name}</p>
-                            <p className="text-xs text-[#8a7f72]">{c.email}</p>
-                          </td>
-                          <td className="py-3 pr-4">{c.count}</td>
-                          <td className="py-3 pr-4 font-semibold">{formatter.format(c.total)}</td>
-                          <td className="py-3 pr-4 text-[#6b6156]">
-                            {c.last ? new Date(c.last).toLocaleDateString('zh-TW') : '-'}
-                          </td>
-                          <td className="py-3 text-[#6b6156]">
-                            {c.joined ? new Date(c.joined).toLocaleDateString('zh-TW') : '-'}
-                          </td>
-                        </tr>
-                      ))}
+                      {customerRows.map((c) => {
+                        const isOpen = expandedUser === c.user_id;
+                        const memberOrders = isOpen
+                          ? orders.filter((o) => o.user_id === c.user_id)
+                          : [];
+                        return (
+                          <Fragment key={c.user_id}>
+                            <tr
+                              className="cursor-pointer border-b border-[#efe8dd] hover:bg-[#faf7f2]"
+                              onClick={() => setExpandedUser(isOpen ? null : c.user_id)}
+                            >
+                              <td className="py-3 pr-4">
+                                <p className="font-semibold">{c.name}</p>
+                                <p className="text-xs text-[#8a7f72]">{c.email}</p>
+                              </td>
+                              <td className="py-3 pr-4">{c.count}</td>
+                              <td className="py-3 pr-4 font-semibold">{formatter.format(c.total)}</td>
+                              <td className="py-3 pr-4 text-[#6b6156]">
+                                {c.last ? new Date(c.last).toLocaleDateString('zh-TW') : '-'}
+                              </td>
+                              <td className="py-3 text-[#6b6156]">
+                                {c.joined ? new Date(c.joined).toLocaleDateString('zh-TW') : '-'}
+                              </td>
+                            </tr>
+                            {isOpen && (
+                              <tr>
+                                <td colSpan={5} className="bg-[#faf7f2] px-4 py-3">
+                                  {memberOrders.length === 0 ? (
+                                    <p className="text-sm text-[#8a7f72]">這位會員還沒有訂單。</p>
+                                  ) : (
+                                    <div className="space-y-1">
+                                      {memberOrders.map((o) => (
+                                        <div key={o.id} className="flex justify-between text-sm">
+                                          <span>
+                                            {o.order_no}{' '}
+                                            <span className="text-[#a99e8f]">
+                                              {o.created_at
+                                                ? new Date(o.created_at).toLocaleDateString('zh-TW')
+                                                : ''}
+                                            </span>
+                                          </span>
+                                          <span>
+                                            <span className="mr-3 text-[#8a7f72]">{o.status}</span>
+                                            {formatter.format(o.total)}
+                                          </span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                </td>
+                              </tr>
+                            )}
+                          </Fragment>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>

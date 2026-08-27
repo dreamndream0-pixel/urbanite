@@ -38,7 +38,7 @@ export default function Home() {
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
   const [cartOpen, setCartOpen] = useState(false);
   const [cart, setCart] = useState<CartItem[]>([]);
-  const [user, setUser] = useState<{ email: string } | null>(null);
+  const [user, setUser] = useState<{ email: string; name: string } | null>(null);
   const [accountOpen, setAccountOpen] = useState(false);
 
   useEffect(() => {
@@ -63,12 +63,16 @@ export default function Home() {
 
   useEffect(() => {
     const supabase = createBrowserSupabase();
-    supabase.auth.getUser().then(({ data }) => {
-      setUser(data.user ? { email: data.user.email ?? '' } : null);
-    });
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ? { email: session.user.email ?? '' } : null);
-    });
+    const map = (u: { email?: string | null; user_metadata?: Record<string, unknown> } | null | undefined) =>
+      u
+        ? {
+            email: u.email ?? '',
+            name:
+              (u.user_metadata?.name as string) || (u.user_metadata?.full_name as string) || '',
+          }
+        : null;
+    supabase.auth.getUser().then(({ data }) => setUser(map(data.user)));
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => setUser(map(session?.user)));
     return () => sub.subscription.unsubscribe();
   }, []);
 
@@ -331,6 +335,7 @@ export default function Home() {
         shipping={shipping}
         subtotal={subtotal}
         total={total}
+        user={user}
         onClose={() => setCartOpen(false)}
         onUpdate={updateCart}
         onClear={() => setCart([])}
@@ -458,6 +463,7 @@ function CartDrawer({
   shipping,
   subtotal,
   total,
+  user,
   onClose,
   onUpdate,
   onClear,
@@ -467,12 +473,21 @@ function CartDrawer({
   shipping: number;
   subtotal: number;
   total: number;
+  user: { email: string; name: string } | null;
   onClose: () => void;
   onUpdate: (id: string, change: number) => void;
   onClear: () => void;
 }) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
+
+  // 登入會員開啟購物車時,自動帶入會員 Email 與姓名(仍可修改為收件人)
+  useEffect(() => {
+    if (user) {
+      setEmail((e) => e || user.email);
+      setName((n) => n || user.name);
+    }
+  }, [user]);
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
   const [discountInput, setDiscountInput] = useState('');
