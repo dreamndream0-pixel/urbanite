@@ -376,20 +376,24 @@ function ProductCard({
   onFavorite: () => void;
   onAdd: () => void;
 }) {
+  const productHref = `/products/${encodeURIComponent(product.id)}`;
+
   return (
     <div className="group flex flex-col">
       <div className="relative aspect-[3/4] overflow-hidden rounded-lg bg-[#e9e1d6]">
-        {product.image ? (
-          <img
-            src={product.image}
-            alt={product.name}
-            className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
-          />
-        ) : (
-          <div className="flex h-full w-full items-center justify-center text-sm text-[#a99]">
-            無圖片
-          </div>
-        )}
+        <Link href={productHref} aria-label={`查看 ${product.name}`}>
+          {product.image ? (
+            <img
+              src={product.image}
+              alt={product.name}
+              className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
+            />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center text-sm text-[#a99]">
+              無圖片
+            </div>
+          )}
+        </Link>
         {product.status !== '上架中' && (
           <span className="absolute left-2 top-2 rounded bg-[#1f1b19] px-2 py-1 text-xs font-medium text-white">
             {product.status}
@@ -404,8 +408,10 @@ function ProductCard({
         </button>
       </div>
       <div className="mt-3 flex flex-1 flex-col">
-        <h3 className="text-sm font-medium leading-5">{product.name}</h3>
-        <p className="mt-1 line-clamp-1 text-xs text-[#8a7f72]">{product.tagline}</p>
+        <Link href={productHref} className="hover:text-[#c84767]">
+          <h3 className="text-sm font-medium leading-5">{product.name}</h3>
+          <p className="mt-1 line-clamp-1 text-xs text-[#8a7f72]">{product.tagline}</p>
+        </Link>
         <div className="mt-2 flex items-center justify-between">
           <div className="flex items-baseline gap-2">
             <span className="font-semibold">{formatter.format(product.price)}</span>
