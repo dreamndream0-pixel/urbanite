@@ -475,6 +475,29 @@ function CartDrawer({
   const [email, setEmail] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
+  const [discountInput, setDiscountInput] = useState('');
+  const [applied, setApplied] = useState<{ code: string; amount: number } | null>(null);
+  const [discountMsg, setDiscountMsg] = useState('');
+
+  const finalTotal = Math.max(0, total - (applied?.amount ?? 0));
+
+  async function applyDiscount() {
+    setDiscountMsg('');
+    if (!discountInput.trim()) return;
+    const res = await fetch('/api/discounts/validate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code: discountInput, subtotal }),
+    });
+    const data = await res.json();
+    if (res.ok) {
+      setApplied({ code: data.code, amount: data.discount });
+      setDiscountMsg(`已套用 ${data.code},折 ${formatter.format(data.discount)}`);
+    } else {
+      setApplied(null);
+      setDiscountMsg(data.error ?? '折扣碼無效');
+    }
+  }
 
   async function submitOrder() {
     setMessage(null);
@@ -494,6 +517,7 @@ function CartDrawer({
         body: JSON.stringify({
           customer_name: name,
           email,
+          discount_code: applied?.code ?? '',
           items: cart.map((item) => ({
             productId: item.productId,
             variant: item.variant,
@@ -509,6 +533,9 @@ function CartDrawer({
         onClear();
         setName('');
         setEmail('');
+        setApplied(null);
+        setDiscountInput('');
+        setDiscountMsg('');
       }
     } catch {
       setMessage({ type: 'err', text: '連線發生問題,請稍後再試' });
@@ -565,10 +592,32 @@ function CartDrawer({
         </div>
 
         <div className="border-t border-[#e5ded4] p-5">
+          <div className="mb-3 flex gap-2">
+            <input
+              value={discountInput}
+              onChange={(e) => setDiscountInput(e.target.value)}
+              placeholder="折扣碼(選填)"
+              className="flex-1 rounded-lg border border-[#e5ded4] px-4 py-2.5 text-sm"
+            />
+            <button
+              onClick={applyDiscount}
+              className="rounded-lg border border-[#1f1b19] px-4 py-2.5 text-sm font-semibold"
+            >
+              套用
+            </button>
+          </div>
+          {discountMsg && (
+            <p className={`mb-3 text-xs ${applied ? 'text-[#1f7a44]' : 'text-[#c0392b]'}`}>
+              {discountMsg}
+            </p>
+          )}
           <div className="space-y-2 text-sm">
             <Row label="小計" value={formatter.format(subtotal)} />
             <Row label="運費" value={shipping === 0 ? '免運' : formatter.format(shipping)} />
-            <Row label="總計" value={formatter.format(total)} strong />
+            {applied && (
+              <Row label={`折扣 ${applied.code}`} value={`-${formatter.format(applied.amount)}`} />
+            )}
+            <Row label="總計" value={formatter.format(finalTotal)} strong />
           </div>
           <div className="mt-4 grid gap-3">
             <input

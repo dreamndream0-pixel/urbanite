@@ -23,6 +23,16 @@ export type SiteSettings = {
   updated_at?: string;
 };
 
+export type Discount = {
+  id: string;
+  code: string;
+  type: string; // percent | amount
+  value: number;
+  min_spend: number;
+  active: boolean;
+  created_at?: string;
+};
+
 export type Category = {
   id: string;
   slug: string;
@@ -47,6 +57,8 @@ export type Order = {
   items: OrderItem[];
   subtotal: number;
   shipping: number;
+  discount: number;
+  discount_code: string;
   total: number;
   status: string;
   paid: boolean;

@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getAdminUser, getSessionUser } from '@/lib/supabase/server';
-import type { Order, OrderItem } from '@/lib/types';
+import { calcDiscount } from '@/lib/discount';
+import type { Discount, Order, OrderItem } from '@/lib/types';
 
 const FREE_SHIPPING_THRESHOLD = 2000;
 const SHIPPING_FEE = 120;
@@ -70,7 +71,25 @@ export async function POST(request: Request) {
   }
 
   const shipping = subtotal >= FREE_SHIPPING_THRESHOLD ? 0 : SHIPPING_FEE;
-  const total = subtotal + shipping;
+
+  // 折扣碼(可選):由後端重新驗證計算,避免竄改
+  let discount = 0;
+  let discountCode = '';
+  const rawCode = String(body?.discount_code ?? '').trim().toUpperCase();
+  if (rawCode) {
+    const { data: d } = await supabase
+      .from('discounts')
+      .select('*')
+      .eq('code', rawCode)
+      .eq('active', true)
+      .maybeSingle();
+    if (d) {
+      discount = calcDiscount(d as Discount, subtotal);
+      if (discount > 0) discountCode = rawCode;
+    }
+  }
+
+  const total = Math.max(0, subtotal + shipping - discount);
   const orderNo = `UB-${Date.now().toString().slice(-8)}`;
 
   // 若客人已登入,把訂單關聯到他的帳號(訪客下單則為 null)
@@ -86,6 +105,8 @@ export async function POST(request: Request) {
       items: orderItems,
       subtotal,
       shipping,
+      discount,
+      discount_code: discountCode,
       total,
       status: '待出貨',
       paid: false,
