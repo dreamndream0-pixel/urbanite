@@ -38,7 +38,7 @@ export default function Home() {
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
   const [cartOpen, setCartOpen] = useState(false);
   const [cart, setCart] = useState<CartItem[]>([]);
-  const [user, setUser] = useState<{ email: string; name: string } | null>(null);
+  const [user, setUser] = useState<{ email: string; name: string; isAdmin: boolean } | null>(null);
   const [accountOpen, setAccountOpen] = useState(false);
 
   useEffect(() => {
@@ -63,16 +63,21 @@ export default function Home() {
 
   useEffect(() => {
     const supabase = createBrowserSupabase();
-    const map = (u: { email?: string | null; user_metadata?: Record<string, unknown> } | null | undefined) =>
-      u
-        ? {
-            email: u.email ?? '',
-            name:
-              (u.user_metadata?.name as string) || (u.user_metadata?.full_name as string) || '',
-          }
-        : null;
-    supabase.auth.getUser().then(({ data }) => setUser(map(data.user)));
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => setUser(map(session?.user)));
+    const refresh = async () => {
+      try {
+        const res = await fetch('/api/me');
+        const data = await res.json();
+        setUser(
+          data?.email
+            ? { email: data.email, name: data.name ?? '', isAdmin: !!data.isAdmin }
+            : null,
+        );
+      } catch {
+        setUser(null);
+      }
+    };
+    refresh();
+    const { data: sub } = supabase.auth.onAuthStateChange(() => refresh());
     return () => sub.subscription.unsubscribe();
   }, []);
 
@@ -211,7 +216,23 @@ export default function Home() {
                 <div className="absolute right-0 top-full z-50 mt-2 w-52 rounded-lg border border-[#e5ded4] bg-white p-2 shadow-lg">
                   {user ? (
                     <>
-                      <p className="truncate px-3 py-2 text-xs text-[#8a7f72]">{user.email}</p>
+                      <div className="px-3 py-2">
+                        <p className="truncate text-xs text-[#8a7f72]">{user.email}</p>
+                        {user.isAdmin && (
+                          <span className="mt-1 inline-block rounded-full bg-[#1f1b19] px-2 py-0.5 text-[10px] font-semibold tracking-wide text-white">
+                            主管理員
+                          </span>
+                        )}
+                      </div>
+                      {user.isAdmin && (
+                        <Link
+                          href="/admin"
+                          onClick={() => setAccountOpen(false)}
+                          className="mb-1 block rounded bg-[#f3ede4] px-3 py-2 text-sm font-semibold hover:bg-[#ece2d5]"
+                        >
+                          進入管理後台
+                        </Link>
+                      )}
                       <Link
                         href="/account"
                         onClick={() => setAccountOpen(false)}
