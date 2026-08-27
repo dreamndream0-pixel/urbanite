@@ -28,6 +28,7 @@ const ALL_TAB: CategoryTab = { slug: 'all', name: '全部', en: 'ALL' };
 export default function Home() {
   const [products, setProducts] = useState<Product[]>([]);
   const [dbCategories, setDbCategories] = useState<Category[]>([]);
+  const [logoUrl, setLogoUrl] = useState('');
   const [loading, setLoading] = useState(true);
   const [category, setCategory] = useState('all');
   const [menuOpen, setMenuOpen] = useState(false);
@@ -48,6 +49,13 @@ export default function Home() {
       .then((res) => (res.ok ? res.json() : []))
       .then((data: Category[]) => setDbCategories(data))
       .catch(() => setDbCategories([]));
+
+    fetch('/api/settings')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((s) => {
+        if (s?.logo_url) setLogoUrl(s.logo_url);
+      })
+      .catch(() => {});
   }, []);
 
   const categoryTabs: CategoryTab[] = [
@@ -131,7 +139,17 @@ export default function Home() {
 
           {/* 中:Logo */}
           <Link href="/" className="justify-self-center px-2 text-center">
-            <span className="font-serif text-2xl italic tracking-wide sm:text-3xl">{STORE_NAME}</span>
+            {logoUrl ? (
+              <img
+                src={logoUrl}
+                alt={STORE_NAME}
+                className="mx-auto h-8 w-auto object-contain sm:h-10"
+              />
+            ) : (
+              <span className="font-serif text-2xl italic tracking-wide sm:text-3xl">
+                {STORE_NAME}
+              </span>
+            )}
           </Link>
 
           {/* 右:圖示列 */}

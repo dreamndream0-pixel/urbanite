@@ -57,11 +57,13 @@ export default function AdminDashboard({
   initialProducts,
   initialOrders,
   initialCategories,
+  initialLogoUrl,
   userEmail,
 }: {
   initialProducts: Product[];
   initialOrders: Order[];
   initialCategories: Category[];
+  initialLogoUrl: string;
   userEmail: string;
 }) {
   const router = useRouter();
@@ -69,6 +71,8 @@ export default function AdminDashboard({
   const [orders, setOrders] = useState<Order[]>(initialOrders);
   const [categories, setCategories] = useState<Category[]>(initialCategories);
   const [newCat, setNewCat] = useState({ slug: '', name: '', en: '' });
+  const [logoUrl, setLogoUrl] = useState(initialLogoUrl);
+  const [uploading, setUploading] = useState(false);
   const [editing, setEditing] = useState<Draft | null>(null);
   const [isNew, setIsNew] = useState(false);
 
@@ -201,6 +205,22 @@ export default function AdminDashboard({
       setCategories((list) => list.filter((c) => c.id !== id));
     } else {
       alert('刪除失敗');
+    }
+  }
+
+  async function uploadLogo(file: File) {
+    setUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      const res = await fetch('/api/settings/logo', { method: 'POST', body: fd });
+      const data = await res.json();
+      if (res.ok) setLogoUrl(data.logo_url);
+      else alert(data.error ?? '上傳失敗');
+    } catch {
+      alert('上傳發生問題');
+    } finally {
+      setUploading(false);
     }
   }
 
@@ -440,6 +460,39 @@ export default function AdminDashboard({
               >
                 新增分類
               </button>
+            </div>
+          </Panel>
+        </div>
+
+        <div className="mt-6">
+          <Panel title="網站設定 · Logo">
+            <div className="flex flex-wrap items-center gap-5">
+              <div className="flex h-16 w-40 items-center justify-center rounded-lg border border-[#ead8d1] bg-white">
+                {logoUrl ? (
+                  <img src={logoUrl} alt="Logo" className="max-h-12 max-w-full object-contain" />
+                ) : (
+                  <span className="text-sm text-[#a99e8f]">目前用文字 Logo</span>
+                )}
+              </div>
+              <div>
+                <label className="inline-block cursor-pointer rounded-full bg-[#251b1f] px-4 py-2 text-sm font-semibold text-white">
+                  {uploading ? '上傳中…' : '上傳 Logo 圖片'}
+                  <input
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp,image/svg+xml,image/gif"
+                    className="hidden"
+                    disabled={uploading}
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      if (f) uploadLogo(f);
+                      e.target.value = '';
+                    }}
+                  />
+                </label>
+                <p className="mt-2 max-w-xs text-xs text-[#8a7f72]">
+                  PNG / JPG / WEBP / SVG,建議寬版、透明背景,小於 3MB。上傳後首頁 Logo 會立即更新。
+                </p>
+              </div>
             </div>
           </Panel>
         </div>

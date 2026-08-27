@@ -17,6 +17,12 @@ export type Product = {
   created_at?: string;
 };
 
+export type SiteSettings = {
+  id: number;
+  logo_url: string;
+  updated_at?: string;
+};
+
 export type Category = {
   id: string;
   slug: string;

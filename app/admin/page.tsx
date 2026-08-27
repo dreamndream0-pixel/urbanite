@@ -20,17 +20,20 @@ export default async function AdminPage() {
 
   // 已是管理員 → 讀取初始資料並顯示後台
   const supabase = createAdminClient();
-  const [{ data: products }, { data: orders }, { data: categories }] = await Promise.all([
-    supabase.from('products').select('*').order('sort_order', { ascending: true }),
-    supabase.from('orders').select('*').order('created_at', { ascending: false }),
-    supabase.from('categories').select('*').order('sort_order', { ascending: true }),
-  ]);
+  const [{ data: products }, { data: orders }, { data: categories }, { data: settings }] =
+    await Promise.all([
+      supabase.from('products').select('*').order('sort_order', { ascending: true }),
+      supabase.from('orders').select('*').order('created_at', { ascending: false }),
+      supabase.from('categories').select('*').order('sort_order', { ascending: true }),
+      supabase.from('site_settings').select('*').eq('id', 1).maybeSingle(),
+    ]);
 
   return (
     <AdminDashboard
       initialProducts={(products ?? []) as Product[]}
       initialOrders={(orders ?? []) as Order[]}
       initialCategories={(categories ?? []) as Category[]}
+      initialLogoUrl={settings?.logo_url ?? ''}
       userEmail={user.email ?? ''}
     />
   );
