@@ -85,6 +85,7 @@ export default function AdminDashboard({
 }) {
   const router = useRouter();
   const [section, setSection] = useState<SectionKey>('overview');
+  const [menuOpen, setMenuOpen] = useState(false);
   const [products, setProducts] = useState<Product[]>(initialProducts);
   const [orders, setOrders] = useState<Order[]>(initialOrders);
   const [categories, setCategories] = useState<Category[]>(initialCategories);
@@ -302,57 +303,108 @@ export default function AdminDashboard({
   const activeNav = NAV.find((n) => n.key === section) ?? NAV[0];
 
   return (
-    <div className="min-h-screen bg-[#f6f2ec] text-[#1f1b19] lg:flex">
-      {/* 側邊欄 */}
-      <aside className="shrink-0 border-b border-[#e5ded4] bg-white lg:h-screen lg:w-60 lg:border-b-0 lg:border-r lg:sticky lg:top-0">
-        <div className="flex items-center gap-2 px-5 py-4">
-          {logoUrl ? (
-            <img src={logoUrl} alt="Logo" className="h-7 w-auto object-contain" />
-          ) : (
-            <span className="font-serif text-lg italic">URBANITE</span>
-          )}
-          <span className="rounded bg-[#f3ede4] px-1.5 py-0.5 text-[10px] font-semibold text-[#8a7f72]">
-            ADMIN
-          </span>
+    <div className="min-h-screen bg-[#f6f2ec] text-[#1f1b19]">
+      <header className="sticky top-0 z-30 border-b border-[#e5ded4] bg-[#faf7f2]/95 backdrop-blur">
+        <nav className="mx-auto grid max-w-7xl grid-cols-[1fr_auto_1fr] items-center px-4 py-4 sm:px-6">
+          <div className="flex items-center">
+            <button
+              onClick={() => setMenuOpen(true)}
+              aria-label="開啟後台選單"
+              className="rounded-md p-1 text-[#1f1b19] hover:bg-[#efe8dd]"
+            >
+              <IconMenu />
+            </button>
+          </div>
+
+          <Link href="/admin" className="justify-self-center px-2 text-center">
+            {logoUrl ? (
+              <img src={logoUrl} alt="Logo" className="mx-auto h-8 w-auto object-contain sm:h-10" />
+            ) : (
+              <span className="font-serif text-2xl italic tracking-wide sm:text-3xl">URBANITE</span>
+            )}
+          </Link>
+
+          <div className="flex items-center justify-end gap-2">
+            <div className="flex min-w-0 items-center gap-2 rounded-full border border-[#e5ded4] bg-white px-3 py-1.5">
+              <IconUser />
+              <span className="hidden max-w-40 truncate text-xs font-medium text-[#6b6156] sm:inline">
+                {userEmail}
+              </span>
+            </div>
+          </div>
+        </nav>
+      </header>
+
+      <div
+        className={`fixed inset-0 z-40 bg-black/30 transition-opacity duration-300 ${
+          menuOpen ? 'opacity-100' : 'pointer-events-none opacity-0'
+        }`}
+        onClick={() => setMenuOpen(false)}
+      />
+      <aside
+        className={`fixed inset-y-0 left-0 z-50 flex w-full max-w-xs flex-col bg-[#faf7f2] shadow-2xl transition-transform duration-300 ${
+          menuOpen ? 'translate-x-0' : '-translate-x-full'
+        }`}
+      >
+        <div className="flex items-center justify-between border-b border-[#e5ded4] px-5 py-4">
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-semibold tracking-[0.2em] text-[#8a7f72]">ADMIN</span>
+            <span className="rounded bg-[#f3ede4] px-1.5 py-0.5 text-[10px] font-semibold text-[#8a7f72]">
+              {activeNav.label}
+            </span>
+          </div>
+          <button onClick={() => setMenuOpen(false)} aria-label="關閉選單" className="rounded-md p-1 hover:bg-[#efe8dd]">
+            <IconClose />
+          </button>
         </div>
-        <nav className="flex gap-1 overflow-x-auto px-3 pb-3 lg:flex-col lg:gap-0.5 lg:pb-4">
+        <nav className="flex flex-col gap-1 p-3">
           {NAV.map((n) => (
             <button
               key={n.key}
-              onClick={() => setSection(n.key)}
-              className={`flex shrink-0 items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition ${
+              onClick={() => {
+                setSection(n.key);
+                setMenuOpen(false);
+              }}
+              className={`flex items-center gap-3 rounded-lg px-3 py-3 text-left text-sm font-medium transition ${
                 section === n.key
                   ? 'bg-[#1f1b19] text-white'
                   : 'text-[#6b6156] hover:bg-[#f3ede4]'
               }`}
             >
               <n.Icon />
-              <span className="whitespace-nowrap">{n.label}</span>
+              <span>{n.label}</span>
             </button>
           ))}
         </nav>
+        <div className="mt-auto border-t border-[#e5ded4] p-3">
+          <Link
+            href="/"
+            className="block rounded-lg px-3 py-3 text-sm font-semibold text-[#6b6156] hover:bg-[#f3ede4]"
+          >
+            看前台
+          </Link>
+          <button
+            onClick={signOut}
+            className="mt-1 block w-full rounded-lg px-3 py-3 text-left text-sm font-semibold text-[#c84767] hover:bg-[#f3ede4]"
+          >
+            登出
+          </button>
+        </div>
       </aside>
 
       {/* 主內容 */}
-      <div className="flex-1">
-        <header className="sticky top-0 z-20 flex items-center justify-between border-b border-[#e5ded4] bg-[#faf7f2] px-4 py-3 sm:px-6">
-          <h1 className="text-lg font-semibold">{activeNav.label}</h1>
-          <div className="flex items-center gap-2">
-            <span className="hidden text-sm text-[#8a7f72] sm:inline">{userEmail}</span>
+      <div>
+        <div className="border-b border-[#e5ded4] bg-[#faf7f2] px-4 py-4 sm:px-6">
+          <div className="mx-auto flex max-w-5xl items-center justify-between gap-3">
+            <h1 className="text-lg font-semibold">{activeNav.label}</h1>
             <Link
               href="/"
               className="rounded-full border border-[#e5ded4] bg-white px-3 py-1.5 text-sm font-medium text-[#6b6156] hover:bg-[#efe8dd]"
             >
               看前台
             </Link>
-            <button
-              onClick={signOut}
-              className="rounded-full bg-[#1f1b19] px-3 py-1.5 text-sm font-semibold text-white"
-            >
-              登出
-            </button>
           </div>
-        </header>
+        </div>
 
         <main className="mx-auto max-w-5xl px-4 py-6 sm:px-6">
           {/* ===== 總覽 ===== */}
@@ -1102,6 +1154,32 @@ const svgProps = {
   strokeLinecap: 'round' as const,
   strokeLinejoin: 'round' as const,
 };
+
+function IconMenu() {
+  return (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
+      <path d="M4 7h16M4 12h16M4 17h16" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function IconClose() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+      <path d="M6 6l12 12M18 6 6 18" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function IconUser() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
+      <circle cx="12" cy="8" r="4" />
+      <path d="M4 21c0-4 3.5-6 8-6s8 2 8 6" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 function IconGrid() {
   return (
     <svg {...svgProps}>
