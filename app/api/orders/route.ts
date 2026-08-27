@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { getAdminUser } from '@/lib/supabase/server';
+import { getAdminUser, getSessionUser } from '@/lib/supabase/server';
 import type { Order, OrderItem } from '@/lib/types';
 
 const FREE_SHIPPING_THRESHOLD = 2000;
@@ -73,6 +73,9 @@ export async function POST(request: Request) {
   const total = subtotal + shipping;
   const orderNo = `UB-${Date.now().toString().slice(-8)}`;
 
+  // 若客人已登入,把訂單關聯到他的帳號(訪客下單則為 null)
+  const user = await getSessionUser();
+
   // 寫入訂單
   const { data: order, error: orderErr } = await supabase
     .from('orders')
@@ -86,6 +89,7 @@ export async function POST(request: Request) {
       total,
       status: '待出貨',
       paid: false,
+      user_id: user?.id ?? null,
     })
     .select()
     .single();

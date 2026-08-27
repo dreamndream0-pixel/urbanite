@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
+import { createBrowserSupabase } from '@/lib/supabase/client';
 import type { Product, Category } from '@/lib/types';
 
 type CartItem = {
@@ -37,6 +38,8 @@ export default function Home() {
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
   const [cartOpen, setCartOpen] = useState(false);
   const [cart, setCart] = useState<CartItem[]>([]);
+  const [user, setUser] = useState<{ email: string } | null>(null);
+  const [accountOpen, setAccountOpen] = useState(false);
 
   useEffect(() => {
     fetch('/api/products')
@@ -57,6 +60,31 @@ export default function Home() {
       })
       .catch(() => {});
   }, []);
+
+  useEffect(() => {
+    const supabase = createBrowserSupabase();
+    supabase.auth.getUser().then(({ data }) => {
+      setUser(data.user ? { email: data.user.email ?? '' } : null);
+    });
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ? { email: session.user.email ?? '' } : null);
+    });
+    return () => sub.subscription.unsubscribe();
+  }, []);
+
+  async function signIn() {
+    const supabase = createBrowserSupabase();
+    await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo: `${window.location.origin}/auth/callback?next=/` },
+    });
+  }
+
+  async function signOut() {
+    await createBrowserSupabase().auth.signOut();
+    setUser(null);
+    setAccountOpen(false);
+  }
 
   const categoryTabs: CategoryTab[] = [
     ALL_TAB,
@@ -167,9 +195,44 @@ export default function Home() {
             >
               <IconHeart filled={favorites.size > 0} />
             </button>
-            <Link href="/admin" aria-label="我的帳號" className="rounded-md p-2 hover:bg-[#efe8dd]">
-              <IconUser />
-            </Link>
+            <div className="relative">
+              <button
+                onClick={() => setAccountOpen((v) => !v)}
+                aria-label="我的帳號"
+                className="rounded-md p-2 hover:bg-[#efe8dd]"
+              >
+                <IconUser />
+              </button>
+              {accountOpen && (
+                <div className="absolute right-0 top-full z-50 mt-2 w-52 rounded-lg border border-[#e5ded4] bg-white p-2 shadow-lg">
+                  {user ? (
+                    <>
+                      <p className="truncate px-3 py-2 text-xs text-[#8a7f72]">{user.email}</p>
+                      <Link
+                        href="/account"
+                        onClick={() => setAccountOpen(false)}
+                        className="block rounded px-3 py-2 text-sm hover:bg-[#f6f2ec]"
+                      >
+                        我的訂單
+                      </Link>
+                      <button
+                        onClick={signOut}
+                        className="block w-full rounded px-3 py-2 text-left text-sm hover:bg-[#f6f2ec]"
+                      >
+                        登出
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      onClick={signIn}
+                      className="block w-full rounded px-3 py-2 text-left text-sm hover:bg-[#f6f2ec]"
+                    >
+                      使用 Google 登入
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
             <button
               onClick={() => setCartOpen(true)}
               aria-label="購物車"

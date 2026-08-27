@@ -25,6 +25,15 @@ export async function createServerSupabase() {
   });
 }
 
+// 取得目前登入者(任何登入的客人或管理員;未登入回 null)。
+export async function getSessionUser() {
+  const supabase = await createServerSupabase();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  return user ?? null;
+}
+
 // 判斷目前登入者是否為管理員(email 在白名單內)。
 export async function getAdminUser() {
   const supabase = await createServerSupabase();
