@@ -499,16 +499,8 @@ function CartDrawer({
   onUpdate: (id: string, change: number) => void;
   onClear: () => void;
 }) {
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-
-  // 登入會員開啟購物車時,自動帶入會員 Email 與姓名(仍可修改為收件人)
-  useEffect(() => {
-    if (user) {
-      setEmail((e) => e || user.email);
-      setName((n) => n || user.name);
-    }
-  }, [user]);
+  const [name, setName] = useState<string | null>(null);
+  const [email, setEmail] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
   const [discountInput, setDiscountInput] = useState('');
@@ -516,6 +508,8 @@ function CartDrawer({
   const [discountMsg, setDiscountMsg] = useState('');
 
   const finalTotal = Math.max(0, total - (applied?.amount ?? 0));
+  const checkoutEmail = email ?? user?.email ?? '';
+  const checkoutName = name ?? user?.name ?? '';
 
   async function applyDiscount() {
     setDiscountMsg('');
@@ -541,7 +535,7 @@ function CartDrawer({
       setMessage({ type: 'err', text: '購物車是空的' });
       return;
     }
-    if (!name || !email) {
+    if (!checkoutName || !checkoutEmail) {
       setMessage({ type: 'err', text: '請填寫 Email 與收件人姓名' });
       return;
     }
@@ -551,8 +545,8 @@ function CartDrawer({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          customer_name: name,
-          email,
+          customer_name: checkoutName,
+          email: checkoutEmail,
           discount_code: applied?.code ?? '',
           items: cart.map((item) => ({
             productId: item.productId,
@@ -567,8 +561,8 @@ function CartDrawer({
       } else {
         setMessage({ type: 'ok', text: `訂單成立!單號 ${data.order_no}` });
         onClear();
-        setName('');
-        setEmail('');
+        setName(null);
+        setEmail(null);
         setApplied(null);
         setDiscountInput('');
         setDiscountMsg('');
@@ -659,13 +653,13 @@ function CartDrawer({
             <input
               className="rounded-lg border border-[#e5ded4] px-4 py-3"
               placeholder="Email"
-              value={email}
+              value={checkoutEmail}
               onChange={(e) => setEmail(e.target.value)}
             />
             <input
               className="rounded-lg border border-[#e5ded4] px-4 py-3"
               placeholder="收件人姓名"
-              value={name}
+              value={checkoutName}
               onChange={(e) => setName(e.target.value)}
             />
             {message && (

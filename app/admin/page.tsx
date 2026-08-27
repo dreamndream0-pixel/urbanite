@@ -1,4 +1,5 @@
-import { getAdminUser } from '@/lib/supabase/server';
+import { redirect } from 'next/navigation';
+import { getAdminUser, getSessionUser } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import LoginPanel from './LoginPanel';
 import AdminDashboard from './AdminDashboard';
@@ -11,9 +12,15 @@ export default async function AdminPage() {
     process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
   );
 
-  const user = configured ? await getAdminUser() : null;
+  const sessionUser = configured ? await getSessionUser() : null;
+  const user = sessionUser ? await getAdminUser() : null;
 
-  // 未設定 Supabase,或未登入 / 非管理員 → 顯示登入畫面
+  // 已登入但不是管理員時回到前台,避免 OAuth 登入後卡在後台登入頁。
+  if (sessionUser && !user) {
+    redirect('/');
+  }
+
+  // 未設定 Supabase,或尚未登入 → 顯示登入畫面
   if (!user) {
     return <LoginPanel configured={configured} />;
   }
