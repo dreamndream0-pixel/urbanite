@@ -20,6 +20,14 @@ export type Product = {
 export type SiteSettings = {
   id: number;
   logo_url: string;
+  footer_about_links?: string[];
+  footer_service_links?: string[];
+  footer_service_hours?: string;
+  footer_email?: string;
+  footer_company_name?: string;
+  footer_tax_id?: string;
+  footer_instagram_url?: string;
+  footer_line_url?: string;
   updated_at?: string;
 };
 

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { createBrowserSupabase } from '@/lib/supabase/client';
-import type { Product, Category } from '@/lib/types';
+import type { Product, Category, SiteSettings } from '@/lib/types';
 
 type CartItem = {
   id: string;
@@ -30,6 +30,7 @@ export default function Home() {
   const [products, setProducts] = useState<Product[]>([]);
   const [dbCategories, setDbCategories] = useState<Category[]>([]);
   const [logoUrl, setLogoUrl] = useState('');
+  const [settings, setSettings] = useState<SiteSettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [category, setCategory] = useState('all');
   const [menuOpen, setMenuOpen] = useState(false);
@@ -57,6 +58,7 @@ export default function Home() {
       .then((res) => (res.ok ? res.json() : null))
       .then((s) => {
         if (s?.logo_url) setLogoUrl(s.logo_url);
+        if (s) setSettings(s);
       })
       .catch(() => {});
   }, []);
@@ -200,7 +202,7 @@ export default function Home() {
             </button>
             <button
               aria-label="收藏"
-              className="hidden rounded-md p-2 hover:bg-[#efe8dd] sm:block"
+              className="rounded-md p-2 hover:bg-[#efe8dd]"
             >
               <IconStar filled={favorites.size > 0} />
             </button>
@@ -291,8 +293,7 @@ export default function Home() {
 
       {/* 標題 */}
       <section className="mx-auto max-w-7xl px-4 pb-4 pt-10 text-center sm:px-6 sm:pt-14">
-        <p className="text-xs font-semibold tracking-[0.3em] text-[#8a7f72]">SHOP</p>
-        <h1 className="mt-3 text-4xl font-semibold tracking-[0.15em] sm:text-5xl">
+        <h1 className="text-4xl font-semibold tracking-[0.15em] sm:text-5xl">
           {activeCategory.slug === 'all' ? '全部商品' : activeCategory.name}
         </h1>
       </section>
@@ -339,6 +340,8 @@ export default function Home() {
         )}
       </section>
 
+      <Footer settings={settings} />
+
       {/* 左側分類選單 */}
       <SideMenu
         open={menuOpen}
@@ -364,6 +367,78 @@ export default function Home() {
         onClear={() => setCart([])}
       />
     </main>
+  );
+}
+
+function Footer({ settings }: { settings: SiteSettings | null }) {
+  const aboutLinks = settings?.footer_about_links?.length
+    ? settings.footer_about_links
+    : ['優惠資訊 / Coupon', '商店介紹 / Introduction', '與我們合作 / Cooperation'];
+  const serviceLinks = settings?.footer_service_links?.length
+    ? settings.footer_service_links
+    : [
+        '加入會員享折扣 / VIP',
+        '挑選尺寸 / About Size',
+        '購物須知 / How To Buy',
+        '退換貨政策 / After-sales Service',
+        '使用者條款 / Terms',
+        '隱私權政策 / Privacy',
+      ];
+
+  return (
+    <footer className="border-t border-[#e5ded4] bg-white px-8 py-12 text-[#2c2826] sm:px-10">
+      <div className="mx-auto grid max-w-7xl gap-14 sm:grid-cols-3">
+        <FooterGroup title="關於我們 ABOUT US" items={aboutLinks} />
+        <FooterGroup title="顧客服務 SERVICE" items={serviceLinks} />
+        <section>
+          <h2 className="text-2xl font-bold tracking-wide">尋找我們 FOLLOW US</h2>
+          <div className="mt-8 space-y-3 text-lg leading-7 text-[#494541]">
+            {settings?.footer_service_hours && <p>服務時間：{settings.footer_service_hours}</p>}
+            {settings?.footer_email && <p>信箱:{settings.footer_email}</p>}
+            {settings?.footer_company_name && <p>公司名稱：{settings.footer_company_name}</p>}
+            {settings?.footer_tax_id && <p>統一編號：{settings.footer_tax_id}</p>}
+          </div>
+          <div className="mt-5 flex gap-3">
+            {settings?.footer_line_url && (
+              <a
+                href={settings.footer_line_url}
+                className="flex h-12 w-12 items-center justify-center border border-[#e5ded4] text-sm font-semibold"
+                target="_blank"
+                rel="noreferrer"
+              >
+                LINE
+              </a>
+            )}
+            {settings?.footer_instagram_url && (
+              <a
+                href={settings.footer_instagram_url}
+                className="flex h-12 w-12 items-center justify-center border border-[#1f1b19] text-2xl font-semibold"
+                target="_blank"
+                rel="noreferrer"
+                aria-label="Instagram"
+              >
+                ◎
+              </a>
+            )}
+          </div>
+        </section>
+      </div>
+    </footer>
+  );
+}
+
+function FooterGroup({ title, items }: { title: string; items: string[] }) {
+  return (
+    <section>
+      <h2 className="text-2xl font-bold tracking-wide">{title}</h2>
+      <nav className="mt-8 space-y-4 text-lg leading-7 text-[#494541]">
+        {items.map((item, index) => (
+          <a key={`${item}-${index}`} href="#" className={index === 0 ? 'block text-[#b64b43]' : 'block'}>
+            {item}
+          </a>
+        ))}
+      </nav>
+    </section>
   );
 }
 

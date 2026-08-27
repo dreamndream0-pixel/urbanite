@@ -2,7 +2,7 @@ import { redirect } from 'next/navigation';
 import { getAdminUser, getSessionUser } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import AdminDashboard from './AdminDashboard';
-import type { Category, Customer, Discount, Order, Product } from '@/lib/types';
+import type { Category, Customer, Discount, Order, Product, SiteSettings } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
 
@@ -50,6 +50,7 @@ export default async function AdminPage() {
       initialDiscounts={(discounts ?? []) as Discount[]}
       initialCustomers={(customers ?? []) as Customer[]}
       initialLogoUrl={settings?.logo_url ?? ''}
+      initialSettings={settings as SiteSettings | null}
       userEmail={user.email ?? ''}
     />
   );

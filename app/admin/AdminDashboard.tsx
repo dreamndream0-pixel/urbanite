@@ -4,7 +4,7 @@ import { Fragment, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createBrowserSupabase } from '@/lib/supabase/client';
-import type { Category, Customer, Discount, Order, Product } from '@/lib/types';
+import type { Category, Customer, Discount, Order, Product, SiteSettings } from '@/lib/types';
 
 const formatter = new Intl.NumberFormat('zh-TW', {
   style: 'currency',
@@ -73,6 +73,7 @@ export default function AdminDashboard({
   initialDiscounts,
   initialCustomers,
   initialLogoUrl,
+  initialSettings,
   userEmail,
 }: {
   initialProducts: Product[];
@@ -81,6 +82,7 @@ export default function AdminDashboard({
   initialDiscounts: Discount[];
   initialCustomers: Customer[];
   initialLogoUrl: string;
+  initialSettings: SiteSettings | null;
   userEmail: string;
 }) {
   const router = useRouter();
@@ -94,6 +96,28 @@ export default function AdminDashboard({
   const [newCat, setNewCat] = useState({ slug: '', name: '', en: '' });
   const [newDiscount, setNewDiscount] = useState({ code: '', type: 'percent', value: 0, min_spend: 0 });
   const [logoUrl, setLogoUrl] = useState(initialLogoUrl);
+  const [footerDraft, setFooterDraft] = useState({
+    about: (initialSettings?.footer_about_links ?? [
+      '優惠資訊 / Coupon',
+      '商店介紹 / Introduction',
+      '與我們合作 / Cooperation',
+    ]).join('\n'),
+    service: (initialSettings?.footer_service_links ?? [
+      '加入會員享折扣 / VIP',
+      '挑選尺寸 / About Size',
+      '購物須知 / How To Buy',
+      '退換貨政策 / After-sales Service',
+      '使用者條款 / Terms',
+      '隱私權政策 / Privacy',
+    ]).join('\n'),
+    serviceHours: initialSettings?.footer_service_hours ?? '上班日 11:00 - 18:00',
+    email: initialSettings?.footer_email ?? '',
+    companyName: initialSettings?.footer_company_name ?? '',
+    taxId: initialSettings?.footer_tax_id ?? '',
+    instagramUrl: initialSettings?.footer_instagram_url ?? '',
+    lineUrl: initialSettings?.footer_line_url ?? '',
+  });
+  const [savingSettings, setSavingSettings] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [editing, setEditing] = useState<Draft | null>(null);
   const [isNew, setIsNew] = useState(false);
@@ -297,6 +321,38 @@ export default function AdminDashboard({
       alert('上傳發生問題');
     } finally {
       setUploading(false);
+    }
+  }
+
+  async function saveFooterSettings() {
+    setSavingSettings(true);
+    try {
+      const toLines = (value: string) =>
+        value
+          .split('\n')
+          .map((line) => line.trim())
+          .filter(Boolean);
+      const res = await fetch('/api/settings', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          footer_about_links: toLines(footerDraft.about),
+          footer_service_links: toLines(footerDraft.service),
+          footer_service_hours: footerDraft.serviceHours.trim(),
+          footer_email: footerDraft.email.trim(),
+          footer_company_name: footerDraft.companyName.trim(),
+          footer_tax_id: footerDraft.taxId.trim(),
+          footer_instagram_url: footerDraft.instagramUrl.trim(),
+          footer_line_url: footerDraft.lineUrl.trim(),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? '儲存失敗');
+      alert('頁尾資訊已更新');
+    } catch (error) {
+      alert(error instanceof Error ? error.message : '儲存失敗');
+    } finally {
+      setSavingSettings(false);
     }
   }
 
@@ -888,36 +944,112 @@ export default function AdminDashboard({
 
           {/* ===== 系統設定 ===== */}
           {section === 'settings' && (
-            <Card title="網站 Logo">
-              <div className="flex flex-wrap items-center gap-5">
-                <div className="flex h-16 w-40 items-center justify-center rounded-lg border border-[#e5ded4] bg-white">
-                  {logoUrl ? (
-                    <img src={logoUrl} alt="Logo" className="max-h-12 max-w-full object-contain" />
-                  ) : (
-                    <span className="text-sm text-[#a99e8f]">目前用文字 Logo</span>
-                  )}
+            <div className="space-y-6">
+              <Card title="網站 Logo">
+                <div className="flex flex-wrap items-center gap-5">
+                  <div className="flex h-16 w-40 items-center justify-center rounded-lg border border-[#e5ded4] bg-white">
+                    {logoUrl ? (
+                      <img src={logoUrl} alt="Logo" className="max-h-12 max-w-full object-contain" />
+                    ) : (
+                      <span className="text-sm text-[#a99e8f]">目前用文字 Logo</span>
+                    )}
+                  </div>
+                  <div>
+                    <label className="inline-block cursor-pointer rounded-full bg-[#1f1b19] px-4 py-2 text-sm font-semibold text-white">
+                      {uploading ? '上傳中…' : '上傳 Logo 圖片'}
+                      <input
+                        type="file"
+                        accept="image/png,image/jpeg,image/webp,image/svg+xml,image/gif"
+                        className="hidden"
+                        disabled={uploading}
+                        onChange={(e) => {
+                          const f = e.target.files?.[0];
+                          if (f) uploadLogo(f);
+                          e.target.value = '';
+                        }}
+                      />
+                    </label>
+                    <p className="mt-2 max-w-xs text-xs text-[#8a7f72]">
+                      PNG / JPG / WEBP / SVG,建議寬版、透明背景,小於 3MB。上傳後首頁與後台 Logo 都會更新。
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <label className="inline-block cursor-pointer rounded-full bg-[#1f1b19] px-4 py-2 text-sm font-semibold text-white">
-                    {uploading ? '上傳中…' : '上傳 Logo 圖片'}
-                    <input
-                      type="file"
-                      accept="image/png,image/jpeg,image/webp,image/svg+xml,image/gif"
-                      className="hidden"
-                      disabled={uploading}
-                      onChange={(e) => {
-                        const f = e.target.files?.[0];
-                        if (f) uploadLogo(f);
-                        e.target.value = '';
-                      }}
+              </Card>
+
+              <Card
+                title="頁尾資訊"
+                action={
+                  <button
+                    onClick={saveFooterSettings}
+                    disabled={savingSettings}
+                    className="rounded-full bg-[#1f1b19] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+                  >
+                    {savingSettings ? '儲存中...' : '儲存頁尾'}
+                  </button>
+                }
+              >
+                <div className="grid gap-4 lg:grid-cols-2">
+                  <Field label="關於我們連結(一行一筆)">
+                    <textarea
+                      value={footerDraft.about}
+                      onChange={(e) => setFooterDraft({ ...footerDraft, about: e.target.value })}
+                      rows={5}
+                      className="w-full rounded-lg border border-[#e5ded4] px-3 py-2"
                     />
-                  </label>
-                  <p className="mt-2 max-w-xs text-xs text-[#8a7f72]">
-                    PNG / JPG / WEBP / SVG,建議寬版、透明背景,小於 3MB。上傳後首頁與後台 Logo 都會更新。
-                  </p>
+                  </Field>
+                  <Field label="顧客服務連結(一行一筆)">
+                    <textarea
+                      value={footerDraft.service}
+                      onChange={(e) => setFooterDraft({ ...footerDraft, service: e.target.value })}
+                      rows={5}
+                      className="w-full rounded-lg border border-[#e5ded4] px-3 py-2"
+                    />
+                  </Field>
+                  <Field label="服務時間">
+                    <input
+                      value={footerDraft.serviceHours}
+                      onChange={(e) => setFooterDraft({ ...footerDraft, serviceHours: e.target.value })}
+                      className="w-full rounded-lg border border-[#e5ded4] px-3 py-2"
+                    />
+                  </Field>
+                  <Field label="信箱">
+                    <input
+                      value={footerDraft.email}
+                      onChange={(e) => setFooterDraft({ ...footerDraft, email: e.target.value })}
+                      className="w-full rounded-lg border border-[#e5ded4] px-3 py-2"
+                    />
+                  </Field>
+                  <Field label="公司名稱">
+                    <input
+                      value={footerDraft.companyName}
+                      onChange={(e) => setFooterDraft({ ...footerDraft, companyName: e.target.value })}
+                      className="w-full rounded-lg border border-[#e5ded4] px-3 py-2"
+                    />
+                  </Field>
+                  <Field label="統一編號">
+                    <input
+                      value={footerDraft.taxId}
+                      onChange={(e) => setFooterDraft({ ...footerDraft, taxId: e.target.value })}
+                      className="w-full rounded-lg border border-[#e5ded4] px-3 py-2"
+                    />
+                  </Field>
+                  <Field label="Instagram 連結">
+                    <input
+                      value={footerDraft.instagramUrl}
+                      onChange={(e) => setFooterDraft({ ...footerDraft, instagramUrl: e.target.value })}
+                      className="w-full rounded-lg border border-[#e5ded4] px-3 py-2"
+                    />
+                  </Field>
+                  <Field label="LINE 連結">
+                    <input
+                      value={footerDraft.lineUrl}
+                      onChange={(e) => setFooterDraft({ ...footerDraft, lineUrl: e.target.value })}
+                      className="w-full rounded-lg border border-[#e5ded4] px-3 py-2"
+                    />
+                  </Field>
                 </div>
-              </div>
-            </Card>
+              </Card>
+            </div>
           )}
         </main>
       </div>

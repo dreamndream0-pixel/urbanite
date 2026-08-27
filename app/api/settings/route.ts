@@ -1,6 +1,27 @@
 import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { getAdminUser } from '@/lib/supabase/server';
 import type { SiteSettings } from '@/lib/types';
+
+const DEFAULT_SETTINGS: SiteSettings = {
+  id: 1,
+  logo_url: '',
+  footer_about_links: ['優惠資訊 / Coupon', '商店介紹 / Introduction', '與我們合作 / Cooperation'],
+  footer_service_links: [
+    '加入會員享折扣 / VIP',
+    '挑選尺寸 / About Size',
+    '購物須知 / How To Buy',
+    '退換貨政策 / After-sales Service',
+    '使用者條款 / Terms',
+    '隱私權政策 / Privacy',
+  ],
+  footer_service_hours: '上班日 11:00 - 18:00',
+  footer_email: '',
+  footer_company_name: '',
+  footer_tax_id: '',
+  footer_instagram_url: '',
+  footer_line_url: '',
+};
 
 // GET /api/settings — 取得網站設定(前台與後台共用,公開)
 export async function GET() {
@@ -11,5 +32,42 @@ export async function GET() {
     .eq('id', 1)
     .single();
 
-  return NextResponse.json((data ?? { id: 1, logo_url: '' }) as SiteSettings);
+  return NextResponse.json({ ...DEFAULT_SETTINGS, ...(data ?? {}) } as SiteSettings);
+}
+
+// PATCH /api/settings — 更新網站設定(限管理員)
+export async function PATCH(request: Request) {
+  const admin = await getAdminUser();
+  if (!admin) return NextResponse.json({ error: '未授權' }, { status: 401 });
+
+  const body = (await request.json()) as Record<string, unknown>;
+  const update: Record<string, unknown> = {
+    id: 1,
+    updated_at: new Date().toISOString(),
+  };
+
+  const keys = [
+    'footer_about_links',
+    'footer_service_links',
+    'footer_service_hours',
+    'footer_email',
+    'footer_company_name',
+    'footer_tax_id',
+    'footer_instagram_url',
+    'footer_line_url',
+  ] as const;
+
+  for (const key of keys) {
+    if (key in body) update[key] = body[key];
+  }
+
+  const supabase = createAdminClient();
+  const { data, error } = await supabase
+    .from('site_settings')
+    .upsert(update)
+    .select()
+    .single();
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  return NextResponse.json({ ...DEFAULT_SETTINGS, ...data } as SiteSettings);
 }

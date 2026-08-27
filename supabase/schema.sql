@@ -66,3 +66,27 @@ values
    'https://images.unsplash.com/photo-1596462502278-27bfdc403348?auto=format&fit=crop&w=1200&q=80',
    '{Rose}', '{}', false, 3)
 on conflict (id) do nothing;
+
+-- ---------- 網站設定 ----------
+create table if not exists public.site_settings (
+  id                   integer primary key default 1,
+  logo_url             text default '',
+  footer_about_links   jsonb not null default '["優惠資訊 / Coupon","商店介紹 / Introduction","與我們合作 / Cooperation"]',
+  footer_service_links jsonb not null default '["加入會員享折扣 / VIP","挑選尺寸 / About Size","購物須知 / How To Buy","退換貨政策 / After-sales Service","使用者條款 / Terms","隱私權政策 / Privacy"]',
+  footer_service_hours text default '上班日 11:00 - 18:00',
+  footer_email         text default '',
+  footer_company_name  text default '',
+  footer_tax_id        text default '',
+  footer_instagram_url text default '',
+  footer_line_url      text default '',
+  updated_at           timestamptz default now(),
+  constraint single_row check (id = 1)
+);
+
+insert into public.site_settings (id) values (1) on conflict (id) do nothing;
+
+alter table public.site_settings enable row level security;
+drop policy if exists "settings public read" on public.site_settings;
+create policy "settings public read"
+  on public.site_settings for select
+  using (true);
