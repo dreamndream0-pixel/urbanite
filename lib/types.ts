@@ -8,6 +8,7 @@ export type Product = {
   original_price: number | null;
   inventory: number;
   status: string;
+  category: string;
   image: string;
   colors: string[];
   sizes: string[];

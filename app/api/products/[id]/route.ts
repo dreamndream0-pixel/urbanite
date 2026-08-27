@@ -11,6 +11,7 @@ const EDITABLE: (keyof Product)[] = [
   'original_price',
   'inventory',
   'status',
+  'category',
   'image',
   'colors',
   'sizes',

@@ -14,6 +14,15 @@ const formatter = new Intl.NumberFormat('zh-TW', {
 
 const ORDER_STATUSES = ['待出貨', '備貨中', '已出貨', '已取消'];
 const PRODUCT_STATUSES = ['上架中', '加購品', '已下架'];
+const CATEGORY_OPTIONS = [
+  { key: '', label: '未分類' },
+  { key: 'new', label: '新品' },
+  { key: 'spring', label: '春 Spring' },
+  { key: 'summer', label: '夏 Summer' },
+  { key: 'autumn', label: '秋 Autumn' },
+  { key: 'winter', label: '冬 Winter' },
+  { key: 'acc', label: '飾品 Acc' },
+];
 
 type Draft = {
   id: string;
@@ -23,6 +32,7 @@ type Draft = {
   original_price: number | null;
   inventory: number;
   status: string;
+  category: string;
   image: string;
   colors: string;
   sizes: string;
@@ -39,6 +49,7 @@ function blankDraft(): Draft {
     original_price: null,
     inventory: 0,
     status: '上架中',
+    category: '',
     image: '',
     colors: '',
     sizes: '',
@@ -423,6 +434,19 @@ function ProductModal({
               </select>
             </Field>
           </div>
+          <Field label="分類(首頁篩選用)">
+            <select
+              className="w-full rounded-lg border border-[#ead8d1] px-3 py-2"
+              value={draft.category}
+              onChange={(e) => set('category', e.target.value)}
+            >
+              {CATEGORY_OPTIONS.map((o) => (
+                <option key={o.key} value={o.key}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </Field>
           <Field label="圖片網址">
             <input
               className="w-full rounded-lg border border-[#ead8d1] px-3 py-2"

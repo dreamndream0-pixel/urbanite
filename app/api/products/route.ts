@@ -36,6 +36,7 @@ export async function POST(request: Request) {
       original_price: body.original_price ?? null,
       inventory: body.inventory ?? 0,
       status: body.status ?? '上架中',
+      category: body.category ?? '',
       image: body.image ?? '',
       colors: body.colors ?? [],
       sizes: body.sizes ?? [],
