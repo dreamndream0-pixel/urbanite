@@ -3,7 +3,27 @@
 // 規格維度(例:{name:'顏色', options:['紅','綠','藍']})
 export type SpecDim = { name: string; options: string[] };
 // 每個規格組合的庫存(options 依 specs 順序,例:['紅','S'])
-export type Variant = { options: string[]; inventory: number };
+export type Variant = {
+  options: string[];
+  inventory: number;
+  cost?: number; // 單位成本
+  safety?: number; // 安全庫存
+  location?: string; // 儲位
+};
+
+// 進出庫紀錄
+export type StockMovement = {
+  id: string;
+  product_id: string;
+  variant_key: string;
+  type: 'in' | 'out';
+  quantity: number;
+  unit_price: number;
+  location: string;
+  handler: string;
+  note: string;
+  created_at?: string;
+};
 
 export type Product = {
   id: string;
@@ -22,6 +42,7 @@ export type Product = {
   sizes: string[];
   specs: SpecDim[];
   variants: Variant[];
+  unit?: string;
   is_featured: boolean;
   sort_order: number;
   created_at?: string;

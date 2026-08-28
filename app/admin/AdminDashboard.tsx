@@ -4,7 +4,17 @@ import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createBrowserSupabase } from '@/lib/supabase/client';
-import type { Banner, Category, Customer, Discount, Order, Product, SiteSettings } from '@/lib/types';
+import type {
+  Banner,
+  Category,
+  Customer,
+  Discount,
+  Order,
+  Product,
+  SiteSettings,
+  StockMovement,
+  Variant,
+} from '@/lib/types';
 
 const formatter = new Intl.NumberFormat('zh-TW', {
   style: 'currency',
@@ -45,8 +55,11 @@ type Draft = {
   available_shipping_methods: string[];
   colors: string;
   sizes: string;
+  unit: string;
   specs: { name: string; optionsText: string }[];
   variantStock: Record<string, number>; // key = 各選項用 ' / ' 串起來
+  variantCost: Record<string, number>; // 各規格單位成本
+  variantSafety: Record<string, number>; // 各規格安全庫存
   is_featured: boolean;
   sort_order: number;
 };
@@ -87,8 +100,11 @@ function blankDraft(): Draft {
     available_shipping_methods: [],
     colors: '',
     sizes: '',
+    unit: '',
     specs: [],
     variantStock: {},
+    variantCost: {},
+    variantSafety: {},
     is_featured: false,
     sort_order: 0,
   };
@@ -98,7 +114,14 @@ function toDraft(p: Product): Draft {
   const images = p.images?.length ? p.images : p.image ? [p.image] : [];
   const specs = (p.specs ?? []).map((s) => ({ name: s.name, optionsText: s.options.join(', ') }));
   const variantStock: Record<string, number> = {};
-  for (const v of p.variants ?? []) variantStock[v.options.join(' / ')] = v.inventory;
+  const variantCost: Record<string, number> = {};
+  const variantSafety: Record<string, number> = {};
+  for (const v of p.variants ?? []) {
+    const k = v.options.join(' / ');
+    variantStock[k] = v.inventory;
+    if (v.cost != null) variantCost[k] = v.cost;
+    if (v.safety != null) variantSafety[k] = v.safety;
+  }
   return {
     ...p,
     images,
@@ -106,8 +129,11 @@ function toDraft(p: Product): Draft {
     available_shipping_methods: p.available_shipping_methods ?? [],
     colors: p.colors.join(', '),
     sizes: p.sizes.join(', '),
+    unit: p.unit ?? '',
     specs,
     variantStock,
+    variantCost,
+    variantSafety,
   };
 }
 
@@ -118,6 +144,7 @@ export default function AdminDashboard({
   initialDiscounts,
   initialCustomers,
   initialBanners,
+  initialMovements,
   initialLogoUrl,
   initialSettings,
   userEmail,
@@ -128,6 +155,7 @@ export default function AdminDashboard({
   initialDiscounts: Discount[];
   initialCustomers: Customer[];
   initialBanners: Banner[];
+  initialMovements: StockMovement[];
   initialLogoUrl: string;
   initialSettings: SiteSettings | null;
   userEmail: string;
@@ -146,6 +174,17 @@ export default function AdminDashboard({
   const [orderFilter, setOrderFilter] = useState<string>('全部');
   const [openOrderId, setOpenOrderId] = useState<string | null>(null);
   const [productsTab, setProductsTab] = useState<'items' | 'categories'>('items');
+  const [movements, setMovements] = useState<StockMovement[]>(initialMovements);
+  const [mvForm, setMvForm] = useState({
+    product_id: '',
+    variant_key: '',
+    type: 'in' as 'in' | 'out',
+    quantity: 1,
+    unit_price: 0,
+    location: '',
+    handler: '',
+    note: '',
+  });
   const [cropFile, setCropFile] = useState<File | null>(null);
   const [editBannerId, setEditBannerId] = useState<string | null>(null);
   const [newCat, setNewCat] = useState({ slug: '', name: '', en: '' });
@@ -278,10 +317,15 @@ export default function AdminDashboard({
     const specs = editing.specs
       .map((s) => ({ name: s.name.trim(), options: parseOptions(s.optionsText) }))
       .filter((s) => s.name && s.options.length > 0);
-    const variants = specCombos(specs).map((opts) => ({
-      options: opts,
-      inventory: Math.max(0, Math.floor(Number(editing.variantStock[opts.join(' / ')] ?? 0))),
-    }));
+    const variants = specCombos(specs).map((opts) => {
+      const k = opts.join(' / ');
+      return {
+        options: opts,
+        inventory: Math.max(0, Math.floor(Number(editing.variantStock[k] ?? 0))),
+        cost: Math.max(0, Math.floor(Number(editing.variantCost[k] ?? 0))),
+        safety: Math.max(0, Math.floor(Number(editing.variantSafety[k] ?? 0))),
+      };
+    });
     // 有規格時,總庫存 = 各規格庫存加總;沒規格時沿用手填的庫存
     const inventory =
       specs.length > 0 ? variants.reduce((n, v) => n + v.inventory, 0) : editing.inventory;
@@ -359,6 +403,37 @@ export default function AdminDashboard({
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ variants, inventory: total }),
     });
+  }
+
+  // 進出庫:新增一筆入庫/出庫,後端會自動更新庫存
+  async function addMovement() {
+    if (!mvForm.product_id) return alert('請選擇品項');
+    if (mvForm.quantity <= 0) return alert('數量需大於 0');
+    const res = await fetch('/api/stock-movements', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(mvForm),
+    });
+    const data = await res.json();
+    if (!res.ok) return alert(data.error ?? '新增失敗');
+    setMovements((l) => [data as StockMovement, ...l]);
+    // 同步本地庫存
+    const delta = mvForm.type === 'in' ? mvForm.quantity : -mvForm.quantity;
+    setProducts((l) =>
+      l.map((p) => {
+        if (p.id !== mvForm.product_id) return p;
+        if (p.variants.length > 0 && mvForm.variant_key) {
+          const variants = p.variants.map((v) =>
+            v.options.join(' / ') === mvForm.variant_key
+              ? { ...v, inventory: Math.max(0, v.inventory + delta) }
+              : v,
+          );
+          return { ...p, variants, inventory: variants.reduce((n, v) => n + v.inventory, 0) };
+        }
+        return { ...p, inventory: Math.max(0, p.inventory + delta) };
+      }),
+    );
+    setMvForm({ ...mvForm, quantity: 1, unit_price: 0, location: '', note: '' });
   }
 
   async function saveNewCategory() {
@@ -938,78 +1013,16 @@ export default function AdminDashboard({
             </div>
           )}
 
-          {/* ===== 庫存管理(進銷存 / 庫存表) ===== */}
+          {/* ===== 庫存管理(進銷存) ===== */}
           {section === 'inventory' && (
-            <Card title="進銷存 / 庫存表">
-              <div className="space-y-3">
-                {products.map((p) => (
-                  <div
-                    key={p.id}
-                    className={`rounded-lg border p-3 ${
-                      p.inventory <= 10 ? 'border-[#e0b4b4] bg-[#fdf5f3]' : 'border-[#e5ded4]'
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      {p.image ? (
-                        <img className="h-10 w-10 shrink-0 rounded-md object-cover" src={p.image} alt="" />
-                      ) : (
-                        <div className="h-10 w-10 shrink-0 rounded-md bg-[#f1e3dc]" />
-                      )}
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate font-semibold">{p.name}</p>
-                        <p className="text-sm text-[#8a7f72]">
-                          總庫存 {p.inventory}
-                          {p.inventory <= 10 && <span className="ml-2 text-[#c0392b]">偏低</span>}
-                        </p>
-                      </div>
-                      {p.variants.length === 0 && (
-                        <div className="inline-flex shrink-0 items-center rounded-full border border-[#d7c9bd] bg-white">
-                          <button className="px-3 py-1.5 text-lg" onClick={() => adjustInventory(p.id, p.inventory - 1)}>
-                            -
-                          </button>
-                          <input
-                            type="number"
-                            value={p.inventory}
-                            onChange={(e) => adjustInventory(p.id, Number(e.target.value))}
-                            className="w-14 border-x border-[#e5ded4] px-2 py-1 text-center text-sm"
-                          />
-                          <button className="px-3 py-1.5 text-lg" onClick={() => adjustInventory(p.id, p.inventory + 1)}>
-                            +
-                          </button>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* 各規格庫存 */}
-                    {p.variants.length > 0 && (
-                      <div className="mt-3 space-y-1.5 border-t border-[#efe8dd] pt-3">
-                        {p.variants.map((v, i) => (
-                          <div key={i} className="flex items-center justify-between gap-2">
-                            <span className={`min-w-0 truncate text-sm ${v.inventory <= 3 ? 'text-[#c0392b]' : 'text-[#6b6156]'}`}>
-                              {v.options.join(' / ')}
-                            </span>
-                            <div className="inline-flex shrink-0 items-center rounded-full border border-[#d7c9bd] bg-white">
-                              <button className="px-2.5 py-1 text-sm" onClick={() => adjustVariantStock(p.id, i, v.inventory - 1)}>
-                                -
-                              </button>
-                              <input
-                                type="number"
-                                value={v.inventory}
-                                onChange={(e) => adjustVariantStock(p.id, i, Number(e.target.value))}
-                                className="w-12 border-x border-[#e5ded4] px-1 py-0.5 text-center text-sm"
-                              />
-                              <button className="px-2.5 py-1 text-sm" onClick={() => adjustVariantStock(p.id, i, v.inventory + 1)}>
-                                +
-                              </button>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </Card>
+            <InventorySection
+              products={products}
+              categories={categories}
+              movements={movements}
+              mvForm={mvForm}
+              setMvForm={setMvForm}
+              onAddMovement={addMovement}
+            />
           )}
 
           {/* ===== 顧客管理 ===== */}
@@ -1983,6 +1996,274 @@ function AdminOrderModal({
   );
 }
 
+type MvForm = {
+  product_id: string;
+  variant_key: string;
+  type: 'in' | 'out';
+  quantity: number;
+  unit_price: number;
+  location: string;
+  handler: string;
+  note: string;
+};
+
+function InventorySection({
+  products,
+  categories,
+  movements,
+  mvForm,
+  setMvForm,
+  onAddMovement,
+}: {
+  products: Product[];
+  categories: Category[];
+  movements: StockMovement[];
+  mvForm: MvForm;
+  setMvForm: (f: MvForm) => void;
+  onAddMovement: () => void;
+}) {
+  const catName = (slug: string) => categories.find((c) => c.slug === slug)?.name || slug || '—';
+  const nameById = (id: string) => products.find((p) => p.id === id)?.name || id;
+  const fmtDate = (s?: string) => (s ? new Date(s).toLocaleDateString('zh-TW') : '—');
+
+  // 最後異動日期(movements 已 desc 排序,第一筆即最新)
+  const lastMv = new Map<string, string>();
+  for (const m of movements) {
+    const k = `${m.product_id}${m.variant_key || ''}`;
+    if (!lastMv.has(k)) lastMv.set(k, m.created_at || '');
+  }
+
+  const rows = products.flatMap((p) => {
+    const base = { pid: p.id, name: p.name, cat: catName(p.category), unit: p.unit || '件' };
+    if (p.variants.length > 0) {
+      return p.variants.map((v) => ({
+        ...base,
+        spec: v.options.join(' / '),
+        key: v.options.join(' / '),
+        inv: v.inventory,
+        safety: v.safety ?? 0,
+        cost: v.cost ?? 0,
+        location: v.location || '—',
+      }));
+    }
+    return [{ ...base, spec: '—', key: '', inv: p.inventory, safety: 0, cost: 0, location: '—' }];
+  });
+
+  const selProduct = products.find((p) => p.id === mvForm.product_id);
+
+  return (
+    <div className="space-y-6">
+      {/* 庫存總表 */}
+      <Card title="庫存總表">
+        <div className="overflow-x-auto">
+          <table className="w-full whitespace-nowrap text-sm">
+            <thead>
+              <tr className="border-b border-[#e5ded4] text-left text-xs text-[#8a7f72]">
+                <th className="px-2 py-2">品項編號</th>
+                <th className="px-2 py-2">品名</th>
+                <th className="px-2 py-2">分類</th>
+                <th className="px-2 py-2">規格</th>
+                <th className="px-2 py-2">單位</th>
+                <th className="px-2 py-2 text-right">目前庫存</th>
+                <th className="px-2 py-2 text-right">安全庫存</th>
+                <th className="px-2 py-2">庫存狀態</th>
+                <th className="px-2 py-2 text-right">單位成本</th>
+                <th className="px-2 py-2 text-right">庫存金額</th>
+                <th className="px-2 py-2">儲位</th>
+                <th className="px-2 py-2">最後異動</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r, i) => {
+                const low = r.inv <= r.safety;
+                return (
+                  <tr key={`${r.pid}-${r.key}-${i}`} className="border-b border-[#efe8dd]">
+                    <td className="px-2 py-2 font-mono text-xs">{r.pid}</td>
+                    <td className="px-2 py-2">{r.name}</td>
+                    <td className="px-2 py-2 text-[#8a7f72]">{r.cat}</td>
+                    <td className="px-2 py-2">{r.spec}</td>
+                    <td className="px-2 py-2 text-[#8a7f72]">{r.unit}</td>
+                    <td className="px-2 py-2 text-right font-semibold">{r.inv}</td>
+                    <td className="px-2 py-2 text-right text-[#8a7f72]">{r.safety}</td>
+                    <td className="px-2 py-2">
+                      <span className={low ? 'text-[#c0392b]' : 'text-[#1f7a44]'}>
+                        {low ? '🔴 需補貨' : '🟢 正常'}
+                      </span>
+                    </td>
+                    <td className="px-2 py-2 text-right">{r.cost}</td>
+                    <td className="px-2 py-2 text-right">{(r.inv * r.cost).toLocaleString()}</td>
+                    <td className="px-2 py-2 text-[#8a7f72]">{r.location}</td>
+                    <td className="px-2 py-2 text-[#8a7f72]">
+                      {fmtDate(lastMv.get(`${r.pid}${r.key}`))}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+        <p className="mt-2 text-xs text-[#8a7f72]">
+          庫存數量由「入庫 / 出庫」自動計算,請用下方表單登錄異動,不要直接改數字。
+        </p>
+      </Card>
+
+      {/* 入庫 / 出庫 */}
+      <Card title="入庫 / 出庫">
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className="block">
+            <span className="mb-1 block text-sm text-[#8a7f72]">類型</span>
+            <div className="flex gap-2">
+              {(['in', 'out'] as const).map((t) => (
+                <button
+                  key={t}
+                  onClick={() => setMvForm({ ...mvForm, type: t })}
+                  className={`flex-1 rounded-lg border px-3 py-2 text-sm font-semibold ${
+                    mvForm.type === t ? 'border-[#1f1b19] bg-[#1f1b19] text-white' : 'border-[#d7c9bd]'
+                  }`}
+                >
+                  {t === 'in' ? '入庫 +' : '出庫 −'}
+                </button>
+              ))}
+            </div>
+          </label>
+          <label className="block">
+            <span className="mb-1 block text-sm text-[#8a7f72]">品項</span>
+            <select
+              value={mvForm.product_id}
+              onChange={(e) => setMvForm({ ...mvForm, product_id: e.target.value, variant_key: '' })}
+              className="w-full rounded-lg border border-[#e5ded4] px-3 py-2"
+            >
+              <option value="">請選擇</option>
+              {products.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          {selProduct && selProduct.variants.length > 0 && (
+            <label className="block">
+              <span className="mb-1 block text-sm text-[#8a7f72]">規格</span>
+              <select
+                value={mvForm.variant_key}
+                onChange={(e) => setMvForm({ ...mvForm, variant_key: e.target.value })}
+                className="w-full rounded-lg border border-[#e5ded4] px-3 py-2"
+              >
+                <option value="">請選擇</option>
+                {selProduct.variants.map((v) => {
+                  const k = v.options.join(' / ');
+                  return (
+                    <option key={k} value={k}>
+                      {k}(庫存 {v.inventory})
+                    </option>
+                  );
+                })}
+              </select>
+            </label>
+          )}
+          <label className="block">
+            <span className="mb-1 block text-sm text-[#8a7f72]">數量</span>
+            <input
+              type="number"
+              min={1}
+              value={mvForm.quantity}
+              onChange={(e) => setMvForm({ ...mvForm, quantity: Math.max(1, Number(e.target.value)) })}
+              className="w-full rounded-lg border border-[#e5ded4] px-3 py-2"
+            />
+          </label>
+          <label className="block">
+            <span className="mb-1 block text-sm text-[#8a7f72]">單價</span>
+            <input
+              type="number"
+              min={0}
+              value={mvForm.unit_price}
+              onChange={(e) => setMvForm({ ...mvForm, unit_price: Math.max(0, Number(e.target.value)) })}
+              className="w-full rounded-lg border border-[#e5ded4] px-3 py-2"
+            />
+          </label>
+          <label className="block">
+            <span className="mb-1 block text-sm text-[#8a7f72]">使用地點 / 對象</span>
+            <input
+              value={mvForm.location}
+              onChange={(e) => setMvForm({ ...mvForm, location: e.target.value })}
+              className="w-full rounded-lg border border-[#e5ded4] px-3 py-2"
+            />
+          </label>
+          <label className="block">
+            <span className="mb-1 block text-sm text-[#8a7f72]">經手人</span>
+            <input
+              value={mvForm.handler}
+              onChange={(e) => setMvForm({ ...mvForm, handler: e.target.value })}
+              className="w-full rounded-lg border border-[#e5ded4] px-3 py-2"
+            />
+          </label>
+          <label className="block sm:col-span-2">
+            <span className="mb-1 block text-sm text-[#8a7f72]">備註</span>
+            <input
+              value={mvForm.note}
+              onChange={(e) => setMvForm({ ...mvForm, note: e.target.value })}
+              className="w-full rounded-lg border border-[#e5ded4] px-3 py-2"
+            />
+          </label>
+        </div>
+        <button
+          onClick={onAddMovement}
+          className="mt-4 rounded-full bg-[#1f1b19] px-6 py-2.5 text-sm font-semibold text-white"
+        >
+          登錄{mvForm.type === 'in' ? '入庫' : '出庫'}
+        </button>
+      </Card>
+
+      {/* 進出庫紀錄 */}
+      <Card title="進出庫紀錄">
+        {movements.length === 0 ? (
+          <Empty>目前沒有進出庫紀錄。</Empty>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full whitespace-nowrap text-sm">
+              <thead>
+                <tr className="border-b border-[#e5ded4] text-left text-xs text-[#8a7f72]">
+                  <th className="px-2 py-2">日期</th>
+                  <th className="px-2 py-2">品項</th>
+                  <th className="px-2 py-2">規格</th>
+                  <th className="px-2 py-2">類型</th>
+                  <th className="px-2 py-2 text-right">數量</th>
+                  <th className="px-2 py-2 text-right">單價</th>
+                  <th className="px-2 py-2">地點 / 對象</th>
+                  <th className="px-2 py-2">經手人</th>
+                  <th className="px-2 py-2">備註</th>
+                </tr>
+              </thead>
+              <tbody>
+                {movements.map((m) => (
+                  <tr key={m.id} className="border-b border-[#efe8dd]">
+                    <td className="px-2 py-2 text-[#8a7f72]">{fmtDate(m.created_at)}</td>
+                    <td className="px-2 py-2">{nameById(m.product_id)}</td>
+                    <td className="px-2 py-2 text-[#8a7f72]">{m.variant_key || '—'}</td>
+                    <td className="px-2 py-2">
+                      <span className={m.type === 'in' ? 'text-[#1f7a44]' : 'text-[#c0392b]'}>
+                        {m.type === 'in' ? '入庫' : '出庫'}
+                      </span>
+                    </td>
+                    <td className="px-2 py-2 text-right font-semibold">
+                      {m.type === 'in' ? '+' : '−'}
+                      {m.quantity}
+                    </td>
+                    <td className="px-2 py-2 text-right">{m.unit_price}</td>
+                    <td className="px-2 py-2 text-[#8a7f72]">{m.location || '—'}</td>
+                    <td className="px-2 py-2 text-[#8a7f72]">{m.handler || '—'}</td>
+                    <td className="px-2 py-2 text-[#8a7f72]">{m.note || '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Card>
+    </div>
+  );
+}
+
 function StatCard({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-xl border border-[#e5ded4] bg-white p-4">
@@ -2048,6 +2329,7 @@ function ProductModal({
   const [uploadProgress, setUploadProgress] = useState<{ done: number; total: number; percent: number } | null>(
     null,
   );
+  const [batch, setBatch] = useState({ stock: 0, cost: 0, safety: 0 });
 
   function set<K extends keyof Draft>(key: K, value: Draft[K]) {
     onChange({ ...draft, [key]: value });
@@ -2075,6 +2357,18 @@ function ProductModal({
   }
   function setVariantStock(key: string, value: number) {
     onChange({ ...draft, variantStock: { ...draft.variantStock, [key]: value } });
+  }
+  function setVariantCost(key: string, value: number) {
+    onChange({ ...draft, variantCost: { ...draft.variantCost, [key]: value } });
+  }
+  function setVariantSafety(key: string, value: number) {
+    onChange({ ...draft, variantSafety: { ...draft.variantSafety, [key]: value } });
+  }
+  // 批次:把某個值套用到所有規格組合
+  function batchApply(field: 'variantStock' | 'variantCost' | 'variantSafety', value: number) {
+    const map: Record<string, number> = {};
+    for (const opts of modalCombos) map[opts.join(' / ')] = value;
+    onChange({ ...draft, [field]: map });
   }
 
   function toggleMethod(
@@ -2210,6 +2504,14 @@ function ProductModal({
               </select>
             </Field>
           </div>
+          <Field label="單位(例:件 / 串 / 顆 / 入)">
+            <input
+              className="w-full rounded-lg border border-[#e5ded4] px-3 py-2"
+              value={draft.unit}
+              placeholder="件"
+              onChange={(e) => set('unit', e.target.value)}
+            />
+          </Field>
           <Field label="分類(首頁篩選用)">
             <select
               className="w-full rounded-lg border border-[#e5ded4] px-3 py-2"
@@ -2388,25 +2690,101 @@ function ProductModal({
 
           {hasSpecs && (
             <Field label="各規格庫存(階梯選擇 · 分別入庫存)">
-              <div className="max-h-64 space-y-2 overflow-auto rounded-lg border border-[#eee5da] bg-[#faf7f2] p-2">
-                {modalCombos.map((opts) => {
-                  const key = opts.join(' / ');
-                  return (
-                    <div
-                      key={key}
-                      className="flex items-center justify-between gap-3 rounded-lg bg-white px-3 py-2"
-                    >
-                      <span className="min-w-0 truncate text-sm font-medium">{key}</span>
-                      <input
-                        type="number"
-                        min={0}
-                        value={draft.variantStock[key] ?? 0}
-                        onChange={(e) => setVariantStock(key, Math.max(0, Number(e.target.value)))}
-                        className="w-24 shrink-0 rounded-lg border border-[#e5ded4] px-2 py-1.5 text-right text-sm"
-                      />
-                    </div>
-                  );
-                })}
+              {/* 批次修改 */}
+              <div className="mb-2 flex flex-wrap items-end gap-2 rounded-lg bg-[#f3ede4] p-2 text-xs">
+                <span className="font-semibold text-[#6b6156]">批次套用全部:</span>
+                <label className="flex flex-col">
+                  庫存
+                  <input
+                    type="number"
+                    value={batch.stock}
+                    onChange={(e) => setBatch({ ...batch, stock: Number(e.target.value) })}
+                    className="w-16 rounded border border-[#d7c9bd] px-2 py-1"
+                  />
+                </label>
+                <label className="flex flex-col">
+                  成本
+                  <input
+                    type="number"
+                    value={batch.cost}
+                    onChange={(e) => setBatch({ ...batch, cost: Number(e.target.value) })}
+                    className="w-16 rounded border border-[#d7c9bd] px-2 py-1"
+                  />
+                </label>
+                <label className="flex flex-col">
+                  安全庫存
+                  <input
+                    type="number"
+                    value={batch.safety}
+                    onChange={(e) => setBatch({ ...batch, safety: Number(e.target.value) })}
+                    className="w-16 rounded border border-[#d7c9bd] px-2 py-1"
+                  />
+                </label>
+                <button
+                  type="button"
+                  onClick={() => {
+                    batchApply('variantStock', Math.max(0, batch.stock));
+                    batchApply('variantCost', Math.max(0, batch.cost));
+                    batchApply('variantSafety', Math.max(0, batch.safety));
+                  }}
+                  className="rounded-full bg-[#1f1b19] px-3 py-1.5 font-semibold text-white"
+                >
+                  套用
+                </button>
+              </div>
+
+              <div className="max-h-72 overflow-auto rounded-lg border border-[#eee5da] bg-[#faf7f2] p-2">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-left text-xs text-[#8a7f72]">
+                      <th className="px-1 py-1">規格</th>
+                      <th className="px-1 py-1 text-right">庫存</th>
+                      <th className="px-1 py-1 text-right">成本</th>
+                      <th className="px-1 py-1 text-right">安全</th>
+                      <th className="px-1 py-1 text-right">金額</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {modalCombos.map((opts) => {
+                      const key = opts.join(' / ');
+                      const inv = Number(draft.variantStock[key] ?? 0);
+                      const cost = Number(draft.variantCost[key] ?? 0);
+                      return (
+                        <tr key={key} className="border-t border-[#efe8dd]">
+                          <td className="px-1 py-1">{key}</td>
+                          <td className="px-1 py-1">
+                            <input
+                              type="number"
+                              min={0}
+                              value={inv}
+                              onChange={(e) => setVariantStock(key, Math.max(0, Number(e.target.value)))}
+                              className="w-14 rounded border border-[#e5ded4] px-1 py-1 text-right"
+                            />
+                          </td>
+                          <td className="px-1 py-1">
+                            <input
+                              type="number"
+                              min={0}
+                              value={cost}
+                              onChange={(e) => setVariantCost(key, Math.max(0, Number(e.target.value)))}
+                              className="w-14 rounded border border-[#e5ded4] px-1 py-1 text-right"
+                            />
+                          </td>
+                          <td className="px-1 py-1">
+                            <input
+                              type="number"
+                              min={0}
+                              value={Number(draft.variantSafety[key] ?? 0)}
+                              onChange={(e) => setVariantSafety(key, Math.max(0, Number(e.target.value)))}
+                              className="w-12 rounded border border-[#e5ded4] px-1 py-1 text-right"
+                            />
+                          </td>
+                          <td className="px-1 py-1 text-right text-[#6b6156]">{inv * cost}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
               <p className="mt-1 text-xs text-[#8a7f72]">
                 共 {modalCombos.length} 個組合,總庫存 {specTotal}。

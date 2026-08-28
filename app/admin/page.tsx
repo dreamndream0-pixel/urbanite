@@ -2,7 +2,16 @@ import { redirect } from 'next/navigation';
 import { getAdminUser, getSessionUser } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import AdminDashboard from './AdminDashboard';
-import type { Banner, Category, Customer, Discount, Order, Product, SiteSettings } from '@/lib/types';
+import type {
+  Banner,
+  Category,
+  Customer,
+  Discount,
+  Order,
+  Product,
+  SiteSettings,
+  StockMovement,
+} from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
 
@@ -34,6 +43,7 @@ export default async function AdminPage() {
     { data: discounts },
     { data: customers },
     { data: banners },
+    { data: movements },
   ] = await Promise.all([
     supabase.from('products').select('*').order('sort_order', { ascending: true }),
     supabase.from('orders').select('*').order('created_at', { ascending: false }),
@@ -42,6 +52,7 @@ export default async function AdminPage() {
     supabase.from('discounts').select('*').order('created_at', { ascending: false }),
     supabase.from('customers').select('*').order('created_at', { ascending: false }),
     supabase.from('banners').select('*').order('sort_order', { ascending: true }),
+    supabase.from('stock_movements').select('*').order('created_at', { ascending: false }).limit(200),
   ]);
 
   return (
@@ -52,6 +63,7 @@ export default async function AdminPage() {
       initialDiscounts={(discounts ?? []) as Discount[]}
       initialCustomers={(customers ?? []) as Customer[]}
       initialBanners={(banners ?? []) as Banner[]}
+      initialMovements={(movements ?? []) as StockMovement[]}
       initialLogoUrl={settings?.logo_url ?? ''}
       initialSettings={settings as SiteSettings | null}
       userEmail={user.email ?? ''}

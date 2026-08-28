@@ -49,6 +49,7 @@ export async function POST(request: Request) {
       sizes: body.sizes ?? [],
       specs: Array.isArray(body.specs) ? body.specs : [],
       variants: Array.isArray(body.variants) ? body.variants : [],
+      unit: body.unit ?? '',
       is_featured: body.is_featured ?? false,
       sort_order: body.sort_order ?? 0,
     })

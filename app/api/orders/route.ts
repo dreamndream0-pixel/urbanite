@@ -183,5 +183,29 @@ export async function POST(request: Request) {
       .eq('id', pid);
   }
 
+  // 記錄出庫(訂單銷貨),供進出庫紀錄查閱
+  try {
+    const movements = items
+      .map((item) => {
+        const base = priceMap.get(String(item.productId));
+        if (!base) return null;
+        const hasVariants = Array.isArray(base.variants) && base.variants.length > 0;
+        return {
+          product_id: String(item.productId),
+          variant_key: hasVariants ? String(item.variant ?? '') : '',
+          type: 'out',
+          quantity: Math.max(1, Math.floor(Number(item.quantity) || 1)),
+          unit_price: base.price ?? 0,
+          location: customer_name || '',
+          handler: '系統(訂單)',
+          note: `訂單 ${orderNo}`,
+        };
+      })
+      .filter((m): m is NonNullable<typeof m> => m !== null);
+    if (movements.length) await supabase.from('stock_movements').insert(movements);
+  } catch {
+    /* 記錄失敗不影響下單 */
+  }
+
   return NextResponse.json(order as Order, { status: 201 });
 }
