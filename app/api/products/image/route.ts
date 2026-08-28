@@ -13,6 +13,7 @@ export async function POST(request: Request) {
   const formData = await request.formData();
   const file = formData.get('file');
   const productId = String(formData.get('productId') ?? 'new').replace(/[^a-zA-Z0-9_-]/g, '-');
+  const folder = String(formData.get('folder') ?? 'products').replace(/[^a-zA-Z0-9_-]/g, '') || 'products';
 
   if (!(file instanceof File)) {
     return NextResponse.json({ error: '沒有收到檔案' }, { status: 400 });
@@ -26,7 +27,7 @@ export async function POST(request: Request) {
 
   const supabase = createAdminClient();
   const ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
-  const path = `products/${productId || 'new'}-${Date.now()}.${ext}`;
+  const path = `${folder}/${productId || 'new'}-${Date.now()}.${ext}`;
   const bytes = new Uint8Array(await file.arrayBuffer());
 
   const { error } = await supabase.storage

@@ -59,6 +59,16 @@ export type Category = {
   created_at?: string;
 };
 
+export type Banner = {
+  id: string;
+  image: string;
+  link: string;
+  title: string;
+  active: boolean;
+  sort_order: number;
+  created_at?: string;
+};
+
 export type OrderItem = {
   name: string;
   variant: string;

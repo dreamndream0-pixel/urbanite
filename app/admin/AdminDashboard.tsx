@@ -4,7 +4,7 @@ import { Fragment, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createBrowserSupabase } from '@/lib/supabase/client';
-import type { Category, Customer, Discount, Order, Product, SiteSettings } from '@/lib/types';
+import type { Banner, Category, Customer, Discount, Order, Product, SiteSettings } from '@/lib/types';
 
 const formatter = new Intl.NumberFormat('zh-TW', {
   style: 'currency',
@@ -19,6 +19,7 @@ const NAV = [
   { key: 'overview', label: '總覽', Icon: IconGrid },
   { key: 'orders', label: '訂單管理', Icon: IconReceipt },
   { key: 'products', label: '商品及分類', Icon: IconTag },
+  { key: 'banners', label: '輪播圖', Icon: IconImage },
   { key: 'inventory', label: '庫存管理', Icon: IconBox },
   { key: 'customers', label: '顧客管理', Icon: IconUsers },
   { key: 'promotions', label: '促銷管理', Icon: IconGift },
@@ -78,6 +79,7 @@ export default function AdminDashboard({
   initialCategories,
   initialDiscounts,
   initialCustomers,
+  initialBanners,
   initialLogoUrl,
   initialSettings,
   userEmail,
@@ -87,6 +89,7 @@ export default function AdminDashboard({
   initialCategories: Category[];
   initialDiscounts: Discount[];
   initialCustomers: Customer[];
+  initialBanners: Banner[];
   initialLogoUrl: string;
   initialSettings: SiteSettings | null;
   userEmail: string;
@@ -99,6 +102,8 @@ export default function AdminDashboard({
   const [categories, setCategories] = useState<Category[]>(initialCategories);
   const [discounts, setDiscounts] = useState<Discount[]>(initialDiscounts);
   const [customers] = useState<Customer[]>(initialCustomers);
+  const [banners, setBanners] = useState<Banner[]>(initialBanners);
+  const [uploadingBanner, setUploadingBanner] = useState(false);
   const [newCat, setNewCat] = useState({ slug: '', name: '', en: '' });
   const [newDiscount, setNewDiscount] = useState({ code: '', type: 'percent', value: 0, min_spend: 0 });
   const [logoUrl, setLogoUrl] = useState(initialLogoUrl);
@@ -331,6 +336,49 @@ export default function AdminDashboard({
     } finally {
       setUploading(false);
     }
+  }
+
+  async function uploadBanner(file: File) {
+    setUploadingBanner(true);
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      fd.append('folder', 'banners');
+      fd.append('productId', 'banner');
+      const up = await fetch('/api/products/image', { method: 'POST', body: fd });
+      const upData = await up.json();
+      if (!up.ok) throw new Error(upData.error ?? '上傳失敗');
+      const res = await fetch('/api/banners', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image: upData.image_url, sort_order: banners.length }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? '新增失敗');
+      setBanners((l) => [...l, data as Banner]);
+    } catch (error) {
+      alert(error instanceof Error ? error.message : '上傳失敗');
+    } finally {
+      setUploadingBanner(false);
+    }
+  }
+
+  async function updateBanner(id: string, patch: Partial<Banner>) {
+    const res = await fetch(`/api/banners/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(patch),
+    });
+    const data = await res.json();
+    if (res.ok) setBanners((l) => l.map((b) => (b.id === id ? (data as Banner) : b)));
+    else alert(data.error ?? '更新失敗');
+  }
+
+  async function deleteBanner(id: string) {
+    if (!confirm('確定要刪除這張輪播圖嗎?')) return;
+    const res = await fetch(`/api/banners/${id}`, { method: 'DELETE' });
+    if (res.ok) setBanners((l) => l.filter((b) => b.id !== id));
+    else alert('刪除失敗');
   }
 
   async function saveFooterSettings() {
@@ -720,6 +768,92 @@ export default function AdminDashboard({
                 </div>
               </Card>
             </div>
+          )}
+
+          {/* ===== 輪播圖 ===== */}
+          {section === 'banners' && (
+            <Card title="首頁輪播圖">
+              <p className="mb-4 text-sm text-[#8a7f72]">
+                顯示在首頁最上方,可放多張輪播。第一張(排序小的)先顯示,前台每 4 秒自動切換。
+              </p>
+              <label className="mb-5 inline-flex cursor-pointer items-center rounded-full bg-[#1f1b19] px-5 py-2.5 text-sm font-semibold text-white">
+                {uploadingBanner ? '上傳中…' : '+ 上傳輪播圖'}
+                <input
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp,image/gif"
+                  className="hidden"
+                  disabled={uploadingBanner}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) uploadBanner(file);
+                    e.target.value = '';
+                  }}
+                />
+              </label>
+
+              {banners.length === 0 ? (
+                <p className="rounded-lg bg-[#f6f2ec] p-5 text-sm text-[#6b6156]">
+                  還沒有輪播圖,上傳一張開始吧。
+                </p>
+              ) : (
+                <div className="space-y-3">
+                  {banners.map((banner, index) => (
+                    <div
+                      key={banner.id}
+                      className="flex flex-col gap-3 rounded-xl border border-[#e5ded4] p-3 sm:flex-row sm:items-center"
+                    >
+                      <div className="h-20 w-36 shrink-0 overflow-hidden rounded-lg bg-[#f6f2ec]">
+                        <img src={banner.image} alt="" className="h-full w-full object-cover" />
+                      </div>
+                      <div className="flex-1">
+                        <input
+                          className="w-full rounded-lg border border-[#e5ded4] px-3 py-2 text-sm"
+                          placeholder="點擊後前往的網址(可空)"
+                          defaultValue={banner.link}
+                          onBlur={(e) => {
+                            if (e.target.value !== banner.link) updateBanner(banner.id, { link: e.target.value });
+                          }}
+                        />
+                        <label className="mt-2 flex items-center gap-2 text-sm">
+                          <input
+                            type="checkbox"
+                            checked={banner.active}
+                            onChange={(e) => updateBanner(banner.id, { active: e.target.checked })}
+                          />
+                          <span>{banner.active ? '顯示中' : '已隱藏'}</span>
+                        </label>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => {
+                            if (index === 0) return;
+                            const prev = banners[index - 1];
+                            updateBanner(banner.id, { sort_order: prev.sort_order });
+                            updateBanner(prev.id, { sort_order: banner.sort_order });
+                            setBanners((l) => {
+                              const next = [...l];
+                              [next[index - 1], next[index]] = [next[index], next[index - 1]];
+                              return next;
+                            });
+                          }}
+                          disabled={index === 0}
+                          className="rounded-lg border border-[#d7c9bd] px-3 py-2 text-sm disabled:opacity-30"
+                          aria-label="上移"
+                        >
+                          ↑
+                        </button>
+                        <button
+                          onClick={() => deleteBanner(banner.id)}
+                          className="rounded-lg border border-[#e0b4b4] px-3 py-2 text-sm font-semibold text-[#c0392b]"
+                        >
+                          刪除
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </Card>
           )}
 
           {/* ===== 庫存管理 ===== */}
@@ -1495,6 +1629,15 @@ function IconChart() {
     <svg {...svgProps}>
       <path d="M3 3v18h18" />
       <path d="M7 14l3-4 3 2 4-6" />
+    </svg>
+  );
+}
+function IconImage() {
+  return (
+    <svg {...svgProps}>
+      <rect x="3" y="4" width="18" height="16" rx="2" />
+      <circle cx="9" cy="10" r="2" />
+      <path d="M21 16l-5-5-6 6" />
     </svg>
   );
 }

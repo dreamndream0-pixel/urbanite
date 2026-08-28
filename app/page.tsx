@@ -2,8 +2,12 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { createBrowserSupabase } from '@/lib/supabase/client';
-import type { Product, Category, SiteSettings } from '@/lib/types';
+import type { Product, Category, SiteSettings, Banner } from '@/lib/types';
+
+// 購物車存在瀏覽器本機的 key(結帳頁會讀同一份)
+const CART_KEY = 'cart';
 
 type CartItem = {
   id: string;
@@ -27,7 +31,9 @@ type CategoryTab = { slug: string; name: string; en: string };
 const ALL_TAB: CategoryTab = { slug: 'all', name: '全部', en: 'ALL' };
 
 export default function Home() {
+  const router = useRouter();
   const [products, setProducts] = useState<Product[]>([]);
+  const [banners, setBanners] = useState<Banner[]>([]);
   const [dbCategories, setDbCategories] = useState<Category[]>([]);
   const [logoUrl, setLogoUrl] = useState('');
   const [settings, setSettings] = useState<SiteSettings | null>(null);
@@ -42,6 +48,7 @@ export default function Home() {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [user, setUser] = useState<{ email: string; name: string; isAdmin: boolean } | null>(null);
   const [accountOpen, setAccountOpen] = useState(false);
+  const [quickAdd, setQuickAdd] = useState<Product | null>(null);
 
   useEffect(() => {
     fetch('/api/products')
@@ -62,7 +69,30 @@ export default function Home() {
         if (s) setSettings(s);
       })
       .catch(() => {});
+
+    fetch('/api/banners')
+      .then((res) => (res.ok ? res.json() : []))
+      .then((data: Banner[]) => setBanners(data))
+      .catch(() => setBanners([]));
   }, []);
+
+  // 讀取 / 保存購物車(存在瀏覽器本機,結帳頁共用同一份)
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(CART_KEY);
+      if (raw) setCart(JSON.parse(raw) as CartItem[]);
+    } catch {
+      /* localStorage 不可用時略過 */
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(CART_KEY, JSON.stringify(cart));
+    } catch {
+      /* localStorage 不可用時略過 */
+    }
+  }, [cart]);
 
   // 讀取 / 保存收藏清單(存在瀏覽器本機,重新整理不會消失)
   useEffect(() => {
@@ -142,24 +172,28 @@ export default function Home() {
 
   const activeCategory = categoryTabs.find((c) => c.slug === category) ?? ALL_TAB;
 
-  function addToCart(product: Product) {
-    const color = product.colors[0] ?? '';
-    const size = product.sizes[0] ?? '';
+  function addToCart(
+    product: Product,
+    opts?: { color?: string; size?: string; quantity?: number; openCart?: boolean },
+  ) {
+    const color = opts?.color ?? product.colors[0] ?? '';
+    const size = opts?.size ?? product.sizes[0] ?? '';
+    const quantity = opts?.quantity ?? 1;
     const variant = [color, size].filter(Boolean).join(' / ') || '標準款';
     const id = `${product.id}-${color}-${size}`;
     setCart((items) => {
       const existing = items.find((item) => item.id === id);
       if (existing) {
         return items.map((item) =>
-          item.id === id ? { ...item, quantity: item.quantity + 1 } : item,
+          item.id === id ? { ...item, quantity: item.quantity + quantity } : item,
         );
       }
       return [
         ...items,
-        { id, productId: product.id, name: product.name, variant, price: product.price, quantity: 1 },
+        { id, productId: product.id, name: product.name, variant, price: product.price, quantity },
       ];
     });
-    setCartOpen(true);
+    if (opts?.openCart !== false) setCartOpen(true);
   }
 
   function updateCart(id: string, change: number) {
@@ -316,6 +350,9 @@ export default function Home() {
         )}
       </header>
 
+      {/* 首頁輪播圖 */}
+      <HeroCarousel banners={banners.filter((b) => b.active)} />
+
       {/* 標題 */}
       <section className="mx-auto max-w-7xl px-4 pb-4 pt-10 text-center sm:px-6 sm:pt-14">
         <h1 className="text-4xl font-semibold tracking-[0.15em] sm:text-5xl">
@@ -358,7 +395,7 @@ export default function Home() {
                 product={product}
                 favorited={favorites.has(product.id)}
                 onFavorite={() => toggleFavorite(product.id)}
-                onAdd={() => addToCart(product)}
+                onAdd={() => setQuickAdd(product)}
               />
             ))}
           </div>
@@ -386,10 +423,16 @@ export default function Home() {
         shipping={shipping}
         subtotal={subtotal}
         total={total}
-        user={user}
+        recommendations={liveProducts
+          .filter((p) => !cart.some((c) => c.productId === p.id))
+          .slice(0, 6)}
         onClose={() => setCartOpen(false)}
         onUpdate={updateCart}
-        onClear={() => setCart([])}
+        onAdd={(product) => addToCart(product, { openCart: false })}
+        onCheckout={() => {
+          setCartOpen(false);
+          router.push('/checkout');
+        }}
       />
 
       {/* 收藏清單 */}
@@ -403,6 +446,21 @@ export default function Home() {
           setFavoritesOpen(false);
         }}
       />
+
+      {/* 快速加入購物車懸浮視窗 */}
+      {quickAdd && (
+        <QuickAddModal
+          product={quickAdd}
+          favorited={favorites.has(quickAdd.id)}
+          onFavorite={() => toggleFavorite(quickAdd.id)}
+          onClose={() => setQuickAdd(null)}
+          onAdd={(color, size, quantity, buyNow) => {
+            addToCart(quickAdd, { color, size, quantity, openCart: !buyNow });
+            setQuickAdd(null);
+            if (buyNow) router.push('/checkout');
+          }}
+        />
+      )}
     </main>
   );
 }
@@ -694,96 +752,23 @@ function CartDrawer({
   shipping,
   subtotal,
   total,
-  user,
+  recommendations,
   onClose,
   onUpdate,
-  onClear,
+  onAdd,
+  onCheckout,
 }: {
   cart: CartItem[];
   open: boolean;
   shipping: number;
   subtotal: number;
   total: number;
-  user: { email: string; name: string } | null;
+  recommendations: Product[];
   onClose: () => void;
   onUpdate: (id: string, change: number) => void;
-  onClear: () => void;
+  onAdd: (product: Product) => void;
+  onCheckout: () => void;
 }) {
-  const [name, setName] = useState<string | null>(null);
-  const [email, setEmail] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
-  const [message, setMessage] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
-  const [discountInput, setDiscountInput] = useState('');
-  const [applied, setApplied] = useState<{ code: string; amount: number } | null>(null);
-  const [discountMsg, setDiscountMsg] = useState('');
-
-  const finalTotal = Math.max(0, total - (applied?.amount ?? 0));
-  const checkoutEmail = email ?? user?.email ?? '';
-  const checkoutName = name ?? user?.name ?? '';
-
-  async function applyDiscount() {
-    setDiscountMsg('');
-    if (!discountInput.trim()) return;
-    const res = await fetch('/api/discounts/validate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ code: discountInput, subtotal }),
-    });
-    const data = await res.json();
-    if (res.ok) {
-      setApplied({ code: data.code, amount: data.discount });
-      setDiscountMsg(`已套用 ${data.code},折 ${formatter.format(data.discount)}`);
-    } else {
-      setApplied(null);
-      setDiscountMsg(data.error ?? '折扣碼無效');
-    }
-  }
-
-  async function submitOrder() {
-    setMessage(null);
-    if (cart.length === 0) {
-      setMessage({ type: 'err', text: '購物車是空的' });
-      return;
-    }
-    if (!checkoutName || !checkoutEmail) {
-      setMessage({ type: 'err', text: '請填寫 Email 與收件人姓名' });
-      return;
-    }
-    setSubmitting(true);
-    try {
-      const res = await fetch('/api/orders', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          customer_name: checkoutName,
-          email: checkoutEmail,
-          discount_code: applied?.code ?? '',
-          items: cart.map((item) => ({
-            productId: item.productId,
-            variant: item.variant,
-            quantity: item.quantity,
-          })),
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setMessage({ type: 'err', text: data.error ?? '下單失敗,請稍後再試' });
-      } else {
-        setMessage({ type: 'ok', text: `訂單成立!單號 ${data.order_no}` });
-        onClear();
-        setName(null);
-        setEmail(null);
-        setApplied(null);
-        setDiscountInput('');
-        setDiscountMsg('');
-      }
-    } catch {
-      setMessage({ type: 'err', text: '連線發生問題,請稍後再試' });
-    } finally {
-      setSubmitting(false);
-    }
-  }
-
   return (
     <>
       <div
@@ -815,7 +800,16 @@ function CartDrawer({
                     <h3 className="font-semibold">{item.name}</h3>
                     <p className="mt-1 text-sm text-[#8a7f72]">{item.variant}</p>
                   </div>
-                  <span className="font-semibold">{formatter.format(item.price * item.quantity)}</span>
+                  <div className="flex flex-col items-end gap-2">
+                    <span className="font-semibold">{formatter.format(item.price * item.quantity)}</span>
+                    <button
+                      onClick={() => onUpdate(item.id, -item.quantity)}
+                      aria-label="移除"
+                      className="text-xs text-[#8a7f72] hover:text-[#c0392b]"
+                    >
+                      移除
+                    </button>
+                  </div>
                 </div>
                 <div className="mt-4 inline-flex items-center rounded-full border border-[#e5ded4]">
                   <button className="px-3 py-1" onClick={() => onUpdate(item.id, -1)}>
@@ -829,66 +823,61 @@ function CartDrawer({
               </div>
             ))
           )}
+
+          {/* 您可能喜歡 */}
+          {recommendations.length > 0 && (
+            <div className="pt-2">
+              <h3 className="mb-3 text-sm font-semibold text-[#6b6156]">您可能喜歡…</h3>
+              <div className="space-y-3">
+                {recommendations.map((product) => (
+                  <div key={product.id} className="flex items-center gap-3">
+                    <Link
+                      href={`/products/${encodeURIComponent(product.id)}`}
+                      onClick={onClose}
+                      className="h-14 w-14 shrink-0 overflow-hidden rounded-md bg-[#e9e1d6]"
+                    >
+                      {product.image ? (
+                        <img src={product.image} alt={product.name} className="h-full w-full object-cover" />
+                      ) : null}
+                    </Link>
+                    <div className="min-w-0 flex-1">
+                      <Link
+                        href={`/products/${encodeURIComponent(product.id)}`}
+                        onClick={onClose}
+                        className="line-clamp-1 text-sm font-medium hover:text-[#c84767]"
+                      >
+                        {product.name}
+                      </Link>
+                      <p className="text-sm font-semibold text-[#c84767]">
+                        {formatter.format(product.price)}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => onAdd(product)}
+                      className="shrink-0 rounded-full border border-[#1f1b19] px-3 py-1.5 text-xs font-semibold hover:bg-[#1f1b19] hover:text-white"
+                    >
+                      加入
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="border-t border-[#e5ded4] p-5">
-          <div className="mb-3 flex gap-2">
-            <input
-              value={discountInput}
-              onChange={(e) => setDiscountInput(e.target.value)}
-              placeholder="折扣碼(選填)"
-              className="flex-1 rounded-lg border border-[#e5ded4] px-4 py-2.5 text-sm"
-            />
-            <button
-              onClick={applyDiscount}
-              className="rounded-lg border border-[#1f1b19] px-4 py-2.5 text-sm font-semibold"
-            >
-              套用
-            </button>
-          </div>
-          {discountMsg && (
-            <p className={`mb-3 text-xs ${applied ? 'text-[#1f7a44]' : 'text-[#c0392b]'}`}>
-              {discountMsg}
-            </p>
-          )}
           <div className="space-y-2 text-sm">
             <Row label="小計" value={formatter.format(subtotal)} />
             <Row label="運費" value={shipping === 0 ? '免運' : formatter.format(shipping)} />
-            {applied && (
-              <Row label={`折扣 ${applied.code}`} value={`-${formatter.format(applied.amount)}`} />
-            )}
-            <Row label="總計" value={formatter.format(finalTotal)} strong />
+            <Row label="總計" value={formatter.format(total)} strong />
           </div>
-          <div className="mt-4 grid gap-3">
-            <input
-              className="rounded-lg border border-[#e5ded4] px-4 py-3"
-              placeholder="Email"
-              value={checkoutEmail}
-              onChange={(e) => setEmail(e.target.value)}
-            />
-            <input
-              className="rounded-lg border border-[#e5ded4] px-4 py-3"
-              placeholder="收件人姓名"
-              value={checkoutName}
-              onChange={(e) => setName(e.target.value)}
-            />
-            {message && (
-              <p
-                className={`rounded-lg px-4 py-2 text-sm ${
-                  message.type === 'ok' ? 'bg-[#e9f7ee] text-[#1f7a44]' : 'bg-[#fdecec] text-[#c0392b]'
-                }`}
-              >
-                {message.text}
-              </p>
-            )}
-            <button
-              className="rounded-full bg-[#1f1b19] px-5 py-3 font-semibold text-white disabled:opacity-60"
-              onClick={submitOrder}
-              disabled={submitting}
-            >
-              {submitting ? '送出中…' : '送出訂單'}
-            </button>
-          </div>
+          <button
+            className="mt-4 w-full rounded-full bg-[#c84767] px-5 py-3 font-semibold text-white disabled:opacity-50"
+            onClick={onCheckout}
+            disabled={cart.length === 0}
+          >
+            訂單結帳
+          </button>
         </div>
       </aside>
     </>
@@ -900,6 +889,202 @@ function Row({ label, value, strong = false }: { label: string; value: string; s
     <div className={`flex justify-between ${strong ? 'pt-2 text-lg font-semibold' : 'text-[#6b6156]'}`}>
       <span>{label}</span>
       <span>{value}</span>
+    </div>
+  );
+}
+
+function HeroCarousel({ banners }: { banners: Banner[] }) {
+  const [index, setIndex] = useState(0);
+
+  useEffect(() => {
+    setIndex(0);
+  }, [banners.length]);
+
+  useEffect(() => {
+    if (banners.length <= 1) return;
+    const timer = setInterval(() => {
+      setIndex((i) => (i + 1) % banners.length);
+    }, 4000);
+    return () => clearInterval(timer);
+  }, [banners.length]);
+
+  if (banners.length === 0) return null;
+
+  return (
+    <section className="relative w-full overflow-hidden bg-[#e9e1d6]">
+      <div
+        className="flex transition-transform duration-500 ease-out"
+        style={{ transform: `translateX(-${index * 100}%)` }}
+      >
+        {banners.map((banner) => {
+          const img = (
+            <img
+              src={banner.image}
+              alt={banner.title || '輪播圖'}
+              className="h-full w-full object-cover"
+            />
+          );
+          return (
+            <div key={banner.id} className="relative aspect-[16/9] w-full shrink-0 sm:aspect-[21/9]">
+              {banner.link ? (
+                <a href={banner.link} target="_blank" rel="noreferrer" className="block h-full w-full">
+                  {img}
+                </a>
+              ) : (
+                img
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {banners.length > 1 && (
+        <div className="absolute inset-x-0 bottom-3 flex items-center justify-center gap-2">
+          {banners.map((banner, i) => (
+            <button
+              key={banner.id}
+              onClick={() => setIndex(i)}
+              aria-label={`第 ${i + 1} 張`}
+              className={`h-2 rounded-full transition-all ${
+                i === index ? 'w-5 bg-white' : 'w-2 bg-white/60 hover:bg-white/80'
+              }`}
+            />
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function QuickAddModal({
+  product,
+  favorited,
+  onFavorite,
+  onClose,
+  onAdd,
+}: {
+  product: Product;
+  favorited: boolean;
+  onFavorite: () => void;
+  onClose: () => void;
+  onAdd: (color: string, size: string, quantity: number, buyNow: boolean) => void;
+}) {
+  const [color, setColor] = useState(product.colors[0] ?? '');
+  const [size, setSize] = useState(product.sizes[0] ?? '');
+  const [quantity, setQuantity] = useState(1);
+
+  return (
+    <div
+      className="fixed inset-0 z-[60] flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4"
+      onClick={onClose}
+    >
+      <div
+        className="max-h-[90vh] w-full max-w-lg overflow-auto rounded-t-2xl bg-white p-5 sm:rounded-2xl sm:p-6"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex justify-end">
+          <button onClick={onClose} aria-label="關閉" className="rounded-md p-1 hover:bg-[#efe8dd]">
+            <IconClose />
+          </button>
+        </div>
+
+        <div className="flex gap-4">
+          <div className="h-40 w-40 shrink-0 overflow-hidden rounded-lg bg-[#e9e1d6]">
+            {product.image ? (
+              <img src={product.image} alt={product.name} className="h-full w-full object-cover" />
+            ) : (
+              <div className="flex h-full w-full items-center justify-center text-sm text-[#a99]">無圖片</div>
+            )}
+          </div>
+          <div className="min-w-0 flex-1">
+            <h2 className="text-lg font-semibold leading-6">{product.name}</h2>
+            {product.tagline && (
+              <p className="mt-1 line-clamp-2 text-sm text-[#8a7f72]">{product.tagline}</p>
+            )}
+            <div className="mt-3 flex items-baseline gap-2">
+              <span className="text-2xl font-bold text-[#c84767]">{formatter.format(product.price)}</span>
+              {product.original_price ? (
+                <span className="text-sm text-[#b3a897] line-through">
+                  {formatter.format(product.original_price)}
+                </span>
+              ) : null}
+            </div>
+          </div>
+        </div>
+
+        {product.colors.length > 0 && (
+          <section className="mt-5">
+            <p className="mb-2 text-sm text-[#8a8480]">顏色：{color}</p>
+            <div className="flex flex-wrap gap-2">
+              {product.colors.map((c) => (
+                <button
+                  key={c}
+                  onClick={() => setColor(c)}
+                  className={`min-w-14 border px-4 py-2 text-sm font-semibold ${
+                    color === c ? 'border-[#c84767] text-[#c84767]' : 'border-[#e1d9d3] bg-[#f7f5f2] text-[#3d3935]'
+                  }`}
+                >
+                  {c}
+                </button>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {product.sizes.length > 0 && (
+          <section className="mt-4">
+            <p className="mb-2 text-sm text-[#8a8480]">尺寸：{size}</p>
+            <div className="flex flex-wrap gap-2">
+              {product.sizes.map((s) => (
+                <button
+                  key={s}
+                  onClick={() => setSize(s)}
+                  className={`h-11 min-w-14 border text-sm font-semibold ${
+                    size === s ? 'border-2 border-[#c84767] bg-white text-[#2c2826]' : 'border-[#ece7e2] bg-[#f7f5f2] text-[#3d3935]'
+                  }`}
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
+          </section>
+        )}
+
+        <section className="mt-4">
+          <p className="mb-2 text-sm text-[#8a8480]">數量</p>
+          <div className="grid h-11 w-36 grid-cols-[40px_1fr_40px] border border-[#d8d2cc]">
+            <button onClick={() => setQuantity((q) => Math.max(1, q - 1))} className="text-xl font-bold">
+              -
+            </button>
+            <div className="flex items-center justify-center border-x border-[#d8d2cc]">{quantity}</div>
+            <button onClick={() => setQuantity((q) => q + 1)} className="text-xl font-bold">
+              +
+            </button>
+          </div>
+        </section>
+
+        <div className="mt-6 grid grid-cols-2 gap-3">
+          <button
+            onClick={() => onAdd(color, size, quantity, false)}
+            className="rounded-full bg-[#c84767] px-4 py-3 font-semibold text-white"
+          >
+            加入購物車
+          </button>
+          <button
+            onClick={() => onAdd(color, size, quantity, true)}
+            className="rounded-full bg-[#ff761a] px-4 py-3 font-semibold text-white"
+          >
+            立即購買
+          </button>
+        </div>
+
+        <button
+          onClick={onFavorite}
+          className="mx-auto mt-4 flex items-center justify-center gap-2 text-sm font-semibold text-[#5d5652]"
+        >
+          <IconStar filled={favorited} small /> {favorited ? '已收藏' : '加入收藏'}
+        </button>
+      </div>
     </div>
   );
 }
