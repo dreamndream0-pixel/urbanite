@@ -37,6 +37,7 @@ export default function Home() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
+  const [favoritesOpen, setFavoritesOpen] = useState(false);
   const [cartOpen, setCartOpen] = useState(false);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [user, setUser] = useState<{ email: string; name: string; isAdmin: boolean } | null>(null);
@@ -62,6 +63,24 @@ export default function Home() {
       })
       .catch(() => {});
   }, []);
+
+  // 讀取 / 保存收藏清單(存在瀏覽器本機,重新整理不會消失)
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('favorites');
+      if (raw) setFavorites(new Set(JSON.parse(raw) as string[]));
+    } catch {
+      /* localStorage 不可用時略過 */
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('favorites', JSON.stringify([...favorites]));
+    } catch {
+      /* localStorage 不可用時略過 */
+    }
+  }, [favorites]);
 
   useEffect(() => {
     const supabase = createBrowserSupabase();
@@ -201,10 +220,16 @@ export default function Home() {
               <IconSearch />
             </button>
             <button
-              aria-label="收藏"
-              className="rounded-md p-2 hover:bg-[#efe8dd]"
+              onClick={() => setFavoritesOpen(true)}
+              aria-label="收藏清單"
+              className="relative rounded-md p-2 hover:bg-[#efe8dd]"
             >
               <IconStar filled={favorites.size > 0} />
+              {favorites.size > 0 && (
+                <span className="absolute -right-0.5 -top-0.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-[#c84767] px-1 text-[10px] font-semibold text-white">
+                  {favorites.size}
+                </span>
+              )}
             </button>
             <div className="relative">
               <button
@@ -366,7 +391,108 @@ export default function Home() {
         onUpdate={updateCart}
         onClear={() => setCart([])}
       />
+
+      {/* 收藏清單 */}
+      <FavoritesDrawer
+        open={favoritesOpen}
+        items={liveProducts.filter((p) => favorites.has(p.id))}
+        onClose={() => setFavoritesOpen(false)}
+        onRemove={(id) => toggleFavorite(id)}
+        onAdd={(product) => {
+          addToCart(product);
+          setFavoritesOpen(false);
+        }}
+      />
     </main>
+  );
+}
+
+function FavoritesDrawer({
+  open,
+  items,
+  onClose,
+  onRemove,
+  onAdd,
+}: {
+  open: boolean;
+  items: Product[];
+  onClose: () => void;
+  onRemove: (id: string) => void;
+  onAdd: (product: Product) => void;
+}) {
+  return (
+    <>
+      <div
+        className={`fixed inset-0 z-40 bg-black/30 transition-opacity duration-300 ${
+          open ? 'opacity-100' : 'pointer-events-none opacity-0'
+        }`}
+        onClick={onClose}
+      />
+      <aside
+        className={`fixed inset-y-0 right-0 z-50 flex w-full max-w-md flex-col bg-white shadow-2xl transition-transform duration-300 ${
+          open ? 'translate-x-0' : 'translate-x-full'
+        }`}
+      >
+        <div className="flex items-center justify-between border-b border-[#e5ded4] px-5 py-4">
+          <h2 className="flex items-center gap-2 text-xl font-semibold">
+            <IconStar filled small /> 收藏清單
+          </h2>
+          <button className="rounded-md p-1 hover:bg-[#efe8dd]" onClick={onClose} aria-label="關閉">
+            <IconClose />
+          </button>
+        </div>
+
+        <div className="flex-1 space-y-4 overflow-auto p-5">
+          {items.length === 0 ? (
+            <p className="rounded-lg bg-[#f6f2ec] p-5 text-[#6b6156]">
+              還沒有收藏商品。點商品右上角的星號即可加入收藏。
+            </p>
+          ) : (
+            items.map((product) => (
+              <div key={product.id} className="flex gap-3 rounded-lg border border-[#e5ded4] p-3">
+                <Link
+                  href={`/products/${encodeURIComponent(product.id)}`}
+                  onClick={onClose}
+                  className="h-20 w-20 shrink-0 overflow-hidden rounded-md bg-[#e9e1d6]"
+                >
+                  {product.image ? (
+                    <img src={product.image} alt={product.name} className="h-full w-full object-cover" />
+                  ) : (
+                    <span className="flex h-full w-full items-center justify-center text-xs text-[#a99]">
+                      無圖片
+                    </span>
+                  )}
+                </Link>
+                <div className="flex flex-1 flex-col">
+                  <Link
+                    href={`/products/${encodeURIComponent(product.id)}`}
+                    onClick={onClose}
+                    className="text-sm font-semibold leading-5 hover:text-[#c84767]"
+                  >
+                    {product.name}
+                  </Link>
+                  <span className="mt-1 font-semibold">{formatter.format(product.price)}</span>
+                  <div className="mt-auto flex items-center gap-3 pt-2">
+                    <button
+                      onClick={() => onAdd(product)}
+                      className="rounded-full bg-[#1f1b19] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#3a322e]"
+                    >
+                      加入購物車
+                    </button>
+                    <button
+                      onClick={() => onRemove(product.id)}
+                      className="text-xs text-[#8a7f72] hover:text-[#c0392b]"
+                    >
+                      移除
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </aside>
+    </>
   );
 }
 
@@ -479,7 +605,7 @@ function ProductCard({
         <button
           onClick={onFavorite}
           aria-label="加入收藏"
-          className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full bg-white/90 shadow-sm"
+          className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full bg-white/50 shadow-sm backdrop-blur-sm transition hover:bg-white/70"
         >
           <IconStar filled={favorited} small />
         </button>

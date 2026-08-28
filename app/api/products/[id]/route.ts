@@ -13,6 +13,7 @@ const EDITABLE: (keyof Product)[] = [
   'status',
   'category',
   'image',
+  'images',
   'colors',
   'sizes',
   'is_featured',

@@ -38,11 +38,15 @@ type Draft = {
   status: string;
   category: string;
   image: string;
+  images: string[];
   colors: string;
   sizes: string;
   is_featured: boolean;
   sort_order: number;
 };
+
+// 每個商品最多可放的圖片數
+const MAX_PRODUCT_IMAGES = 10;
 
 function blankDraft(): Draft {
   return {
@@ -55,6 +59,7 @@ function blankDraft(): Draft {
     status: '上架中',
     category: '',
     image: '',
+    images: [],
     colors: '',
     sizes: '',
     is_featured: false,
@@ -63,7 +68,8 @@ function blankDraft(): Draft {
 }
 
 function toDraft(p: Product): Draft {
-  return { ...p, colors: p.colors.join(', '), sizes: p.sizes.join(', ') };
+  const images = p.images?.length ? p.images : p.image ? [p.image] : [];
+  return { ...p, images, colors: p.colors.join(', '), sizes: p.sizes.join(', ') };
 }
 
 export default function AdminDashboard({
@@ -193,8 +199,11 @@ export default function AdminDashboard({
 
   async function saveProduct() {
     if (!editing) return;
+    const images = editing.images.filter(Boolean).slice(0, MAX_PRODUCT_IMAGES);
     const payload = {
       ...editing,
+      images,
+      image: images[0] ?? '', // 第一張作為封面,前台商品卡沿用 image 欄位
       colors: editing.colors.split(',').map((s) => s.trim()).filter(Boolean),
       sizes: editing.sizes.split(',').map((s) => s.trim()).filter(Boolean),
     };
@@ -1131,21 +1140,54 @@ function ProductModal({
     onChange({ ...draft, [key]: value });
   }
 
-  async function uploadProductImage(file: File) {
+  async function uploadProductImages(files: File[]) {
+    const room = MAX_PRODUCT_IMAGES - draft.images.length;
+    if (room <= 0) {
+      alert(`最多只能放 ${MAX_PRODUCT_IMAGES} 張圖片`);
+      return;
+    }
+    const picked = files.slice(0, room);
     setUploadingImage(true);
     try {
-      const fd = new FormData();
-      fd.append('file', file);
-      fd.append('productId', draft.id || 'new-product');
-      const res = await fetch('/api/products/image', { method: 'POST', body: fd });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? '上傳失敗');
-      set('image', data.image_url);
+      const uploaded: string[] = [];
+      for (const file of picked) {
+        const fd = new FormData();
+        fd.append('file', file);
+        fd.append('productId', draft.id || 'new-product');
+        const res = await fetch('/api/products/image', { method: 'POST', body: fd });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error ?? '上傳失敗');
+        uploaded.push(data.image_url);
+      }
+      onChange({ ...draft, images: [...draft.images, ...uploaded].slice(0, MAX_PRODUCT_IMAGES) });
+      if (files.length > room) alert(`最多只能放 ${MAX_PRODUCT_IMAGES} 張,已略過多餘的圖片`);
     } catch (error) {
       alert(error instanceof Error ? error.message : '上傳失敗');
     } finally {
       setUploadingImage(false);
     }
+  }
+
+  function removeImage(index: number) {
+    onChange({ ...draft, images: draft.images.filter((_, i) => i !== index) });
+  }
+
+  function moveImageToFront(index: number) {
+    if (index === 0) return;
+    const next = [...draft.images];
+    const [picked] = next.splice(index, 1);
+    next.unshift(picked);
+    onChange({ ...draft, images: next });
+  }
+
+  function addImageByUrl() {
+    const url = prompt('貼上圖片網址')?.trim();
+    if (!url) return;
+    if (draft.images.length >= MAX_PRODUCT_IMAGES) {
+      alert(`最多只能放 ${MAX_PRODUCT_IMAGES} 張圖片`);
+      return;
+    }
+    onChange({ ...draft, images: [...draft.images, url] });
   }
 
   return (
@@ -1230,39 +1272,75 @@ function ProductModal({
               ))}
             </select>
           </Field>
-          <Field label="商品圖片">
+          <Field label={`商品圖片(最多 ${MAX_PRODUCT_IMAGES} 張,第一張為封面)`}>
             <div className="grid gap-3">
-              <div className="flex items-center gap-3">
-                <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-[#e5ded4] bg-[#f6f2ec]">
-                  {draft.image ? (
-                    <img src={draft.image} alt="" className="h-full w-full object-cover" />
-                  ) : (
-                    <span className="text-xs text-[#8a7f72]">無圖片</span>
-                  )}
+              {draft.images.length > 0 && (
+                <div className="grid grid-cols-4 gap-2 sm:grid-cols-5">
+                  {draft.images.map((url, index) => (
+                    <div
+                      key={`${url}-${index}`}
+                      className="group relative aspect-square overflow-hidden rounded-lg border border-[#e5ded4] bg-[#f6f2ec]"
+                    >
+                      <img src={url} alt="" className="h-full w-full object-cover" />
+                      {index === 0 ? (
+                        <span className="absolute left-1 top-1 rounded bg-[#1f1b19] px-1.5 py-0.5 text-[10px] font-semibold text-white">
+                          封面
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => moveImageToFront(index)}
+                          className="absolute left-1 top-1 rounded bg-white/85 px-1.5 py-0.5 text-[10px] font-semibold text-[#1f1b19] opacity-0 transition group-hover:opacity-100"
+                        >
+                          設為封面
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => removeImage(index)}
+                        aria-label="移除圖片"
+                        className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-black/55 text-xs font-bold text-white hover:bg-[#c0392b]"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
                 </div>
-                <label className="inline-flex cursor-pointer items-center rounded-full bg-[#1f1b19] px-4 py-2 text-sm font-semibold text-white">
+              )}
+              <div className="flex flex-wrap items-center gap-3">
+                <label
+                  className={`inline-flex cursor-pointer items-center rounded-full bg-[#1f1b19] px-4 py-2 text-sm font-semibold text-white ${
+                    draft.images.length >= MAX_PRODUCT_IMAGES ? 'pointer-events-none opacity-40' : ''
+                  }`}
+                >
                   {uploadingImage ? '上傳中...' : '上傳圖片'}
                   <input
                     type="file"
+                    multiple
                     accept="image/png,image/jpeg,image/webp,image/gif"
                     className="hidden"
-                    disabled={uploadingImage}
+                    disabled={uploadingImage || draft.images.length >= MAX_PRODUCT_IMAGES}
                     onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) uploadProductImage(file);
+                      const files = Array.from(e.target.files ?? []);
+                      if (files.length) uploadProductImages(files);
                       e.target.value = '';
                     }}
                   />
                 </label>
+                <button
+                  type="button"
+                  onClick={addImageByUrl}
+                  disabled={draft.images.length >= MAX_PRODUCT_IMAGES}
+                  className="rounded-full border border-[#d7c9bd] px-4 py-2 text-sm font-semibold disabled:opacity-40"
+                >
+                  貼上網址
+                </button>
+                <span className="text-xs text-[#8a7f72]">
+                  {draft.images.length}/{MAX_PRODUCT_IMAGES}
+                </span>
               </div>
-              <input
-                className="w-full rounded-lg border border-[#e5ded4] px-3 py-2"
-                value={draft.image}
-                placeholder="或貼上圖片網址"
-                onChange={(e) => set('image', e.target.value)}
-              />
               <p className="text-xs text-[#8a7f72]">
-                圖片會上傳到 Supabase Storage,儲存商品後會成為前台商品圖。
+                可一次選多張。圖片會上傳到 Supabase Storage,第一張會成為前台封面圖。
               </p>
             </div>
           </Field>

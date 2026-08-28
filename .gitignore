@@ -41,3 +41,7 @@ next-env.d.ts
 /site.tar.gz
 
 .vercel
+
+# 建置暫存
+tsconfig.tsbuildinfo
+supabase/.temp/
