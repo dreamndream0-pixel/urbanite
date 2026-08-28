@@ -25,6 +25,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: '缺少必填欄位(id / name / price)' }, { status: 400 });
   }
 
+  // 多圖:最多保留 10 張;主圖(image)一律同步為第一張
+  const images: string[] = Array.isArray(body.images)
+    ? body.images.filter((u: unknown) => typeof u === 'string' && u.trim() !== '').slice(0, 10)
+    : [];
+  const image = images[0] ?? body.image ?? '';
+
   const supabase = createAdminClient();
   const { data, error } = await supabase
     .from('products')
@@ -37,7 +43,8 @@ export async function POST(request: Request) {
       inventory: body.inventory ?? 0,
       status: body.status ?? '上架中',
       category: body.category ?? '',
-      image: body.image ?? '',
+      image,
+      images: image && images.length === 0 ? [image] : images,
       colors: body.colors ?? [],
       sizes: body.sizes ?? [],
       is_featured: body.is_featured ?? false,

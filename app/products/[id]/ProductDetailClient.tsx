@@ -13,6 +13,12 @@ const formatter = new Intl.NumberFormat('zh-TW', {
 });
 
 export default function ProductDetailClient({ product }: { product: Product }) {
+  // 商品圖:優先用多圖陣列,向後相容舊的單張 image
+  const gallery = useMemo(
+    () => (product.images?.length ? product.images : product.image ? [product.image] : []),
+    [product.images, product.image],
+  );
+  const [activeImage, setActiveImage] = useState(0);
   const [selectedColor, setSelectedColor] = useState(product.colors[0] ?? '');
   const [selectedSize, setSelectedSize] = useState(product.sizes[0] ?? '');
   const [quantity, setQuantity] = useState(1);
@@ -83,12 +89,32 @@ export default function ProductDetailClient({ product }: { product: Product }) {
 
       <section className="mx-auto max-w-5xl">
         <div className="aspect-[16/10] overflow-hidden bg-[#eee8e1] sm:aspect-[16/8]">
-          {product.image ? (
-            <img src={product.image} alt={product.name} className="h-full w-full object-cover" />
+          {gallery.length > 0 ? (
+            <img
+              src={gallery[activeImage] ?? gallery[0]}
+              alt={product.name}
+              className="h-full w-full object-cover"
+            />
           ) : (
             <div className="flex h-full items-center justify-center text-[#8a7f72]">無商品圖片</div>
           )}
         </div>
+        {gallery.length > 1 && (
+          <div className="flex gap-2 overflow-x-auto px-5 py-3 sm:px-8">
+            {gallery.map((url, idx) => (
+              <button
+                key={`${url}-${idx}`}
+                onClick={() => setActiveImage(idx)}
+                aria-label={`顯示第 ${idx + 1} 張圖片`}
+                className={`h-16 w-16 shrink-0 overflow-hidden rounded-md border-2 transition ${
+                  idx === activeImage ? 'border-[#c84767]' : 'border-transparent opacity-70 hover:opacity-100'
+                }`}
+              >
+                <img src={url} alt="" className="h-full w-full object-cover" />
+              </button>
+            ))}
+          </div>
+        )}
 
         <div className="px-5 py-8 sm:px-8">
           <p className="mb-3 text-xs font-semibold uppercase tracking-[0.25em] text-[#c84767]">

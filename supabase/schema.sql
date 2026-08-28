@@ -13,7 +13,8 @@ create table if not exists public.products (
   original_price integer,                        -- 原價(劃線價,可空)
   inventory      integer not null default 0,    -- 庫存數量
   status         text not null default '上架中',-- 狀態:上架中 / 加購品 / 已下架
-  image          text default '',               -- 主圖網址
+  image          text default '',               -- 主圖網址(等同 images 第一張)
+  images         text[] not null default '{}',  -- 多圖網址(最多 10 張)
   colors         text[] default '{}',           -- 可選顏色
   sizes          text[] default '{}',           -- 可選尺寸
   is_featured    boolean not null default false,-- 是否為首頁主打

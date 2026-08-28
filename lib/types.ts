@@ -10,6 +10,7 @@ export type Product = {
   status: string;
   category: string;
   image: string;
+  images: string[];
   colors: string[];
   sizes: string[];
   is_featured: boolean;

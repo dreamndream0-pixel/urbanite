@@ -13,6 +13,7 @@ const EDITABLE: (keyof Product)[] = [
   'status',
   'category',
   'image',
+  'images',
   'colors',
   'sizes',
   'is_featured',
@@ -36,6 +37,17 @@ export async function PATCH(
   }
   if (Object.keys(update).length === 0) {
     return NextResponse.json({ error: '沒有可更新的欄位' }, { status: 400 });
+  }
+
+  // 多圖:最多保留 10 張;主圖(image)一律同步為第一張
+  if ('images' in update) {
+    const images = Array.isArray(update.images)
+      ? (update.images as unknown[])
+          .filter((u): u is string => typeof u === 'string' && u.trim() !== '')
+          .slice(0, 10)
+      : [];
+    update.images = images;
+    update.image = images[0] ?? '';
   }
 
   const supabase = createAdminClient();
