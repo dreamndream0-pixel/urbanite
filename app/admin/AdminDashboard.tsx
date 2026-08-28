@@ -118,6 +118,7 @@ export default function AdminDashboard({
   const [uploadingBanner, setUploadingBanner] = useState(false);
   const [settingsTab, setSettingsTab] = useState<'general' | 'banners'>('general');
   const [orderFilter, setOrderFilter] = useState<string>('全部');
+  const [openOrderId, setOpenOrderId] = useState<string | null>(null);
   const [cropFile, setCropFile] = useState<File | null>(null);
   const [editBannerId, setEditBannerId] = useState<string | null>(null);
   const [newCat, setNewCat] = useState({ slug: '', name: '', en: '' });
@@ -638,7 +639,11 @@ export default function AdminDashboard({
                       const name =
                         (order.user_id && customerByUser.get(order.user_id)?.name) || order.customer_name;
                       return (
-                        <div key={order.id} className="rounded-lg border border-[#e5ded4] p-4">
+                        <button
+                          key={order.id}
+                          onClick={() => setOpenOrderId(order.id)}
+                          className="block w-full rounded-lg border border-[#e5ded4] p-4 text-left transition hover:border-[#c9b8a8] hover:shadow-sm"
+                        >
                           <div className="flex items-start justify-between gap-3">
                             <div className="min-w-0">
                               <p className="font-semibold">{order.order_no}</p>
@@ -678,48 +683,26 @@ export default function AdminDashboard({
                             ))}
                           </div>
 
-                          {(order.shipping_method || order.payment_method) && (
-                            <p className="mt-2 text-sm text-[#8a7f72]">
-                              {order.shipping_method && `送貨:${order.shipping_method}`}
-                              {order.shipping_method && order.payment_method ? ' · ' : ''}
-                              {order.payment_method && `付款:${order.payment_method}`}
-                            </p>
-                          )}
                           {order.note ? (
-                            <p className="mt-1 rounded-lg bg-[#faf6ee] px-3 py-2 text-sm text-[#6b6156]">
+                            <p className="mt-2 line-clamp-1 rounded-lg bg-[#faf6ee] px-3 py-1.5 text-sm text-[#6b6156]">
                               備註:{order.note}
                             </p>
                           ) : null}
-                          {order.discount > 0 && (
-                            <p className="mt-1 text-sm text-[#c84767]">
-                              折扣碼 {order.discount_code}:-{formatter.format(order.discount)}
-                            </p>
-                          )}
 
                           <div className="mt-3 flex flex-wrap items-center gap-2">
-                            <select
-                              value={order.status}
-                              onChange={(e) => updateOrder(order.id, { status: e.target.value })}
-                              className="rounded-full border border-[#d7c9bd] bg-white px-3 py-1.5 text-sm"
-                            >
-                              {ORDER_STATUSES.map((s) => (
-                                <option key={s} value={s}>
-                                  {s}
-                                </option>
-                              ))}
-                            </select>
-                            <button
-                              onClick={() => updateOrder(order.id, { paid: !order.paid })}
-                              className={`rounded-full px-3 py-1.5 text-sm font-semibold ${
-                                order.paid
-                                  ? 'bg-[#e9f7ee] text-[#1f7a44]'
-                                  : 'border border-[#d7c9bd] text-[#6b6156]'
+                            <span className="rounded-full bg-[#f3ede4] px-3 py-1 text-xs font-semibold text-[#6b6156]">
+                              {order.status}
+                            </span>
+                            <span
+                              className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                                order.paid ? 'bg-[#e9f7ee] text-[#1f7a44]' : 'bg-[#fdf3e7] text-[#9a6a1f]'
                               }`}
                             >
                               {order.paid ? '已付款' : '未付款'}
-                            </button>
+                            </span>
+                            <span className="ml-auto text-xs text-[#a99e8f]">點看完整訂單 ›</span>
                           </div>
-                        </div>
+                        </button>
                       );
                     })}
                   </div>
@@ -1394,6 +1377,14 @@ export default function AdminDashboard({
           onConfirm={(blob, filename) => uploadBanner(blob, filename, filename)}
         />
       )}
+
+      {openOrderId && orders.find((o) => o.id === openOrderId) && (
+        <AdminOrderModal
+          order={orders.find((o) => o.id === openOrderId)!}
+          onClose={() => setOpenOrderId(null)}
+          onUpdate={(patch) => updateOrder(openOrderId, patch)}
+        />
+      )}
     </div>
   );
 }
@@ -1736,6 +1727,136 @@ function uploadImageWithProgress(
     xhr.onerror = () => reject(new Error('連線發生問題'));
     xhr.send(fd);
   });
+}
+
+// 後台專用的訂單完整資訊(含出貨狀態 / 付款管理;與客人端的訂單明細分開)
+function AdminOrderModal({
+  order,
+  onClose,
+  onUpdate,
+}: {
+  order: Order;
+  onClose: () => void;
+  onUpdate: (patch: Partial<Order>) => void;
+}) {
+  const dateStr = order.created_at ? new Date(order.created_at).toLocaleString('zh-TW') : '';
+  const row = (label: string, value?: string) =>
+    value ? (
+      <div className="flex justify-between gap-3">
+        <span className="shrink-0 text-[#8a7f72]">{label}</span>
+        <span className="min-w-0 break-words text-right">{value}</span>
+      </div>
+    ) : null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center sm:p-4" onClick={onClose}>
+      <div
+        className="flex max-h-[90dvh] w-full max-w-lg flex-col overflow-hidden rounded-t-2xl bg-white sm:rounded-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex shrink-0 items-center justify-between border-b border-[#e5ded4] px-5 py-4">
+          <h2 className="text-lg font-semibold">{order.order_no}</h2>
+          <button onClick={onClose} aria-label="關閉" className="rounded-md p-1 text-2xl leading-none hover:bg-[#efe8dd]">
+            ×
+          </button>
+        </div>
+
+        <div className="flex-1 space-y-5 overflow-y-auto overscroll-contain p-5">
+          {/* 出貨狀態 / 付款(管理操作,藏在訂單資訊內) */}
+          <div className="rounded-xl bg-[#faf7f2] p-4">
+            <p className="mb-2 text-sm font-semibold text-[#6b6156]">出貨狀態</p>
+            <div className="flex flex-wrap items-center gap-2">
+              <select
+                value={order.status}
+                onChange={(e) => onUpdate({ status: e.target.value })}
+                className="rounded-full border border-[#d7c9bd] bg-white px-3 py-1.5 text-sm"
+              >
+                {ORDER_STATUSES.map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </select>
+              <button
+                onClick={() => onUpdate({ paid: !order.paid })}
+                className={`rounded-full px-3 py-1.5 text-sm font-semibold ${
+                  order.paid ? 'bg-[#e9f7ee] text-[#1f7a44]' : 'border border-[#d7c9bd] text-[#6b6156]'
+                }`}
+              >
+                {order.paid ? '已付款' : '未付款'}
+              </button>
+            </div>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button
+                disabled
+                className="rounded-full border border-dashed border-[#d7c9bd] px-3 py-1.5 text-xs text-[#a99e8f]"
+              >
+                串接物流(開發中)
+              </button>
+              <button
+                disabled
+                className="rounded-full border border-dashed border-[#d7c9bd] px-3 py-1.5 text-xs text-[#a99e8f]"
+              >
+                串接金流(開發中)
+              </button>
+            </div>
+            <p className="mt-2 text-xs text-[#a99e8f]">串接物流與金流後,出貨與付款狀態可自動更新。</p>
+          </div>
+
+          {/* 品項 */}
+          <div className="space-y-3">
+            {order.items.map((it, i) => (
+              <div key={i} className="flex items-center gap-3">
+                <div className="h-14 w-14 shrink-0 overflow-hidden rounded-lg bg-[#e9e1d6]">
+                  {it.image ? <img src={it.image} alt={it.name} className="h-full w-full object-cover" /> : null}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium">{it.name}</p>
+                  <p className="text-xs text-[#8a7f72]">
+                    {it.variant} × {it.quantity}
+                  </p>
+                </div>
+                <span className="text-sm font-semibold">{formatter.format(it.price * it.quantity)}</span>
+              </div>
+            ))}
+          </div>
+
+          <div className="space-y-1.5 border-t border-[#efe8dd] pt-4 text-sm">
+            {row('小計', formatter.format(order.subtotal))}
+            {row('運費', order.shipping === 0 ? '免運' : formatter.format(order.shipping))}
+            {order.discount > 0 ? row(`折扣 ${order.discount_code || ''}`, `-${formatter.format(order.discount)}`) : null}
+            <div className="flex justify-between pt-1 text-base font-semibold">
+              <span>合計</span>
+              <span className="text-[#c84767]">{formatter.format(order.total)}</span>
+            </div>
+          </div>
+
+          <div className="border-t border-[#efe8dd] pt-4">
+            <h3 className="mb-2 font-semibold">訂單資訊</h3>
+            <div className="space-y-1.5 text-sm text-[#6b6156]">
+              {row('訂單號碼', order.order_no)}
+              {row('訂單日期', dateStr)}
+              {row('訂單狀態', order.status)}
+              {row('付款狀態', order.paid ? '已付款' : '未付款')}
+              {row('備註', order.note)}
+            </div>
+          </div>
+
+          <div className="border-t border-[#efe8dd] pt-4">
+            <h3 className="mb-2 font-semibold">顧客與送貨資訊</h3>
+            <div className="space-y-1.5 text-sm text-[#6b6156]">
+              {row('姓名', order.customer_name)}
+              {row('電話', order.phone)}
+              {row('Email', order.email)}
+              {row('地址', order.address)}
+              {row('送貨方式', order.shipping_method)}
+              {row('付款方式', order.payment_method)}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function StatCard({ label, value }: { label: string; value: string }) {
