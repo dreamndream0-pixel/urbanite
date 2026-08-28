@@ -34,9 +34,22 @@ export default function ProductDetailClient({ product }: { product: Product }) {
   const [favorite, setFavorite] = useState(false);
   const [logoUrl, setLogoUrl] = useState('');
   const [settingsLoaded, setSettingsLoaded] = useState(false);
+  const [cartCount, setCartCount] = useState(0);
   const router = useRouter();
 
+  function refreshCartCount() {
+    try {
+      const raw = localStorage.getItem(CART_KEY);
+      const cart: CartItem[] = raw ? JSON.parse(raw) : [];
+      setCartCount(cart.reduce((n, it) => n + it.quantity, 0));
+    } catch {
+      setCartCount(0);
+    }
+  }
+
   useEffect(() => {
+    refreshCartCount();
+
     fetch('/api/settings')
       .then((res) => (res.ok ? res.json() : null))
       .then((settings) => {
@@ -73,6 +86,7 @@ export default function ProductDetailClient({ product }: { product: Product }) {
     } catch {
       /* localStorage 不可用時略過 */
     }
+    refreshCartCount();
     if (action === 'buy') {
       router.push('/checkout');
     } else {
@@ -113,9 +127,14 @@ export default function ProductDetailClient({ product }: { product: Product }) {
             <Link href="/account" aria-label="我的帳號" className="rounded-md p-2 hover:bg-[#efe8dd]">
               <IconUser />
             </Link>
-            <button aria-label="購物車" className="rounded-md p-2 hover:bg-[#efe8dd]">
+            <Link href="/checkout" aria-label="購物車" className="relative rounded-md p-2 hover:bg-[#efe8dd]">
               <IconBag />
-            </button>
+              {cartCount > 0 && (
+                <span className="absolute -right-0.5 -top-0.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-[#c84767] px-1 text-[10px] font-semibold text-white">
+                  {cartCount}
+                </span>
+              )}
+            </Link>
           </div>
         </nav>
       </header>
