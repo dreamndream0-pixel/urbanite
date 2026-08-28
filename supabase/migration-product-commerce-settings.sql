@@ -4,15 +4,15 @@
 -- =============================================================
 
 alter table public.products
-  add column if not exists images jsonb not null default '[]',
+  add column if not exists images text[] not null default '{}',
   add column if not exists available_payment_methods jsonb not null default '[]',
   add column if not exists available_shipping_methods jsonb not null default '[]';
 
 update public.products
-set images = jsonb_build_array(image)
+set images = array[image]
 where image is not null
   and image <> ''
-  and (images is null or images = '[]'::jsonb);
+  and (images is null or cardinality(images) = 0);
 
 alter table public.site_settings
   add column if not exists payment_methods jsonb not null default '["綠界金流","Line Pay","Apple Pay","取貨付款","轉帳匯款"]',

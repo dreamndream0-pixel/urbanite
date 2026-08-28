@@ -14,7 +14,7 @@ create table if not exists public.products (
   inventory      integer not null default 0,    -- 庫存數量
   status         text not null default '上架中',-- 狀態:上架中 / 加購品 / 已下架
   image                      text default '',               -- 主圖網址
-  images                     jsonb not null default '[]',   -- 商品圖片,最多 10 張由後台限制
+  images                     text[] not null default '{}',   -- 商品圖片,最多 10 張由後台限制
   available_payment_methods  jsonb not null default '[]',   -- 此商品可用付款方式
   available_shipping_methods jsonb not null default '[]',   -- 此商品可用物流方式
   colors                     text[] default '{}',           -- 可選顏色
