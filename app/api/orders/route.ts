@@ -30,6 +30,8 @@ export async function POST(request: Request) {
   const { customer_name, email, items } = body ?? {};
   const shippingMethod = String(body?.shipping_method ?? '').trim();
   const paymentMethod = String(body?.payment_method ?? '').trim();
+  const phone = String(body?.phone ?? '').trim();
+  const address = String(body?.address ?? '').trim();
 
   if (!customer_name || !email) {
     return NextResponse.json({ error: '請填寫姓名與 Email' }, { status: 400 });
@@ -72,6 +74,9 @@ export async function POST(request: Request) {
       variant: item.variant ?? '標準款',
       price: product.price,
       quantity,
+      productId: product.id,
+      image: product.image ?? '',
+      original_price: product.original_price ?? null,
     });
   }
 
@@ -116,6 +121,8 @@ export async function POST(request: Request) {
       order_no: orderNo,
       customer_name,
       email,
+      phone,
+      address,
       items: orderItems,
       subtotal,
       shipping,

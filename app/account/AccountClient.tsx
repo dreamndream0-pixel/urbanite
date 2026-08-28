@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createBrowserSupabase } from '@/lib/supabase/client';
@@ -63,6 +63,43 @@ export default function AccountClient({
   async function signOut() {
     await createBrowserSupabase().auth.signOut();
     router.refresh();
+  }
+
+  // 再次加入購物車:把訂單品項放回購物車(用 productId,舊訂單則用商品名對應)後前往結帳
+  function reorder(order: Order) {
+    const byName = new Map(products.map((p) => [p.name, p]));
+    const toAdd = order.items
+      .map((it) => {
+        const pid = it.productId || byName.get(it.name)?.id;
+        if (!pid) return null;
+        return {
+          id: `${pid}-${it.variant}`,
+          productId: pid,
+          name: it.name,
+          variant: it.variant,
+          price: it.price,
+          quantity: it.quantity,
+        };
+      })
+      .filter((x): x is NonNullable<typeof x> => x !== null);
+    if (toAdd.length === 0) {
+      alert('這筆訂單的商品目前已無法加入購物車。');
+      return;
+    }
+    try {
+      const raw = localStorage.getItem('cart');
+      const existing = raw ? (JSON.parse(raw) as typeof toAdd) : [];
+      const map = new Map(existing.map((i) => [i.id, i]));
+      for (const item of toAdd) {
+        const e = map.get(item.id);
+        if (e) e.quantity += item.quantity;
+        else map.set(item.id, item);
+      }
+      localStorage.setItem('cart', JSON.stringify([...map.values()]));
+    } catch {
+      /* localStorage 不可用時略過 */
+    }
+    router.push('/checkout');
   }
 
   return (
@@ -130,7 +167,12 @@ export default function AccountClient({
       </section>
 
       {openOrder && (
-        <OrderModal order={openOrder} imageByName={imageByName} onClose={() => setOpenOrder(null)} />
+        <OrderModal
+          order={openOrder}
+          imageByName={imageByName}
+          onClose={() => setOpenOrder(null)}
+          onReorder={() => reorder(openOrder)}
+        />
       )}
     </main>
   );
@@ -323,8 +365,12 @@ function OrdersTab({
                 key={i}
                 className="relative h-14 w-14 shrink-0 overflow-hidden rounded-md border border-[#eee5da] bg-[#e9e1d6]"
               >
-                {imageByName.get(it.name) ? (
-                  <img src={imageByName.get(it.name)} alt={it.name} className="h-full w-full object-cover" />
+                {it.image || imageByName.get(it.name) ? (
+                  <img
+                    src={it.image || imageByName.get(it.name)}
+                    alt={it.name}
+                    className="h-full w-full object-cover"
+                  />
                 ) : null}
                 {it.quantity > 1 && (
                   <span className="absolute bottom-0 right-0 rounded-tl-md bg-black/60 px-1 text-[10px] font-semibold text-white">
@@ -341,65 +387,62 @@ function OrdersTab({
 }
 
 /* ---------- 訂單完整資訊(懸浮視窗) ---------- */
+const SHIPPING_NOTE =
+  '本網站商品採預購,備貨約 5–14 天(不含假日)。實際運費與到貨時間以出貨通知為準;偏遠、困難點或轉外車聯運費另計。';
+const PAYMENT_NOTE =
+  '請留意收件人姓名、電話、地址正確。取貨付款於取貨時付款;轉帳匯款請於下單後完成並私訊通知。提供 7 天鑑賞期(不含拆封使用)。';
+
 function OrderModal({
   order,
   imageByName,
   onClose,
+  onReorder,
 }: {
   order: Order;
   imageByName: Map<string, string>;
   onClose: () => void;
+  onReorder: () => void;
 }) {
+  const dateStr = order.created_at ? new Date(order.created_at).toLocaleString('zh-TW') : '';
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4" onClick={onClose}>
       <div
         className="max-h-[92vh] w-full max-w-lg overflow-auto rounded-t-2xl bg-white sm:rounded-2xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="sticky top-0 flex items-center justify-between border-b border-[#e5ded4] bg-white px-5 py-4">
-          <div>
-            <h2 className="text-lg font-semibold">{order.order_no}</h2>
-            <p className="text-xs text-[#8a7f72]">
-              {order.created_at ? new Date(order.created_at).toLocaleString('zh-TW') : ''}
-            </p>
-          </div>
+        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-[#e5ded4] bg-white px-5 py-4">
+          <h2 className="text-lg font-semibold">合計：{formatter.format(order.total)}</h2>
           <button onClick={onClose} aria-label="關閉" className="rounded-md p-1 text-2xl leading-none hover:bg-[#efe8dd]">
             ×
           </button>
         </div>
 
-        <div className="space-y-5 p-5">
-          <div className="flex items-center gap-2">
-            <span className="rounded-full bg-[#f3ede4] px-3 py-1 text-sm font-semibold text-[#6b6156]">
-              {order.status}
-            </span>
-            <span
-              className={`rounded-full px-3 py-1 text-sm font-semibold ${
-                order.paid ? 'bg-[#e9f7ee] text-[#1f7a44]' : 'bg-[#fdf3e7] text-[#9a6a1f]'
-              }`}
-            >
-              {order.paid ? '已付款' : '未付款'}
-            </span>
-          </div>
-
-          {/* 品項(含縮圖) */}
+        <div className="space-y-6 p-5">
+          {/* 品項(含縮圖、原價劃線) */}
           <div className="space-y-3">
-            {order.items.map((it, i) => (
-              <div key={i} className="flex items-center gap-3">
-                <div className="h-16 w-16 shrink-0 overflow-hidden rounded-lg bg-[#e9e1d6]">
-                  {imageByName.get(it.name) ? (
-                    <img src={imageByName.get(it.name)} alt={it.name} className="h-full w-full object-cover" />
-                  ) : null}
+            {order.items.map((it, i) => {
+              const img = it.image || imageByName.get(it.name) || '';
+              return (
+                <div key={i} className="flex items-center gap-3">
+                  <div className="h-16 w-16 shrink-0 overflow-hidden rounded-lg bg-[#e9e1d6]">
+                    {img ? <img src={img} alt={it.name} className="h-full w-full object-cover" /> : null}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium">{it.name}</p>
+                    <p className="text-xs text-[#8a7f72]">{it.variant}</p>
+                    <p className="text-xs text-[#8a7f72]">數量：{it.quantity}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm font-semibold">{formatter.format(it.price * it.quantity)}</p>
+                    {it.original_price && it.original_price > it.price ? (
+                      <p className="text-xs text-[#b3a897] line-through">
+                        {formatter.format(it.original_price * it.quantity)}
+                      </p>
+                    ) : null}
+                  </div>
                 </div>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium">{it.name}</p>
-                  <p className="text-xs text-[#8a7f72]">
-                    {it.variant} × {it.quantity}
-                  </p>
-                </div>
-                <span className="text-sm font-semibold">{formatter.format(it.price * it.quantity)}</span>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           {/* 金額 */}
@@ -407,26 +450,55 @@ function OrderModal({
             <Row label="小計" value={formatter.format(order.subtotal)} />
             <Row label="運費" value={order.shipping === 0 ? '免運' : formatter.format(order.shipping)} />
             {order.discount > 0 && (
-              <Row
-                label={`折扣 ${order.discount_code || ''}`}
-                value={`-${formatter.format(order.discount)}`}
-              />
+              <Row label={`折扣 ${order.discount_code || ''}`} value={`-${formatter.format(order.discount)}`} />
             )}
             <div className="flex justify-between pt-1 text-base font-semibold">
-              <span>合計</span>
+              <span>合計（{order.items.reduce((n, it) => n + it.quantity, 0)} 件）</span>
               <span className="text-[#c84767]">{formatter.format(order.total)}</span>
             </div>
           </div>
 
-          {/* 收件 / 付款 */}
-          <div className="space-y-1.5 border-t border-[#efe8dd] pt-4 text-sm text-[#6b6156]">
-            <Row label="收件人" value={order.customer_name} />
-            <Row label="Email" value={order.email} />
+          <button
+            onClick={onReorder}
+            className="w-full rounded-full bg-[#ada265] px-5 py-3 font-semibold text-white transition hover:bg-[#9a9059]"
+          >
+            🛒 再次加入購物車
+          </button>
+
+          {/* 訂單資訊 */}
+          <Section title="訂單資訊">
+            <Row label="訂單號碼" value={order.order_no} />
+            <Row label="訂單電郵" value={order.email} />
+            <Row label="訂單日期" value={dateStr} />
+            <Row label="訂單狀態" value={order.status} />
+          </Section>
+
+          {/* 送貨資訊 */}
+          <Section title="送貨資訊">
+            <Row label="收件人名稱" value={order.customer_name} />
+            {order.phone ? <Row label="收件人電話" value={order.phone} /> : null}
             {order.shipping_method ? <Row label="送貨方式" value={order.shipping_method} /> : null}
+            {order.address ? <Row label="地址" value={order.address} /> : null}
+            <p className="pt-1 text-xs leading-5 text-[#8a7f72]">送貨方式簡介：{SHIPPING_NOTE}</p>
+          </Section>
+
+          {/* 付款資訊 */}
+          <Section title="付款資訊">
             {order.payment_method ? <Row label="付款方式" value={order.payment_method} /> : null}
-          </div>
+            <Row label="付款狀態" value={order.paid ? '已付款' : '未付款'} />
+            <p className="pt-1 text-xs leading-5 text-[#8a7f72]">付款指示：{PAYMENT_NOTE}</p>
+          </Section>
         </div>
       </div>
+    </div>
+  );
+}
+
+function Section({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <div className="border-t border-[#efe8dd] pt-4">
+      <h3 className="mb-2 font-semibold">{title}</h3>
+      <div className="space-y-1.5 text-sm text-[#6b6156]">{children}</div>
     </div>
   );
 }

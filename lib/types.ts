@@ -78,6 +78,9 @@ export type OrderItem = {
   variant: string;
   price: number;
   quantity: number;
+  productId?: string;
+  image?: string;
+  original_price?: number | null;
 };
 
 export type Order = {
@@ -85,6 +88,8 @@ export type Order = {
   order_no: string;
   customer_name: string;
   email: string;
+  phone?: string;
+  address?: string;
   items: OrderItem[];
   subtotal: number;
   shipping: number;

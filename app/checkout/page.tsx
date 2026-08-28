@@ -63,6 +63,8 @@ export default function CheckoutPage() {
   const [loaded, setLoaded] = useState(false);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [address, setAddress] = useState('');
   const [shippingMethod, setShippingMethod] = useState(SHIPPING_METHODS[0]);
   const [paymentMethod, setPaymentMethod] = useState(PAYMENT_METHODS[0]);
   const [discountInput, setDiscountInput] = useState('');
@@ -157,8 +159,8 @@ export default function CheckoutPage() {
       setMessage({ type: 'err', text: '購物車是空的' });
       return;
     }
-    if (!name || !email) {
-      setMessage({ type: 'err', text: '請填寫收件人姓名與 Email' });
+    if (!name || !email || !phone || !address) {
+      setMessage({ type: 'err', text: '請填寫收件人姓名、Email、電話與地址' });
       return;
     }
     if (!selectedShippingMethod || !selectedPaymentMethod) {
@@ -173,6 +175,8 @@ export default function CheckoutPage() {
         body: JSON.stringify({
           customer_name: name,
           email,
+          phone,
+          address,
           shipping_method: selectedShippingMethod,
           payment_method: selectedPaymentMethod,
           discount_code: applied?.code ?? '',
@@ -343,9 +347,23 @@ export default function CheckoutPage() {
                 />
                 <input
                   className="rounded-lg border border-[#e5ded4] px-4 py-3"
+                  placeholder="收件人電話"
+                  inputMode="tel"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                />
+                <input
+                  className="rounded-lg border border-[#e5ded4] px-4 py-3"
                   placeholder="Email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
+                />
+                <textarea
+                  className="rounded-lg border border-[#e5ded4] px-4 py-3"
+                  placeholder="收件地址(或超商取貨門市)"
+                  rows={2}
+                  value={address}
+                  onChange={(e) => setAddress(e.target.value)}
                 />
               </div>
             </section>
