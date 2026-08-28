@@ -1088,7 +1088,10 @@ export default function AdminDashboard({
                       disabled={uploadingBanner}
                       onChange={(e) => {
                         const file = e.target.files?.[0];
-                        if (file) uploadBanner(file, file.name, file.name);
+                        if (file) {
+                          setEditBannerId(null);
+                          setCropFile(file); // 先進裁切編輯器
+                        }
                         e.target.value = '';
                       }}
                     />
@@ -1105,9 +1108,28 @@ export default function AdminDashboard({
                           key={banner.id}
                           className="flex flex-col gap-3 rounded-xl border border-[#e5ded4] p-3 sm:flex-row sm:items-center"
                         >
-                          <div className="h-20 w-36 shrink-0 overflow-hidden rounded-lg bg-[#f6f2ec]">
+                          <label
+                            title="點圖編輯 / 換圖"
+                            className="group relative h-20 w-36 shrink-0 cursor-pointer overflow-hidden rounded-lg border border-[#eee5da] bg-[#f6f2ec]"
+                          >
                             <img src={banner.image} alt="" className="h-full w-full object-contain" />
-                          </div>
+                            <span className="absolute inset-0 flex items-center justify-center bg-black/0 text-xs font-semibold text-white opacity-0 transition group-hover:bg-black/40 group-hover:opacity-100">
+                              點圖編輯
+                            </span>
+                            <input
+                              type="file"
+                              accept="image/png,image/jpeg,image/webp,image/gif"
+                              className="hidden"
+                              disabled={uploadingBanner}
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                e.target.value = '';
+                                if (!file) return;
+                                setEditBannerId(banner.id);
+                                setCropFile(file);
+                              }}
+                            />
+                          </label>
                           <div className="flex-1">
                             {banner.title && (
                               <p className="mb-1 truncate text-xs text-[#8a7f72]">檔名：{banner.title}</p>
@@ -1283,22 +1305,18 @@ export default function AdminDashboard({
                       className="w-full rounded-lg border border-[#e5ded4] px-3 py-2"
                     />
                   </Field>
-                  <Field label="金流方式(一行一筆)">
-                    <textarea
-                      value={footerDraft.payments}
-                      onChange={(e) => setFooterDraft({ ...footerDraft, payments: e.target.value })}
-                      rows={5}
-                      className="w-full rounded-lg border border-[#e5ded4] px-3 py-2"
-                    />
-                  </Field>
-                  <Field label="物流方式(一行一筆)">
-                    <textarea
-                      value={footerDraft.shippings}
-                      onChange={(e) => setFooterDraft({ ...footerDraft, shippings: e.target.value })}
-                      rows={5}
-                      className="w-full rounded-lg border border-[#e5ded4] px-3 py-2"
-                    />
-                  </Field>
+                  <MethodToggles
+                    label="金流方式(勾選=啟用,可套用到各商品)"
+                    defaults={DEFAULT_PAYMENT_METHODS}
+                    value={footerDraft.payments}
+                    onChange={(v) => setFooterDraft({ ...footerDraft, payments: v })}
+                  />
+                  <MethodToggles
+                    label="物流方式(勾選=啟用,可套用到各商品)"
+                    defaults={DEFAULT_SHIPPING_METHODS}
+                    value={footerDraft.shippings}
+                    onChange={(v) => setFooterDraft({ ...footerDraft, shippings: v })}
+                  />
                 </div>
               </Card>
               </>
@@ -1337,6 +1355,7 @@ export default function AdminDashboard({
 }
 
 type CropRect = { x: number; y: number; w: number; h: number };
+type DragMode = 'move' | 'nw' | 'ne' | 'sw' | 'se';
 const ASPECTS: { label: string; value: number | null }[] = [
   { label: '自由', value: null },
   { label: '16:9', value: 16 / 9 },
@@ -1362,7 +1381,7 @@ function BannerCropModal({
   const [crop, setCrop] = useState<CropRect>({ x: 0.05, y: 0.05, w: 0.9, h: 0.5 });
   const boxRef = useRef<HTMLDivElement>(null);
   const imgElRef = useRef<HTMLImageElement>(null);
-  const drag = useRef<{ mode: 'move' | 'resize'; px: number; py: number; start: CropRect } | null>(null);
+  const drag = useRef<{ mode: DragMode; px: number; py: number; start: CropRect } | null>(null);
 
   useEffect(() => () => URL.revokeObjectURL(url), [url]);
 
@@ -1394,7 +1413,7 @@ function BannerCropModal({
     return { x, y, w, h };
   }
 
-  function onPointerDown(mode: 'move' | 'resize', e: React.PointerEvent) {
+  function onPointerDown(mode: DragMode, e: React.PointerEvent) {
     e.preventDefault();
     e.stopPropagation();
     (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
@@ -1405,22 +1424,35 @@ function BannerCropModal({
     if (!drag.current || !boxRef.current) return;
     e.preventDefault();
     const rect = boxRef.current.getBoundingClientRect();
-    const dx = (e.clientX - drag.current.px) / rect.width;
-    const dy = (e.clientY - drag.current.py) / rect.height;
     const s = drag.current.start;
+
     if (drag.current.mode === 'move') {
+      const dx = (e.clientX - drag.current.px) / rect.width;
+      const dy = (e.clientY - drag.current.py) / rect.height;
       setCrop(clamp({ ...s, x: s.x + dx, y: s.y + dy }));
-    } else {
-      let w = s.w + dx;
-      let h: number;
-      if (aspect) {
-        w = Math.min(1 - s.x, Math.max(0.1, w));
-        h = (w * rect.width) / aspect / rect.height;
-      } else {
-        h = s.h + dy;
-      }
-      setCrop(clamp({ ...s, w, h }));
+      return;
     }
+
+    // 四個角拉伸:固定住對角,另外兩條邊跟著手指走
+    const mode = drag.current.mode;
+    const pfx = (e.clientX - rect.left) / rect.width;
+    const pfy = (e.clientY - rect.top) / rect.height;
+    let left = s.x;
+    let right = s.x + s.w;
+    let top = s.y;
+    let bottom = s.y + s.h;
+    if (mode.includes('w')) left = pfx;
+    if (mode.includes('e')) right = pfx;
+    if (mode.includes('n')) top = pfy;
+    if (mode.includes('s')) bottom = pfy;
+    setCrop(
+      clamp({
+        x: Math.min(left, right),
+        y: Math.min(top, bottom),
+        w: Math.abs(right - left),
+        h: Math.abs(bottom - top),
+      }),
+    );
   }
 
   function onPointerUp(e: React.PointerEvent) {
@@ -1515,14 +1547,22 @@ function BannerCropModal({
             }}
             onPointerDown={(e) => onPointerDown('move', e)}
           >
-            {/* 右下角把手放大,好按、好拖 */}
-            <div
-              className="absolute -bottom-4 -right-4 flex h-9 w-9 cursor-se-resize items-center justify-center"
-              style={{ touchAction: 'none' }}
-              onPointerDown={(e) => onPointerDown('resize', e)}
-            >
-              <span className="h-5 w-5 rounded-full border-2 border-[#1f1b19] bg-white shadow" />
-            </div>
+            {/* 四個角的拉伸把手(大一點好按、好拖)*/}
+            {([
+              { c: 'nw', cls: '-left-4 -top-4 cursor-nw-resize' },
+              { c: 'ne', cls: '-right-4 -top-4 cursor-ne-resize' },
+              { c: 'sw', cls: '-bottom-4 -left-4 cursor-sw-resize' },
+              { c: 'se', cls: '-bottom-4 -right-4 cursor-se-resize' },
+            ] as const).map((h) => (
+              <div
+                key={h.c}
+                className={`absolute flex h-9 w-9 items-center justify-center ${h.cls}`}
+                style={{ touchAction: 'none' }}
+                onPointerDown={(e) => onPointerDown(h.c, e)}
+              >
+                <span className="h-4 w-4 rounded-sm border-2 border-[#1f1b19] bg-white shadow" />
+              </div>
+            ))}
           </div>
         </div>
 
@@ -1549,6 +1589,84 @@ function BannerCropModal({
         </div>
       </div>
     </div>
+  );
+}
+
+function MethodToggles({
+  label,
+  defaults,
+  value,
+  onChange,
+}: {
+  label: string;
+  defaults: string[];
+  value: string; // 一行一筆的字串,內容即「啟用中」的方式
+  onChange: (next: string) => void;
+}) {
+  const [custom, setCustom] = useState('');
+  const enabled = value
+    .split('\n')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const master = Array.from(new Set([...defaults, ...enabled]));
+
+  function toggle(method: string, on: boolean) {
+    const set = new Set(enabled);
+    if (on) set.add(method);
+    else set.delete(method);
+    onChange(master.filter((m) => set.has(m)).join('\n'));
+  }
+
+  function addCustom() {
+    const m = custom.trim();
+    if (!m) return;
+    if (!enabled.includes(m)) onChange([...enabled, m].join('\n'));
+    setCustom('');
+  }
+
+  return (
+    <Field label={label}>
+      <div className="space-y-2">
+        {master.map((method) => {
+          const on = enabled.includes(method);
+          return (
+            <label
+              key={method}
+              className="flex items-center justify-between rounded-lg border border-[#e5ded4] px-3 py-2.5"
+            >
+              <span className={`text-sm ${on ? 'font-semibold text-[#1f1b19]' : 'text-[#8a7f72]'}`}>
+                {method}
+              </span>
+              <span className="flex items-center gap-2 text-xs text-[#8a7f72]">
+                {on ? '啟用' : '停用'}
+                <input
+                  type="checkbox"
+                  checked={on}
+                  onChange={(e) => toggle(method, e.target.checked)}
+                  className="h-4 w-4"
+                />
+              </span>
+            </label>
+          );
+        })}
+        <div className="flex gap-2 pt-1">
+          <input
+            value={custom}
+            onChange={(e) => setCustom(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addCustom())}
+            placeholder="新增自訂方式"
+            className="flex-1 rounded-lg border border-[#e5ded4] px-3 py-2 text-sm"
+          />
+          <button
+            type="button"
+            onClick={addCustom}
+            className="rounded-lg border border-[#1f1b19] px-4 py-2 text-sm font-semibold"
+          >
+            新增
+          </button>
+        </div>
+      </div>
+    </Field>
   );
 }
 

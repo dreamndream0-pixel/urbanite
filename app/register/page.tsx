@@ -1,17 +1,17 @@
 import { redirect } from 'next/navigation';
-import { getAdminUser, getSessionUser } from '@/lib/supabase/server';
+import { getSessionUser } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
-import LoginClient from './LoginClient';
+import RegisterClient from './RegisterClient';
 
 export const dynamic = 'force-dynamic';
 
 function normalizeNext(value: string | string[] | undefined) {
   const next = Array.isArray(value) ? value[0] : value;
-  if (!next || !next.startsWith('/') || next.startsWith('//')) return '/account';
+  if (!next || !next.startsWith('/') || next.startsWith('//')) return '/';
   return next;
 }
 
-export default async function LoginPage({
+export default async function RegisterPage({
   searchParams,
 }: {
   searchParams: Promise<{ next?: string | string[] }>;
@@ -25,14 +25,7 @@ export default async function LoginPage({
   let logoUrl = '';
   if (configured) {
     const sessionUser = await getSessionUser();
-    if (sessionUser) {
-      if (nextPath === '/admin') {
-        const adminUser = await getAdminUser();
-        redirect(adminUser ? '/admin' : '/');
-      }
-      redirect(nextPath);
-    }
-    // 伺服器端先讀好 Logo,避免前台先閃一下文字再換成圖片
+    if (sessionUser) redirect(nextPath);
     try {
       const { data } = await createAdminClient()
         .from('site_settings')
@@ -45,5 +38,5 @@ export default async function LoginPage({
     }
   }
 
-  return <LoginClient configured={configured} nextPath={nextPath} logoUrl={logoUrl} />;
+  return <RegisterClient configured={configured} nextPath={nextPath} logoUrl={logoUrl} />;
 }

@@ -10,15 +10,19 @@ const STORE_NAME = process.env.NEXT_PUBLIC_STORE_NAME || 'URBANITE';
 export default function LoginClient({
   configured,
   nextPath,
+  logoUrl = '',
 }: {
   configured: boolean;
   nextPath: string;
+  logoUrl?: string;
 }) {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+
+  const registerHref = `/register?next=${encodeURIComponent(nextPath)}`;
 
   async function signInWithPassword() {
     setError(null);
@@ -27,6 +31,8 @@ export default function LoginClient({
       const supabase = createBrowserSupabase();
       const { error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw error;
+      // 確保顧客資料有建檔(email 登入不會經過 /auth/callback)
+      await fetch('/api/customers', { method: 'POST' }).catch(() => {});
       window.location.href = nextPath;
     } catch (err) {
       setError(err instanceof Error ? err.message : '登入失敗');
@@ -67,8 +73,12 @@ export default function LoginClient({
               <IconSearch />
             </Link>
           </div>
-          <Link href="/" className="bg-black px-5 py-3 text-sm font-semibold tracking-[0.18em] text-white">
-            {STORE_NAME}
+          <Link href="/" aria-label="回首頁" className="justify-self-center px-2 text-center">
+            {logoUrl ? (
+              <img src={logoUrl} alt={STORE_NAME} className="mx-auto h-8 w-auto object-contain sm:h-10" />
+            ) : (
+              <span className="font-serif text-2xl italic tracking-wide sm:text-3xl">{STORE_NAME}</span>
+            )}
           </Link>
           <div className="flex items-center justify-end gap-5 text-[#717171]">
             <IconUser />
@@ -78,7 +88,7 @@ export default function LoginClient({
       </header>
 
       <div className="mx-auto max-w-md px-8 py-10">
-        <h1 className="text-4xl font-bold tracking-wide">登入</h1>
+        <h1 className="text-center text-4xl font-bold tracking-wide">登入</h1>
 
         {!configured ? (
           <div className="mt-6 rounded-lg bg-[#fdf3e7] p-4 text-sm text-[#9a6a1f]">
@@ -160,7 +170,15 @@ export default function LoginClient({
             </div>
 
             <section className="mt-20">
-              <h2 className="text-4xl font-bold tracking-wide">還不是會員？</h2>
+              <div className="flex items-start justify-between gap-4">
+                <h2 className="text-4xl font-bold tracking-wide">還不是會員？</h2>
+                <Link
+                  href={registerHref}
+                  className="mt-1 shrink-0 rounded-full bg-[#ada265] px-5 py-3 text-sm font-bold text-white transition hover:bg-[#9a9059]"
+                >
+                  註冊會員
+                </Link>
+              </div>
               <div className="mt-9 text-lg leading-8 text-[#8a8a8a]">
                 <p>加入會員即可享：</p>
                 <ul className="mt-3 list-disc space-y-1 pl-6">
