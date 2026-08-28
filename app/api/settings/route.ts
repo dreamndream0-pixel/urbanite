@@ -34,7 +34,9 @@ export async function GET() {
     .eq('id', 1)
     .single();
 
-  return NextResponse.json({ ...DEFAULT_SETTINGS, ...(data ?? {}) } as SiteSettings);
+  return NextResponse.json({ ...DEFAULT_SETTINGS, ...(data ?? {}) } as SiteSettings, {
+    headers: { 'Cache-Control': 's-maxage=300, stale-while-revalidate=600' },
+  });
 }
 
 // PATCH /api/settings — 更新網站設定(限管理員)

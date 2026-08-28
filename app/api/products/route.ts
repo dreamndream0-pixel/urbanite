@@ -12,7 +12,10 @@ export async function GET() {
     .order('sort_order', { ascending: true });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json(data as Product[]);
+  // 讓 Vercel CDN 暫存回應,同樣資料不必每個訪客都打一次 Supabase(降低流量)
+  return NextResponse.json(data as Product[], {
+    headers: { 'Cache-Control': 's-maxage=120, stale-while-revalidate=600' },
+  });
 }
 
 // POST /api/products — 新增商品(限管理員)

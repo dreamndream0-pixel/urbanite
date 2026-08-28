@@ -12,7 +12,9 @@ export async function GET() {
     .order('sort_order', { ascending: true });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json(data as Category[]);
+  return NextResponse.json(data as Category[], {
+    headers: { 'Cache-Control': 's-maxage=300, stale-while-revalidate=600' },
+  });
 }
 
 // POST /api/categories — 新增分類(限管理員)

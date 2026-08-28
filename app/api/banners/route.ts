@@ -12,7 +12,9 @@ export async function GET() {
     .order('sort_order', { ascending: true });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json(data as Banner[]);
+  return NextResponse.json(data as Banner[], {
+    headers: { 'Cache-Control': 's-maxage=300, stale-while-revalidate=600' },
+  });
 }
 
 // POST /api/banners — 新增輪播圖(限管理員)
