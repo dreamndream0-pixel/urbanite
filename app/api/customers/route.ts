@@ -34,3 +34,22 @@ export async function POST() {
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
   return NextResponse.json({ ok: true });
 }
+
+// PATCH /api/customers — 會員在會員中心更新自己的姓名 / 手機
+export async function PATCH(request: Request) {
+  const user = await getSessionUser();
+  if (!user) return NextResponse.json({ error: '請先登入' }, { status: 401 });
+
+  const body = await request.json();
+  const update: Record<string, unknown> = { user_id: user.id, email: user.email ?? '' };
+  if (typeof body.name === 'string') update.name = body.name.trim();
+  if (typeof body.phone === 'string') update.phone = body.phone.trim();
+
+  const supabase = createAdminClient();
+  const { error } = await supabase
+    .from('customers')
+    .upsert(update, { onConflict: 'user_id' });
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  return NextResponse.json({ ok: true });
+}
