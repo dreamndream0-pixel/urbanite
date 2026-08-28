@@ -30,6 +30,16 @@ const formatter = new Intl.NumberFormat('zh-TW', {
 type CategoryTab = { slug: string; name: string; en: string };
 const ALL_TAB: CategoryTab = { slug: 'all', name: '全部', en: 'ALL' };
 
+function readCart(): CartItem[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = window.localStorage.getItem(CART_KEY);
+    return raw ? (JSON.parse(raw) as CartItem[]) : [];
+  } catch {
+    return [];
+  }
+}
+
 export default function Home() {
   const router = useRouter();
   const [products, setProducts] = useState<Product[]>([]);
@@ -45,7 +55,7 @@ export default function Home() {
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
   const [favoritesOpen, setFavoritesOpen] = useState(false);
   const [cartOpen, setCartOpen] = useState(false);
-  const [cart, setCart] = useState<CartItem[]>([]);
+  const [cart, setCart] = useState<CartItem[]>(readCart);
   const [user, setUser] = useState<{ email: string; name: string; isAdmin: boolean } | null>(null);
   const [accountOpen, setAccountOpen] = useState(false);
   const [quickAdd, setQuickAdd] = useState<Product | null>(null);
@@ -76,16 +86,6 @@ export default function Home() {
       .catch(() => setBanners([]));
   }, []);
 
-  // 讀取 / 保存購物車(存在瀏覽器本機,結帳頁共用同一份)
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem(CART_KEY);
-      if (raw) setCart(JSON.parse(raw) as CartItem[]);
-    } catch {
-      /* localStorage 不可用時略過 */
-    }
-  }, []);
-
   useEffect(() => {
     try {
       localStorage.setItem(CART_KEY, JSON.stringify(cart));
@@ -97,7 +97,7 @@ export default function Home() {
   // 收藏清單紀錄在帳號裡:登入後從後端讀取,未登入則清空。
   useEffect(() => {
     if (!user) {
-      setFavorites(new Set());
+      Promise.resolve().then(() => setFavorites(new Set()));
       return;
     }
     fetch('/api/favorites')
@@ -125,14 +125,6 @@ export default function Home() {
     const { data: sub } = supabase.auth.onAuthStateChange(() => refresh());
     return () => sub.subscription.unsubscribe();
   }, []);
-
-  async function signIn() {
-    const supabase = createBrowserSupabase();
-    await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: { redirectTo: `${window.location.origin}/auth/callback?next=/` },
-    });
-  }
 
   async function signOut() {
     await createBrowserSupabase().auth.signOut();
@@ -200,8 +192,7 @@ export default function Home() {
 
   function toggleFavorite(id: string) {
     if (!user) {
-      alert('請先登入才能使用收藏功能');
-      setAccountOpen(true);
+      router.push('/login?next=/account');
       return;
     }
     const isFav = favorites.has(id);
@@ -277,55 +268,52 @@ export default function Home() {
             </button>
             <div className="relative">
               <button
-                onClick={() => setAccountOpen((v) => !v)}
+                onClick={() => {
+                  if (!user) {
+                    router.push('/login?next=/account');
+                    return;
+                  }
+                  setAccountOpen((v) => !v);
+                }}
                 aria-label="我的帳號"
                 className="rounded-md p-2 hover:bg-[#efe8dd]"
               >
                 <IconUser />
               </button>
-              {accountOpen && (
+              {accountOpen && user && (
                 <div className="absolute right-0 top-full z-50 mt-2 w-52 rounded-lg border border-[#e5ded4] bg-white p-2 shadow-lg">
-                  {user ? (
-                    <>
-                      <div className="px-3 py-2">
-                        <p className="truncate text-xs text-[#8a7f72]">{user.email}</p>
-                        {user.isAdmin && (
-                          <span className="mt-1 inline-block rounded-full bg-[#1f1b19] px-2 py-0.5 text-[10px] font-semibold tracking-wide text-white">
-                            主管理員
-                          </span>
-                        )}
-                      </div>
+                  <>
+                    <div className="px-3 py-2">
+                      <p className="truncate text-xs text-[#8a7f72]">{user.email}</p>
                       {user.isAdmin && (
-                        <Link
-                          href="/admin"
-                          onClick={() => setAccountOpen(false)}
-                          className="mb-1 block rounded bg-[#f3ede4] px-3 py-2 text-sm font-semibold hover:bg-[#ece2d5]"
-                        >
-                          進入管理後台
-                        </Link>
+                        <span className="mt-1 inline-block rounded-full bg-[#1f1b19] px-2 py-0.5 text-[10px] font-semibold tracking-wide text-white">
+                          主管理員
+                        </span>
                       )}
+                    </div>
+                    {user.isAdmin && (
                       <Link
-                        href="/account"
+                        href="/admin"
                         onClick={() => setAccountOpen(false)}
-                        className="block rounded px-3 py-2 text-sm hover:bg-[#f6f2ec]"
+                        className="mb-1 block rounded bg-[#f3ede4] px-3 py-2 text-sm font-semibold hover:bg-[#ece2d5]"
                       >
-                        我的訂單
+                        進入管理後台
                       </Link>
-                      <button
-                        onClick={signOut}
-                        className="block w-full rounded px-3 py-2 text-left text-sm hover:bg-[#f6f2ec]"
-                      >
-                        登出
-                      </button>
-                    </>
-                  ) : (
+                    )}
+                    <Link
+                      href="/account"
+                      onClick={() => setAccountOpen(false)}
+                      className="block rounded px-3 py-2 text-sm hover:bg-[#f6f2ec]"
+                    >
+                      我的訂單
+                    </Link>
                     <button
-                      onClick={signIn}
+                      onClick={signOut}
                       className="block w-full rounded px-3 py-2 text-left text-sm hover:bg-[#f6f2ec]"
                     >
-                      使用 Google 登入
+                      登出
                     </button>
-                  )}
+                  </>
                 </div>
               )}
             </div>
@@ -906,6 +894,8 @@ function Row({ label, value, strong = false }: { label: string; value: string; s
 function HeroCarousel({ banners }: { banners: Banner[] }) {
   const [index, setIndex] = useState(0);
   const [dragX, setDragX] = useState(0); // 手指拖動中的即時位移(px)
+  const [dragging, setDragging] = useState(false);
+  const [widthPx, setWidthPx] = useState(0);
   const dragXRef = useRef(0);
   const startX = useRef<number | null>(null);
   const width = useRef(0);
@@ -914,20 +904,19 @@ function HeroCarousel({ banners }: { banners: Banner[] }) {
   const go = (i: number) => setIndex((i + count) % count);
 
   useEffect(() => {
-    setIndex(0);
-  }, [count]);
-
-  useEffect(() => {
     if (count <= 1) return;
     const timer = setInterval(() => setIndex((i) => (i + 1) % count), 4000);
     return () => clearInterval(timer);
   }, [count]);
 
   if (count === 0) return null;
+  const safeIndex = Math.min(index, count - 1);
 
   function onDown(clientX: number, currentTarget: HTMLElement) {
     startX.current = clientX;
     width.current = currentTarget.offsetWidth || 1;
+    setWidthPx(width.current);
+    setDragging(true);
     dragXRef.current = 0;
     setDragX(0);
   }
@@ -944,16 +933,17 @@ function HeroCarousel({ banners }: { banners: Banner[] }) {
     else if (d >= threshold) setIndex((i) => (i - 1 + count) % count);
     startX.current = null;
     dragXRef.current = 0;
+    setDragging(false);
     setDragX(0);
   }
 
-  const dragPercent = width.current ? (dragX / width.current) * 100 : 0;
+  const dragPercent = widthPx ? (dragX / widthPx) * 100 : 0;
 
   return (
     <section className="group relative w-full select-none overflow-hidden bg-[#e9e1d6]">
       <div
-        className={`flex ${startX.current === null ? 'transition-transform duration-500 ease-out' : ''}`}
-        style={{ transform: `translateX(calc(-${index * 100}% + ${dragPercent}%))` }}
+        className={`flex ${dragging ? '' : 'transition-transform duration-500 ease-out'}`}
+        style={{ transform: `translateX(calc(-${safeIndex * 100}% + ${dragPercent}%))` }}
         onTouchStart={(e) => onDown(e.touches[0].clientX, e.currentTarget)}
         onTouchMove={(e) => onMove(e.touches[0].clientX)}
         onTouchEnd={onUp}

@@ -39,6 +39,12 @@ export async function POST(request: Request) {
       category: body.category ?? '',
       image: body.image ?? (Array.isArray(body.images) ? body.images[0] ?? '' : ''),
       images: Array.isArray(body.images) ? body.images : body.image ? [body.image] : [],
+      available_payment_methods: Array.isArray(body.available_payment_methods)
+        ? body.available_payment_methods
+        : [],
+      available_shipping_methods: Array.isArray(body.available_shipping_methods)
+        ? body.available_shipping_methods
+        : [],
       colors: body.colors ?? [],
       sizes: body.sizes ?? [],
       is_featured: body.is_featured ?? false,

@@ -14,6 +14,8 @@ const formatter = new Intl.NumberFormat('zh-TW', {
 
 const ORDER_STATUSES = ['待出貨', '備貨中', '已出貨', '已取消'];
 const PRODUCT_STATUSES = ['上架中', '加購品', '已下架'];
+const DEFAULT_PAYMENT_METHODS = ['綠界金流', 'Line Pay', 'Apple Pay', '取貨付款', '轉帳匯款'];
+const DEFAULT_SHIPPING_METHODS = ['綠界物流-超商取貨', '綠界物流-宅配', '7-11 取貨付款', '全家 取貨付款'];
 
 const NAV = [
   { key: 'overview', label: '總覽', Icon: IconGrid },
@@ -39,6 +41,8 @@ type Draft = {
   category: string;
   image: string;
   images: string[];
+  available_payment_methods: string[];
+  available_shipping_methods: string[];
   colors: string;
   sizes: string;
   is_featured: boolean;
@@ -60,6 +64,8 @@ function blankDraft(): Draft {
     category: '',
     image: '',
     images: [],
+    available_payment_methods: [],
+    available_shipping_methods: [],
     colors: '',
     sizes: '',
     is_featured: false,
@@ -69,7 +75,14 @@ function blankDraft(): Draft {
 
 function toDraft(p: Product): Draft {
   const images = p.images?.length ? p.images : p.image ? [p.image] : [];
-  return { ...p, images, colors: p.colors.join(', '), sizes: p.sizes.join(', ') };
+  return {
+    ...p,
+    images,
+    available_payment_methods: p.available_payment_methods ?? [],
+    available_shipping_methods: p.available_shipping_methods ?? [],
+    colors: p.colors.join(', '),
+    sizes: p.sizes.join(', '),
+  };
 }
 
 export default function AdminDashboard({
@@ -128,6 +141,14 @@ export default function AdminDashboard({
     taxId: initialSettings?.footer_tax_id ?? '',
     instagramUrl: initialSettings?.footer_instagram_url ?? '',
     lineUrl: initialSettings?.footer_line_url ?? '',
+    payments: (initialSettings?.payment_methods?.length
+      ? initialSettings.payment_methods
+      : DEFAULT_PAYMENT_METHODS
+    ).join('\n'),
+    shippings: (initialSettings?.shipping_methods?.length
+      ? initialSettings.shipping_methods
+      : DEFAULT_SHIPPING_METHODS
+    ).join('\n'),
   });
   const [savingSettings, setSavingSettings] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -184,6 +205,22 @@ export default function AdminDashboard({
 
   const pendingCount = orders.filter((o) => o.status === '待出貨').length;
   const lowStock = products.filter((p) => p.inventory <= 10).length;
+  const paymentMethods = useMemo(
+    () =>
+      footerDraft.payments
+        .split('\n')
+        .map((line) => line.trim())
+        .filter(Boolean),
+    [footerDraft.payments],
+  );
+  const shippingMethods = useMemo(
+    () =>
+      footerDraft.shippings
+        .split('\n')
+        .map((line) => line.trim())
+        .filter(Boolean),
+    [footerDraft.shippings],
+  );
 
   // ---- 操作 ----
   async function signOut() {
@@ -403,6 +440,8 @@ export default function AdminDashboard({
           footer_tax_id: footerDraft.taxId.trim(),
           footer_instagram_url: footerDraft.instagramUrl.trim(),
           footer_line_url: footerDraft.lineUrl.trim(),
+          payment_methods: toLines(footerDraft.payments),
+          shipping_methods: toLines(footerDraft.shippings),
         }),
       });
       const data = await res.json();
@@ -439,13 +478,14 @@ export default function AdminDashboard({
             )}
           </Link>
 
-          <div className="flex items-center justify-end gap-2">
-            <div className="flex min-w-0 items-center gap-2 rounded-full border border-[#e5ded4] bg-white px-3 py-1.5">
-              <IconUser />
-              <span className="hidden max-w-40 truncate text-xs font-medium text-[#6b6156] sm:inline">
-                {userEmail}
-              </span>
-            </div>
+          <div className="flex items-center justify-end">
+            <Link
+              href="/"
+              aria-label="回到首頁"
+              className="rounded-md p-2 text-[#1f1b19] hover:bg-[#efe8dd]"
+            >
+              <IconHome />
+            </Link>
           </div>
         </nav>
       </header>
@@ -492,15 +532,9 @@ export default function AdminDashboard({
           ))}
         </nav>
         <div className="mt-auto border-t border-[#e5ded4] p-3">
-          <Link
-            href="/"
-            className="block rounded-lg px-3 py-3 text-sm font-semibold text-[#6b6156] hover:bg-[#f3ede4]"
-          >
-            看前台
-          </Link>
           <button
             onClick={signOut}
-            className="mt-1 block w-full rounded-lg px-3 py-3 text-left text-sm font-semibold text-[#c84767] hover:bg-[#f3ede4]"
+            className="block w-full rounded-lg px-3 py-3 text-left text-sm font-semibold text-[#c84767] hover:bg-[#f3ede4]"
           >
             登出
           </button>
@@ -512,12 +546,7 @@ export default function AdminDashboard({
         <div className="border-b border-[#e5ded4] bg-[#faf7f2] px-4 py-4 sm:px-6">
           <div className="mx-auto flex max-w-5xl items-center justify-between gap-3">
             <h1 className="text-lg font-semibold">{activeNav.label}</h1>
-            <Link
-              href="/"
-              className="rounded-full border border-[#e5ded4] bg-white px-3 py-1.5 text-sm font-medium text-[#6b6156] hover:bg-[#efe8dd]"
-            >
-              看前台
-            </Link>
+            <p className="truncate text-xs text-[#8a7f72]">{userEmail}</p>
           </div>
         </div>
 
@@ -598,6 +627,13 @@ export default function AdminDashboard({
                           </li>
                         ))}
                       </ul>
+                      {(order.shipping_method || order.payment_method) && (
+                        <p className="mt-2 text-sm text-[#8a7f72]">
+                          {order.shipping_method && `送貨:${order.shipping_method}`}
+                          {order.shipping_method && order.payment_method ? ' · ' : ''}
+                          {order.payment_method && `付款:${order.payment_method}`}
+                        </p>
+                      )}
                       {order.discount > 0 && (
                         <p className="mt-1 text-sm text-[#c84767]">
                           折扣碼 {order.discount_code}:-{formatter.format(order.discount)}
@@ -1037,7 +1073,7 @@ export default function AdminDashboard({
                       disabled={uploadingBanner}
                       onChange={(e) => {
                         const file = e.target.files?.[0];
-                        if (file) setCropFile(file);
+                        if (file) uploadBanner(file, file.name, file.name);
                         e.target.value = '';
                       }}
                     />
@@ -1055,7 +1091,7 @@ export default function AdminDashboard({
                           className="flex flex-col gap-3 rounded-xl border border-[#e5ded4] p-3 sm:flex-row sm:items-center"
                         >
                           <div className="h-20 w-36 shrink-0 overflow-hidden rounded-lg bg-[#f6f2ec]">
-                            <img src={banner.image} alt="" className="h-full w-full object-cover" />
+                            <img src={banner.image} alt="" className="h-full w-full object-contain" />
                           </div>
                           <div className="flex-1">
                             {banner.title && (
@@ -1079,6 +1115,35 @@ export default function AdminDashboard({
                             </label>
                           </div>
                           <div className="flex items-center gap-2">
+                            <label className="cursor-pointer rounded-lg border border-[#d7c9bd] px-3 py-2 text-sm font-semibold">
+                              換圖
+                              <input
+                                type="file"
+                                accept="image/png,image/jpeg,image/webp,image/gif"
+                                className="hidden"
+                                disabled={uploadingBanner}
+                                onChange={async (e) => {
+                                  const file = e.target.files?.[0];
+                                  e.target.value = '';
+                                  if (!file) return;
+                                  setUploadingBanner(true);
+                                  try {
+                                    const fd = new FormData();
+                                    fd.append('file', file);
+                                    fd.append('folder', 'banners');
+                                    fd.append('productId', 'banner');
+                                    const up = await fetch('/api/products/image', { method: 'POST', body: fd });
+                                    const upData = await up.json();
+                                    if (!up.ok) throw new Error(upData.error ?? '上傳失敗');
+                                    await updateBanner(banner.id, { image: upData.image_url, title: file.name });
+                                  } catch (error) {
+                                    alert(error instanceof Error ? error.message : '上傳失敗');
+                                  } finally {
+                                    setUploadingBanner(false);
+                                  }
+                                }}
+                              />
+                            </label>
                             <button
                               onClick={() => {
                                 if (index === 0) return;
@@ -1215,6 +1280,22 @@ export default function AdminDashboard({
                       className="w-full rounded-lg border border-[#e5ded4] px-3 py-2"
                     />
                   </Field>
+                  <Field label="金流方式(一行一筆)">
+                    <textarea
+                      value={footerDraft.payments}
+                      onChange={(e) => setFooterDraft({ ...footerDraft, payments: e.target.value })}
+                      rows={5}
+                      className="w-full rounded-lg border border-[#e5ded4] px-3 py-2"
+                    />
+                  </Field>
+                  <Field label="物流方式(一行一筆)">
+                    <textarea
+                      value={footerDraft.shippings}
+                      onChange={(e) => setFooterDraft({ ...footerDraft, shippings: e.target.value })}
+                      rows={5}
+                      className="w-full rounded-lg border border-[#e5ded4] px-3 py-2"
+                    />
+                  </Field>
                 </div>
               </Card>
               </>
@@ -1229,6 +1310,8 @@ export default function AdminDashboard({
           draft={editing}
           isNew={isNew}
           categories={categories}
+          paymentMethods={paymentMethods}
+          shippingMethods={shippingMethods}
           onChange={setEditing}
           onClose={() => setEditing(null)}
           onSave={saveProduct}
@@ -1282,7 +1365,7 @@ function BannerCropModal({
     if (!a || !natural.w || !boxRef.current) return { x: 0.05, y: 0.05, w: 0.9, h: 0.5 };
     const rect = boxRef.current.getBoundingClientRect();
     let w = 0.9;
-    let hPx = (w * rect.width) / a;
+    const hPx = (w * rect.width) / a;
     let h = hPx / rect.height;
     if (h > 0.9) {
       h = 0.9;
@@ -1497,6 +1580,8 @@ function ProductModal({
   draft,
   isNew,
   categories,
+  paymentMethods,
+  shippingMethods,
   onChange,
   onClose,
   onSave,
@@ -1504,6 +1589,8 @@ function ProductModal({
   draft: Draft;
   isNew: boolean;
   categories: Category[];
+  paymentMethods: string[];
+  shippingMethods: string[];
   onChange: (d: Draft) => void;
   onClose: () => void;
   onSave: () => void;
@@ -1512,6 +1599,16 @@ function ProductModal({
 
   function set<K extends keyof Draft>(key: K, value: Draft[K]) {
     onChange({ ...draft, [key]: value });
+  }
+
+  function toggleMethod(
+    key: 'available_payment_methods' | 'available_shipping_methods',
+    method: string,
+    checked: boolean,
+  ) {
+    const current = draft[key];
+    const next = checked ? [...current, method] : current.filter((item) => item !== method);
+    set(key, next);
   }
 
   async function uploadProductImages(files: File[]) {
@@ -1566,7 +1663,7 @@ function ProductModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="max-h-[90vh] w-full max-w-lg overflow-auto rounded-2xl bg-white p-6">
+      <div className="max-h-[90vh] w-full max-w-2xl overflow-auto rounded-2xl bg-white p-6">
         <h2 className="text-xl font-semibold">{isNew ? '新增商品' : '編輯商品'}</h2>
         <div className="mt-4 grid gap-3">
           <Field label="商品代碼(英文,新增後不可改)">
@@ -1646,6 +1743,44 @@ function ProductModal({
               ))}
             </select>
           </Field>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field label="可用金流(未勾選=全部)">
+              <div className="space-y-2 rounded-lg border border-[#e5ded4] p-3">
+                {paymentMethods.length === 0 ? (
+                  <p className="text-sm text-[#8a7f72]">請先到系統設定新增金流方式。</p>
+                ) : (
+                  paymentMethods.map((method) => (
+                    <label key={method} className="flex items-center gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={draft.available_payment_methods.includes(method)}
+                        onChange={(e) => toggleMethod('available_payment_methods', method, e.target.checked)}
+                      />
+                      <span>{method}</span>
+                    </label>
+                  ))
+                )}
+              </div>
+            </Field>
+            <Field label="可用物流(未勾選=全部)">
+              <div className="space-y-2 rounded-lg border border-[#e5ded4] p-3">
+                {shippingMethods.length === 0 ? (
+                  <p className="text-sm text-[#8a7f72]">請先到系統設定新增物流方式。</p>
+                ) : (
+                  shippingMethods.map((method) => (
+                    <label key={method} className="flex items-center gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={draft.available_shipping_methods.includes(method)}
+                        onChange={(e) => toggleMethod('available_shipping_methods', method, e.target.checked)}
+                      />
+                      <span>{method}</span>
+                    </label>
+                  ))
+                )}
+              </div>
+            </Field>
+          </div>
           <Field label={`商品圖片(最多 ${MAX_PRODUCT_IMAGES} 張,第一張為封面)`}>
             <div className="grid gap-3">
               {draft.images.length > 0 && (
@@ -1803,11 +1938,12 @@ function IconClose() {
   );
 }
 
-function IconUser() {
+function IconHome() {
   return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
-      <circle cx="12" cy="8" r="4" />
-      <path d="M4 21c0-4 3.5-6 8-6s8 2 8 6" strokeLinecap="round" />
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+      <path d="M3 11.5 12 4l9 7.5" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M5.5 10.5V20h13v-9.5" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M10 20v-5h4v5" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }

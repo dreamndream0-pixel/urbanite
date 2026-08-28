@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
+import type { Product, SiteSettings } from '@/lib/types';
 
 const STORE_NAME = process.env.NEXT_PUBLIC_STORE_NAME || 'URBANITE';
 const CART_KEY = 'cart';
@@ -26,9 +27,39 @@ type CartItem = {
 const SHIPPING_METHODS = ['全家 取貨付款', '7-11 取貨付款', '宅配到府'];
 const PAYMENT_METHODS = ['取貨付款(貨到付款)', '轉帳匯款'];
 
+function allowedForCart(
+  allMethods: string[],
+  products: Product[],
+  cart: CartItem[],
+  key: 'available_payment_methods' | 'available_shipping_methods',
+) {
+  if (cart.length === 0 || products.length === 0) return allMethods;
+  const byId = new Map(products.map((product) => [product.id, product]));
+  let allowed = new Set(allMethods);
+  for (const item of cart) {
+    const product = byId.get(item.productId);
+    const productMethods = product?.[key] ?? [];
+    const allowedForProduct = productMethods.length ? productMethods : allMethods;
+    allowed = new Set([...allowed].filter((method) => allowedForProduct.includes(method)));
+  }
+  return [...allowed];
+}
+
+function readCart(): CartItem[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = window.localStorage.getItem(CART_KEY);
+    return raw ? (JSON.parse(raw) as CartItem[]) : [];
+  } catch {
+    return [];
+  }
+}
+
 export default function CheckoutPage() {
-  const [cart, setCart] = useState<CartItem[]>([]);
-  const [loaded, setLoaded] = useState(false);
+  const [cart, setCart] = useState<CartItem[]>(readCart);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [settings, setSettings] = useState<SiteSettings | null>(null);
+  const loaded = true;
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [shippingMethod, setShippingMethod] = useState(SHIPPING_METHODS[0]);
@@ -41,14 +72,6 @@ export default function CheckoutPage() {
   const [orderNo, setOrderNo] = useState('');
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(CART_KEY);
-      if (raw) setCart(JSON.parse(raw) as CartItem[]);
-    } catch {
-      /* 略過 */
-    }
-    setLoaded(true);
-
     fetch('/api/me')
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
@@ -56,11 +79,37 @@ export default function CheckoutPage() {
         if (data?.name) setName(data.name);
       })
       .catch(() => {});
+
+    fetch('/api/products')
+      .then((res) => (res.ok ? res.json() : []))
+      .then((data: Product[]) => setProducts(data))
+      .catch(() => setProducts([]));
+
+    fetch('/api/settings')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: SiteSettings | null) => setSettings(data))
+      .catch(() => setSettings(null));
   }, []);
 
   const subtotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
   const shipping = subtotal >= FREE_SHIPPING_THRESHOLD ? 0 : subtotal > 0 ? SHIPPING_FEE : 0;
   const total = Math.max(0, subtotal + shipping - (applied?.amount ?? 0));
+  const siteShippingMethods = settings?.shipping_methods?.length ? settings.shipping_methods : SHIPPING_METHODS;
+  const sitePaymentMethods = settings?.payment_methods?.length ? settings.payment_methods : PAYMENT_METHODS;
+  const availableShippingMethods = useMemo(
+    () => allowedForCart(siteShippingMethods, products, cart, 'available_shipping_methods'),
+    [siteShippingMethods, products, cart],
+  );
+  const availablePaymentMethods = useMemo(
+    () => allowedForCart(sitePaymentMethods, products, cart, 'available_payment_methods'),
+    [sitePaymentMethods, products, cart],
+  );
+  const selectedShippingMethod = availableShippingMethods.includes(shippingMethod)
+    ? shippingMethod
+    : availableShippingMethods[0] ?? '';
+  const selectedPaymentMethod = availablePaymentMethods.includes(paymentMethod)
+    ? paymentMethod
+    : availablePaymentMethods[0] ?? '';
 
   function updateQty(id: string, change: number) {
     setCart((items) => {
@@ -108,6 +157,10 @@ export default function CheckoutPage() {
       setMessage({ type: 'err', text: '請填寫收件人姓名與 Email' });
       return;
     }
+    if (!selectedShippingMethod || !selectedPaymentMethod) {
+      setMessage({ type: 'err', text: '購物車內商品沒有共同可用的付款或送貨方式' });
+      return;
+    }
     setSubmitting(true);
     try {
       const res = await fetch('/api/orders', {
@@ -116,6 +169,8 @@ export default function CheckoutPage() {
         body: JSON.stringify({
           customer_name: name,
           email,
+          shipping_method: selectedShippingMethod,
+          payment_method: selectedPaymentMethod,
           discount_code: applied?.code ?? '',
           items: cart.map((item) => ({
             productId: item.productId,
@@ -244,11 +299,11 @@ export default function CheckoutPage() {
                 <label className="block">
                   <span className="mb-1 block text-sm text-[#8a7f72]">送貨方式</span>
                   <select
-                    value={shippingMethod}
+                    value={selectedShippingMethod}
                     onChange={(e) => setShippingMethod(e.target.value)}
                     className="w-full rounded-lg border border-[#e5ded4] px-3 py-2.5"
                   >
-                    {SHIPPING_METHODS.map((m) => (
+                    {availableShippingMethods.map((m) => (
                       <option key={m} value={m}>
                         {m}
                       </option>
@@ -258,11 +313,11 @@ export default function CheckoutPage() {
                 <label className="block">
                   <span className="mb-1 block text-sm text-[#8a7f72]">付款方式</span>
                   <select
-                    value={paymentMethod}
+                    value={selectedPaymentMethod}
                     onChange={(e) => setPaymentMethod(e.target.value)}
                     className="w-full rounded-lg border border-[#e5ded4] px-3 py-2.5"
                   >
-                    {PAYMENT_METHODS.map((m) => (
+                    {availablePaymentMethods.map((m) => (
                       <option key={m} value={m}>
                         {m}
                       </option>

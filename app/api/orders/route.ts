@@ -28,12 +28,17 @@ export async function GET() {
 export async function POST(request: Request) {
   const body = await request.json();
   const { customer_name, email, items } = body ?? {};
+  const shippingMethod = String(body?.shipping_method ?? '').trim();
+  const paymentMethod = String(body?.payment_method ?? '').trim();
 
   if (!customer_name || !email) {
     return NextResponse.json({ error: '請填寫姓名與 Email' }, { status: 400 });
   }
   if (!Array.isArray(items) || items.length === 0) {
     return NextResponse.json({ error: '購物車是空的' }, { status: 400 });
+  }
+  if (!shippingMethod || !paymentMethod) {
+    return NextResponse.json({ error: '請選擇付款與送貨方式' }, { status: 400 });
   }
 
   const supabase = createAdminClient();
@@ -105,6 +110,8 @@ export async function POST(request: Request) {
       items: orderItems,
       subtotal,
       shipping,
+      shipping_method: shippingMethod,
+      payment_method: paymentMethod,
       discount,
       discount_code: discountCode,
       total,

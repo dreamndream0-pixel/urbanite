@@ -11,6 +11,8 @@ export type Product = {
   category: string;
   image: string;
   images: string[];
+  available_payment_methods?: string[];
+  available_shipping_methods?: string[];
   colors: string[];
   sizes: string[];
   is_featured: boolean;
@@ -29,6 +31,8 @@ export type SiteSettings = {
   footer_tax_id?: string;
   footer_instagram_url?: string;
   footer_line_url?: string;
+  payment_methods?: string[];
+  shipping_methods?: string[];
   updated_at?: string;
 };
 
@@ -84,6 +88,8 @@ export type Order = {
   items: OrderItem[];
   subtotal: number;
   shipping: number;
+  shipping_method?: string;
+  payment_method?: string;
   discount: number;
   discount_code: string;
   total: number;

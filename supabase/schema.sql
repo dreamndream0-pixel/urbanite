@@ -13,12 +13,15 @@ create table if not exists public.products (
   original_price integer,                        -- 原價(劃線價,可空)
   inventory      integer not null default 0,    -- 庫存數量
   status         text not null default '上架中',-- 狀態:上架中 / 加購品 / 已下架
-  image          text default '',               -- 主圖網址
-  colors         text[] default '{}',           -- 可選顏色
-  sizes          text[] default '{}',           -- 可選尺寸
-  is_featured    boolean not null default false,-- 是否為首頁主打
-  sort_order     integer not null default 0,    -- 排序(小的在前)
-  created_at     timestamptz not null default now()
+  image                      text default '',               -- 主圖網址
+  images                     jsonb not null default '[]',   -- 商品圖片,最多 10 張由後台限制
+  available_payment_methods  jsonb not null default '[]',   -- 此商品可用付款方式
+  available_shipping_methods jsonb not null default '[]',   -- 此商品可用物流方式
+  colors                     text[] default '{}',           -- 可選顏色
+  sizes                      text[] default '{}',           -- 可選尺寸
+  is_featured                boolean not null default false,-- 是否為首頁主打
+  sort_order                 integer not null default 0,    -- 排序(小的在前)
+  created_at                 timestamptz not null default now()
 );
 
 -- ---------- 訂單表 ----------
@@ -30,6 +33,8 @@ create table if not exists public.orders (
   items         jsonb not null default '[]',    -- 購買品項明細(名稱/變體/單價/數量)
   subtotal      integer not null default 0,     -- 小計
   shipping      integer not null default 0,     -- 運費
+  shipping_method text default '',              -- 送貨方式
+  payment_method  text default '',              -- 付款方式
   total         integer not null default 0,     -- 總計
   status        text not null default '待出貨', -- 待出貨 / 備貨中 / 已出貨 / 已取消
   paid          boolean not null default false, -- 是否已付款
@@ -79,6 +84,8 @@ create table if not exists public.site_settings (
   footer_tax_id        text default '',
   footer_instagram_url text default '',
   footer_line_url      text default '',
+  payment_methods      jsonb not null default '["綠界金流","Line Pay","Apple Pay","取貨付款","轉帳匯款"]',
+  shipping_methods     jsonb not null default '["綠界物流-超商取貨","綠界物流-宅配","7-11 取貨付款","全家 取貨付款"]',
   updated_at           timestamptz default now(),
   constraint single_row check (id = 1)
 );
