@@ -170,11 +170,11 @@ export default function LoginClient({
             </div>
 
             <section className="mt-20">
-              <div className="flex items-start justify-between gap-4">
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
                 <h2 className="text-4xl font-bold tracking-wide">還不是會員？</h2>
                 <Link
                   href={registerHref}
-                  className="mt-1 shrink-0 rounded-full bg-[#ada265] px-5 py-3 text-sm font-bold text-white transition hover:bg-[#9a9059]"
+                  className="shrink-0 rounded-full bg-[#ada265] px-3 py-1.5 text-xs font-bold text-white transition hover:bg-[#9a9059]"
                 >
                   註冊會員
                 </Link>

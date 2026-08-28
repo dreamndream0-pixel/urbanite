@@ -46,6 +46,7 @@ export default function Home() {
   const [banners, setBanners] = useState<Banner[]>([]);
   const [dbCategories, setDbCategories] = useState<Category[]>([]);
   const [logoUrl, setLogoUrl] = useState('');
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [settings, setSettings] = useState<SiteSettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [category, setCategory] = useState('all');
@@ -81,7 +82,8 @@ export default function Home() {
         if (s?.logo_url) setLogoUrl(s.logo_url);
         if (s) setSettings(s);
       })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => setSettingsLoaded(true));
 
     fetch('/api/banners')
       .then((res) => (res.ok ? res.json() : []))
@@ -247,7 +249,7 @@ export default function Home() {
             </button>
           </div>
 
-          {/* 中:Logo */}
+          {/* 中:Logo(載入完成前先留白,避免先閃文字再換成 Logo 圖)*/}
           <Link href="/" className="justify-self-center px-2 text-center">
             {logoUrl ? (
               <img
@@ -255,10 +257,12 @@ export default function Home() {
                 alt={STORE_NAME}
                 className="mx-auto h-8 w-auto object-contain sm:h-10"
               />
-            ) : (
+            ) : settingsLoaded ? (
               <span className="font-serif text-2xl italic tracking-wide sm:text-3xl">
                 {STORE_NAME}
               </span>
+            ) : (
+              <span className="inline-block h-8 sm:h-10" />
             )}
           </Link>
 
