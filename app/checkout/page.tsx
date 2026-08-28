@@ -56,10 +56,11 @@ function readCart(): CartItem[] {
 }
 
 export default function CheckoutPage() {
-  const [cart, setCart] = useState<CartItem[]>(readCart);
+  // 先以空購物車渲染,掛載後再從 localStorage 載入,避免 hydration 不匹配
+  const [cart, setCart] = useState<CartItem[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [settings, setSettings] = useState<SiteSettings | null>(null);
-  const loaded = true;
+  const [loaded, setLoaded] = useState(false);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [shippingMethod, setShippingMethod] = useState(SHIPPING_METHODS[0]);
@@ -72,6 +73,9 @@ export default function CheckoutPage() {
   const [orderNo, setOrderNo] = useState('');
 
   useEffect(() => {
+    setCart(readCart());
+    setLoaded(true);
+
     fetch('/api/me')
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {

@@ -55,7 +55,10 @@ export default function Home() {
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
   const [favoritesOpen, setFavoritesOpen] = useState(false);
   const [cartOpen, setCartOpen] = useState(false);
-  const [cart, setCart] = useState<CartItem[]>(readCart);
+  // 購物車一律先以空陣列渲染,掛載後再從 localStorage 載入,
+  // 這樣伺服器與瀏覽器第一次渲染一致,避免 hydration 不匹配警告。
+  const [cart, setCart] = useState<CartItem[]>([]);
+  const [cartHydrated, setCartHydrated] = useState(false);
   const [user, setUser] = useState<{ email: string; name: string; isAdmin: boolean } | null>(null);
   const [accountOpen, setAccountOpen] = useState(false);
   const [quickAdd, setQuickAdd] = useState<Product | null>(null);
@@ -86,13 +89,20 @@ export default function Home() {
       .catch(() => setBanners([]));
   }, []);
 
+  // 掛載後才從 localStorage 載入購物車
   useEffect(() => {
+    setCart(readCart());
+    setCartHydrated(true);
+  }, []);
+
+  useEffect(() => {
+    if (!cartHydrated) return; // 尚未載入前不要寫入,以免把已存的購物車覆蓋成空
     try {
       localStorage.setItem(CART_KEY, JSON.stringify(cart));
     } catch {
       /* localStorage 不可用時略過 */
     }
-  }, [cart]);
+  }, [cart, cartHydrated]);
 
   // 收藏清單紀錄在帳號裡:登入後從後端讀取,未登入則清空。
   useEffect(() => {
