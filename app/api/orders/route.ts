@@ -32,6 +32,7 @@ export async function POST(request: Request) {
   const paymentMethod = String(body?.payment_method ?? '').trim();
   const phone = String(body?.phone ?? '').trim();
   const address = String(body?.address ?? '').trim();
+  const note = String(body?.note ?? '').trim();
 
   if (!customer_name || !email) {
     return NextResponse.json({ error: '請填寫姓名與 Email' }, { status: 400 });
@@ -123,6 +124,7 @@ export async function POST(request: Request) {
       email,
       phone,
       address,
+      note,
       items: orderItems,
       subtotal,
       shipping,

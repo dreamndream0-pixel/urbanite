@@ -90,6 +90,7 @@ export type Order = {
   email: string;
   phone?: string;
   address?: string;
+  note?: string;
   items: OrderItem[];
   subtotal: number;
   shipping: number;

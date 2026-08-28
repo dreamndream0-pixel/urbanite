@@ -12,7 +12,7 @@ const formatter = new Intl.NumberFormat('zh-TW', {
   maximumFractionDigits: 0,
 });
 
-const ORDER_STATUSES = ['待出貨', '備貨中', '已出貨', '已取消'];
+const ORDER_STATUSES = ['尚未付款', '待出貨', '已出貨', '已完成', '取消', '退貨'];
 const PRODUCT_STATUSES = ['上架中', '加購品', '已下架'];
 const DEFAULT_PAYMENT_METHODS = ['綠界金流', 'Line Pay', 'Apple Pay', '取貨付款', '轉帳匯款'];
 const DEFAULT_SHIPPING_METHODS = ['綠界物流-超商取貨', '綠界物流-宅配', '7-11 取貨付款', '全家 取貨付款'];
@@ -117,6 +117,7 @@ export default function AdminDashboard({
   const [banners, setBanners] = useState<Banner[]>(initialBanners);
   const [uploadingBanner, setUploadingBanner] = useState(false);
   const [settingsTab, setSettingsTab] = useState<'general' | 'banners'>('general');
+  const [orderFilter, setOrderFilter] = useState<string>('全部');
   const [cropFile, setCropFile] = useState<File | null>(null);
   const [editBannerId, setEditBannerId] = useState<string | null>(null);
   const [newCat, setNewCat] = useState({ slug: '', name: '', en: '' });
@@ -607,80 +608,123 @@ export default function AdminDashboard({
           {/* ===== 訂單管理 ===== */}
           {section === 'orders' && (
             <Card title={`訂單(${orders.length})`}>
-              {orders.length === 0 ? (
-                <Empty>目前還沒有訂單。</Empty>
-              ) : (
-                <div className="space-y-3">
-                  {orders.map((order) => (
-                    <div key={order.id} className="rounded-lg border border-[#e5ded4] p-4">
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <p className="font-semibold">{order.order_no}</p>
-                          <p className="text-sm text-[#8a7f72]">
-                            {(order.user_id && customerByUser.get(order.user_id)?.name) ||
-                              order.customer_name}{' '}
-                            ·{' '}
-                            {(order.user_id && customerByUser.get(order.user_id)?.email) ||
-                              order.email}
-                            {order.user_id && customerByUser.has(order.user_id) ? (
-                              <span className="ml-2 rounded-full bg-[#eef3ec] px-2 py-0.5 text-xs font-semibold text-[#4a7a44]">
-                                會員
-                              </span>
-                            ) : (
-                              <span className="ml-2 rounded-full bg-[#f3ede4] px-2 py-0.5 text-xs font-semibold text-[#8a7f72]">
-                                訪客
-                              </span>
-                            )}
-                          </p>
+              {/* 狀態分類 */}
+              <div className="mb-4 -mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
+                {['全部', ...ORDER_STATUSES].map((s) => {
+                  const n = s === '全部' ? orders.length : orders.filter((o) => o.status === s).length;
+                  return (
+                    <button
+                      key={s}
+                      onClick={() => setOrderFilter(s)}
+                      className={`shrink-0 rounded-full border px-3 py-1.5 text-sm font-semibold transition ${
+                        orderFilter === s
+                          ? 'border-[#1f1b19] bg-[#1f1b19] text-white'
+                          : 'border-[#d7c9bd] text-[#6b6156]'
+                      }`}
+                    >
+                      {s}
+                      <span className={`ml-1 ${orderFilter === s ? 'text-white/70' : 'text-[#a99e8f]'}`}>{n}</span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {(() => {
+                const shown = orderFilter === '全部' ? orders : orders.filter((o) => o.status === orderFilter);
+                if (shown.length === 0) return <Empty>此分類目前沒有訂單。</Empty>;
+                return (
+                  <div className="space-y-3">
+                    {shown.map((order) => {
+                      const name =
+                        (order.user_id && customerByUser.get(order.user_id)?.name) || order.customer_name;
+                      return (
+                        <div key={order.id} className="rounded-lg border border-[#e5ded4] p-4">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <p className="font-semibold">{order.order_no}</p>
+                              <p className="text-sm text-[#8a7f72]">
+                                {name}
+                                {order.user_id && customerByUser.has(order.user_id) ? (
+                                  <span className="ml-2 rounded-full bg-[#eef3ec] px-2 py-0.5 text-xs font-semibold text-[#4a7a44]">
+                                    會員
+                                  </span>
+                                ) : (
+                                  <span className="ml-2 rounded-full bg-[#f3ede4] px-2 py-0.5 text-xs font-semibold text-[#8a7f72]">
+                                    訪客
+                                  </span>
+                                )}
+                              </p>
+                            </div>
+                            <span className="shrink-0 font-semibold">{formatter.format(order.total)}</span>
+                          </div>
+
+                          {/* 商品縮圖 */}
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            {order.items.map((it, i) => (
+                              <div
+                                key={i}
+                                className="relative h-12 w-12 shrink-0 overflow-hidden rounded-md border border-[#eee5da] bg-[#e9e1d6]"
+                                title={`${it.name} (${it.variant}) ×${it.quantity}`}
+                              >
+                                {it.image ? (
+                                  <img src={it.image} alt={it.name} className="h-full w-full object-cover" />
+                                ) : null}
+                                {it.quantity > 1 && (
+                                  <span className="absolute bottom-0 right-0 rounded-tl bg-black/60 px-1 text-[10px] font-semibold text-white">
+                                    ×{it.quantity}
+                                  </span>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+
+                          {(order.shipping_method || order.payment_method) && (
+                            <p className="mt-2 text-sm text-[#8a7f72]">
+                              {order.shipping_method && `送貨:${order.shipping_method}`}
+                              {order.shipping_method && order.payment_method ? ' · ' : ''}
+                              {order.payment_method && `付款:${order.payment_method}`}
+                            </p>
+                          )}
+                          {order.note ? (
+                            <p className="mt-1 rounded-lg bg-[#faf6ee] px-3 py-2 text-sm text-[#6b6156]">
+                              備註:{order.note}
+                            </p>
+                          ) : null}
+                          {order.discount > 0 && (
+                            <p className="mt-1 text-sm text-[#c84767]">
+                              折扣碼 {order.discount_code}:-{formatter.format(order.discount)}
+                            </p>
+                          )}
+
+                          <div className="mt-3 flex flex-wrap items-center gap-2">
+                            <select
+                              value={order.status}
+                              onChange={(e) => updateOrder(order.id, { status: e.target.value })}
+                              className="rounded-full border border-[#d7c9bd] bg-white px-3 py-1.5 text-sm"
+                            >
+                              {ORDER_STATUSES.map((s) => (
+                                <option key={s} value={s}>
+                                  {s}
+                                </option>
+                              ))}
+                            </select>
+                            <button
+                              onClick={() => updateOrder(order.id, { paid: !order.paid })}
+                              className={`rounded-full px-3 py-1.5 text-sm font-semibold ${
+                                order.paid
+                                  ? 'bg-[#e9f7ee] text-[#1f7a44]'
+                                  : 'border border-[#d7c9bd] text-[#6b6156]'
+                              }`}
+                            >
+                              {order.paid ? '已付款' : '未付款'}
+                            </button>
+                          </div>
                         </div>
-                        <span className="font-semibold">{formatter.format(order.total)}</span>
-                      </div>
-                      <ul className="mt-2 text-sm text-[#6b6156]">
-                        {order.items.map((it, i) => (
-                          <li key={i}>
-                            {it.name} × {it.quantity}({it.variant})
-                          </li>
-                        ))}
-                      </ul>
-                      {(order.shipping_method || order.payment_method) && (
-                        <p className="mt-2 text-sm text-[#8a7f72]">
-                          {order.shipping_method && `送貨:${order.shipping_method}`}
-                          {order.shipping_method && order.payment_method ? ' · ' : ''}
-                          {order.payment_method && `付款:${order.payment_method}`}
-                        </p>
-                      )}
-                      {order.discount > 0 && (
-                        <p className="mt-1 text-sm text-[#c84767]">
-                          折扣碼 {order.discount_code}:-{formatter.format(order.discount)}
-                        </p>
-                      )}
-                      <div className="mt-3 flex flex-wrap items-center gap-2">
-                        <select
-                          value={order.status}
-                          onChange={(e) => updateOrder(order.id, { status: e.target.value })}
-                          className="rounded-full border border-[#d7c9bd] bg-white px-3 py-1.5 text-sm"
-                        >
-                          {ORDER_STATUSES.map((s) => (
-                            <option key={s} value={s}>
-                              {s}
-                            </option>
-                          ))}
-                        </select>
-                        <button
-                          onClick={() => updateOrder(order.id, { paid: !order.paid })}
-                          className={`rounded-full px-3 py-1.5 text-sm font-semibold ${
-                            order.paid
-                              ? 'bg-[#e9f7ee] text-[#1f7a44]'
-                              : 'border border-[#d7c9bd] text-[#6b6156]'
-                          }`}
-                        >
-                          {order.paid ? '已付款' : '未付款'}
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+                      );
+                    })}
+                  </div>
+                );
+              })()}
             </Card>
           )}
 

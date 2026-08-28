@@ -405,19 +405,22 @@ function OrderModal({
 }) {
   const dateStr = order.created_at ? new Date(order.created_at).toLocaleString('zh-TW') : '';
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4" onClick={onClose}>
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center sm:p-4"
+      onClick={onClose}
+    >
       <div
-        className="max-h-[92vh] w-full max-w-lg overflow-auto rounded-t-2xl bg-white sm:rounded-2xl"
+        className="flex max-h-[90dvh] w-full max-w-lg flex-col overflow-hidden rounded-t-2xl bg-white sm:rounded-2xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-[#e5ded4] bg-white px-5 py-4">
+        <div className="flex shrink-0 items-center justify-between border-b border-[#e5ded4] bg-white px-5 py-4">
           <h2 className="text-lg font-semibold">合計：{formatter.format(order.total)}</h2>
           <button onClick={onClose} aria-label="關閉" className="rounded-md p-1 text-2xl leading-none hover:bg-[#efe8dd]">
             ×
           </button>
         </div>
 
-        <div className="space-y-6 p-5">
+        <div className="flex-1 space-y-6 overflow-y-auto overscroll-contain p-5">
           {/* 品項(含縮圖、原價劃線) */}
           <div className="space-y-3">
             {order.items.map((it, i) => {
@@ -471,6 +474,7 @@ function OrderModal({
             <Row label="訂單電郵" value={order.email} />
             <Row label="訂單日期" value={dateStr} />
             <Row label="訂單狀態" value={order.status} />
+            {order.note ? <Row label="備註" value={order.note} /> : null}
           </Section>
 
           {/* 送貨資訊 */}
@@ -506,8 +510,8 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 function Row({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex justify-between gap-3">
-      <span className="text-[#8a7f72]">{label}</span>
-      <span className="text-right">{value}</span>
+      <span className="shrink-0 text-[#8a7f72]">{label}</span>
+      <span className="min-w-0 break-words text-right">{value}</span>
     </div>
   );
 }

@@ -65,6 +65,7 @@ export default function CheckoutPage() {
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [address, setAddress] = useState('');
+  const [note, setNote] = useState('');
   const [shippingMethod, setShippingMethod] = useState(SHIPPING_METHODS[0]);
   const [paymentMethod, setPaymentMethod] = useState(PAYMENT_METHODS[0]);
   const [discountInput, setDiscountInput] = useState('');
@@ -177,6 +178,7 @@ export default function CheckoutPage() {
           email,
           phone,
           address,
+          note,
           shipping_method: selectedShippingMethod,
           payment_method: selectedPaymentMethod,
           discount_code: applied?.code ?? '',
@@ -364,6 +366,13 @@ export default function CheckoutPage() {
                   rows={2}
                   value={address}
                   onChange={(e) => setAddress(e.target.value)}
+                />
+                <textarea
+                  className="rounded-lg border border-[#e5ded4] px-4 py-3"
+                  placeholder="訂單備註(選填)"
+                  rows={2}
+                  value={note}
+                  onChange={(e) => setNote(e.target.value)}
                 />
               </div>
             </section>
