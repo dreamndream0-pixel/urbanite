@@ -980,11 +980,15 @@ function HeroCarousel({ banners }: { banners: Banner[] }) {
               src={banner.image}
               alt={banner.title || '輪播圖'}
               draggable={false}
-              className="pointer-events-none h-full w-full object-cover"
+              // 固定框架,圖片完整縮放進框內(不裁切),空白處用底色補滿
+              className="pointer-events-none h-full w-full object-contain"
             />
           );
           return (
-            <div key={banner.id} className="relative aspect-[16/13] w-full shrink-0 sm:aspect-[14/9]">
+            <div
+              key={banner.id}
+              className="relative aspect-[16/13] w-full shrink-0 bg-[#e9e1d6] sm:aspect-[14/9]"
+            >
               {banner.link ? (
                 <a href={banner.link} target="_blank" rel="noreferrer" className="block h-full w-full">
                   {img}

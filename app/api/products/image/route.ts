@@ -4,6 +4,13 @@ import { getAdminUser } from '@/lib/supabase/server';
 
 const MAX_SIZE = 5 * 1024 * 1024; // 5MB
 const ALLOWED = ['image/png', 'image/jpeg', 'image/webp', 'image/gif'];
+// 副檔名一律由 MIME 類型決定,避免用手機原始檔名(可能含中文/空白)組出無效的儲存路徑
+const EXT_BY_TYPE: Record<string, string> = {
+  'image/png': 'png',
+  'image/jpeg': 'jpg',
+  'image/webp': 'webp',
+  'image/gif': 'gif',
+};
 
 // POST /api/products/image — 上傳商品圖片到 Supabase Storage(限管理員)
 export async function POST(request: Request) {
@@ -26,8 +33,9 @@ export async function POST(request: Request) {
   }
 
   const supabase = createAdminClient();
-  const ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
-  const path = `${folder}/${productId || 'new'}-${Date.now()}.${ext}`;
+  const ext = EXT_BY_TYPE[file.type] ?? 'jpg';
+  const rand = Math.random().toString(36).slice(2, 8);
+  const path = `${folder}/${productId || 'new'}-${Date.now()}-${rand}.${ext}`;
   const bytes = new Uint8Array(await file.arrayBuffer());
 
   const { error } = await supabase.storage

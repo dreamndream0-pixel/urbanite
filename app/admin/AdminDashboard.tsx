@@ -1670,6 +1670,36 @@ function MethodToggles({
   );
 }
 
+// 用 XMLHttpRequest 上傳,才能拿到上傳進度(fetch 沒有上傳進度事件)
+function uploadImageWithProgress(
+  file: File,
+  productId: string,
+  onProgress: (fraction: number) => void,
+): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const fd = new FormData();
+    fd.append('file', file);
+    fd.append('productId', productId);
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', '/api/products/image');
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable) onProgress(e.loaded / e.total);
+    };
+    xhr.onload = () => {
+      let data: { image_url?: string; error?: string } = {};
+      try {
+        data = JSON.parse(xhr.responseText);
+      } catch {
+        /* 忽略解析錯誤 */
+      }
+      if (xhr.status >= 200 && xhr.status < 300 && data.image_url) resolve(data.image_url);
+      else reject(new Error(data.error ?? '上傳失敗'));
+    };
+    xhr.onerror = () => reject(new Error('連線發生問題'));
+    xhr.send(fd);
+  });
+}
+
 function StatCard({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-xl border border-[#e5ded4] bg-white p-4">
@@ -1732,6 +1762,9 @@ function ProductModal({
   onSave: () => void;
 }) {
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<{ done: number; total: number; percent: number } | null>(
+    null,
+  );
 
   function set<K extends keyof Draft>(key: K, value: Draft[K]) {
     onChange({ ...draft, [key]: value });
@@ -1755,16 +1788,15 @@ function ProductModal({
     }
     const picked = files.slice(0, room);
     setUploadingImage(true);
+    setUploadProgress({ done: 0, total: picked.length, percent: 0 });
     try {
       const uploaded: string[] = [];
-      for (const file of picked) {
-        const fd = new FormData();
-        fd.append('file', file);
-        fd.append('productId', draft.id || 'new-product');
-        const res = await fetch('/api/products/image', { method: 'POST', body: fd });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error ?? '上傳失敗');
-        uploaded.push(data.image_url);
+      for (let i = 0; i < picked.length; i++) {
+        const url = await uploadImageWithProgress(picked[i], draft.id || 'new-product', (p) =>
+          setUploadProgress({ done: i, total: picked.length, percent: Math.round(p * 100) }),
+        );
+        uploaded.push(url);
+        setUploadProgress({ done: i + 1, total: picked.length, percent: 100 });
       }
       onChange({ ...draft, images: [...draft.images, ...uploaded].slice(0, MAX_PRODUCT_IMAGES) });
       if (files.length > room) alert(`最多只能放 ${MAX_PRODUCT_IMAGES} 張,已略過多餘的圖片`);
@@ -1772,6 +1804,7 @@ function ProductModal({
       alert(error instanceof Error ? error.message : '上傳失敗');
     } finally {
       setUploadingImage(false);
+      setUploadProgress(null);
     }
   }
 
@@ -1984,6 +2017,22 @@ function ProductModal({
                   {draft.images.length}/{MAX_PRODUCT_IMAGES}
                 </span>
               </div>
+              {uploadProgress && (
+                <div>
+                  <div className="mb-1 flex justify-between text-xs text-[#8a7f72]">
+                    <span>
+                      上傳中 {uploadProgress.done}/{uploadProgress.total}
+                    </span>
+                    <span>{uploadProgress.percent}%</span>
+                  </div>
+                  <div className="h-2 w-full overflow-hidden rounded-full bg-[#eee5da]">
+                    <div
+                      className="h-full rounded-full bg-[#1f1b19] transition-all duration-150"
+                      style={{ width: `${uploadProgress.percent}%` }}
+                    />
+                  </div>
+                </div>
+              )}
               <p className="text-xs text-[#8a7f72]">
                 可一次選多張。圖片會上傳到 Supabase Storage,第一張會成為前台封面圖。
               </p>
