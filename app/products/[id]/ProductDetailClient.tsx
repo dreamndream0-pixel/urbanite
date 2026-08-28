@@ -25,9 +25,12 @@ const formatter = new Intl.NumberFormat('zh-TW', {
 
 export default function ProductDetailClient({ product }: { product: Product }) {
   const gallery = product.images?.length ? product.images : product.image ? [product.image] : [];
+  const specs = product.specs ?? [];
+  const hasSpecs = specs.length > 0;
   const [activeImage, setActiveImage] = useState(gallery[0] ?? '');
   const [selectedColor, setSelectedColor] = useState(product.colors[0] ?? '');
   const [selectedSize, setSelectedSize] = useState(product.sizes[0] ?? '');
+  const [specSel, setSpecSel] = useState<string[]>(() => specs.map((d) => d.options[0] ?? ''));
   const [quantity, setQuantity] = useState(1);
   const [tab, setTab] = useState<'description' | 'shipping'>('shipping');
   const [message, setMessage] = useState('');
@@ -59,13 +62,32 @@ export default function ProductDetailClient({ product }: { product: Product }) {
       .finally(() => setSettingsLoaded(true));
   }, []);
 
-  const variantLabel = useMemo(
-    () => [selectedColor, selectedSize].filter(Boolean).join(' / ') || '標準款',
-    [selectedColor, selectedSize],
-  );
+  const variantLabel = useMemo(() => {
+    if (hasSpecs) return specSel.filter(Boolean).join(' / ') || '標準款';
+    return [selectedColor, selectedSize].filter(Boolean).join(' / ') || '標準款';
+  }, [hasSpecs, specSel, selectedColor, selectedSize]);
+
+  // 依所選規格找到對應的庫存組合
+  const selectedVariant = useMemo(() => {
+    if (!hasSpecs) return null;
+    const key = specSel.join(' / ');
+    return (product.variants ?? []).find((v) => v.options.join(' / ') === key) ?? null;
+  }, [hasSpecs, specSel, product.variants]);
+
+  const allSpecsChosen = !hasSpecs || specSel.every(Boolean);
+  const variantInventory = hasSpecs ? selectedVariant?.inventory ?? 0 : product.inventory;
+  const soldOut = hasSpecs && allSpecsChosen && variantInventory <= 0;
 
   function addToCart(action: 'cart' | 'buy') {
-    const id = `${product.id}-${selectedColor}-${selectedSize}`;
+    if (hasSpecs && !allSpecsChosen) {
+      setMessage('請先選擇完整規格');
+      return;
+    }
+    if (soldOut) {
+      setMessage('此規格已售完');
+      return;
+    }
+    const id = `${product.id}-${variantLabel}`;
     try {
       const raw = localStorage.getItem(CART_KEY);
       const cart: CartItem[] = raw ? JSON.parse(raw) : [];
@@ -186,46 +208,84 @@ export default function ProductDetailClient({ product }: { product: Product }) {
             ) : null}
           </div>
 
-          {product.colors.length > 0 && (
-            <section className="mt-7">
-              <p className="mb-2 text-sm text-[#8a8480]">顏色: {selectedColor}</p>
-              <div className="flex flex-wrap gap-2">
-                {product.colors.map((color) => (
-                  <button
-                    key={color}
-                    onClick={() => setSelectedColor(color)}
-                    className={`min-w-16 border px-5 py-3 text-sm font-semibold ${
-                      selectedColor === color
-                        ? 'border-[#c84767] text-[#c84767]'
-                        : 'border-[#e1d9d3] bg-[#f7f5f2] text-[#3d3935]'
-                    }`}
-                  >
-                    {color}
-                  </button>
-                ))}
-              </div>
-            </section>
-          )}
+          {hasSpecs ? (
+            <>
+              {specs.map((dim, i) => (
+                <section key={dim.name} className="mt-6">
+                  <p className="mb-2 text-sm text-[#8a8480]">
+                    {dim.name}：{specSel[i] || '請選擇'}
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {dim.options.map((opt) => (
+                      <button
+                        key={opt}
+                        onClick={() => setSpecSel((prev) => prev.map((v, idx) => (idx === i ? opt : v)))}
+                        className={`min-w-16 border px-5 py-3 text-sm font-semibold ${
+                          specSel[i] === opt
+                            ? 'border-[#c84767] text-[#c84767]'
+                            : 'border-[#e1d9d3] bg-[#f7f5f2] text-[#3d3935]'
+                        }`}
+                      >
+                        {opt}
+                      </button>
+                    ))}
+                  </div>
+                </section>
+              ))}
+              <p className="mt-3 text-sm">
+                {!allSpecsChosen ? (
+                  <span className="text-[#8a8480]">請選擇完整規格</span>
+                ) : soldOut ? (
+                  <span className="font-semibold text-[#c0392b]">此規格已售完</span>
+                ) : (
+                  <span className="text-[#8a8480]">庫存：{variantInventory} 件</span>
+                )}
+              </p>
+            </>
+          ) : (
+            <>
+              {product.colors.length > 0 && (
+                <section className="mt-7">
+                  <p className="mb-2 text-sm text-[#8a8480]">顏色: {selectedColor}</p>
+                  <div className="flex flex-wrap gap-2">
+                    {product.colors.map((color) => (
+                      <button
+                        key={color}
+                        onClick={() => setSelectedColor(color)}
+                        className={`min-w-16 border px-5 py-3 text-sm font-semibold ${
+                          selectedColor === color
+                            ? 'border-[#c84767] text-[#c84767]'
+                            : 'border-[#e1d9d3] bg-[#f7f5f2] text-[#3d3935]'
+                        }`}
+                      >
+                        {color}
+                      </button>
+                    ))}
+                  </div>
+                </section>
+              )}
 
-          {product.sizes.length > 0 && (
-            <section className="mt-6">
-              <p className="mb-2 text-sm text-[#8a8480]">尺寸: {selectedSize}</p>
-              <div className="flex flex-wrap gap-2">
-                {product.sizes.map((size) => (
-                  <button
-                    key={size}
-                    onClick={() => setSelectedSize(size)}
-                    className={`h-14 min-w-16 border text-sm font-semibold ${
-                      selectedSize === size
-                        ? 'border-2 border-[#c84767] bg-white text-[#2c2826]'
-                        : 'border-[#ece7e2] bg-[#f7f5f2] text-[#3d3935]'
-                    }`}
-                  >
-                    {size}
-                  </button>
-                ))}
-              </div>
-            </section>
+              {product.sizes.length > 0 && (
+                <section className="mt-6">
+                  <p className="mb-2 text-sm text-[#8a8480]">尺寸: {selectedSize}</p>
+                  <div className="flex flex-wrap gap-2">
+                    {product.sizes.map((size) => (
+                      <button
+                        key={size}
+                        onClick={() => setSelectedSize(size)}
+                        className={`h-14 min-w-16 border text-sm font-semibold ${
+                          selectedSize === size
+                            ? 'border-2 border-[#c84767] bg-white text-[#2c2826]'
+                            : 'border-[#ece7e2] bg-[#f7f5f2] text-[#3d3935]'
+                        }`}
+                      >
+                        {size}
+                      </button>
+                    ))}
+                  </div>
+                </section>
+              )}
+            </>
           )}
 
           <section className="mt-6">
@@ -244,13 +304,15 @@ export default function ProductDetailClient({ product }: { product: Product }) {
           <div className="mt-4 grid grid-cols-2 gap-3">
             <button
               onClick={() => addToCart('cart')}
-              className="bg-[#c84767] px-4 py-3 font-semibold text-white"
+              disabled={soldOut}
+              className="bg-[#c84767] px-4 py-3 font-semibold text-white disabled:opacity-50"
             >
-              加入購物車
+              {soldOut ? '已售完' : '加入購物車'}
             </button>
             <button
               onClick={() => addToCart('buy')}
-              className="bg-[#ff761a] px-4 py-3 font-semibold text-white"
+              disabled={soldOut}
+              className="bg-[#ff761a] px-4 py-3 font-semibold text-white disabled:opacity-50"
             >
               ♧ 立即購買
             </button>

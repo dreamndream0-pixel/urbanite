@@ -1,5 +1,10 @@
 // 前後端共用的資料型別
 
+// 規格維度(例:{name:'顏色', options:['紅','綠','藍']})
+export type SpecDim = { name: string; options: string[] };
+// 每個規格組合的庫存(options 依 specs 順序,例:['紅','S'])
+export type Variant = { options: string[]; inventory: number };
+
 export type Product = {
   id: string;
   name: string;
@@ -15,6 +20,8 @@ export type Product = {
   available_shipping_methods?: string[];
   colors: string[];
   sizes: string[];
+  specs: SpecDim[];
+  variants: Variant[];
   is_featured: boolean;
   sort_order: number;
   created_at?: string;

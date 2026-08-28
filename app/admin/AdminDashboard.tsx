@@ -45,12 +45,31 @@ type Draft = {
   available_shipping_methods: string[];
   colors: string;
   sizes: string;
+  specs: { name: string; optionsText: string }[];
+  variantStock: Record<string, number>; // key = 各選項用 ' / ' 串起來
   is_featured: boolean;
   sort_order: number;
 };
 
 // 每個商品最多可放的圖片數
 const MAX_PRODUCT_IMAGES = 10;
+
+// 由規格維度算出所有組合(笛卡兒積),回傳每個組合的選項陣列
+function specCombos(specs: { name: string; options: string[] }[]): string[][] {
+  const valid = specs.filter((s) => s.options.length > 0);
+  if (valid.length === 0) return [];
+  return valid.reduce<string[][]>(
+    (acc, dim) => acc.flatMap((combo) => dim.options.map((o) => [...combo, o])),
+    [[]],
+  );
+}
+
+function parseOptions(text: string): string[] {
+  return text
+    .split(/[,，/、\s]+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
 
 function blankDraft(): Draft {
   return {
@@ -68,6 +87,8 @@ function blankDraft(): Draft {
     available_shipping_methods: [],
     colors: '',
     sizes: '',
+    specs: [],
+    variantStock: {},
     is_featured: false,
     sort_order: 0,
   };
@@ -75,6 +96,9 @@ function blankDraft(): Draft {
 
 function toDraft(p: Product): Draft {
   const images = p.images?.length ? p.images : p.image ? [p.image] : [];
+  const specs = (p.specs ?? []).map((s) => ({ name: s.name, optionsText: s.options.join(', ') }));
+  const variantStock: Record<string, number> = {};
+  for (const v of p.variants ?? []) variantStock[v.options.join(' / ')] = v.inventory;
   return {
     ...p,
     images,
@@ -82,6 +106,8 @@ function toDraft(p: Product): Draft {
     available_shipping_methods: p.available_shipping_methods ?? [],
     colors: p.colors.join(', '),
     sizes: p.sizes.join(', '),
+    specs,
+    variantStock,
   };
 }
 
@@ -247,12 +273,35 @@ export default function AdminDashboard({
   async function saveProduct() {
     if (!editing) return;
     const images = editing.images.filter(Boolean).slice(0, MAX_PRODUCT_IMAGES);
+
+    // 規格制:整理規格維度 + 各組合庫存
+    const specs = editing.specs
+      .map((s) => ({ name: s.name.trim(), options: parseOptions(s.optionsText) }))
+      .filter((s) => s.name && s.options.length > 0);
+    const variants = specCombos(specs).map((opts) => ({
+      options: opts,
+      inventory: Math.max(0, Math.floor(Number(editing.variantStock[opts.join(' / ')] ?? 0))),
+    }));
+    // 有規格時,總庫存 = 各規格庫存加總;沒規格時沿用手填的庫存
+    const inventory =
+      specs.length > 0 ? variants.reduce((n, v) => n + v.inventory, 0) : editing.inventory;
+    // 顏色/尺寸:有對應維度就帶入(向下相容前台舊欄位)
+    const colorDim = specs.find((s) => s.name.includes('色'));
+    const sizeDim = specs.find((s) => s.name.includes('尺寸') || /size/i.test(s.name));
+
     const payload = {
       ...editing,
       images,
       image: images[0] ?? '', // 第一張作為封面,前台商品卡沿用 image 欄位
-      colors: editing.colors.split(',').map((s) => s.trim()).filter(Boolean),
-      sizes: editing.sizes.split(',').map((s) => s.trim()).filter(Boolean),
+      inventory,
+      specs,
+      variants,
+      colors: colorDim
+        ? colorDim.options
+        : editing.colors.split(',').map((s) => s.trim()).filter(Boolean),
+      sizes: sizeDim
+        ? sizeDim.options
+        : editing.sizes.split(',').map((s) => s.trim()).filter(Boolean),
     };
     if (isNew) {
       if (!payload.id || !payload.name) return alert('請填寫商品代碼與名稱');
@@ -294,6 +343,21 @@ export default function AdminDashboard({
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ inventory: value }),
+    });
+  }
+
+  // 進銷存:更新某商品某規格的庫存,並同步總庫存
+  async function adjustVariantStock(id: string, index: number, inventory: number) {
+    const product = products.find((p) => p.id === id);
+    if (!product) return;
+    const value = Math.max(0, Math.floor(inventory) || 0);
+    const variants = product.variants.map((v, i) => (i === index ? { ...v, inventory: value } : v));
+    const total = variants.reduce((n, v) => n + v.inventory, 0);
+    setProducts((l) => l.map((p) => (p.id === id ? { ...p, variants, inventory: total } : p)));
+    await fetch(`/api/products/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ variants, inventory: total }),
     });
   }
 
@@ -874,38 +938,74 @@ export default function AdminDashboard({
             </div>
           )}
 
-          {/* ===== 庫存管理 ===== */}
+          {/* ===== 庫存管理(進銷存 / 庫存表) ===== */}
           {section === 'inventory' && (
-            <Card title="庫存管理">
-              <div className="space-y-2">
+            <Card title="進銷存 / 庫存表">
+              <div className="space-y-3">
                 {products.map((p) => (
                   <div
                     key={p.id}
-                    className={`flex items-center gap-3 rounded-lg border p-3 ${
+                    className={`rounded-lg border p-3 ${
                       p.inventory <= 10 ? 'border-[#e0b4b4] bg-[#fdf5f3]' : 'border-[#e5ded4]'
                     }`}
                   >
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate font-semibold">{p.name}</p>
-                      <p className="text-sm text-[#8a7f72]">
-                        {p.status}
-                        {p.inventory <= 10 && <span className="ml-2 text-[#c0392b]">庫存偏低</span>}
-                      </p>
+                    <div className="flex items-center gap-3">
+                      {p.image ? (
+                        <img className="h-10 w-10 shrink-0 rounded-md object-cover" src={p.image} alt="" />
+                      ) : (
+                        <div className="h-10 w-10 shrink-0 rounded-md bg-[#f1e3dc]" />
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate font-semibold">{p.name}</p>
+                        <p className="text-sm text-[#8a7f72]">
+                          總庫存 {p.inventory}
+                          {p.inventory <= 10 && <span className="ml-2 text-[#c0392b]">偏低</span>}
+                        </p>
+                      </div>
+                      {p.variants.length === 0 && (
+                        <div className="inline-flex shrink-0 items-center rounded-full border border-[#d7c9bd] bg-white">
+                          <button className="px-3 py-1.5 text-lg" onClick={() => adjustInventory(p.id, p.inventory - 1)}>
+                            -
+                          </button>
+                          <input
+                            type="number"
+                            value={p.inventory}
+                            onChange={(e) => adjustInventory(p.id, Number(e.target.value))}
+                            className="w-14 border-x border-[#e5ded4] px-2 py-1 text-center text-sm"
+                          />
+                          <button className="px-3 py-1.5 text-lg" onClick={() => adjustInventory(p.id, p.inventory + 1)}>
+                            +
+                          </button>
+                        </div>
+                      )}
                     </div>
-                    <div className="inline-flex items-center rounded-full border border-[#d7c9bd] bg-white">
-                      <button className="px-3 py-1.5 text-lg" onClick={() => adjustInventory(p.id, p.inventory - 1)}>
-                        -
-                      </button>
-                      <input
-                        type="number"
-                        value={p.inventory}
-                        onChange={(e) => adjustInventory(p.id, Number(e.target.value))}
-                        className="w-16 border-x border-[#e5ded4] px-2 py-1 text-center text-sm"
-                      />
-                      <button className="px-3 py-1.5 text-lg" onClick={() => adjustInventory(p.id, p.inventory + 1)}>
-                        +
-                      </button>
-                    </div>
+
+                    {/* 各規格庫存 */}
+                    {p.variants.length > 0 && (
+                      <div className="mt-3 space-y-1.5 border-t border-[#efe8dd] pt-3">
+                        {p.variants.map((v, i) => (
+                          <div key={i} className="flex items-center justify-between gap-2">
+                            <span className={`min-w-0 truncate text-sm ${v.inventory <= 3 ? 'text-[#c0392b]' : 'text-[#6b6156]'}`}>
+                              {v.options.join(' / ')}
+                            </span>
+                            <div className="inline-flex shrink-0 items-center rounded-full border border-[#d7c9bd] bg-white">
+                              <button className="px-2.5 py-1 text-sm" onClick={() => adjustVariantStock(p.id, i, v.inventory - 1)}>
+                                -
+                              </button>
+                              <input
+                                type="number"
+                                value={v.inventory}
+                                onChange={(e) => adjustVariantStock(p.id, i, Number(e.target.value))}
+                                className="w-12 border-x border-[#e5ded4] px-1 py-0.5 text-center text-sm"
+                              />
+                              <button className="px-2.5 py-1 text-sm" onClick={() => adjustVariantStock(p.id, i, v.inventory + 1)}>
+                                +
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -1953,6 +2053,30 @@ function ProductModal({
     onChange({ ...draft, [key]: value });
   }
 
+  // 規格制:即時算出組合與各組合庫存
+  const modalSpecs = draft.specs
+    .map((s) => ({ name: s.name.trim(), options: parseOptions(s.optionsText) }))
+    .filter((s) => s.name && s.options.length > 0);
+  const modalCombos = specCombos(modalSpecs);
+  const hasSpecs = modalCombos.length > 0;
+  const specTotal = modalCombos.reduce(
+    (n, opts) => n + (Number(draft.variantStock[opts.join(' / ')]) || 0),
+    0,
+  );
+
+  function updateSpec(i: number, patch: Partial<{ name: string; optionsText: string }>) {
+    onChange({ ...draft, specs: draft.specs.map((s, idx) => (idx === i ? { ...s, ...patch } : s)) });
+  }
+  function addSpec() {
+    onChange({ ...draft, specs: [...draft.specs, { name: '', optionsText: '' }] });
+  }
+  function removeSpec(i: number) {
+    onChange({ ...draft, specs: draft.specs.filter((_, idx) => idx !== i) });
+  }
+  function setVariantStock(key: string, value: number) {
+    onChange({ ...draft, variantStock: { ...draft.variantStock, [key]: value } });
+  }
+
   function toggleMethod(
     key: 'available_payment_methods' | 'available_shipping_methods',
     method: string,
@@ -2063,11 +2187,12 @@ function ProductModal({
             </Field>
           </div>
           <div className="grid grid-cols-2 gap-3">
-            <Field label="庫存">
+            <Field label={hasSpecs ? '總庫存(各規格加總)' : '庫存'}>
               <input
                 type="number"
-                className="w-full rounded-lg border border-[#e5ded4] px-3 py-2"
-                value={draft.inventory}
+                className="w-full rounded-lg border border-[#e5ded4] px-3 py-2 disabled:bg-[#f5efec]"
+                value={hasSpecs ? specTotal : draft.inventory}
+                disabled={hasSpecs}
                 onChange={(e) => set('inventory', Number(e.target.value))}
               />
             </Field>
@@ -2225,22 +2350,69 @@ function ProductModal({
               </p>
             </div>
           </Field>
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="顏色(逗號分隔)">
-              <input
-                className="w-full rounded-lg border border-[#e5ded4] px-3 py-2"
-                value={draft.colors}
-                onChange={(e) => set('colors', e.target.value)}
-              />
+          <Field label="規格設定(例:顏色→紅,綠,藍;尺寸→S,M,L;規格→3入,5入)">
+            <div className="space-y-2">
+              {draft.specs.map((s, i) => (
+                <div key={i} className="flex gap-2">
+                  <input
+                    placeholder="規格名稱"
+                    value={s.name}
+                    onChange={(e) => updateSpec(i, { name: e.target.value })}
+                    className="w-24 shrink-0 rounded-lg border border-[#e5ded4] px-3 py-2 text-sm"
+                  />
+                  <input
+                    placeholder="選項(用逗號 / 斜線分隔)"
+                    value={s.optionsText}
+                    onChange={(e) => updateSpec(i, { optionsText: e.target.value })}
+                    className="min-w-0 flex-1 rounded-lg border border-[#e5ded4] px-3 py-2 text-sm"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removeSpec(i)}
+                    aria-label="刪除規格"
+                    className="shrink-0 rounded-lg border border-[#e0b4b4] px-3 text-sm font-semibold text-[#c0392b]"
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
+              <button
+                type="button"
+                onClick={addSpec}
+                className="rounded-full border border-[#d7c9bd] px-4 py-2 text-sm font-semibold"
+              >
+                + 新增規格維度
+              </button>
+            </div>
+          </Field>
+
+          {hasSpecs && (
+            <Field label="各規格庫存(階梯選擇 · 分別入庫存)">
+              <div className="max-h-64 space-y-2 overflow-auto rounded-lg border border-[#eee5da] bg-[#faf7f2] p-2">
+                {modalCombos.map((opts) => {
+                  const key = opts.join(' / ');
+                  return (
+                    <div
+                      key={key}
+                      className="flex items-center justify-between gap-3 rounded-lg bg-white px-3 py-2"
+                    >
+                      <span className="min-w-0 truncate text-sm font-medium">{key}</span>
+                      <input
+                        type="number"
+                        min={0}
+                        value={draft.variantStock[key] ?? 0}
+                        onChange={(e) => setVariantStock(key, Math.max(0, Number(e.target.value)))}
+                        className="w-24 shrink-0 rounded-lg border border-[#e5ded4] px-2 py-1.5 text-right text-sm"
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+              <p className="mt-1 text-xs text-[#8a7f72]">
+                共 {modalCombos.length} 個組合,總庫存 {specTotal}。
+              </p>
             </Field>
-            <Field label="尺寸(逗號分隔)">
-              <input
-                className="w-full rounded-lg border border-[#e5ded4] px-3 py-2"
-                value={draft.sizes}
-                onChange={(e) => set('sizes', e.target.value)}
-              />
-            </Field>
-          </div>
+          )}
           <div className="grid grid-cols-2 gap-3">
             <Field label="排序(小的在前)">
               <input

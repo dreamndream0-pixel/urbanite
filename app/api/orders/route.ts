@@ -66,7 +66,15 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: `找不到商品:${item.productId}` }, { status: 400 });
     }
     const quantity = Math.max(1, Math.floor(Number(item.quantity) || 1));
-    if (product.inventory < quantity) {
+    // 有規格的商品:檢查對應規格組合的庫存;否則檢查總庫存
+    const variants = Array.isArray(product.variants) ? product.variants : [];
+    if (variants.length > 0) {
+      const label = String(item.variant ?? '');
+      const v = variants.find((vv: { options: string[] }) => vv.options.join(' / ') === label);
+      if (!v || v.inventory < quantity) {
+        return NextResponse.json({ error: `「${product.name}」${label} 庫存不足` }, { status: 409 });
+      }
+    } else if (product.inventory < quantity) {
       return NextResponse.json({ error: `「${product.name}」庫存不足` }, { status: 409 });
     }
     subtotal += product.price * quantity;
@@ -142,15 +150,37 @@ export async function POST(request: Request) {
 
   if (orderErr) return NextResponse.json({ error: orderErr.message }, { status: 400 });
 
-  // 扣減庫存
+  // 扣減庫存(用工作副本累積,避免同商品多規格互相覆蓋),最後每個商品寫一次
+  type WorkProduct = { inventory: number; variants: { options: string[]; inventory: number }[] };
+  const working = new Map<string, WorkProduct>();
   for (const item of items) {
-    const product = priceMap.get(String(item.productId));
-    if (!product) continue;
+    const pid = String(item.productId);
+    const base = priceMap.get(pid);
+    if (!base) continue;
+    const w =
+      working.get(pid) ??
+      ({
+        inventory: base.inventory,
+        variants: (Array.isArray(base.variants) ? base.variants : []).map(
+          (v: { options: string[]; inventory: number }) => ({ ...v }),
+        ),
+      } as WorkProduct);
     const quantity = Math.max(1, Math.floor(Number(item.quantity) || 1));
+    if (w.variants.length > 0) {
+      const label = String(item.variant ?? '');
+      const v = w.variants.find((vv) => vv.options.join(' / ') === label);
+      if (v) v.inventory = Math.max(0, v.inventory - quantity);
+      w.inventory = w.variants.reduce((n, vv) => n + vv.inventory, 0);
+    } else {
+      w.inventory = Math.max(0, w.inventory - quantity);
+    }
+    working.set(pid, w);
+  }
+  for (const [pid, w] of working) {
     await supabase
       .from('products')
-      .update({ inventory: product.inventory - quantity })
-      .eq('id', product.id);
+      .update({ inventory: w.inventory, variants: w.variants })
+      .eq('id', pid);
   }
 
   return NextResponse.json(order as Order, { status: 201 });

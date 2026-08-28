@@ -172,13 +172,13 @@ export default function Home() {
 
   function addToCart(
     product: Product,
-    opts?: { color?: string; size?: string; quantity?: number; openCart?: boolean },
+    opts?: { variant?: string; quantity?: number; openCart?: boolean },
   ) {
-    const color = opts?.color ?? product.colors[0] ?? '';
-    const size = opts?.size ?? product.sizes[0] ?? '';
     const quantity = opts?.quantity ?? 1;
-    const variant = [color, size].filter(Boolean).join(' / ') || '標準款';
-    const id = `${product.id}-${color}-${size}`;
+    const variant =
+      opts?.variant ??
+      ([product.colors[0], product.sizes[0]].filter(Boolean).join(' / ') || '標準款');
+    const id = `${product.id}-${variant}`;
     setCart((items) => {
       const existing = items.find((item) => item.id === id);
       if (existing) {
@@ -466,8 +466,8 @@ export default function Home() {
           favorited={favorites.has(quickAdd.id)}
           onFavorite={() => toggleFavorite(quickAdd.id)}
           onClose={() => setQuickAdd(null)}
-          onAdd={(color, size, quantity, buyNow) => {
-            addToCart(quickAdd, { color, size, quantity, openCart: !buyNow });
+          onAdd={(variant, quantity, buyNow) => {
+            addToCart(quickAdd, { variant, quantity, openCart: !buyNow });
             setQuickAdd(null);
             if (buyNow) router.push('/checkout');
           }}
@@ -1058,11 +1058,24 @@ function QuickAddModal({
   favorited: boolean;
   onFavorite: () => void;
   onClose: () => void;
-  onAdd: (color: string, size: string, quantity: number, buyNow: boolean) => void;
+  onAdd: (variant: string, quantity: number, buyNow: boolean) => void;
 }) {
+  const specs = product.specs ?? [];
+  const hasSpecs = specs.length > 0;
   const [color, setColor] = useState(product.colors[0] ?? '');
   const [size, setSize] = useState(product.sizes[0] ?? '');
+  const [specSel, setSpecSel] = useState<string[]>(() => specs.map((d) => d.options[0] ?? ''));
   const [quantity, setQuantity] = useState(1);
+
+  const variantLabel = hasSpecs
+    ? specSel.filter(Boolean).join(' / ') || '標準款'
+    : [color, size].filter(Boolean).join(' / ') || '標準款';
+  const allChosen = !hasSpecs || specSel.every(Boolean);
+  const variant = hasSpecs
+    ? (product.variants ?? []).find((v) => v.options.join(' / ') === specSel.join(' / '))
+    : null;
+  const inv = hasSpecs ? variant?.inventory ?? 0 : product.inventory;
+  const soldOut = hasSpecs && allChosen && inv <= 0;
 
   return (
     <div
@@ -1103,42 +1116,80 @@ function QuickAddModal({
           </div>
         </div>
 
-        {product.colors.length > 0 && (
-          <section className="mt-5">
-            <p className="mb-2 text-sm text-[#8a8480]">顏色：{color}</p>
-            <div className="flex flex-wrap gap-2">
-              {product.colors.map((c) => (
-                <button
-                  key={c}
-                  onClick={() => setColor(c)}
-                  className={`min-w-14 border px-4 py-2 text-sm font-semibold ${
-                    color === c ? 'border-[#c84767] text-[#c84767]' : 'border-[#e1d9d3] bg-[#f7f5f2] text-[#3d3935]'
-                  }`}
-                >
-                  {c}
-                </button>
-              ))}
-            </div>
-          </section>
-        )}
+        {hasSpecs ? (
+          <>
+            {specs.map((dim, i) => (
+              <section key={dim.name} className="mt-4">
+                <p className="mb-2 text-sm text-[#8a8480]">
+                  {dim.name}：{specSel[i] || '請選擇'}
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {dim.options.map((opt) => (
+                    <button
+                      key={opt}
+                      onClick={() => setSpecSel((prev) => prev.map((v, idx) => (idx === i ? opt : v)))}
+                      className={`min-w-14 border px-4 py-2 text-sm font-semibold ${
+                        specSel[i] === opt
+                          ? 'border-[#c84767] text-[#c84767]'
+                          : 'border-[#e1d9d3] bg-[#f7f5f2] text-[#3d3935]'
+                      }`}
+                    >
+                      {opt}
+                    </button>
+                  ))}
+                </div>
+              </section>
+            ))}
+            <p className="mt-3 text-sm">
+              {!allChosen ? (
+                <span className="text-[#8a8480]">請選擇完整規格</span>
+              ) : soldOut ? (
+                <span className="font-semibold text-[#c0392b]">此規格已售完</span>
+              ) : (
+                <span className="text-[#8a8480]">庫存：{inv} 件</span>
+              )}
+            </p>
+          </>
+        ) : (
+          <>
+            {product.colors.length > 0 && (
+              <section className="mt-5">
+                <p className="mb-2 text-sm text-[#8a8480]">顏色：{color}</p>
+                <div className="flex flex-wrap gap-2">
+                  {product.colors.map((c) => (
+                    <button
+                      key={c}
+                      onClick={() => setColor(c)}
+                      className={`min-w-14 border px-4 py-2 text-sm font-semibold ${
+                        color === c ? 'border-[#c84767] text-[#c84767]' : 'border-[#e1d9d3] bg-[#f7f5f2] text-[#3d3935]'
+                      }`}
+                    >
+                      {c}
+                    </button>
+                  ))}
+                </div>
+              </section>
+            )}
 
-        {product.sizes.length > 0 && (
-          <section className="mt-4">
-            <p className="mb-2 text-sm text-[#8a8480]">尺寸：{size}</p>
-            <div className="flex flex-wrap gap-2">
-              {product.sizes.map((s) => (
-                <button
-                  key={s}
-                  onClick={() => setSize(s)}
-                  className={`h-11 min-w-14 border text-sm font-semibold ${
-                    size === s ? 'border-2 border-[#c84767] bg-white text-[#2c2826]' : 'border-[#ece7e2] bg-[#f7f5f2] text-[#3d3935]'
-                  }`}
-                >
-                  {s}
-                </button>
-              ))}
-            </div>
-          </section>
+            {product.sizes.length > 0 && (
+              <section className="mt-4">
+                <p className="mb-2 text-sm text-[#8a8480]">尺寸：{size}</p>
+                <div className="flex flex-wrap gap-2">
+                  {product.sizes.map((s) => (
+                    <button
+                      key={s}
+                      onClick={() => setSize(s)}
+                      className={`h-11 min-w-14 border text-sm font-semibold ${
+                        size === s ? 'border-2 border-[#c84767] bg-white text-[#2c2826]' : 'border-[#ece7e2] bg-[#f7f5f2] text-[#3d3935]'
+                      }`}
+                    >
+                      {s}
+                    </button>
+                  ))}
+                </div>
+              </section>
+            )}
+          </>
         )}
 
         <section className="mt-4">
@@ -1156,14 +1207,16 @@ function QuickAddModal({
 
         <div className="mt-6 grid grid-cols-2 gap-3">
           <button
-            onClick={() => onAdd(color, size, quantity, false)}
-            className="rounded-full bg-[#c84767] px-4 py-3 font-semibold text-white"
+            onClick={() => onAdd(variantLabel, quantity, false)}
+            disabled={!allChosen || soldOut}
+            className="rounded-full bg-[#c84767] px-4 py-3 font-semibold text-white disabled:opacity-50"
           >
-            加入購物車
+            {soldOut ? '已售完' : '加入購物車'}
           </button>
           <button
-            onClick={() => onAdd(color, size, quantity, true)}
-            className="rounded-full bg-[#ff761a] px-4 py-3 font-semibold text-white"
+            onClick={() => onAdd(variantLabel, quantity, true)}
+            disabled={!allChosen || soldOut}
+            className="rounded-full bg-[#ff761a] px-4 py-3 font-semibold text-white disabled:opacity-50"
           >
             立即購買
           </button>

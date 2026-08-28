@@ -18,6 +18,8 @@ const EDITABLE: (keyof Product)[] = [
   'available_shipping_methods',
   'colors',
   'sizes',
+  'specs',
+  'variants',
   'is_featured',
   'sort_order',
 ];

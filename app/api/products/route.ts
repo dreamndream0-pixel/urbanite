@@ -47,6 +47,8 @@ export async function POST(request: Request) {
         : [],
       colors: body.colors ?? [],
       sizes: body.sizes ?? [],
+      specs: Array.isArray(body.specs) ? body.specs : [],
+      variants: Array.isArray(body.variants) ? body.variants : [],
       is_featured: body.is_featured ?? false,
       sort_order: body.sort_order ?? 0,
     })
