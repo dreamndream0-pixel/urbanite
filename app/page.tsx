@@ -987,7 +987,7 @@ function HeroCarousel({ banners }: { banners: Banner[] }) {
           return (
             <div
               key={banner.id}
-              className="relative aspect-[16/13] w-full shrink-0 bg-[#e9e1d6] sm:aspect-[14/9]"
+              className="relative aspect-[16/13] w-full shrink-0 bg-[#e9e1d6]"
             >
               {banner.link ? (
                 <a href={banner.link} target="_blank" rel="noreferrer" className="block h-full w-full">

@@ -1354,15 +1354,10 @@ export default function AdminDashboard({
   );
 }
 
-type CropRect = { x: number; y: number; w: number; h: number };
-type DragMode = 'move' | 'nw' | 'ne' | 'sw' | 'se';
-const ASPECTS: { label: string; value: number | null }[] = [
-  { label: '自由', value: null },
-  { label: '16:9', value: 16 / 9 },
-  { label: '3:2', value: 3 / 2 },
-  { label: '4:3', value: 4 / 3 },
-  { label: '1:1', value: 1 },
-];
+// 輪播圖比例(= 首頁輪播固定比例 16:13),裁切框與輸出都用這個
+const BANNER_AW = 16;
+const BANNER_AH = 13;
+const BG_CHOICES = ['#e9e1d6', '#ffffff', '#1f1b19', '#f6f2ec'];
 
 function BannerCropModal({
   file,
@@ -1377,103 +1372,84 @@ function BannerCropModal({
 }) {
   const [url] = useState(() => URL.createObjectURL(file));
   const [natural, setNatural] = useState({ w: 0, h: 0 });
-  const [aspect, setAspect] = useState<number | null>(16 / 9);
-  const [crop, setCrop] = useState<CropRect>({ x: 0.05, y: 0.05, w: 0.9, h: 0.5 });
-  const boxRef = useRef<HTMLDivElement>(null);
+  const [vp, setVp] = useState({ w: 0, h: 0 }); // 裁切框在畫面上的像素尺寸
+  const [scale, setScale] = useState(1); // 使用者縮放(1 = 完整貼合框)
+  const [pan, setPan] = useState({ x: 0, y: 0 }); // 平移(px)
+  const [bg, setBg] = useState(BG_CHOICES[0]);
+  const viewportRef = useRef<HTMLDivElement>(null);
   const imgElRef = useRef<HTMLImageElement>(null);
-  const drag = useRef<{ mode: DragMode; px: number; py: number; start: CropRect } | null>(null);
+  const drag = useRef<{ px: number; py: number; sx: number; sy: number } | null>(null);
+  const inited = useRef(false);
 
   useEffect(() => () => URL.revokeObjectURL(url), [url]);
 
-  // 依所選比例把裁切框置中
-  function centerFor(a: number | null): CropRect {
-    if (!a || !natural.w || !boxRef.current) return { x: 0.05, y: 0.05, w: 0.9, h: 0.5 };
-    const rect = boxRef.current.getBoundingClientRect();
-    let w = 0.9;
-    const hPx = (w * rect.width) / a;
-    let h = hPx / rect.height;
-    if (h > 0.9) {
-      h = 0.9;
-      const wPx = h * rect.height * a;
-      w = wPx / rect.width;
+  // 量測裁切框在畫面上的實際尺寸
+  useEffect(() => {
+    function measure() {
+      if (viewportRef.current) {
+        const r = viewportRef.current.getBoundingClientRect();
+        setVp({ w: r.width, h: r.height });
+      }
     }
-    return { x: (1 - w) / 2, y: (1 - h) / 2, w, h };
-  }
+    measure();
+    window.addEventListener('resize', measure);
+    return () => window.removeEventListener('resize', measure);
+  }, []);
 
-  function pickAspect(a: number | null) {
-    setAspect(a);
-    if (a) setCrop(centerFor(a));
-  }
+  // 完整貼合框(contain)所需的縮放比
+  const fit = natural.w && vp.w ? Math.min(vp.w / natural.w, vp.h / natural.h) : 1;
+  // 填滿框(cover)相對於 contain 的倍率
+  const coverRatio =
+    natural.w && vp.w ? Math.max(vp.w / natural.w, vp.h / natural.h) / fit : 1;
 
-  function clamp(c: CropRect): CropRect {
-    const w = Math.min(1, Math.max(0.1, c.w));
-    const h = Math.min(1, Math.max(0.1, c.h));
-    const x = Math.min(1 - w, Math.max(0, c.x));
-    const y = Math.min(1 - h, Math.max(0, c.y));
-    return { x, y, w, h };
-  }
+  // 一開始預設「填滿框」,使用者可再縮放/平移
+  useEffect(() => {
+    if (!inited.current && natural.w && vp.w) {
+      inited.current = true;
+      setScale(coverRatio);
+      setPan({ x: 0, y: 0 });
+    }
+  }, [natural.w, vp.w, coverRatio]);
 
-  function onPointerDown(mode: DragMode, e: React.PointerEvent) {
+  const displayW = natural.w * fit * scale;
+  const displayH = natural.h * fit * scale;
+  const ox = vp.w / 2 - displayW / 2 + pan.x;
+  const oy = vp.h / 2 - displayH / 2 + pan.y;
+
+  function onPointerDown(e: React.PointerEvent) {
     e.preventDefault();
-    e.stopPropagation();
     (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
-    drag.current = { mode, px: e.clientX, py: e.clientY, start: crop };
+    drag.current = { px: e.clientX, py: e.clientY, sx: pan.x, sy: pan.y };
   }
-
   function onPointerMove(e: React.PointerEvent) {
-    if (!drag.current || !boxRef.current) return;
+    if (!drag.current) return;
     e.preventDefault();
-    const rect = boxRef.current.getBoundingClientRect();
-    const s = drag.current.start;
-
-    if (drag.current.mode === 'move') {
-      const dx = (e.clientX - drag.current.px) / rect.width;
-      const dy = (e.clientY - drag.current.py) / rect.height;
-      setCrop(clamp({ ...s, x: s.x + dx, y: s.y + dy }));
-      return;
-    }
-
-    // 四個角拉伸:固定住對角,另外兩條邊跟著手指走
-    const mode = drag.current.mode;
-    const pfx = (e.clientX - rect.left) / rect.width;
-    const pfy = (e.clientY - rect.top) / rect.height;
-    let left = s.x;
-    let right = s.x + s.w;
-    let top = s.y;
-    let bottom = s.y + s.h;
-    if (mode.includes('w')) left = pfx;
-    if (mode.includes('e')) right = pfx;
-    if (mode.includes('n')) top = pfy;
-    if (mode.includes('s')) bottom = pfy;
-    setCrop(
-      clamp({
-        x: Math.min(left, right),
-        y: Math.min(top, bottom),
-        w: Math.abs(right - left),
-        h: Math.abs(bottom - top),
-      }),
-    );
+    setPan({ x: drag.current.sx + (e.clientX - drag.current.px), y: drag.current.sy + (e.clientY - drag.current.py) });
   }
-
   function onPointerUp(e: React.PointerEvent) {
     (e.target as HTMLElement).releasePointerCapture?.(e.pointerId);
     drag.current = null;
   }
 
-  const outW = Math.round(crop.w * natural.w);
-  const outH = Math.round(crop.h * natural.h);
+  function reset() {
+    setScale(coverRatio);
+    setPan({ x: 0, y: 0 });
+  }
 
   function apply() {
     const img = imgElRef.current;
-    if (!img) return;
-    const sw = crop.w * natural.w;
-    const sh = crop.h * natural.h;
+    if (!img || !vp.w) return;
+    const OUT_W = 1600;
+    const OUT_H = Math.round((OUT_W * BANNER_AH) / BANNER_AW);
+    const k = OUT_W / vp.w;
     const canvas = document.createElement('canvas');
-    canvas.width = Math.max(1, Math.round(sw));
-    canvas.height = Math.max(1, Math.round(sh));
+    canvas.width = OUT_W;
+    canvas.height = OUT_H;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
-    ctx.drawImage(img, crop.x * natural.w, crop.y * natural.h, sw, sh, 0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = bg; // 沒被圖片蓋到的地方補底色
+    ctx.fillRect(0, 0, OUT_W, OUT_H);
+    ctx.drawImage(img, ox * k, oy * k, displayW * k, displayH * k);
     const base = file.name.replace(/\.[^.]+$/, '') || 'banner';
     canvas.toBlob(
       (blob) => {
@@ -1487,39 +1463,20 @@ function BannerCropModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
       <div
-        className="max-h-[92vh] w-full max-w-2xl overflow-auto rounded-2xl bg-white p-6"
+        className="max-h-[92vh] w-full max-w-lg overflow-auto rounded-2xl bg-white p-6"
         style={{ overscrollBehavior: 'contain' }}
       >
-        <h2 className="text-xl font-semibold">輪播圖 — 編輯裁切</h2>
+        <h2 className="text-xl font-semibold">輪播圖 — 調整顯示範圍</h2>
+        <p className="mt-1 text-sm text-[#8a7f72]">
+          框是首頁輪播的固定比例。拖動照片、用下方滑桿放大縮小,選你要顯示的部分。
+        </p>
 
-        {/* 檔案資訊 */}
-        <div className="mt-3 grid grid-cols-2 gap-2 rounded-lg bg-[#f6f2ec] p-3 text-xs text-[#6b6156] sm:grid-cols-4">
-          <span className="truncate">檔名：{file.name}</span>
-          <span>類型：{file.type.replace('image/', '') || '—'}</span>
-          <span>原始尺寸：{natural.w}×{natural.h}</span>
-          <span>檔案大小：{(file.size / 1024).toFixed(0)} KB</span>
-        </div>
-
-        {/* 比例選擇 */}
-        <div className="mt-4 flex flex-wrap gap-2">
-          {ASPECTS.map((a) => (
-            <button
-              key={a.label}
-              onClick={() => pickAspect(a.value)}
-              className={`rounded-full border px-3 py-1.5 text-sm font-semibold ${
-                aspect === a.value ? 'border-[#1f1b19] bg-[#1f1b19] text-white' : 'border-[#d7c9bd]'
-              }`}
-            >
-              {a.label}
-            </button>
-          ))}
-        </div>
-
-        {/* 裁切區(touch-action:none 讓拖動不會捲動頁面 / 觸發下拉重新整理)*/}
+        {/* 固定比例的裁切框:框不動,照片在後面縮放平移 */}
         <div
-          ref={boxRef}
-          className="relative mt-4 select-none overflow-hidden rounded-lg bg-[#eee8e1]"
-          style={{ touchAction: 'none', overscrollBehavior: 'contain' }}
+          ref={viewportRef}
+          className="relative mt-4 aspect-[16/13] w-full select-none overflow-hidden rounded-lg"
+          style={{ backgroundColor: bg, touchAction: 'none', overscrollBehavior: 'contain', cursor: 'move' }}
+          onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
           onPointerUp={onPointerUp}
           onPointerCancel={onPointerUp}
@@ -1529,47 +1486,47 @@ function BannerCropModal({
             src={url}
             alt=""
             draggable={false}
-            onLoad={(e) => {
-              const el = e.currentTarget;
-              setNatural({ w: el.naturalWidth, h: el.naturalHeight });
-            }}
-            className="pointer-events-none block max-h-[55vh] w-full object-contain"
+            onLoad={(e) => setNatural({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight })}
+            className="pointer-events-none absolute max-w-none"
+            style={{ left: `${ox}px`, top: `${oy}px`, width: `${displayW}px`, height: `${displayH}px` }}
           />
-          {/* 遮罩 + 裁切框 */}
-          <div
-            className="absolute cursor-move border-2 border-white shadow-[0_0_0_9999px_rgba(0,0,0,0.45)]"
-            style={{
-              left: `${crop.x * 100}%`,
-              top: `${crop.y * 100}%`,
-              width: `${crop.w * 100}%`,
-              height: `${crop.h * 100}%`,
-              touchAction: 'none',
-            }}
-            onPointerDown={(e) => onPointerDown('move', e)}
-          >
-            {/* 四個角的拉伸把手(大一點好按、好拖)*/}
-            {([
-              { c: 'nw', cls: '-left-4 -top-4 cursor-nw-resize' },
-              { c: 'ne', cls: '-right-4 -top-4 cursor-ne-resize' },
-              { c: 'sw', cls: '-bottom-4 -left-4 cursor-sw-resize' },
-              { c: 'se', cls: '-bottom-4 -right-4 cursor-se-resize' },
-            ] as const).map((h) => (
-              <div
-                key={h.c}
-                className={`absolute flex h-9 w-9 items-center justify-center ${h.cls}`}
-                style={{ touchAction: 'none' }}
-                onPointerDown={(e) => onPointerDown(h.c, e)}
-              >
-                <span className="h-4 w-4 rounded-sm border-2 border-[#1f1b19] bg-white shadow" />
-              </div>
-            ))}
-          </div>
+          {/* 白框提示 */}
+          <div className="pointer-events-none absolute inset-0 rounded-lg ring-2 ring-inset ring-white/80" />
         </div>
 
-        <p className="mt-3 text-sm text-[#6b6156]">
-          裁切框內拖動可移動,右下角圓點可調整大小。裁切後大小:
-          <span className="font-semibold">{outW}×{outH}</span> px
-        </p>
+        {/* 縮放滑桿 */}
+        <div className="mt-4 flex items-center gap-3">
+          <span className="text-sm text-[#8a7f72]">縮小</span>
+          <input
+            type="range"
+            min={0.2}
+            max={Math.max(4, coverRatio * 2)}
+            step={0.01}
+            value={scale}
+            onChange={(e) => setScale(Number(e.target.value))}
+            className="flex-1 accent-[#1f1b19]"
+          />
+          <span className="text-sm text-[#8a7f72]">放大</span>
+        </div>
+
+        {/* 底色 + 重設 */}
+        <div className="mt-4 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-[#8a7f72]">底色</span>
+            {BG_CHOICES.map((c) => (
+              <button
+                key={c}
+                onClick={() => setBg(c)}
+                aria-label={`底色 ${c}`}
+                className={`h-7 w-7 rounded-full border ${bg === c ? 'ring-2 ring-[#1f1b19] ring-offset-1' : 'border-[#d7c9bd]'}`}
+                style={{ backgroundColor: c }}
+              />
+            ))}
+          </div>
+          <button onClick={reset} className="text-sm font-semibold text-[#6b6156] underline">
+            重設
+          </button>
+        </div>
 
         <div className="mt-6 flex justify-end gap-3">
           <button
@@ -1584,7 +1541,7 @@ function BannerCropModal({
             disabled={busy || !natural.w}
             className="rounded-full bg-[#1f1b19] px-5 py-2 text-sm font-semibold text-white disabled:opacity-50"
           >
-            {busy ? '上傳中…' : '裁切並上傳'}
+            {busy ? '上傳中…' : '套用並上傳'}
           </button>
         </div>
       </div>
