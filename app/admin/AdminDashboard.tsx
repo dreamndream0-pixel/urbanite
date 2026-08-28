@@ -118,6 +118,7 @@ export default function AdminDashboard({
   const [uploadingBanner, setUploadingBanner] = useState(false);
   const [settingsTab, setSettingsTab] = useState<'general' | 'banners'>('general');
   const [cropFile, setCropFile] = useState<File | null>(null);
+  const [editBannerId, setEditBannerId] = useState<string | null>(null);
   const [newCat, setNewCat] = useState({ slug: '', name: '', en: '' });
   const [newDiscount, setNewDiscount] = useState({ code: '', type: 'percent', value: 0, min_spend: 0 });
   const [logoUrl, setLogoUrl] = useState(initialLogoUrl);
@@ -386,15 +387,29 @@ export default function AdminDashboard({
       const up = await fetch('/api/products/image', { method: 'POST', body: fd });
       const upData = await up.json();
       if (!up.ok) throw new Error(upData.error ?? '上傳失敗');
-      const res = await fetch('/api/banners', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ image: upData.image_url, title, sort_order: banners.length }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? '新增失敗');
-      setBanners((l) => [...l, data as Banner]);
+
+      if (editBannerId) {
+        // 更換現有輪播圖的圖片
+        const res = await fetch(`/api/banners/${editBannerId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ image: upData.image_url, title }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error ?? '更新失敗');
+        setBanners((l) => l.map((b) => (b.id === editBannerId ? (data as Banner) : b)));
+      } else {
+        const res = await fetch('/api/banners', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ image: upData.image_url, title, sort_order: banners.length }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error ?? '新增失敗');
+        setBanners((l) => [...l, data as Banner]);
+      }
       setCropFile(null);
+      setEditBannerId(null);
     } catch (error) {
       alert(error instanceof Error ? error.message : '上傳失敗');
     } finally {
@@ -1116,31 +1131,19 @@ export default function AdminDashboard({
                           </div>
                           <div className="flex items-center gap-2">
                             <label className="cursor-pointer rounded-lg border border-[#d7c9bd] px-3 py-2 text-sm font-semibold">
-                              換圖
+                              換圖/裁切
                               <input
                                 type="file"
                                 accept="image/png,image/jpeg,image/webp,image/gif"
                                 className="hidden"
                                 disabled={uploadingBanner}
-                                onChange={async (e) => {
+                                onChange={(e) => {
                                   const file = e.target.files?.[0];
                                   e.target.value = '';
                                   if (!file) return;
-                                  setUploadingBanner(true);
-                                  try {
-                                    const fd = new FormData();
-                                    fd.append('file', file);
-                                    fd.append('folder', 'banners');
-                                    fd.append('productId', 'banner');
-                                    const up = await fetch('/api/products/image', { method: 'POST', body: fd });
-                                    const upData = await up.json();
-                                    if (!up.ok) throw new Error(upData.error ?? '上傳失敗');
-                                    await updateBanner(banner.id, { image: upData.image_url, title: file.name });
-                                  } catch (error) {
-                                    alert(error instanceof Error ? error.message : '上傳失敗');
-                                  } finally {
-                                    setUploadingBanner(false);
-                                  }
+                                  // 走裁切編輯器,裁好再更新這張輪播圖
+                                  setEditBannerId(banner.id);
+                                  setCropFile(file);
                                 }}
                               />
                             </label>
@@ -1322,7 +1325,10 @@ export default function AdminDashboard({
         <BannerCropModal
           file={cropFile}
           busy={uploadingBanner}
-          onCancel={() => setCropFile(null)}
+          onCancel={() => {
+            setCropFile(null);
+            setEditBannerId(null);
+          }}
           onConfirm={(blob, filename) => uploadBanner(blob, filename, filename)}
         />
       )}
@@ -1397,6 +1403,7 @@ function BannerCropModal({
 
   function onPointerMove(e: React.PointerEvent) {
     if (!drag.current || !boxRef.current) return;
+    e.preventDefault();
     const rect = boxRef.current.getBoundingClientRect();
     const dx = (e.clientX - drag.current.px) / rect.width;
     const dy = (e.clientY - drag.current.py) / rect.height;
@@ -1447,8 +1454,11 @@ function BannerCropModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="max-h-[92vh] w-full max-w-2xl overflow-auto rounded-2xl bg-white p-6">
-        <h2 className="text-xl font-semibold">新增輪播圖 — 編輯裁切</h2>
+      <div
+        className="max-h-[92vh] w-full max-w-2xl overflow-auto rounded-2xl bg-white p-6"
+        style={{ overscrollBehavior: 'contain' }}
+      >
+        <h2 className="text-xl font-semibold">輪播圖 — 編輯裁切</h2>
 
         {/* 檔案資訊 */}
         <div className="mt-3 grid grid-cols-2 gap-2 rounded-lg bg-[#f6f2ec] p-3 text-xs text-[#6b6156] sm:grid-cols-4">
@@ -1473,12 +1483,14 @@ function BannerCropModal({
           ))}
         </div>
 
-        {/* 裁切區 */}
+        {/* 裁切區(touch-action:none 讓拖動不會捲動頁面 / 觸發下拉重新整理)*/}
         <div
           ref={boxRef}
           className="relative mt-4 select-none overflow-hidden rounded-lg bg-[#eee8e1]"
+          style={{ touchAction: 'none', overscrollBehavior: 'contain' }}
           onPointerMove={onPointerMove}
           onPointerUp={onPointerUp}
+          onPointerCancel={onPointerUp}
         >
           <img
             ref={imgElRef}
@@ -1489,7 +1501,7 @@ function BannerCropModal({
               const el = e.currentTarget;
               setNatural({ w: el.naturalWidth, h: el.naturalHeight });
             }}
-            className="pointer-events-none block max-h-[50vh] w-full object-contain"
+            className="pointer-events-none block max-h-[55vh] w-full object-contain"
           />
           {/* 遮罩 + 裁切框 */}
           <div
@@ -1499,18 +1511,24 @@ function BannerCropModal({
               top: `${crop.y * 100}%`,
               width: `${crop.w * 100}%`,
               height: `${crop.h * 100}%`,
+              touchAction: 'none',
             }}
             onPointerDown={(e) => onPointerDown('move', e)}
           >
+            {/* 右下角把手放大,好按、好拖 */}
             <div
-              className="absolute -bottom-2 -right-2 h-4 w-4 cursor-se-resize rounded-full border-2 border-[#1f1b19] bg-white"
+              className="absolute -bottom-4 -right-4 flex h-9 w-9 cursor-se-resize items-center justify-center"
+              style={{ touchAction: 'none' }}
               onPointerDown={(e) => onPointerDown('resize', e)}
-            />
+            >
+              <span className="h-5 w-5 rounded-full border-2 border-[#1f1b19] bg-white shadow" />
+            </div>
           </div>
         </div>
 
         <p className="mt-3 text-sm text-[#6b6156]">
-          顯示大小(裁切後):<span className="font-semibold">{outW}×{outH}</span> px
+          裁切框內拖動可移動,右下角圓點可調整大小。裁切後大小:
+          <span className="font-semibold">{outW}×{outH}</span> px
         </p>
 
         <div className="mt-6 flex justify-end gap-3">
