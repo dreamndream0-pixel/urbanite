@@ -122,7 +122,9 @@ export default function AccountClient({
 
         {tab === 'coupons' && <CouponsTab coupons={coupons} />}
 
-        {tab === 'orders' && <OrdersTab orders={orders} onOpen={setOpenOrder} />}
+        {tab === 'orders' && (
+          <OrdersTab orders={orders} imageByName={imageByName} onOpen={setOpenOrder} />
+        )}
 
         {tab === 'favorites' && <FavoritesTab products={favoriteProducts} />}
       </section>
@@ -270,7 +272,15 @@ function CouponsTab({ coupons }: { coupons: Discount[] }) {
 }
 
 /* ---------- 訂單紀錄(列表) ---------- */
-function OrdersTab({ orders, onOpen }: { orders: Order[]; onOpen: (o: Order) => void }) {
+function OrdersTab({
+  orders,
+  imageByName,
+  onOpen,
+}: {
+  orders: Order[];
+  imageByName: Map<string, string>;
+  onOpen: (o: Order) => void;
+}) {
   if (orders.length === 0) {
     return (
       <p className="rounded-2xl border border-[#e5ded4] bg-white p-8 text-center text-[#6b6156]">
@@ -287,21 +297,42 @@ function OrdersTab({ orders, onOpen }: { orders: Order[]; onOpen: (o: Order) => 
         <button
           key={order.id}
           onClick={() => onOpen(order)}
-          className="flex w-full flex-wrap items-center justify-between gap-2 rounded-xl border border-[#e5ded4] bg-white p-5 text-left transition hover:border-[#c9b8a8] hover:shadow-sm"
+          className="block w-full rounded-xl border border-[#e5ded4] bg-white p-5 text-left transition hover:border-[#c9b8a8] hover:shadow-sm"
         >
-          <div>
-            <p className="font-semibold">{order.order_no}</p>
-            <p className="text-sm text-[#8a7f72]">
-              {order.created_at ? new Date(order.created_at).toLocaleString('zh-TW') : ''} ·{' '}
-              {order.items.reduce((n, it) => n + it.quantity, 0)} 件
-            </p>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <p className="font-semibold">{order.order_no}</p>
+              <p className="text-sm text-[#8a7f72]">
+                {order.created_at ? new Date(order.created_at).toLocaleString('zh-TW') : ''} ·{' '}
+                {order.items.reduce((n, it) => n + it.quantity, 0)} 件
+              </p>
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="rounded-full bg-[#f3ede4] px-3 py-1 text-sm font-semibold text-[#6b6156]">
+                {order.status}
+              </span>
+              <span className="font-semibold">{formatter.format(order.total)}</span>
+              <span className="text-[#c9b8a8]">›</span>
+            </div>
           </div>
-          <div className="flex items-center gap-3">
-            <span className="rounded-full bg-[#f3ede4] px-3 py-1 text-sm font-semibold text-[#6b6156]">
-              {order.status}
-            </span>
-            <span className="font-semibold">{formatter.format(order.total)}</span>
-            <span className="text-[#c9b8a8]">›</span>
+
+          {/* 所有商品縮圖 */}
+          <div className="mt-3 flex flex-wrap gap-2">
+            {order.items.map((it, i) => (
+              <div
+                key={i}
+                className="relative h-14 w-14 shrink-0 overflow-hidden rounded-md border border-[#eee5da] bg-[#e9e1d6]"
+              >
+                {imageByName.get(it.name) ? (
+                  <img src={imageByName.get(it.name)} alt={it.name} className="h-full w-full object-cover" />
+                ) : null}
+                {it.quantity > 1 && (
+                  <span className="absolute bottom-0 right-0 rounded-tl-md bg-black/60 px-1 text-[10px] font-semibold text-white">
+                    ×{it.quantity}
+                  </span>
+                )}
+              </div>
+            ))}
           </div>
         </button>
       ))}

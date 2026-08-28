@@ -95,7 +95,16 @@ export async function POST(request: Request) {
   }
 
   const total = Math.max(0, subtotal + shipping - discount);
-  const orderNo = `UB-${Date.now().toString().slice(-8)}`;
+
+  // 訂單編號:UB + 台灣日期(YYYYMMDD) + 當日流水號(4 碼),例如 UB202608290001
+  const tw = new Date(Date.now() + 8 * 3600 * 1000);
+  const ymd = tw.toISOString().slice(0, 10).replace(/-/g, '');
+  const prefix = `UB${ymd}`;
+  const { count: todayCount } = await supabase
+    .from('orders')
+    .select('order_no', { count: 'exact', head: true })
+    .like('order_no', `${prefix}%`);
+  const orderNo = `${prefix}${String((todayCount ?? 0) + 1).padStart(4, '0')}`;
 
   // 若客人已登入,把訂單關聯到他的帳號(訪客下單則為 null)
   const user = await getSessionUser();
