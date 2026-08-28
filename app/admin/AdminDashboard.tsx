@@ -1,6 +1,6 @@
 'use client';
 
-import { Fragment, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createBrowserSupabase } from '@/lib/supabase/client';
@@ -19,7 +19,6 @@ const NAV = [
   { key: 'overview', label: '總覽', Icon: IconGrid },
   { key: 'orders', label: '訂單管理', Icon: IconReceipt },
   { key: 'products', label: '商品及分類', Icon: IconTag },
-  { key: 'banners', label: '輪播圖', Icon: IconImage },
   { key: 'inventory', label: '庫存管理', Icon: IconBox },
   { key: 'customers', label: '顧客管理', Icon: IconUsers },
   { key: 'promotions', label: '促銷管理', Icon: IconGift },
@@ -104,6 +103,8 @@ export default function AdminDashboard({
   const [customers] = useState<Customer[]>(initialCustomers);
   const [banners, setBanners] = useState<Banner[]>(initialBanners);
   const [uploadingBanner, setUploadingBanner] = useState(false);
+  const [settingsTab, setSettingsTab] = useState<'general' | 'banners'>('general');
+  const [cropFile, setCropFile] = useState<File | null>(null);
   const [newCat, setNewCat] = useState({ slug: '', name: '', en: '' });
   const [newDiscount, setNewDiscount] = useState({ code: '', type: 'percent', value: 0, min_spend: 0 });
   const [logoUrl, setLogoUrl] = useState(initialLogoUrl);
@@ -338,11 +339,11 @@ export default function AdminDashboard({
     }
   }
 
-  async function uploadBanner(file: File) {
+  async function uploadBanner(blob: Blob, filename: string, title: string) {
     setUploadingBanner(true);
     try {
       const fd = new FormData();
-      fd.append('file', file);
+      fd.append('file', blob, filename);
       fd.append('folder', 'banners');
       fd.append('productId', 'banner');
       const up = await fetch('/api/products/image', { method: 'POST', body: fd });
@@ -351,11 +352,12 @@ export default function AdminDashboard({
       const res = await fetch('/api/banners', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ image: upData.image_url, sort_order: banners.length }),
+        body: JSON.stringify({ image: upData.image_url, title, sort_order: banners.length }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? '新增失敗');
       setBanners((l) => [...l, data as Banner]);
+      setCropFile(null);
     } catch (error) {
       alert(error instanceof Error ? error.message : '上傳失敗');
     } finally {
@@ -770,92 +772,6 @@ export default function AdminDashboard({
             </div>
           )}
 
-          {/* ===== 輪播圖 ===== */}
-          {section === 'banners' && (
-            <Card title="首頁輪播圖">
-              <p className="mb-4 text-sm text-[#8a7f72]">
-                顯示在首頁最上方,可放多張輪播。第一張(排序小的)先顯示,前台每 4 秒自動切換。
-              </p>
-              <label className="mb-5 inline-flex cursor-pointer items-center rounded-full bg-[#1f1b19] px-5 py-2.5 text-sm font-semibold text-white">
-                {uploadingBanner ? '上傳中…' : '+ 上傳輪播圖'}
-                <input
-                  type="file"
-                  accept="image/png,image/jpeg,image/webp,image/gif"
-                  className="hidden"
-                  disabled={uploadingBanner}
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) uploadBanner(file);
-                    e.target.value = '';
-                  }}
-                />
-              </label>
-
-              {banners.length === 0 ? (
-                <p className="rounded-lg bg-[#f6f2ec] p-5 text-sm text-[#6b6156]">
-                  還沒有輪播圖,上傳一張開始吧。
-                </p>
-              ) : (
-                <div className="space-y-3">
-                  {banners.map((banner, index) => (
-                    <div
-                      key={banner.id}
-                      className="flex flex-col gap-3 rounded-xl border border-[#e5ded4] p-3 sm:flex-row sm:items-center"
-                    >
-                      <div className="h-20 w-36 shrink-0 overflow-hidden rounded-lg bg-[#f6f2ec]">
-                        <img src={banner.image} alt="" className="h-full w-full object-cover" />
-                      </div>
-                      <div className="flex-1">
-                        <input
-                          className="w-full rounded-lg border border-[#e5ded4] px-3 py-2 text-sm"
-                          placeholder="點擊後前往的網址(可空)"
-                          defaultValue={banner.link}
-                          onBlur={(e) => {
-                            if (e.target.value !== banner.link) updateBanner(banner.id, { link: e.target.value });
-                          }}
-                        />
-                        <label className="mt-2 flex items-center gap-2 text-sm">
-                          <input
-                            type="checkbox"
-                            checked={banner.active}
-                            onChange={(e) => updateBanner(banner.id, { active: e.target.checked })}
-                          />
-                          <span>{banner.active ? '顯示中' : '已隱藏'}</span>
-                        </label>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => {
-                            if (index === 0) return;
-                            const prev = banners[index - 1];
-                            updateBanner(banner.id, { sort_order: prev.sort_order });
-                            updateBanner(prev.id, { sort_order: banner.sort_order });
-                            setBanners((l) => {
-                              const next = [...l];
-                              [next[index - 1], next[index]] = [next[index], next[index - 1]];
-                              return next;
-                            });
-                          }}
-                          disabled={index === 0}
-                          className="rounded-lg border border-[#d7c9bd] px-3 py-2 text-sm disabled:opacity-30"
-                          aria-label="上移"
-                        >
-                          ↑
-                        </button>
-                        <button
-                          onClick={() => deleteBanner(banner.id)}
-                          className="rounded-lg border border-[#e0b4b4] px-3 py-2 text-sm font-semibold text-[#c0392b]"
-                        >
-                          刪除
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </Card>
-          )}
-
           {/* ===== 庫存管理 ===== */}
           {section === 'inventory' && (
             <Card title="庫存管理">
@@ -1088,6 +1004,115 @@ export default function AdminDashboard({
           {/* ===== 系統設定 ===== */}
           {section === 'settings' && (
             <div className="space-y-6">
+              <div className="flex gap-2 border-b border-[#e5ded4]">
+                {([
+                  { key: 'general', label: '一般設定' },
+                  { key: 'banners', label: '輪播圖' },
+                ] as const).map((t) => (
+                  <button
+                    key={t.key}
+                    onClick={() => setSettingsTab(t.key)}
+                    className={`-mb-px border-b-2 px-4 py-2 text-sm font-semibold transition ${
+                      settingsTab === t.key
+                        ? 'border-[#1f1b19] text-[#1f1b19]'
+                        : 'border-transparent text-[#8a7f72] hover:text-[#1f1b19]'
+                    }`}
+                  >
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+
+              {settingsTab === 'banners' && (
+                <Card title="首頁輪播圖">
+                  <p className="mb-4 text-sm text-[#8a7f72]">
+                    顯示在首頁最上方,可放多張。第一張(排序小的)先顯示,前台每 4 秒自動切換,也可左右滑動。
+                  </p>
+                  <label className="mb-5 inline-flex cursor-pointer items-center rounded-full bg-[#1f1b19] px-5 py-2.5 text-sm font-semibold text-white">
+                    {uploadingBanner ? '處理中…' : '+ 新增輪播圖'}
+                    <input
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp,image/gif"
+                      className="hidden"
+                      disabled={uploadingBanner}
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) setCropFile(file);
+                        e.target.value = '';
+                      }}
+                    />
+                  </label>
+
+                  {banners.length === 0 ? (
+                    <p className="rounded-lg bg-[#f6f2ec] p-5 text-sm text-[#6b6156]">
+                      還沒有輪播圖,上傳一張開始吧。
+                    </p>
+                  ) : (
+                    <div className="space-y-3">
+                      {banners.map((banner, index) => (
+                        <div
+                          key={banner.id}
+                          className="flex flex-col gap-3 rounded-xl border border-[#e5ded4] p-3 sm:flex-row sm:items-center"
+                        >
+                          <div className="h-20 w-36 shrink-0 overflow-hidden rounded-lg bg-[#f6f2ec]">
+                            <img src={banner.image} alt="" className="h-full w-full object-cover" />
+                          </div>
+                          <div className="flex-1">
+                            {banner.title && (
+                              <p className="mb-1 truncate text-xs text-[#8a7f72]">檔名：{banner.title}</p>
+                            )}
+                            <input
+                              className="w-full rounded-lg border border-[#e5ded4] px-3 py-2 text-sm"
+                              placeholder="點擊後前往的網址(可空)"
+                              defaultValue={banner.link}
+                              onBlur={(e) => {
+                                if (e.target.value !== banner.link) updateBanner(banner.id, { link: e.target.value });
+                              }}
+                            />
+                            <label className="mt-2 flex items-center gap-2 text-sm">
+                              <input
+                                type="checkbox"
+                                checked={banner.active}
+                                onChange={(e) => updateBanner(banner.id, { active: e.target.checked })}
+                              />
+                              <span>{banner.active ? '顯示中' : '已隱藏'}</span>
+                            </label>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => {
+                                if (index === 0) return;
+                                const prev = banners[index - 1];
+                                updateBanner(banner.id, { sort_order: prev.sort_order });
+                                updateBanner(prev.id, { sort_order: banner.sort_order });
+                                setBanners((l) => {
+                                  const next = [...l];
+                                  [next[index - 1], next[index]] = [next[index], next[index - 1]];
+                                  return next;
+                                });
+                              }}
+                              disabled={index === 0}
+                              className="rounded-lg border border-[#d7c9bd] px-3 py-2 text-sm disabled:opacity-30"
+                              aria-label="上移"
+                            >
+                              ↑
+                            </button>
+                            <button
+                              onClick={() => deleteBanner(banner.id)}
+                              className="rounded-lg border border-[#e0b4b4] px-3 py-2 text-sm font-semibold text-[#c0392b]"
+                            >
+                              刪除
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </Card>
+              )}
+
+              {settingsTab === 'general' && (
+              <>
               <Card title="網站 Logo">
                 <div className="flex flex-wrap items-center gap-5">
                   <div className="flex h-16 w-40 items-center justify-center rounded-lg border border-[#e5ded4] bg-white">
@@ -1192,6 +1217,8 @@ export default function AdminDashboard({
                   </Field>
                 </div>
               </Card>
+              </>
+              )}
             </div>
           )}
         </main>
@@ -1207,6 +1234,219 @@ export default function AdminDashboard({
           onSave={saveProduct}
         />
       )}
+
+      {cropFile && (
+        <BannerCropModal
+          file={cropFile}
+          busy={uploadingBanner}
+          onCancel={() => setCropFile(null)}
+          onConfirm={(blob, filename) => uploadBanner(blob, filename, filename)}
+        />
+      )}
+    </div>
+  );
+}
+
+type CropRect = { x: number; y: number; w: number; h: number };
+const ASPECTS: { label: string; value: number | null }[] = [
+  { label: '自由', value: null },
+  { label: '16:9', value: 16 / 9 },
+  { label: '3:2', value: 3 / 2 },
+  { label: '4:3', value: 4 / 3 },
+  { label: '1:1', value: 1 },
+];
+
+function BannerCropModal({
+  file,
+  busy,
+  onCancel,
+  onConfirm,
+}: {
+  file: File;
+  busy: boolean;
+  onCancel: () => void;
+  onConfirm: (blob: Blob, filename: string) => void;
+}) {
+  const [url] = useState(() => URL.createObjectURL(file));
+  const [natural, setNatural] = useState({ w: 0, h: 0 });
+  const [aspect, setAspect] = useState<number | null>(16 / 9);
+  const [crop, setCrop] = useState<CropRect>({ x: 0.05, y: 0.05, w: 0.9, h: 0.5 });
+  const boxRef = useRef<HTMLDivElement>(null);
+  const imgElRef = useRef<HTMLImageElement>(null);
+  const drag = useRef<{ mode: 'move' | 'resize'; px: number; py: number; start: CropRect } | null>(null);
+
+  useEffect(() => () => URL.revokeObjectURL(url), [url]);
+
+  // 依所選比例把裁切框置中
+  function centerFor(a: number | null): CropRect {
+    if (!a || !natural.w || !boxRef.current) return { x: 0.05, y: 0.05, w: 0.9, h: 0.5 };
+    const rect = boxRef.current.getBoundingClientRect();
+    let w = 0.9;
+    let hPx = (w * rect.width) / a;
+    let h = hPx / rect.height;
+    if (h > 0.9) {
+      h = 0.9;
+      const wPx = h * rect.height * a;
+      w = wPx / rect.width;
+    }
+    return { x: (1 - w) / 2, y: (1 - h) / 2, w, h };
+  }
+
+  function pickAspect(a: number | null) {
+    setAspect(a);
+    if (a) setCrop(centerFor(a));
+  }
+
+  function clamp(c: CropRect): CropRect {
+    const w = Math.min(1, Math.max(0.1, c.w));
+    const h = Math.min(1, Math.max(0.1, c.h));
+    const x = Math.min(1 - w, Math.max(0, c.x));
+    const y = Math.min(1 - h, Math.max(0, c.y));
+    return { x, y, w, h };
+  }
+
+  function onPointerDown(mode: 'move' | 'resize', e: React.PointerEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
+    drag.current = { mode, px: e.clientX, py: e.clientY, start: crop };
+  }
+
+  function onPointerMove(e: React.PointerEvent) {
+    if (!drag.current || !boxRef.current) return;
+    const rect = boxRef.current.getBoundingClientRect();
+    const dx = (e.clientX - drag.current.px) / rect.width;
+    const dy = (e.clientY - drag.current.py) / rect.height;
+    const s = drag.current.start;
+    if (drag.current.mode === 'move') {
+      setCrop(clamp({ ...s, x: s.x + dx, y: s.y + dy }));
+    } else {
+      let w = s.w + dx;
+      let h: number;
+      if (aspect) {
+        w = Math.min(1 - s.x, Math.max(0.1, w));
+        h = (w * rect.width) / aspect / rect.height;
+      } else {
+        h = s.h + dy;
+      }
+      setCrop(clamp({ ...s, w, h }));
+    }
+  }
+
+  function onPointerUp(e: React.PointerEvent) {
+    (e.target as HTMLElement).releasePointerCapture?.(e.pointerId);
+    drag.current = null;
+  }
+
+  const outW = Math.round(crop.w * natural.w);
+  const outH = Math.round(crop.h * natural.h);
+
+  function apply() {
+    const img = imgElRef.current;
+    if (!img) return;
+    const sw = crop.w * natural.w;
+    const sh = crop.h * natural.h;
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.round(sw));
+    canvas.height = Math.max(1, Math.round(sh));
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.drawImage(img, crop.x * natural.w, crop.y * natural.h, sw, sh, 0, 0, canvas.width, canvas.height);
+    const base = file.name.replace(/\.[^.]+$/, '') || 'banner';
+    canvas.toBlob(
+      (blob) => {
+        if (blob) onConfirm(blob, `${base}.jpg`);
+      },
+      'image/jpeg',
+      0.9,
+    );
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <div className="max-h-[92vh] w-full max-w-2xl overflow-auto rounded-2xl bg-white p-6">
+        <h2 className="text-xl font-semibold">新增輪播圖 — 編輯裁切</h2>
+
+        {/* 檔案資訊 */}
+        <div className="mt-3 grid grid-cols-2 gap-2 rounded-lg bg-[#f6f2ec] p-3 text-xs text-[#6b6156] sm:grid-cols-4">
+          <span className="truncate">檔名：{file.name}</span>
+          <span>類型：{file.type.replace('image/', '') || '—'}</span>
+          <span>原始尺寸：{natural.w}×{natural.h}</span>
+          <span>檔案大小：{(file.size / 1024).toFixed(0)} KB</span>
+        </div>
+
+        {/* 比例選擇 */}
+        <div className="mt-4 flex flex-wrap gap-2">
+          {ASPECTS.map((a) => (
+            <button
+              key={a.label}
+              onClick={() => pickAspect(a.value)}
+              className={`rounded-full border px-3 py-1.5 text-sm font-semibold ${
+                aspect === a.value ? 'border-[#1f1b19] bg-[#1f1b19] text-white' : 'border-[#d7c9bd]'
+              }`}
+            >
+              {a.label}
+            </button>
+          ))}
+        </div>
+
+        {/* 裁切區 */}
+        <div
+          ref={boxRef}
+          className="relative mt-4 select-none overflow-hidden rounded-lg bg-[#eee8e1]"
+          onPointerMove={onPointerMove}
+          onPointerUp={onPointerUp}
+        >
+          <img
+            ref={imgElRef}
+            src={url}
+            alt=""
+            draggable={false}
+            onLoad={(e) => {
+              const el = e.currentTarget;
+              setNatural({ w: el.naturalWidth, h: el.naturalHeight });
+            }}
+            className="pointer-events-none block max-h-[50vh] w-full object-contain"
+          />
+          {/* 遮罩 + 裁切框 */}
+          <div
+            className="absolute cursor-move border-2 border-white shadow-[0_0_0_9999px_rgba(0,0,0,0.45)]"
+            style={{
+              left: `${crop.x * 100}%`,
+              top: `${crop.y * 100}%`,
+              width: `${crop.w * 100}%`,
+              height: `${crop.h * 100}%`,
+            }}
+            onPointerDown={(e) => onPointerDown('move', e)}
+          >
+            <div
+              className="absolute -bottom-2 -right-2 h-4 w-4 cursor-se-resize rounded-full border-2 border-[#1f1b19] bg-white"
+              onPointerDown={(e) => onPointerDown('resize', e)}
+            />
+          </div>
+        </div>
+
+        <p className="mt-3 text-sm text-[#6b6156]">
+          顯示大小(裁切後):<span className="font-semibold">{outW}×{outH}</span> px
+        </p>
+
+        <div className="mt-6 flex justify-end gap-3">
+          <button
+            onClick={onCancel}
+            disabled={busy}
+            className="rounded-full border border-[#d7c9bd] px-5 py-2 text-sm font-semibold disabled:opacity-50"
+          >
+            取消
+          </button>
+          <button
+            onClick={apply}
+            disabled={busy || !natural.w}
+            className="rounded-full bg-[#1f1b19] px-5 py-2 text-sm font-semibold text-white disabled:opacity-50"
+          >
+            {busy ? '上傳中…' : '裁切並上傳'}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -1629,15 +1869,6 @@ function IconChart() {
     <svg {...svgProps}>
       <path d="M3 3v18h18" />
       <path d="M7 14l3-4 3 2 4-6" />
-    </svg>
-  );
-}
-function IconImage() {
-  return (
-    <svg {...svgProps}>
-      <rect x="3" y="4" width="18" height="16" rx="2" />
-      <circle cx="9" cy="10" r="2" />
-      <path d="M21 16l-5-5-6 6" />
     </svg>
   );
 }

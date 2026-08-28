@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createBrowserSupabase } from '@/lib/supabase/client';
@@ -94,23 +94,17 @@ export default function Home() {
     }
   }, [cart]);
 
-  // 讀取 / 保存收藏清單(存在瀏覽器本機,重新整理不會消失)
+  // 收藏清單紀錄在帳號裡:登入後從後端讀取,未登入則清空。
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem('favorites');
-      if (raw) setFavorites(new Set(JSON.parse(raw) as string[]));
-    } catch {
-      /* localStorage 不可用時略過 */
+    if (!user) {
+      setFavorites(new Set());
+      return;
     }
-  }, []);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem('favorites', JSON.stringify([...favorites]));
-    } catch {
-      /* localStorage 不可用時略過 */
-    }
-  }, [favorites]);
+    fetch('/api/favorites')
+      .then((res) => (res.ok ? res.json() : { productIds: [] }))
+      .then((data: { productIds?: string[] }) => setFavorites(new Set(data.productIds ?? [])))
+      .catch(() => {});
+  }, [user]);
 
   useEffect(() => {
     const supabase = createBrowserSupabase();
@@ -205,12 +199,28 @@ export default function Home() {
   }
 
   function toggleFavorite(id: string) {
+    if (!user) {
+      alert('請先登入才能使用收藏功能');
+      setAccountOpen(true);
+      return;
+    }
+    const isFav = favorites.has(id);
+    // 先樂觀更新畫面,再同步到後端
     setFavorites((prev) => {
       const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
+      if (isFav) next.delete(id);
       else next.add(id);
       return next;
     });
+    if (isFav) {
+      fetch(`/api/favorites?productId=${encodeURIComponent(id)}`, { method: 'DELETE' }).catch(() => {});
+    } else {
+      fetch('/api/favorites', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ productId: id }),
+      }).catch(() => {});
+    }
   }
 
   return (
@@ -218,14 +228,21 @@ export default function Home() {
       {/* 頂部導覽 */}
       <header className="sticky top-0 z-30 border-b border-[#e5ded4] bg-[#faf7f2]/95 backdrop-blur">
         <nav className="mx-auto grid max-w-7xl grid-cols-[1fr_auto_1fr] items-center px-4 py-4 sm:px-6">
-          {/* 左:漢堡選單 */}
-          <div className="flex items-center gap-3">
+          {/* 左:漢堡選單 + 搜尋 */}
+          <div className="flex items-center gap-1 sm:gap-2">
             <button
               onClick={() => setMenuOpen(true)}
               aria-label="開啟選單"
               className="rounded-md p-1 text-[#1f1b19] hover:bg-[#efe8dd]"
             >
               <IconMenu />
+            </button>
+            <button
+              onClick={() => setSearchOpen((v) => !v)}
+              aria-label="搜尋"
+              className="rounded-md p-2 hover:bg-[#efe8dd]"
+            >
+              <IconSearch />
             </button>
           </div>
 
@@ -246,13 +263,6 @@ export default function Home() {
 
           {/* 右:圖示列 */}
           <div className="flex items-center justify-end gap-1 sm:gap-2">
-            <button
-              onClick={() => setSearchOpen((v) => !v)}
-              aria-label="搜尋"
-              className="rounded-md p-2 hover:bg-[#efe8dd]"
-            >
-              <IconSearch />
-            </button>
             <button
               onClick={() => setFavoritesOpen(true)}
               aria-label="收藏清單"
@@ -895,37 +905,82 @@ function Row({ label, value, strong = false }: { label: string; value: string; s
 
 function HeroCarousel({ banners }: { banners: Banner[] }) {
   const [index, setIndex] = useState(0);
+  const [dragX, setDragX] = useState(0); // 手指拖動中的即時位移(px)
+  const dragXRef = useRef(0);
+  const startX = useRef<number | null>(null);
+  const width = useRef(0);
+  const count = banners.length;
+
+  const go = (i: number) => setIndex((i + count) % count);
 
   useEffect(() => {
     setIndex(0);
-  }, [banners.length]);
+  }, [count]);
 
   useEffect(() => {
-    if (banners.length <= 1) return;
-    const timer = setInterval(() => {
-      setIndex((i) => (i + 1) % banners.length);
-    }, 4000);
+    if (count <= 1) return;
+    const timer = setInterval(() => setIndex((i) => (i + 1) % count), 4000);
     return () => clearInterval(timer);
-  }, [banners.length]);
+  }, [count]);
 
-  if (banners.length === 0) return null;
+  if (count === 0) return null;
+
+  function onDown(clientX: number, currentTarget: HTMLElement) {
+    startX.current = clientX;
+    width.current = currentTarget.offsetWidth || 1;
+    dragXRef.current = 0;
+    setDragX(0);
+  }
+  function onMove(clientX: number) {
+    if (startX.current === null) return;
+    dragXRef.current = clientX - startX.current;
+    setDragX(dragXRef.current);
+  }
+  function onUp() {
+    if (startX.current === null) return;
+    const d = dragXRef.current;
+    const threshold = width.current * 0.15;
+    if (d <= -threshold) setIndex((i) => (i + 1) % count);
+    else if (d >= threshold) setIndex((i) => (i - 1 + count) % count);
+    startX.current = null;
+    dragXRef.current = 0;
+    setDragX(0);
+  }
+
+  const dragPercent = width.current ? (dragX / width.current) * 100 : 0;
 
   return (
-    <section className="relative w-full overflow-hidden bg-[#e9e1d6]">
+    <section className="group relative w-full select-none overflow-hidden bg-[#e9e1d6]">
       <div
-        className="flex transition-transform duration-500 ease-out"
-        style={{ transform: `translateX(-${index * 100}%)` }}
+        className={`flex ${startX.current === null ? 'transition-transform duration-500 ease-out' : ''}`}
+        style={{ transform: `translateX(calc(-${index * 100}% + ${dragPercent}%))` }}
+        onTouchStart={(e) => onDown(e.touches[0].clientX, e.currentTarget)}
+        onTouchMove={(e) => onMove(e.touches[0].clientX)}
+        onTouchEnd={onUp}
+        onPointerDown={(e) => {
+          if (e.pointerType === 'mouse') onDown(e.clientX, e.currentTarget);
+        }}
+        onPointerMove={(e) => {
+          if (e.pointerType === 'mouse' && startX.current !== null) onMove(e.clientX);
+        }}
+        onPointerUp={(e) => {
+          if (e.pointerType === 'mouse') onUp();
+        }}
+        onPointerLeave={(e) => {
+          if (e.pointerType === 'mouse') onUp();
+        }}
       >
         {banners.map((banner) => {
           const img = (
             <img
               src={banner.image}
               alt={banner.title || '輪播圖'}
-              className="h-full w-full object-cover"
+              draggable={false}
+              className="pointer-events-none h-full w-full object-cover"
             />
           );
           return (
-            <div key={banner.id} className="relative aspect-[16/9] w-full shrink-0 sm:aspect-[21/9]">
+            <div key={banner.id} className="relative aspect-[16/13] w-full shrink-0 sm:aspect-[14/9]">
               {banner.link ? (
                 <a href={banner.link} target="_blank" rel="noreferrer" className="block h-full w-full">
                   {img}
@@ -938,21 +993,49 @@ function HeroCarousel({ banners }: { banners: Banner[] }) {
         })}
       </div>
 
-      {banners.length > 1 && (
-        <div className="absolute inset-x-0 bottom-3 flex items-center justify-center gap-2">
-          {banners.map((banner, i) => (
-            <button
-              key={banner.id}
-              onClick={() => setIndex(i)}
-              aria-label={`第 ${i + 1} 張`}
-              className={`h-2 rounded-full transition-all ${
-                i === index ? 'w-5 bg-white' : 'w-2 bg-white/60 hover:bg-white/80'
-              }`}
-            />
-          ))}
-        </div>
+      {count > 1 && (
+        <>
+          <button
+            onClick={() => go(index - 1)}
+            aria-label="上一張"
+            className="absolute left-2 top-1/2 hidden -translate-y-1/2 items-center justify-center rounded-full bg-black/30 p-2 text-white opacity-0 transition group-hover:opacity-100 sm:flex"
+          >
+            <IconChevron dir="left" />
+          </button>
+          <button
+            onClick={() => go(index + 1)}
+            aria-label="下一張"
+            className="absolute right-2 top-1/2 hidden -translate-y-1/2 items-center justify-center rounded-full bg-black/30 p-2 text-white opacity-0 transition group-hover:opacity-100 sm:flex"
+          >
+            <IconChevron dir="right" />
+          </button>
+          <div className="absolute inset-x-0 bottom-3 flex items-center justify-center gap-2">
+            {banners.map((banner, i) => (
+              <button
+                key={banner.id}
+                onClick={() => setIndex(i)}
+                aria-label={`第 ${i + 1} 張`}
+                className={`h-2 rounded-full transition-all ${
+                  i === index ? 'w-5 bg-white' : 'w-2 bg-white/60 hover:bg-white/80'
+                }`}
+              />
+            ))}
+          </div>
+        </>
       )}
     </section>
+  );
+}
+
+function IconChevron({ dir }: { dir: 'left' | 'right' }) {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path
+        d={dir === 'left' ? 'M15 6l-6 6 6 6' : 'M9 6l6 6-6 6'}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
   );
 }
 
