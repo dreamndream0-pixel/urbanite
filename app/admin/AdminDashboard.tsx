@@ -119,6 +119,7 @@ export default function AdminDashboard({
   const [settingsTab, setSettingsTab] = useState<'general' | 'banners'>('general');
   const [orderFilter, setOrderFilter] = useState<string>('全部');
   const [openOrderId, setOpenOrderId] = useState<string | null>(null);
+  const [productsTab, setProductsTab] = useState<'items' | 'categories'>('items');
   const [cropFile, setCropFile] = useState<File | null>(null);
   const [editBannerId, setEditBannerId] = useState<string | null>(null);
   const [newCat, setNewCat] = useState({ slug: '', name: '', en: '' });
@@ -714,6 +715,26 @@ export default function AdminDashboard({
           {/* ===== 商品及分類 ===== */}
           {section === 'products' && (
             <div className="space-y-6">
+              <div className="flex gap-2 border-b border-[#e5ded4]">
+                {([
+                  { key: 'items', label: '我的商品' },
+                  { key: 'categories', label: '分類管理' },
+                ] as const).map((t) => (
+                  <button
+                    key={t.key}
+                    onClick={() => setProductsTab(t.key)}
+                    className={`-mb-px border-b-2 px-4 py-2 text-sm font-semibold transition ${
+                      productsTab === t.key
+                        ? 'border-[#1f1b19] text-[#1f1b19]'
+                        : 'border-transparent text-[#8a7f72] hover:text-[#1f1b19]'
+                    }`}
+                  >
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+
+              {productsTab === 'items' && (
               <Card
                 title="商品"
                 action={
@@ -773,7 +794,9 @@ export default function AdminDashboard({
                   ))}
                 </div>
               </Card>
+              )}
 
+              {productsTab === 'categories' && (
               <Card title="分類管理(首頁分類選單)">
                 <div className="space-y-2">
                   {categories.map((c) => (
@@ -847,6 +870,7 @@ export default function AdminDashboard({
                   </button>
                 </div>
               </Card>
+              )}
             </div>
           )}
 
