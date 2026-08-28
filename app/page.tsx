@@ -980,8 +980,8 @@ function HeroCarousel({ banners }: { banners: Banner[] }) {
               src={banner.image}
               alt={banner.title || '輪播圖'}
               draggable={false}
-              // 固定框架,圖片完整縮放進框內(不裁切),空白處用底色補滿
-              className="pointer-events-none h-full w-full object-contain"
+              // 固定框架,圖片放大縮小填滿整個輪播框(適配版面大小)
+              className="pointer-events-none h-full w-full object-cover"
             />
           );
           return (

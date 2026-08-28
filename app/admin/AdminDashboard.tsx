@@ -1670,15 +1670,52 @@ function MethodToggles({
   );
 }
 
+// 上傳前先在瀏覽器縮圖壓縮:避免手機大圖超過伺服器上傳上限而失敗,也順便把 HEIC 轉成 JPG
+function compressImage(file: File, maxDim = 1600, quality = 0.85): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      let { width, height } = img;
+      if (width > maxDim || height > maxDim) {
+        const scale = maxDim / Math.max(width, height);
+        width = Math.round(width * scale);
+        height = Math.round(height * scale);
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        reject(new Error('無法處理圖片'));
+        return;
+      }
+      ctx.drawImage(img, 0, 0, width, height);
+      canvas.toBlob(
+        (blob) => (blob ? resolve(blob) : reject(new Error('圖片壓縮失敗'))),
+        'image/jpeg',
+        quality,
+      );
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error('圖片讀取失敗(可能是不支援的格式)'));
+    };
+    img.src = url;
+  });
+}
+
 // 用 XMLHttpRequest 上傳,才能拿到上傳進度(fetch 沒有上傳進度事件)
 function uploadImageWithProgress(
-  file: File,
+  blob: Blob,
+  filename: string,
   productId: string,
   onProgress: (fraction: number) => void,
 ): Promise<string> {
   return new Promise((resolve, reject) => {
     const fd = new FormData();
-    fd.append('file', file);
+    fd.append('file', blob, filename);
     fd.append('productId', productId);
     const xhr = new XMLHttpRequest();
     xhr.open('POST', '/api/products/image');
@@ -1792,8 +1829,12 @@ function ProductModal({
     try {
       const uploaded: string[] = [];
       for (let i = 0; i < picked.length; i++) {
-        const url = await uploadImageWithProgress(picked[i], draft.id || 'new-product', (p) =>
-          setUploadProgress({ done: i, total: picked.length, percent: Math.round(p * 100) }),
+        const blob = await compressImage(picked[i]);
+        const url = await uploadImageWithProgress(
+          blob,
+          `product-${Date.now()}-${i}.jpg`,
+          draft.id || 'new-product',
+          (p) => setUploadProgress({ done: i, total: picked.length, percent: Math.round(p * 100) }),
         );
         uploaded.push(url);
         setUploadProgress({ done: i + 1, total: picked.length, percent: 100 });

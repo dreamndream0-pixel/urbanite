@@ -1,10 +1,21 @@
 'use client';
 
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import type { Product } from '@/lib/types';
 
 const STORE_NAME = process.env.NEXT_PUBLIC_STORE_NAME || 'URBANITE';
+const CART_KEY = 'cart';
+
+type CartItem = {
+  id: string;
+  productId: string;
+  name: string;
+  variant: string;
+  price: number;
+  quantity: number;
+};
 
 const formatter = new Intl.NumberFormat('zh-TW', {
   style: 'currency',
@@ -23,6 +34,7 @@ export default function ProductDetailClient({ product }: { product: Product }) {
   const [favorite, setFavorite] = useState(false);
   const [logoUrl, setLogoUrl] = useState('');
   const [settingsLoaded, setSettingsLoaded] = useState(false);
+  const router = useRouter();
 
   useEffect(() => {
     fetch('/api/settings')
@@ -40,11 +52,32 @@ export default function ProductDetailClient({ product }: { product: Product }) {
   );
 
   function addToCart(action: 'cart' | 'buy') {
-    setMessage(
-      action === 'buy'
-        ? `已選擇 ${variantLabel} x ${quantity},可前往結帳。`
-        : `已加入購物車: ${variantLabel} x ${quantity}`,
-    );
+    const id = `${product.id}-${selectedColor}-${selectedSize}`;
+    try {
+      const raw = localStorage.getItem(CART_KEY);
+      const cart: CartItem[] = raw ? JSON.parse(raw) : [];
+      const existing = cart.find((it) => it.id === id);
+      if (existing) {
+        existing.quantity += quantity;
+      } else {
+        cart.push({
+          id,
+          productId: product.id,
+          name: product.name,
+          variant: variantLabel,
+          price: product.price,
+          quantity,
+        });
+      }
+      localStorage.setItem(CART_KEY, JSON.stringify(cart));
+    } catch {
+      /* localStorage 不可用時略過 */
+    }
+    if (action === 'buy') {
+      router.push('/checkout');
+    } else {
+      setMessage(`已加入購物車：${variantLabel} x ${quantity}`);
+    }
   }
 
   return (
