@@ -231,6 +231,11 @@ export default function AdminDashboard({
     () => new Map(customers.map((c) => [c.user_id, c])),
     [customers],
   );
+  // 舊訂單品項沒存圖片,用商品名稱對應現有商品圖當備援
+  const imageByName = useMemo(
+    () => new Map(products.filter((p) => p.image).map((p) => [p.name, p.image])),
+    [products],
+  );
 
   // 顧客列表:以「登入建檔的顧客」為主,合併其訂單統計
   const customerRows = useMemo(() => {
@@ -811,8 +816,12 @@ export default function AdminDashboard({
                                 className="relative h-12 w-12 shrink-0 overflow-hidden rounded-md border border-[#eee5da] bg-[#e9e1d6]"
                                 title={`${it.name} (${it.variant}) ×${it.quantity}`}
                               >
-                                {it.image ? (
-                                  <img src={it.image} alt={it.name} className="h-full w-full object-cover" />
+                                {it.image || imageByName.get(it.name) ? (
+                                  <img
+                                    src={it.image || imageByName.get(it.name)}
+                                    alt={it.name}
+                                    className="h-full w-full object-cover"
+                                  />
                                 ) : null}
                                 {it.quantity > 1 && (
                                   <span className="absolute bottom-0 right-0 rounded-tl bg-black/60 px-1 text-[10px] font-semibold text-white">
@@ -1518,6 +1527,7 @@ export default function AdminDashboard({
       {openOrderId && orders.find((o) => o.id === openOrderId) && (
         <AdminOrderModal
           order={orders.find((o) => o.id === openOrderId)!}
+          imageByName={imageByName}
           onClose={() => setOpenOrderId(null)}
           onUpdate={(patch) => updateOrder(openOrderId, patch)}
         />
@@ -1869,10 +1879,12 @@ function uploadImageWithProgress(
 // 後台專用的訂單完整資訊(含出貨狀態 / 付款管理;與客人端的訂單明細分開)
 function AdminOrderModal({
   order,
+  imageByName,
   onClose,
   onUpdate,
 }: {
   order: Order;
+  imageByName: Map<string, string>;
   onClose: () => void;
   onUpdate: (patch: Partial<Order>) => void;
 }) {
@@ -1945,7 +1957,9 @@ function AdminOrderModal({
             {order.items.map((it, i) => (
               <div key={i} className="flex items-center gap-3">
                 <div className="h-14 w-14 shrink-0 overflow-hidden rounded-lg bg-[#e9e1d6]">
-                  {it.image ? <img src={it.image} alt={it.name} className="h-full w-full object-cover" /> : null}
+                  {it.image || imageByName.get(it.name) ? (
+                    <img src={it.image || imageByName.get(it.name)} alt={it.name} className="h-full w-full object-cover" />
+                  ) : null}
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium">{it.name}</p>
@@ -2697,8 +2711,10 @@ function ProductModal({
                   庫存
                   <input
                     type="number"
-                    value={batch.stock}
-                    onChange={(e) => setBatch({ ...batch, stock: Number(e.target.value) })}
+                    min={0}
+                    placeholder="0"
+                    value={batch.stock || ''}
+                    onChange={(e) => setBatch({ ...batch, stock: Number(e.target.value) || 0 })}
                     className="w-16 rounded border border-[#d7c9bd] px-2 py-1"
                   />
                 </label>
@@ -2706,8 +2722,10 @@ function ProductModal({
                   成本
                   <input
                     type="number"
-                    value={batch.cost}
-                    onChange={(e) => setBatch({ ...batch, cost: Number(e.target.value) })}
+                    min={0}
+                    placeholder="0"
+                    value={batch.cost || ''}
+                    onChange={(e) => setBatch({ ...batch, cost: Number(e.target.value) || 0 })}
                     className="w-16 rounded border border-[#d7c9bd] px-2 py-1"
                   />
                 </label>
@@ -2715,8 +2733,10 @@ function ProductModal({
                   安全庫存
                   <input
                     type="number"
-                    value={batch.safety}
-                    onChange={(e) => setBatch({ ...batch, safety: Number(e.target.value) })}
+                    min={0}
+                    placeholder="0"
+                    value={batch.safety || ''}
+                    onChange={(e) => setBatch({ ...batch, safety: Number(e.target.value) || 0 })}
                     className="w-16 rounded border border-[#d7c9bd] px-2 py-1"
                   />
                 </label>
@@ -2756,8 +2776,9 @@ function ProductModal({
                             <input
                               type="number"
                               min={0}
-                              value={inv}
-                              onChange={(e) => setVariantStock(key, Math.max(0, Number(e.target.value)))}
+                              placeholder="0"
+                              value={inv || ''}
+                              onChange={(e) => setVariantStock(key, Math.max(0, Number(e.target.value) || 0))}
                               className="w-14 rounded border border-[#e5ded4] px-1 py-1 text-right"
                             />
                           </td>
@@ -2765,8 +2786,9 @@ function ProductModal({
                             <input
                               type="number"
                               min={0}
-                              value={cost}
-                              onChange={(e) => setVariantCost(key, Math.max(0, Number(e.target.value)))}
+                              placeholder="0"
+                              value={cost || ''}
+                              onChange={(e) => setVariantCost(key, Math.max(0, Number(e.target.value) || 0))}
                               className="w-14 rounded border border-[#e5ded4] px-1 py-1 text-right"
                             />
                           </td>
@@ -2774,8 +2796,9 @@ function ProductModal({
                             <input
                               type="number"
                               min={0}
-                              value={Number(draft.variantSafety[key] ?? 0)}
-                              onChange={(e) => setVariantSafety(key, Math.max(0, Number(e.target.value)))}
+                              placeholder="0"
+                              value={Number(draft.variantSafety[key] ?? 0) || ''}
+                              onChange={(e) => setVariantSafety(key, Math.max(0, Number(e.target.value) || 0))}
                               className="w-12 rounded border border-[#e5ded4] px-1 py-1 text-right"
                             />
                           </td>
