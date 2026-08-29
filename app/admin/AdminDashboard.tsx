@@ -441,6 +441,25 @@ export default function AdminDashboard({
     setMvForm({ ...mvForm, quantity: 1, unit_price: 0, location: '', note: '' });
   }
 
+  // 在庫存管理直接修改某規格的成本 / 安全庫存 / 儲位(不動庫存數量)
+  async function updateVariantMeta(
+    productId: string,
+    variantKey: string,
+    patch: Partial<Pick<Variant, 'cost' | 'safety' | 'location'>>,
+  ) {
+    const product = products.find((p) => p.id === productId);
+    if (!product) return;
+    const variants = product.variants.map((v) =>
+      v.options.join(' / ') === variantKey ? { ...v, ...patch } : v,
+    );
+    setProducts((l) => l.map((p) => (p.id === productId ? { ...p, variants } : p)));
+    await fetch(`/api/products/${productId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ variants }),
+    });
+  }
+
   async function saveNewCategory() {
     const slug = newCat.slug.trim().toLowerCase();
     if (!slug || !newCat.name.trim()) return alert('請填寫代碼(英文)與名稱');
@@ -1031,6 +1050,7 @@ export default function AdminDashboard({
               mvForm={mvForm}
               setMvForm={setMvForm}
               onAddMovement={addMovement}
+              onUpdateVariantMeta={updateVariantMeta}
             />
           )}
 
@@ -2028,6 +2048,7 @@ function InventorySection({
   mvForm,
   setMvForm,
   onAddMovement,
+  onUpdateVariantMeta,
 }: {
   products: Product[];
   categories: Category[];
@@ -2035,6 +2056,11 @@ function InventorySection({
   mvForm: MvForm;
   setMvForm: (f: MvForm) => void;
   onAddMovement: () => void;
+  onUpdateVariantMeta: (
+    productId: string,
+    variantKey: string,
+    patch: Partial<Pick<Variant, 'cost' | 'safety' | 'location'>>,
+  ) => void;
 }) {
   const catName = (slug: string) => categories.find((c) => c.slug === slug)?.name || slug || '—';
   const nameById = (id: string) => products.find((p) => p.id === id)?.name || id;
@@ -2098,15 +2124,62 @@ function InventorySection({
                     <td className="px-2 py-2">{r.spec}</td>
                     <td className="px-2 py-2 text-[#8a7f72]">{r.unit}</td>
                     <td className="px-2 py-2 text-right font-semibold">{r.inv}</td>
-                    <td className="px-2 py-2 text-right text-[#8a7f72]">{r.safety}</td>
+                    <td className="px-2 py-2 text-right text-[#8a7f72]">
+                      {r.key ? (
+                        <input
+                          type="number"
+                          min={0}
+                          defaultValue={r.safety || ''}
+                          placeholder="0"
+                          onBlur={(e) =>
+                            onUpdateVariantMeta(r.pid, r.key, {
+                              safety: Math.max(0, Number(e.target.value) || 0),
+                            })
+                          }
+                          className="w-16 rounded border border-[#e5ded4] px-1 py-1 text-right"
+                        />
+                      ) : (
+                        r.safety
+                      )}
+                    </td>
                     <td className="px-2 py-2">
                       <span className={low ? 'text-[#c0392b]' : 'text-[#1f7a44]'}>
                         {low ? '🔴 需補貨' : '🟢 正常'}
                       </span>
                     </td>
-                    <td className="px-2 py-2 text-right">{r.cost}</td>
+                    <td className="px-2 py-2 text-right">
+                      {r.key ? (
+                        <input
+                          type="number"
+                          min={0}
+                          defaultValue={r.cost || ''}
+                          placeholder="0"
+                          onBlur={(e) =>
+                            onUpdateVariantMeta(r.pid, r.key, {
+                              cost: Math.max(0, Number(e.target.value) || 0),
+                            })
+                          }
+                          className="w-20 rounded border border-[#e5ded4] px-1 py-1 text-right"
+                        />
+                      ) : (
+                        r.cost
+                      )}
+                    </td>
                     <td className="px-2 py-2 text-right">{(r.inv * r.cost).toLocaleString()}</td>
-                    <td className="px-2 py-2 text-[#8a7f72]">{r.location}</td>
+                    <td className="px-2 py-2 text-[#8a7f72]">
+                      {r.key ? (
+                        <input
+                          defaultValue={r.location === '—' ? '' : r.location}
+                          placeholder="—"
+                          onBlur={(e) =>
+                            onUpdateVariantMeta(r.pid, r.key, { location: e.target.value.trim() })
+                          }
+                          className="w-24 rounded border border-[#e5ded4] px-1 py-1"
+                        />
+                      ) : (
+                        r.location
+                      )}
+                    </td>
                     <td className="px-2 py-2 text-[#8a7f72]">
                       {fmtDate(lastMv.get(`${r.pid}${r.key}`))}
                     </td>
@@ -2118,6 +2191,7 @@ function InventorySection({
         </div>
         <p className="mt-2 text-xs text-[#8a7f72]">
           庫存數量由「入庫 / 出庫」自動計算,請用下方表單登錄異動,不要直接改數字。
+          安全庫存、單位成本、儲位可直接在表格內修改(離開欄位即儲存)。
         </p>
       </Card>
 
@@ -2343,8 +2417,6 @@ function ProductModal({
   const [uploadProgress, setUploadProgress] = useState<{ done: number; total: number; percent: number } | null>(
     null,
   );
-  const [batch, setBatch] = useState({ stock: 0, cost: 0, safety: 0 });
-
   function set<K extends keyof Draft>(key: K, value: Draft[K]) {
     onChange({ ...draft, [key]: value });
   }
@@ -2369,22 +2441,6 @@ function ProductModal({
   function removeSpec(i: number) {
     onChange({ ...draft, specs: draft.specs.filter((_, idx) => idx !== i) });
   }
-  function setVariantStock(key: string, value: number) {
-    onChange({ ...draft, variantStock: { ...draft.variantStock, [key]: value } });
-  }
-  function setVariantCost(key: string, value: number) {
-    onChange({ ...draft, variantCost: { ...draft.variantCost, [key]: value } });
-  }
-  function setVariantSafety(key: string, value: number) {
-    onChange({ ...draft, variantSafety: { ...draft.variantSafety, [key]: value } });
-  }
-  // 批次:把某個值套用到所有規格組合
-  function batchApply(field: 'variantStock' | 'variantCost' | 'variantSafety', value: number) {
-    const map: Record<string, number> = {};
-    for (const opts of modalCombos) map[opts.join(' / ')] = value;
-    onChange({ ...draft, [field]: map });
-  }
-
   function toggleMethod(
     key: 'available_payment_methods' | 'available_shipping_methods',
     method: string,
@@ -2703,106 +2759,25 @@ function ProductModal({
           </Field>
 
           {hasSpecs && (
-            <Field label="各規格庫存(階梯選擇 · 分別入庫存)">
-              {/* 批次修改 */}
-              <div className="mb-2 flex flex-wrap items-end gap-2 rounded-lg bg-[#f3ede4] p-2 text-xs">
-                <span className="font-semibold text-[#6b6156]">批次套用全部:</span>
-                <label className="flex flex-col">
-                  庫存
-                  <input
-                    type="number"
-                    min={0}
-                    placeholder="0"
-                    value={batch.stock || ''}
-                    onChange={(e) => setBatch({ ...batch, stock: Number(e.target.value) || 0 })}
-                    className="w-16 rounded border border-[#d7c9bd] px-2 py-1"
-                  />
-                </label>
-                <label className="flex flex-col">
-                  成本
-                  <input
-                    type="number"
-                    min={0}
-                    placeholder="0"
-                    value={batch.cost || ''}
-                    onChange={(e) => setBatch({ ...batch, cost: Number(e.target.value) || 0 })}
-                    className="w-16 rounded border border-[#d7c9bd] px-2 py-1"
-                  />
-                </label>
-                <label className="flex flex-col">
-                  安全庫存
-                  <input
-                    type="number"
-                    min={0}
-                    placeholder="0"
-                    value={batch.safety || ''}
-                    onChange={(e) => setBatch({ ...batch, safety: Number(e.target.value) || 0 })}
-                    className="w-16 rounded border border-[#d7c9bd] px-2 py-1"
-                  />
-                </label>
-                <button
-                  type="button"
-                  onClick={() => {
-                    batchApply('variantStock', Math.max(0, batch.stock));
-                    batchApply('variantCost', Math.max(0, batch.cost));
-                    batchApply('variantSafety', Math.max(0, batch.safety));
-                  }}
-                  className="rounded-full bg-[#1f1b19] px-3 py-1.5 font-semibold text-white"
-                >
-                  套用
-                </button>
-              </div>
-
-              <div className="max-h-72 overflow-auto rounded-lg border border-[#eee5da] bg-[#faf7f2] p-2">
+            <Field label="各規格庫存(顯示)">
+              <div className="max-h-64 overflow-auto rounded-lg border border-[#eee5da] bg-[#faf7f2] p-2">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="text-left text-xs text-[#8a7f72]">
-                      <th className="px-1 py-1">規格</th>
-                      <th className="px-1 py-1 text-right">庫存</th>
-                      <th className="px-1 py-1 text-right">成本</th>
-                      <th className="px-1 py-1 text-right">安全</th>
-                      <th className="px-1 py-1 text-right">金額</th>
+                      <th className="px-2 py-1">規格</th>
+                      <th className="px-2 py-1 text-right">目前庫存</th>
                     </tr>
                   </thead>
                   <tbody>
                     {modalCombos.map((opts) => {
                       const key = opts.join(' / ');
                       const inv = Number(draft.variantStock[key] ?? 0);
-                      const cost = Number(draft.variantCost[key] ?? 0);
                       return (
                         <tr key={key} className="border-t border-[#efe8dd]">
-                          <td className="px-1 py-1">{key}</td>
-                          <td className="px-1 py-1">
-                            <input
-                              type="number"
-                              min={0}
-                              placeholder="0"
-                              value={inv || ''}
-                              onChange={(e) => setVariantStock(key, Math.max(0, Number(e.target.value) || 0))}
-                              className="w-14 rounded border border-[#e5ded4] px-1 py-1 text-right"
-                            />
+                          <td className="px-2 py-1">{key}</td>
+                          <td className={`px-2 py-1 text-right font-medium ${inv <= 0 ? 'text-[#c0392b]' : ''}`}>
+                            {inv}
                           </td>
-                          <td className="px-1 py-1">
-                            <input
-                              type="number"
-                              min={0}
-                              placeholder="0"
-                              value={cost || ''}
-                              onChange={(e) => setVariantCost(key, Math.max(0, Number(e.target.value) || 0))}
-                              className="w-14 rounded border border-[#e5ded4] px-1 py-1 text-right"
-                            />
-                          </td>
-                          <td className="px-1 py-1">
-                            <input
-                              type="number"
-                              min={0}
-                              placeholder="0"
-                              value={Number(draft.variantSafety[key] ?? 0) || ''}
-                              onChange={(e) => setVariantSafety(key, Math.max(0, Number(e.target.value) || 0))}
-                              className="w-12 rounded border border-[#e5ded4] px-1 py-1 text-right"
-                            />
-                          </td>
-                          <td className="px-1 py-1 text-right text-[#6b6156]">{inv * cost}</td>
                         </tr>
                       );
                     })}
@@ -2810,7 +2785,7 @@ function ProductModal({
                 </table>
               </div>
               <p className="mt-1 text-xs text-[#8a7f72]">
-                共 {modalCombos.length} 個組合,總庫存 {specTotal}。
+                共 {modalCombos.length} 個組合,總庫存 {specTotal}。庫存、成本、安全庫存的異動請到「庫存管理」設定。
               </p>
             </Field>
           )}
