@@ -62,6 +62,9 @@ export function getEcpayConfig() {
     aioUrl: isProd
       ? 'https://payment.ecpay.com.tw/Cashier/AioCheckOut/V5'
       : 'https://payment-stage.ecpay.com.tw/Cashier/AioCheckOut/V5',
+    // 付款方式:ALL=全部(需商店已開通所有方式);Credit=只信用卡;ATM / CVS 等亦可
+    // 若正式環境只開通了信用卡,設 ECPAY_CHOOSE_PAYMENT=Credit 可先上線收信用卡
+    choosePayment: process.env.ECPAY_CHOOSE_PAYMENT || 'ALL',
     siteUrl: (process.env.NEXT_PUBLIC_SITE_URL || 'https://urbanite-tw.vercel.app').replace(/\/$/, ''),
   };
 }
@@ -104,7 +107,7 @@ export function buildCheckoutParams(order: {
     ReturnURL: `${cfg.siteUrl}/api/payment/ecpay/callback`, // Server-to-Server 通知
     OrderResultURL: `${cfg.siteUrl}/api/payment/ecpay/result`, // 付款後瀏覽器帶結果導回
     ClientBackURL: `${cfg.siteUrl}/checkout/complete?order_no=${encodeURIComponent(order.order_no)}`,
-    ChoosePayment: 'ALL', // 由消費者在綠界頁選信用卡 / ATM / 超商等
+    ChoosePayment: cfg.choosePayment, // 由消費者在綠界頁選信用卡 / ATM / 超商等(可用 ECPAY_CHOOSE_PAYMENT 調整)
     EncryptType: '1',
     NeedExtraPaidInfo: 'N',
   };
