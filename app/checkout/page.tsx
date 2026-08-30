@@ -25,7 +25,7 @@ type CartItem = {
 };
 
 const SHIPPING_METHODS = ['全家 取貨付款', '7-11 取貨付款', '宅配到府'];
-const PAYMENT_METHODS = ['綠界金流(信用卡/ATM/超商)', '取貨付款(貨到付款)', '轉帳匯款'];
+const PAYMENT_METHODS = ['信用卡 / ATM / 超商(綠界)', '取貨付款(貨到付款)', '轉帳匯款'];
 
 // 判斷此付款方式是否走綠界線上金流(建單後導向綠界付款頁)
 function isEcpayMethod(method: string): boolean {
