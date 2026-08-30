@@ -25,7 +25,12 @@ type CartItem = {
 };
 
 const SHIPPING_METHODS = ['全家 取貨付款', '7-11 取貨付款', '宅配到府'];
-const PAYMENT_METHODS = ['取貨付款(貨到付款)', '轉帳匯款'];
+const PAYMENT_METHODS = ['綠界金流(信用卡/ATM/超商)', '取貨付款(貨到付款)', '轉帳匯款'];
+
+// 判斷此付款方式是否走綠界線上金流(建單後導向綠界付款頁)
+function isEcpayMethod(method: string): boolean {
+  return /綠界|信用卡|line\s?pay|apple\s?pay/i.test(method);
+}
 
 function allowedForCart(
   allMethods: string[],
@@ -193,13 +198,18 @@ export default function CheckoutPage() {
       if (!res.ok) {
         setMessage({ type: 'err', text: data.error ?? '下單失敗，請稍後再試' });
       } else {
-        setOrderNo(data.order_no);
         setCart([]);
         try {
           localStorage.removeItem(CART_KEY);
         } catch {
           /* 略過 */
         }
+        // 綠界線上金流:建單後導向綠界付款頁(不在此顯示訂單成立)
+        if (isEcpayMethod(selectedPaymentMethod)) {
+          window.location.href = `/api/payment/ecpay/checkout?order=${encodeURIComponent(data.order_no)}`;
+          return;
+        }
+        setOrderNo(data.order_no);
       }
     } catch {
       setMessage({ type: 'err', text: '連線發生問題，請稍後再試' });
@@ -416,7 +426,11 @@ export default function CheckoutPage() {
                 onClick={submitOrder}
                 disabled={submitting}
               >
-                {submitting ? '送出中…' : '前往結帳'}
+                {submitting
+                  ? '送出中…'
+                  : isEcpayMethod(selectedPaymentMethod)
+                    ? '前往綠界付款'
+                    : '送出訂單'}
               </button>
             </section>
           </div>
