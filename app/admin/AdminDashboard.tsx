@@ -1560,7 +1560,7 @@ export default function AdminDashboard({
       )}
 
       {cropFile && (
-        <BannerCropModal
+        <FixedBannerCropModal
           file={cropFile}
           busy={uploadingBanner}
           onCancel={() => {
@@ -1584,6 +1584,139 @@ export default function AdminDashboard({
 }
 
 type CropRect = { x: number; y: number; w: number; h: number };
+
+// 固定首頁比例的取景框:照片移動與縮放,取景框本身不變。
+function FixedBannerCropModal({
+  file,
+  busy,
+  onCancel,
+  onConfirm,
+}: {
+  file: File;
+  busy: boolean;
+  onCancel: () => void;
+  onConfirm: (blob: Blob, filename: string) => void;
+}) {
+  const [url] = useState(() => URL.createObjectURL(file));
+  const [zoom, setZoom] = useState(1);
+  const [background, setBackground] = useState('#8a877f');
+  const [loaded, setLoaded] = useState({ w: 0, h: 0 });
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const frameRef = useRef<HTMLDivElement>(null);
+  const imageRef = useRef<HTMLImageElement>(null);
+  const drag = useRef<{ x: number; y: number; start: { x: number; y: number } } | null>(null);
+
+  useEffect(() => () => URL.revokeObjectURL(url), [url]);
+  useEffect(() => {
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = previous; };
+  }, []);
+
+  function geometry() {
+    const frame = frameRef.current;
+    if (!frame || !loaded.w) return null;
+    const w = frame.clientWidth;
+    const h = frame.clientHeight;
+    const scale = Math.max(w / loaded.w, h / loaded.h);
+    const imageW = loaded.w * scale * zoom;
+    const imageH = loaded.h * scale * zoom;
+    const limitX = Math.max(0, (imageW - w) / 2);
+    const limitY = Math.max(0, (imageH - h) / 2);
+    return { w, h, scale, imageW, imageH, limitX, limitY };
+  }
+
+  function clampPan(next: { x: number; y: number }) {
+    const g = geometry();
+    if (!g) return next;
+    return {
+      x: Math.min(g.limitX, Math.max(-g.limitX, next.x)),
+      y: Math.min(g.limitY, Math.max(-g.limitY, next.y)),
+    };
+  }
+
+  function changeZoom(nextZoom: number) {
+    const old = geometry();
+    setZoom(nextZoom);
+    if (!old) return;
+    const frame = frameRef.current;
+    if (!frame) return;
+    const centerRatio = { x: (frame.clientWidth / 2 + pan.x) / frame.clientWidth, y: (frame.clientHeight / 2 + pan.y) / frame.clientHeight };
+    requestAnimationFrame(() => {
+      const next = geometry();
+      if (!next) return;
+      setPan(clampPan({ x: centerRatio.x * frame.clientWidth - frame.clientWidth / 2, y: centerRatio.y * frame.clientHeight - frame.clientHeight / 2 }));
+    });
+  }
+
+  function onPointerDown(e: React.PointerEvent<HTMLDivElement>) {
+    e.preventDefault();
+    e.currentTarget.setPointerCapture(e.pointerId);
+    drag.current = { x: e.clientX, y: e.clientY, start: pan };
+  }
+
+  function onPointerMove(e: React.PointerEvent<HTMLDivElement>) {
+    if (!drag.current) return;
+    e.preventDefault();
+    setPan(clampPan({ x: drag.current.start.x + e.clientX - drag.current.x, y: drag.current.start.y + e.clientY - drag.current.y }));
+  }
+
+  function stopDrag(e: React.PointerEvent<HTMLDivElement>) {
+    e.currentTarget.releasePointerCapture?.(e.pointerId);
+    drag.current = null;
+  }
+
+  function apply() {
+    const g = geometry();
+    if (!g || !loaded.w) return;
+    const left = (g.w - g.imageW) / 2 + pan.x;
+    const top = (g.h - g.imageH) / 2 + pan.y;
+    const sx = Math.max(0, -left) / (g.scale * zoom);
+    const sy = Math.max(0, -top) / (g.scale * zoom);
+    const sw = Math.min(loaded.w - sx, g.w / (g.scale * zoom));
+    const sh = Math.min(loaded.h - sy, g.h / (g.scale * zoom));
+    const canvas = document.createElement('canvas');
+    canvas.width = 1600;
+    canvas.height = 900;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.fillStyle = background;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    if (!imageRef.current) return;
+    ctx.drawImage(imageRef.current, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
+    const base = file.name.replace(/\.[^.]+$/, '') || 'banner';
+    canvas.toBlob((blob) => blob && onConfirm(blob, `${base}.jpg`), 'image/jpeg', 0.9);
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <div className="max-h-[92vh] w-full max-w-2xl overflow-auto rounded-2xl bg-white p-6">
+        <h2 className="text-xl font-semibold">輪播圖 — 固定首頁比例取景</h2>
+        <p className="mt-1 text-sm text-[#6b6156]">白色框架固定為首頁 16:9；在框內拖曳照片，使用縮放桿調整顯示位置。</p>
+        <div ref={frameRef} className="relative mx-auto mt-5 aspect-video w-full max-w-xl touch-none select-none overflow-hidden border-2 border-white shadow-[0_0_0_9999px_rgba(0,0,0,0.45)]" style={{ backgroundColor: background }} onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={stopDrag} onPointerCancel={stopDrag}>
+          <img
+            ref={imageRef}
+            src={url}
+            alt=""
+            draggable={false}
+            onLoad={(e) => { setLoaded({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight }); }}
+            className="pointer-events-none absolute inset-0 h-full w-full object-cover"
+            style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`, transformOrigin: 'center', objectFit: 'cover' }}
+          />
+          <div className="pointer-events-none absolute inset-0 border-2 border-white/90" />
+        </div>
+        <div className="mt-4 flex flex-wrap items-center gap-4 text-sm text-[#6b6156]">
+          <label className="flex min-w-[260px] flex-1 items-center gap-2">縮放<input type="range" min="1" max="4" step="0.01" value={zoom} onChange={(e) => changeZoom(Number(e.target.value))} className="flex-1 accent-[#1f1b19]" /><span className="w-12 text-right">{zoom.toFixed(2)}x</span></label>
+          <label className="flex items-center gap-2">補底色<input type="color" value={background} onChange={(e) => setBackground(e.target.value)} className="h-8 w-10 rounded border border-[#d7c9bd] p-0.5" /></label>
+        </div>
+        <div className="mt-6 flex justify-end gap-3">
+          <button type="button" onClick={onCancel} disabled={busy} className="rounded-full border border-[#d7c9bd] px-5 py-2 text-sm font-semibold">取消</button>
+          <button type="button" onClick={apply} disabled={busy || !loaded.w} className="rounded-full bg-[#1f1b19] px-5 py-2 text-sm font-semibold text-white disabled:opacity-50">{busy ? '上傳中...' : '套用並上傳'}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
 type CropHandle = 'move' | 'nw' | 'ne' | 'sw' | 'se';
 
 const ASPECTS: { label: string; value: number | null }[] = [
