@@ -588,7 +588,7 @@ function Footer({ settings }: { settings: SiteSettings | null }) {
 
   return (
     <footer className="border-t border-[#e5ded4] bg-white px-6 py-5 text-[#2c2826] sm:px-8">
-      <div className="mx-auto grid max-w-7xl justify-items-center gap-6 text-center sm:grid-cols-2 lg:grid-cols-4">
+      <div className="mx-auto flex max-w-5xl flex-wrap justify-center gap-x-20 gap-y-6 text-center">
         {sections.map((section, index) => (
           <FooterGroup
             key={`${section.title}-${index}`}
