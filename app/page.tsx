@@ -569,39 +569,26 @@ function FavoritesDrawer({
 }
 
 function Footer({ settings }: { settings: SiteSettings | null }) {
-  const customSections = settings?.footer_sections ?? [];
-  const aboutLinks = settings?.footer_about_links?.length
-    ? settings.footer_about_links
-    : ['優惠資訊 / Coupon', '商店介紹 / Introduction', '與我們合作 / Cooperation'];
-  const serviceLinks = settings?.footer_service_links?.length
-    ? settings.footer_service_links
-    : [
-        '加入會員享折扣 / VIP',
-        '挑選尺寸 / About Size',
-        '購物須知 / How To Buy',
-        '退換貨政策 / After-sales Service',
-        '使用者條款 / Terms',
-        '隱私權政策 / Privacy',
-      ];
+  const aboutLinks = settings?.footer_about_links?.length ? settings.footer_about_links : ['優惠資訊 / Coupon', '商店介紹 / Introduction', '與我們合作 / Cooperation'];
+  const serviceLinks = settings?.footer_service_links?.length ? settings.footer_service_links : ['加入會員享折扣 / VIP', '挑選尺寸 / About Size', '購物須知 / How To Buy', '退換貨政策 / After-sales Service', '使用者條款 / Terms', '隱私權政策 / Privacy'];
+  const groups = { about: [] as FooterLinkItem[], service: [] as FooterLinkItem[], find: [] as FooterLinkItem[] };
+  for (const item of aboutLinks) groups.about.push({ subtitle: item, content: '', url: '' });
+  for (const item of serviceLinks) groups.service.push({ subtitle: item, content: '', url: '' });
+  for (const section of settings?.footer_sections ?? []) {
+    const key = /顧客|客服|service/i.test(section.title) ? 'service' : /尋找|follow|聯絡|contact/i.test(section.title) ? 'find' : 'about';
+    groups[key].push(...section.items);
+  }
 
   return (
     <footer className="border-t border-[#e5ded4] bg-white px-6 py-5 text-[#2c2826] sm:px-8">
       <div className="mx-auto grid max-w-7xl gap-6 sm:grid-cols-3">
-        {customSections.length > 0 ? customSections.map((section) => (
-          <section key={section.title}>
-            <h2 className="text-base font-bold tracking-wide">{section.title}</h2>
-            <div className="mt-3 space-y-2 text-sm leading-5 text-[#494541]">
-              {section.items.map((item, index) => (
-                <div key={`${item.subtitle}-${index}`}>
-                  {item.url ? <a href={item.url} className="font-medium hover:underline">{item.subtitle}</a> : <p className="font-medium">{item.subtitle}</p>}
-                  {item.content && <p>{item.content}</p>}
-                </div>
-              ))}
-            </div>
-          </section>
-        )) : <><FooterGroup title="關於我們 ABOUT US" items={aboutLinks} /><FooterGroup title="顧客服務 SERVICE" items={serviceLinks} /></>}
+        <FooterGroup title="關於我們 ABOUT US" items={groups.about} sectionKey="about" />
+        <FooterGroup title="顧客服務 SERVICE" items={groups.service} sectionKey="service" />
         <section>
           <h2 className="text-base font-bold tracking-wide">尋找我們 FOLLOW US</h2>
+          <nav className="mt-3 space-y-1.5 text-sm leading-5 text-[#494541]">
+            {groups.find.map((item, index) => <FooterLink key={`${item.subtitle}-${index}`} item={item} sectionKey="find" />)}
+          </nav>
           <div className="mt-3 space-y-1 text-sm leading-5 text-[#494541]">
             {settings?.footer_service_hours && <p>服務時間：{settings.footer_service_hours}</p>}
             {settings?.footer_email && <p>信箱:{settings.footer_email}</p>}
@@ -637,19 +624,22 @@ function Footer({ settings }: { settings: SiteSettings | null }) {
   );
 }
 
-function FooterGroup({ title, items }: { title: string; items: string[] }) {
+type FooterLinkItem = { subtitle: string; content: string; url: string };
+
+function FooterGroup({ title, items, sectionKey }: { title: string; items: FooterLinkItem[]; sectionKey: string }) {
   return (
     <section>
       <h2 className="text-base font-bold tracking-wide">{title}</h2>
       <nav className="mt-3 space-y-1.5 text-sm leading-5 text-[#494541]">
-        {items.map((item, index) => (
-          <a key={`${item}-${index}`} href="#" className={index === 0 ? 'block text-[#b64b43]' : 'block'}>
-            {item}
-          </a>
-        ))}
+        {items.map((item, index) => <FooterLink key={`${item.subtitle}-${index}`} item={item} sectionKey={sectionKey} />)}
       </nav>
     </section>
   );
+}
+
+function FooterLink({ item, sectionKey }: { item: FooterLinkItem; sectionKey: string }) {
+  const href = item.content ? `/footer/${sectionKey}/${encodeURIComponent(item.subtitle)}` : item.url || '#';
+  return <a href={href} className="block hover:underline">{item.subtitle}</a>;
 }
 
 function ProductCard({
