@@ -1543,6 +1543,7 @@ function FixedBannerCropModal({
   const [zoom, setZoom] = useState(1);
   const [background, setBackground] = useState('#8a877f');
   const [loaded, setLoaded] = useState({ w: 0, h: 0 });
+  const [frameSize, setFrameSize] = useState({ w: 0, h: 0 });
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const frameRef = useRef<HTMLDivElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);
@@ -1554,17 +1555,25 @@ function FixedBannerCropModal({
     document.body.style.overflow = 'hidden';
     return () => { document.body.style.overflow = previous; };
   }, []);
+  useEffect(() => {
+    const frame = frameRef.current;
+    if (!frame) return;
+    const update = () => setFrameSize({ w: frame.clientWidth, h: frame.clientHeight });
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(frame);
+    return () => observer.disconnect();
+  }, []);
 
   function geometry() {
-    const frame = frameRef.current;
-    if (!frame || !loaded.w) return null;
-    const w = frame.clientWidth;
-    const h = frame.clientHeight;
-    const scale = Math.max(w / loaded.w, h / loaded.h);
+    if (!loaded.w || !frameSize.w || !frameSize.h) return null;
+    const w = frameSize.w;
+    const h = frameSize.h;
+    const scale = Math.min(w / loaded.w, h / loaded.h);
     const imageW = loaded.w * scale * zoom;
     const imageH = loaded.h * scale * zoom;
-    const limitX = Math.max(0, (imageW - w) / 2);
-    const limitY = Math.max(0, (imageH - h) / 2);
+    const limitX = Math.abs(imageW - w) / 2;
+    const limitY = Math.abs(imageH - h) / 2;
     return { w, h, scale, imageW, imageH, limitX, limitY };
   }
 
@@ -1581,13 +1590,11 @@ function FixedBannerCropModal({
     const old = geometry();
     setZoom(nextZoom);
     if (!old) return;
-    const frame = frameRef.current;
-    if (!frame) return;
-    const centerRatio = { x: (frame.clientWidth / 2 + pan.x) / frame.clientWidth, y: (frame.clientHeight / 2 + pan.y) / frame.clientHeight };
+    const centerRatio = { x: (frameSize.w / 2 + pan.x) / frameSize.w, y: (frameSize.h / 2 + pan.y) / frameSize.h };
     requestAnimationFrame(() => {
       const next = geometry();
       if (!next) return;
-      setPan(clampPan({ x: centerRatio.x * frame.clientWidth - frame.clientWidth / 2, y: centerRatio.y * frame.clientHeight - frame.clientHeight / 2 }));
+      setPan(clampPan({ x: centerRatio.x * frameSize.w - frameSize.w / 2, y: centerRatio.y * frameSize.h - frameSize.h / 2 }));
     });
   }
 
@@ -1611,39 +1618,52 @@ function FixedBannerCropModal({
   function apply() {
     const g = geometry();
     if (!g || !loaded.w) return;
-    const left = (g.w - g.imageW) / 2 + pan.x;
-    const top = (g.h - g.imageH) / 2 + pan.y;
-    const sx = Math.max(0, -left) / (g.scale * zoom);
-    const sy = Math.max(0, -top) / (g.scale * zoom);
-    const sw = Math.min(loaded.w - sx, g.w / (g.scale * zoom));
-    const sh = Math.min(loaded.h - sy, g.h / (g.scale * zoom));
     const canvas = document.createElement('canvas');
     canvas.width = 1600;
-    canvas.height = 900;
+    canvas.height = 1300;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     ctx.fillStyle = background;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     if (!imageRef.current) return;
-    ctx.drawImage(imageRef.current, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
+    const canvasScale = canvas.width / g.w;
+    const drawW = g.imageW * canvasScale;
+    const drawH = g.imageH * canvasScale;
+    const drawX = (canvas.width - drawW) / 2 + pan.x * canvasScale;
+    const drawY = (canvas.height - drawH) / 2 + pan.y * canvasScale;
+    ctx.drawImage(imageRef.current, drawX, drawY, drawW, drawH);
     const base = file.name.replace(/\.[^.]+$/, '') || 'banner';
     canvas.toBlob((blob) => blob && onConfirm(blob, `${base}.jpg`), 'image/jpeg', 0.9);
   }
+
+  const preview = geometry();
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
       <div className="max-h-[92vh] w-full max-w-2xl overflow-auto rounded-2xl bg-white p-6">
         <h2 className="text-xl font-semibold">輪播圖 — 固定首頁比例取景</h2>
-        <p className="mt-1 text-sm text-[#6b6156]">白色框架固定為首頁 16:9；在框內拖曳照片，使用縮放桿調整顯示位置。</p>
-        <div ref={frameRef} className="relative mx-auto mt-5 aspect-video w-full max-w-xl touch-none select-none overflow-hidden border-2 border-white shadow-[0_0_0_9999px_rgba(0,0,0,0.45)]" style={{ backgroundColor: background }} onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={stopDrag} onPointerCancel={stopDrag}>
+        <p className="mt-1 text-sm text-[#6b6156]">白色框架固定為首頁 16:13；照片會先完整放進框內，再拖曳與縮放調整顯示位置。</p>
+        <div ref={frameRef} className="relative mx-auto mt-5 aspect-[16/13] w-full max-w-xl touch-none select-none overflow-hidden border-2 border-white shadow-[0_0_0_9999px_rgba(0,0,0,0.45)]" style={{ backgroundColor: background }} onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={stopDrag} onPointerCancel={stopDrag}>
+          {loaded.w > 0 && (
+            <img
+              src={url}
+              alt=""
+              draggable={false}
+              className="pointer-events-none absolute left-1/2 top-1/2 max-w-none"
+              style={{
+                width: `${preview?.imageW ?? 0}px`,
+                height: `${preview?.imageH ?? 0}px`,
+                transform: `translate(-50%, -50%) translate(${pan.x}px, ${pan.y}px)`,
+              }}
+            />
+          )}
           <img
             ref={imageRef}
             src={url}
             alt=""
             draggable={false}
             onLoad={(e) => { setLoaded({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight }); }}
-            className="pointer-events-none absolute inset-0 h-full w-full object-cover"
-            style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`, transformOrigin: 'center', objectFit: 'cover' }}
+            className="hidden"
           />
           <div className="pointer-events-none absolute inset-0 border-2 border-white/90" />
         </div>
