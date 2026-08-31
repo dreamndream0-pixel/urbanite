@@ -19,9 +19,9 @@ export default async function FooterContentPage({ params }: { params: Promise<{ 
   const settings = data as Pick<SiteSettings, 'footer_sections'> | null;
   const sections = settings?.footer_sections ?? [];
   const sectionData = sections.find((entry) => {
-    if (section === 'service') return /顧客|客服|service/i.test(entry.title);
+    if (section === 'service') return /顧客|客服|service|租屋|隱私|privacy|條款|terms/i.test(entry.title);
     if (section === 'find') return /尋找|follow|聯絡|contact/i.test(entry.title);
-    return !/顧客|客服|service|尋找|follow|聯絡|contact/i.test(entry.title);
+    return !/顧客|客服|service|租屋|隱私|privacy|條款|terms|尋找|follow|聯絡|contact/i.test(entry.title);
   });
   const content = sectionData?.items.find((entry) => entry.subtitle === itemTitle);
   if (!content) notFound();

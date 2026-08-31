@@ -575,7 +575,7 @@ function Footer({ settings }: { settings: SiteSettings | null }) {
   for (const item of aboutLinks) groups.about.push({ subtitle: item, content: '', url: '' });
   for (const item of serviceLinks) groups.service.push({ subtitle: item, content: '', url: '' });
   for (const section of settings?.footer_sections ?? []) {
-    const key = /顧客|客服|service/i.test(section.title) ? 'service' : /尋找|follow|聯絡|contact/i.test(section.title) ? 'find' : 'about';
+    const key = /顧客|客服|service|租屋|隱私|privacy|條款|terms/i.test(section.title) ? 'service' : /尋找|follow|聯絡|contact/i.test(section.title) ? 'find' : 'about';
     groups[key].push(...section.items);
   }
 

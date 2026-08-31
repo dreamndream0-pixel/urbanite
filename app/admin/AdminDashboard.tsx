@@ -1464,26 +1464,10 @@ export default function AdminDashboard({
                 }
               >
                 <div className="grid gap-4 lg:grid-cols-2">
-                  <FooterSectionsEditor
+                  <FooterPagesEditor
                     value={footerDraft.sections}
                     onChange={(sections) => setFooterDraft({ ...footerDraft, sections })}
                   />
-                  <Field label="關於我們連結(一行一筆)">
-                    <textarea
-                      value={footerDraft.about}
-                      onChange={(e) => setFooterDraft({ ...footerDraft, about: e.target.value })}
-                      rows={5}
-                      className="w-full rounded-lg border border-[#e5ded4] px-3 py-2"
-                    />
-                  </Field>
-                  <Field label="顧客服務連結(一行一筆)">
-                    <textarea
-                      value={footerDraft.service}
-                      onChange={(e) => setFooterDraft({ ...footerDraft, service: e.target.value })}
-                      rows={5}
-                      className="w-full rounded-lg border border-[#e5ded4] px-3 py-2"
-                    />
-                  </Field>
                   <Field label="服務時間">
                     <input
                       value={footerDraft.serviceHours}
@@ -1994,6 +1978,65 @@ function BannerCropModal({
 
 type FooterItemDraft = { subtitle: string; content: string; url: string };
 type FooterSectionDraft = { title: string; items: FooterItemDraft[] };
+
+const FOOTER_PAGE_DEFAULTS: FooterSectionDraft[] = [
+  { title: '關於我們', items: [{ subtitle: '關於我們', content: '', url: '' }] },
+  { title: '租屋須知', items: [{ subtitle: '租屋須知', content: '', url: '' }] },
+  { title: '隱私權政策', items: [{ subtitle: '隱私權政策', content: '', url: '' }] },
+  { title: '服務條款', items: [{ subtitle: '服務條款', content: '', url: '' }] },
+];
+
+function FooterPagesEditor({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+  const [active, setActive] = useState(0);
+  const [pages, setPages] = useState<FooterSectionDraft[]>(() => {
+    let saved: FooterSectionDraft[] = [];
+    try { saved = JSON.parse(value); } catch { /* 使用預設頁面 */ }
+    return FOOTER_PAGE_DEFAULTS.map((page, index) => {
+      const match = saved.find((item) => {
+        const title = item.title.toLowerCase();
+        return index === 0 ? /關於|about/.test(title) : index === 1 ? /租屋|購物|顧客|service/.test(title) : index === 2 ? /隱私|privacy/.test(title) : /條款|服務|terms/.test(title);
+      });
+      return match ?? page;
+    });
+  });
+
+  function update(index: number, patch: Partial<FooterSectionDraft>) {
+    const next = pages.map((page, pageIndex) => pageIndex === index ? { ...page, ...patch } : page);
+    setPages(next);
+    onChange(JSON.stringify(next));
+  }
+
+  const page = pages[active];
+  const item = page.items[0] ?? { subtitle: page.title, content: '', url: '' };
+  function updateItem(patch: Partial<FooterItemDraft>) {
+    update(active, { items: [{ ...item, ...patch }] });
+  }
+
+  return (
+    <div className="lg:col-span-2 rounded-lg border border-[#e5ded4] p-4">
+      <h3 className="text-lg font-bold">頁尾頁面設定</h3>
+      <p className="mt-1 text-sm text-[#8a7f72]">編輯網站頁尾連結的頁面內容；小標題點擊後會開啟完整內文頁。</p>
+      <div className="mt-5 flex flex-wrap gap-2 border-b border-[#e5ded4] pb-3">
+        {pages.map((entry, index) => (
+          <button key={index} type="button" onClick={() => setActive(index)} className={`rounded-full px-4 py-2 text-sm font-semibold ${active === index ? 'bg-[#7da185] text-white' : 'border border-[#e5ded4] bg-white'}`}>
+            {entry.title}
+          </button>
+        ))}
+      </div>
+      <div className="mt-5 space-y-3">
+        <label className="block text-sm text-[#8a7f72]">頁面標題
+          <input value={page.title} onChange={(e) => update(active, { title: e.target.value, items: [{ ...item, subtitle: e.target.value }] })} className="mt-2 w-full rounded-lg border border-[#e5ded4] px-3 py-2 text-base text-[#1f1b19]" />
+        </label>
+        <label className="block text-sm text-[#8a7f72]">頁面內容
+          <textarea value={item.content} onChange={(e) => updateItem({ content: e.target.value })} rows={14} placeholder="輸入這個頁面的完整內文..." className="mt-2 w-full rounded-lg border border-[#e5ded4] px-3 py-3 text-base leading-7 text-[#1f1b19]" />
+        </label>
+        <label className="block text-sm text-[#8a7f72]">外部連結（選填）
+          <input value={item.url} onChange={(e) => updateItem({ url: e.target.value })} placeholder="https://..." className="mt-2 w-full rounded-lg border border-[#e5ded4] px-3 py-2 text-base text-[#1f1b19]" />
+        </label>
+      </div>
+    </div>
+  );
+}
 
 function FooterSectionsEditor({ value, onChange }: { value: string; onChange: (value: string) => void }) {
   const [sections, setSections] = useState<FooterSectionDraft[]>(() => {
