@@ -2165,8 +2165,13 @@ function MethodToggles({
   );
 }
 
-// 上傳前先在瀏覽器縮圖壓縮:避免手機大圖超過伺服器上傳上限而失敗,也順便把 HEIC 轉成 JPG
-function compressImage(file: File, maxDim = 1600, quality = 0.85): Promise<Blob> {
+// 上傳前先在瀏覽器縮圖壓縮 JPEG；透明圖檔保持原檔,避免 PNG/WebP 去背被轉成黑底。
+function prepareProductImage(file: File, index: number, maxDim = 1600, quality = 0.85): Promise<{ blob: Blob; filename: string }> {
+  if (file.type !== 'image/jpeg') {
+    const ext = file.type === 'image/png' ? 'png' : file.type === 'image/webp' ? 'webp' : file.type === 'image/gif' ? 'gif' : 'img';
+    return Promise.resolve({ blob: file, filename: `product-${Date.now()}-${index}.${ext}` });
+  }
+
   return new Promise((resolve, reject) => {
     const url = URL.createObjectURL(file);
     const img = new Image();
@@ -2188,7 +2193,7 @@ function compressImage(file: File, maxDim = 1600, quality = 0.85): Promise<Blob>
       }
       ctx.drawImage(img, 0, 0, width, height);
       canvas.toBlob(
-        (blob) => (blob ? resolve(blob) : reject(new Error('圖片壓縮失敗'))),
+        (blob) => (blob ? resolve({ blob, filename: `product-${Date.now()}-${index}.jpg` }) : reject(new Error('圖片壓縮失敗'))),
         'image/jpeg',
         quality,
       );
@@ -2799,10 +2804,10 @@ function ProductModal({
     try {
       const uploaded: string[] = [];
       for (let i = 0; i < picked.length; i++) {
-        const blob = await compressImage(picked[i]);
+        const prepared = await prepareProductImage(picked[i], i);
         const url = await uploadImageWithProgress(
-          blob,
-          `product-${Date.now()}-${i}.jpg`,
+          prepared.blob,
+          prepared.filename,
           draft.id || 'new-product',
           (p) => setUploadProgress({ done: i, total: picked.length, percent: Math.round(p * 100) }),
         );
@@ -2977,9 +2982,9 @@ function ProductModal({
                   {draft.images.map((url, index) => (
                     <div
                       key={`${url}-${index}`}
-                      className="group relative aspect-square overflow-hidden rounded-lg border border-[#e5ded4] bg-[#f6f2ec]"
+                      className="group relative aspect-[3/4] overflow-hidden rounded-lg border border-[#e5ded4] bg-[#f6f2ec]"
                     >
-                      <img src={url} alt="" className="h-full w-full object-cover" />
+                      <img src={url} alt="" className="h-full w-full object-contain" />
                       {index === 0 ? (
                         <span className="absolute left-1 top-1 rounded bg-[#1f1b19] px-1.5 py-0.5 text-[10px] font-semibold text-white">
                           封面
