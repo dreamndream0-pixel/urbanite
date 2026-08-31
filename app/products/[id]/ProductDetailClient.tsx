@@ -162,7 +162,7 @@ export default function ProductDetailClient({ product }: { product: Product }) {
       </header>
 
       <section className="mx-auto max-w-5xl">
-        <div className="aspect-[16/10] overflow-hidden bg-[#eee8e1] sm:aspect-[16/8]">
+        <div className="mx-auto aspect-[3/4] w-full max-w-md overflow-hidden bg-[#eee8e1] sm:max-w-lg">
           {activeImage ? (
             <img src={activeImage} alt={product.name} className="h-full w-full object-contain" />
           ) : (
@@ -176,7 +176,7 @@ export default function ProductDetailClient({ product }: { product: Product }) {
                 key={`${url}-${index}`}
                 onClick={() => setActiveImage(url)}
                 aria-label={`查看圖片 ${index + 1}`}
-                className={`h-16 w-16 shrink-0 overflow-hidden rounded-md border-2 transition ${
+                className={`aspect-[3/4] w-12 shrink-0 overflow-hidden rounded-md border-2 bg-[#eee8e1] transition ${
                   activeImage === url ? 'border-[#c84767]' : 'border-transparent opacity-70 hover:opacity-100'
                 }`}
               >

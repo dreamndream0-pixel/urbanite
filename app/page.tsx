@@ -528,7 +528,7 @@ function FavoritesDrawer({
                   className="h-20 w-20 shrink-0 overflow-hidden rounded-md bg-[#e9e1d6]"
                 >
                   {product.image ? (
-                    <img src={product.image} alt={product.name} className="h-full w-full object-cover" />
+                    <img src={product.image} alt={product.name} className="h-full w-full object-contain" />
                   ) : (
                     <span className="flex h-full w-full items-center justify-center text-xs text-[#a99]">
                       無圖片
@@ -679,7 +679,7 @@ function ProductCard({
             <img
               src={product.image}
               alt={product.name}
-              className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
+              className="h-full w-full object-contain"
             />
           ) : (
             <div className="flex h-full w-full items-center justify-center text-sm text-[#a99]">
@@ -869,7 +869,7 @@ function CartDrawer({
                       className="h-14 w-14 shrink-0 overflow-hidden rounded-md bg-[#e9e1d6]"
                     >
                       {product.image ? (
-                        <img src={product.image} alt={product.name} className="h-full w-full object-cover" />
+                        <img src={product.image} alt={product.name} className="h-full w-full object-contain" />
                       ) : null}
                     </Link>
                     <div className="min-w-0 flex-1">
@@ -1115,7 +1115,7 @@ function QuickAddModal({
         <div className="flex gap-4">
           <div className="h-40 w-40 shrink-0 overflow-hidden rounded-lg bg-[#e9e1d6]">
             {product.image ? (
-              <img src={product.image} alt={product.name} className="h-full w-full object-cover" />
+              <img src={product.image} alt={product.name} className="h-full w-full object-contain" />
             ) : (
               <div className="flex h-full w-full items-center justify-center text-sm text-[#a99]">無圖片</div>
             )}
