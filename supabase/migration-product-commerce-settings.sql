@@ -15,6 +15,9 @@ where image is not null
   and (images is null or cardinality(images) = 0);
 
 alter table public.site_settings
+  add column if not exists footer_sections jsonb not null default '[]'::jsonb;
+
+alter table public.site_settings
   add column if not exists payment_methods jsonb not null default '["綠界金流","Line Pay","Apple Pay","取貨付款","轉帳匯款"]',
   add column if not exists shipping_methods jsonb not null default '["綠界物流-超商取貨","綠界物流-宅配","7-11 取貨付款","全家 取貨付款"]',
   add column if not exists enabled_payment_methods jsonb not null default '["綠界金流","Line Pay","Apple Pay","取貨付款","轉帳匯款"]',

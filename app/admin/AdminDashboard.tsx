@@ -191,6 +191,7 @@ export default function AdminDashboard({
   const [newDiscount, setNewDiscount] = useState({ code: '', type: 'percent', value: 0, min_spend: 0 });
   const [logoUrl, setLogoUrl] = useState(initialLogoUrl);
   const [footerDraft, setFooterDraft] = useState({
+    sections: JSON.stringify(initialSettings?.footer_sections ?? [], null, 2),
     about: (initialSettings?.footer_about_links ?? [
       '優惠資訊 / Coupon',
       '商店介紹 / Introduction',
@@ -639,6 +640,7 @@ export default function AdminDashboard({
           footer_tax_id: footerDraft.taxId.trim(),
           footer_instagram_url: footerDraft.instagramUrl.trim(),
           footer_line_url: footerDraft.lineUrl.trim(),
+          footer_sections: JSON.parse(footerDraft.sections || '[]'),
           payment_methods: toLines(footerDraft.payments),
           shipping_methods: toLines(footerDraft.shippings),
           enabled_payment_methods: toLines(footerDraft.payments),
@@ -1462,6 +1464,16 @@ export default function AdminDashboard({
                 }
               >
                 <div className="grid gap-4 lg:grid-cols-2">
+                  <Field label="自訂頁尾欄位(JSON：主標題、內文小標題、內容、連結)">
+                    <textarea
+                      value={footerDraft.sections}
+                      onChange={(e) => setFooterDraft({ ...footerDraft, sections: e.target.value })}
+                      rows={10}
+                      className="w-full rounded-lg border border-[#e5ded4] px-3 py-2 font-mono text-xs"
+                      placeholder={'[{"title":"關於我們","items":[{"subtitle":"商店介紹","content":"品牌故事","url":"/about"}]}]'}
+                    />
+                    <p className="mt-1 text-xs text-[#8a7f72]">可新增任意欄位；每個項目可設定小標題、內文與連結。請保持有效 JSON。</p>
+                  </Field>
                   <Field label="關於我們連結(一行一筆)">
                     <textarea
                       value={footerDraft.about}

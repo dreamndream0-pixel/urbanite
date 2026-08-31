@@ -164,7 +164,7 @@ export default function ProductDetailClient({ product }: { product: Product }) {
       <section className="mx-auto max-w-5xl">
         <div className="aspect-[16/10] overflow-hidden bg-[#eee8e1] sm:aspect-[16/8]">
           {activeImage ? (
-            <img src={activeImage} alt={product.name} className="h-full w-full object-cover" />
+            <img src={activeImage} alt={product.name} className="h-full w-full object-contain" />
           ) : (
             <div className="flex h-full items-center justify-center text-[#8a7f72]">無商品圖片</div>
           )}
@@ -180,7 +180,7 @@ export default function ProductDetailClient({ product }: { product: Product }) {
                   activeImage === url ? 'border-[#c84767]' : 'border-transparent opacity-70 hover:opacity-100'
                 }`}
               >
-                <img src={url} alt="" className="h-full w-full object-cover" />
+                <img src={url} alt="" className="h-full w-full object-contain" />
               </button>
             ))}
           </div>

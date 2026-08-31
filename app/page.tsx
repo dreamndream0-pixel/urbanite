@@ -569,6 +569,7 @@ function FavoritesDrawer({
 }
 
 function Footer({ settings }: { settings: SiteSettings | null }) {
+  const customSections = settings?.footer_sections ?? [];
   const aboutLinks = settings?.footer_about_links?.length
     ? settings.footer_about_links
     : ['優惠資訊 / Coupon', '商店介紹 / Introduction', '與我們合作 / Cooperation'];
@@ -586,8 +587,19 @@ function Footer({ settings }: { settings: SiteSettings | null }) {
   return (
     <footer className="border-t border-[#e5ded4] bg-white px-6 py-5 text-[#2c2826] sm:px-8">
       <div className="mx-auto grid max-w-7xl gap-6 sm:grid-cols-3">
-        <FooterGroup title="關於我們 ABOUT US" items={aboutLinks} />
-        <FooterGroup title="顧客服務 SERVICE" items={serviceLinks} />
+        {customSections.length > 0 ? customSections.map((section) => (
+          <section key={section.title}>
+            <h2 className="text-base font-bold tracking-wide">{section.title}</h2>
+            <div className="mt-3 space-y-2 text-sm leading-5 text-[#494541]">
+              {section.items.map((item, index) => (
+                <div key={`${item.subtitle}-${index}`}>
+                  {item.url ? <a href={item.url} className="font-medium hover:underline">{item.subtitle}</a> : <p className="font-medium">{item.subtitle}</p>}
+                  {item.content && <p>{item.content}</p>}
+                </div>
+              ))}
+            </div>
+          </section>
+        )) : <><FooterGroup title="關於我們 ABOUT US" items={aboutLinks} /><FooterGroup title="顧客服務 SERVICE" items={serviceLinks} /></>}
         <section>
           <h2 className="text-base font-bold tracking-wide">尋找我們 FOLLOW US</h2>
           <div className="mt-3 space-y-1 text-sm leading-5 text-[#494541]">

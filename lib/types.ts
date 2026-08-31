@@ -53,6 +53,7 @@ export type SiteSettings = {
   logo_url: string;
   footer_about_links?: string[];
   footer_service_links?: string[];
+  footer_sections?: { title: string; items: { subtitle: string; content: string; url: string }[] }[];
   footer_service_hours?: string;
   footer_email?: string;
   footer_company_name?: string;

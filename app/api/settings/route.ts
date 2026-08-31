@@ -15,6 +15,7 @@ const DEFAULT_SETTINGS: SiteSettings = {
     '使用者條款 / Terms',
     '隱私權政策 / Privacy',
   ],
+  footer_sections: [],
   footer_service_hours: '上班日 11:00 - 18:00',
   footer_email: '',
   footer_company_name: '',
@@ -55,6 +56,7 @@ export async function PATCH(request: Request) {
   const keys = [
     'footer_about_links',
     'footer_service_links',
+    'footer_sections',
     'footer_service_hours',
     'footer_email',
     'footer_company_name',
