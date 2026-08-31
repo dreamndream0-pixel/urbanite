@@ -17,6 +17,12 @@ where image is not null
 alter table public.site_settings
   add column if not exists footer_about_links jsonb not null default '["優惠資訊 / Coupon","商店介紹 / Introduction","與我們合作 / Cooperation"]',
   add column if not exists footer_service_links jsonb not null default '["加入會員享折扣 / VIP","挑選尺寸 / About Size","購物須知 / How To Buy","退換貨政策 / After-sales Service","使用者條款 / Terms","隱私權政策 / Privacy"]',
+  add column if not exists footer_service_hours text default '上班日 11:00 - 18:00',
+  add column if not exists footer_email text default '',
+  add column if not exists footer_company_name text default '',
+  add column if not exists footer_tax_id text default '',
+  add column if not exists footer_instagram_url text default '',
+  add column if not exists footer_line_url text default '',
   add column if not exists footer_sections jsonb not null default '[]'::jsonb;
 
 alter table public.site_settings
