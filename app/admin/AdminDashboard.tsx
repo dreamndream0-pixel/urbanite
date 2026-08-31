@@ -1979,70 +1979,22 @@ function BannerCropModal({
 type FooterItemDraft = { subtitle: string; content: string; url: string };
 type FooterSectionDraft = { title: string; items: FooterItemDraft[] };
 
-const FOOTER_PAGE_DEFAULTS: FooterSectionDraft[] = [
-  { title: '關於我們', items: [{ subtitle: '關於我們', content: '', url: '' }] },
-  { title: '租屋須知', items: [{ subtitle: '租屋須知', content: '', url: '' }] },
-  { title: '隱私權政策', items: [{ subtitle: '隱私權政策', content: '', url: '' }] },
-  { title: '服務條款', items: [{ subtitle: '服務條款', content: '', url: '' }] },
-];
-
 function FooterPagesEditor({ value, onChange }: { value: string; onChange: (value: string) => void }) {
   const [active, setActive] = useState(0);
-  const [pages, setPages] = useState<FooterSectionDraft[]>(() => {
-    let saved: FooterSectionDraft[] = [];
-    try { saved = JSON.parse(value); } catch { /* 使用預設頁面 */ }
-    return FOOTER_PAGE_DEFAULTS.map((page, index) => {
-      const match = saved.find((item) => {
-        const title = item.title.toLowerCase();
-        return index === 0 ? /關於|about/.test(title) : index === 1 ? /租屋|購物|顧客|service/.test(title) : index === 2 ? /隱私|privacy/.test(title) : /條款|服務|terms/.test(title);
-      });
-      return match ?? page;
-    });
-  });
-
-  function update(index: number, patch: Partial<FooterSectionDraft>) {
-    const next = pages.map((page, pageIndex) => pageIndex === index ? { ...page, ...patch } : page);
-    setPages(next);
-    onChange(JSON.stringify(next));
-  }
-
-  const page = pages[active];
-  const item = page.items[0] ?? { subtitle: page.title, content: '', url: '' };
-  function updateItem(patch: Partial<FooterItemDraft>) {
-    update(active, { items: [{ ...item, ...patch }] });
-  }
-
-  return (
-    <div className="lg:col-span-2 rounded-lg border border-[#e5ded4] p-4">
-      <h3 className="text-lg font-bold">頁尾頁面設定</h3>
-      <p className="mt-1 text-sm text-[#8a7f72]">編輯網站頁尾連結的頁面內容；小標題點擊後會開啟完整內文頁。</p>
-      <div className="mt-5 flex flex-wrap gap-2 border-b border-[#e5ded4] pb-3">
-        {pages.map((entry, index) => (
-          <button key={index} type="button" onClick={() => setActive(index)} className={`rounded-full px-4 py-2 text-sm font-semibold ${active === index ? 'bg-[#7da185] text-white' : 'border border-[#e5ded4] bg-white'}`}>
-            {entry.title}
-          </button>
-        ))}
-      </div>
-      <div className="mt-5 space-y-3">
-        <label className="block text-sm text-[#8a7f72]">頁面標題
-          <input value={page.title} onChange={(e) => update(active, { title: e.target.value, items: [{ ...item, subtitle: e.target.value }] })} className="mt-2 w-full rounded-lg border border-[#e5ded4] px-3 py-2 text-base text-[#1f1b19]" />
-        </label>
-        <label className="block text-sm text-[#8a7f72]">頁面內容
-          <textarea value={item.content} onChange={(e) => updateItem({ content: e.target.value })} rows={14} placeholder="輸入這個頁面的完整內文..." className="mt-2 w-full rounded-lg border border-[#e5ded4] px-3 py-3 text-base leading-7 text-[#1f1b19]" />
-        </label>
-        <label className="block text-sm text-[#8a7f72]">外部連結（選填）
-          <input value={item.url} onChange={(e) => updateItem({ url: e.target.value })} placeholder="https://..." className="mt-2 w-full rounded-lg border border-[#e5ded4] px-3 py-2 text-base text-[#1f1b19]" />
-        </label>
-      </div>
-    </div>
-  );
-}
-
-function FooterSectionsEditor({ value, onChange }: { value: string; onChange: (value: string) => void }) {
   const [sections, setSections] = useState<FooterSectionDraft[]>(() => {
     try {
       const parsed = JSON.parse(value);
-      return Array.isArray(parsed) ? parsed : [];
+      if (!Array.isArray(parsed)) return [];
+      return parsed.map((section) => ({
+        title: typeof section?.title === 'string' ? section.title : '',
+        items: Array.isArray(section?.items)
+          ? section.items.map((item: Partial<FooterItemDraft>) => ({
+              subtitle: typeof item?.subtitle === 'string' ? item.subtitle : '',
+              content: typeof item?.content === 'string' ? item.content : '',
+              url: typeof item?.url === 'string' ? item.url : '',
+            }))
+          : [],
+      }));
     } catch {
       return [];
     }
@@ -2050,83 +2002,129 @@ function FooterSectionsEditor({ value, onChange }: { value: string; onChange: (v
 
   function update(next: FooterSectionDraft[]) {
     setSections(next);
-    onChange(JSON.stringify(next));
+    onChange(JSON.stringify(next, null, 2));
   }
 
   function addSection() {
-    update([...sections, { title: '新欄位', items: [{ subtitle: '', content: '', url: '' }] }]);
+    const next = [...sections, { title: '新大標題', items: [{ subtitle: '新小標題', content: '', url: '' }] }];
+    setActive(next.length - 1);
+    update(next);
   }
 
   function updateSection(index: number, patch: Partial<FooterSectionDraft>) {
     update(sections.map((section, i) => (i === index ? { ...section, ...patch } : section)));
   }
 
+  function deleteSection(index: number) {
+    const next = sections.filter((_, i) => i !== index);
+    setActive(Math.max(0, Math.min(active, next.length - 1)));
+    update(next);
+  }
+
+  const section = sections[active];
+
   return (
     <div className="lg:col-span-2 rounded-lg border border-[#e5ded4] p-4">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <h3 className="font-semibold">頁尾自訂欄位</h3>
-          <p className="mt-1 text-xs text-[#8a7f72]">每個欄位可加入多個小標題、內容與網址。</p>
+          <h3 className="text-lg font-bold">頁尾頁面設定</h3>
+          <p className="mt-1 text-sm text-[#8a7f72]">大標題、小標題、內文與網址都可自行新增、刪除與編輯。</p>
         </div>
         <button type="button" onClick={addSection} className="rounded-lg border border-[#1f1b19] px-3 py-2 text-sm font-semibold">
           + 新增大標題
         </button>
       </div>
-      <div className="mt-4 space-y-4">
-        {sections.map((section, sectionIndex) => (
-          <div key={sectionIndex} className="rounded-lg bg-[#f8f5f0] p-3">
-            <div className="flex gap-2">
+
+      <div className="mt-5 flex flex-wrap gap-2 border-b border-[#e5ded4] pb-3">
+        {sections.map((entry, index) => (
+          <button
+            key={`${entry.title}-${index}`}
+            type="button"
+            onClick={() => setActive(index)}
+            className={`rounded-lg px-4 py-2 text-sm font-semibold ${
+              active === index ? 'bg-[#7da185] text-white' : 'border border-[#e5ded4] bg-white'
+            }`}
+          >
+            {entry.title || '未命名大標題'}
+          </button>
+        ))}
+      </div>
+
+      {section ? (
+        <div className="mt-5 space-y-5">
+          <div className="flex gap-2">
+            <label className="block min-w-0 flex-1 text-sm text-[#8a7f72]">
+              大標題
               <input
                 value={section.title}
-                onChange={(e) => updateSection(sectionIndex, { title: e.target.value })}
-                placeholder="大標題"
-                className="min-w-0 flex-1 rounded-lg border border-[#e5ded4] bg-white px-3 py-2 font-semibold"
+                onChange={(e) => updateSection(active, { title: e.target.value })}
+                placeholder="例如：關於我們 ABOUT US"
+                className="mt-2 w-full rounded-lg border border-[#e5ded4] px-3 py-2 text-base font-semibold text-[#1f1b19]"
               />
-              <button type="button" onClick={() => update(sections.filter((_, i) => i !== sectionIndex))} className="px-2 text-sm text-[#a64d45]">
-                刪除
-              </button>
-            </div>
-            <div className="mt-3 space-y-3">
-              {section.items.map((item, itemIndex) => (
-                <div key={itemIndex} className="grid gap-2 rounded-lg border border-[#e5ded4] bg-white p-3 md:grid-cols-3">
-                  <input
-                    value={item.subtitle}
-                    onChange={(e) => updateSection(sectionIndex, { items: section.items.map((x, i) => i === itemIndex ? { ...x, subtitle: e.target.value } : x) })}
-                    placeholder="小標題"
-                    className="rounded-lg border border-[#e5ded4] px-3 py-2 text-sm"
-                  />
+            </label>
+            <button
+              type="button"
+              onClick={() => deleteSection(active)}
+              className="mt-7 rounded-lg border border-[#e0b4b4] px-3 py-2 text-sm font-semibold text-[#a64d45]"
+            >
+              刪除大標題
+            </button>
+          </div>
+
+          <div className="space-y-4">
+            {section.items.map((item, itemIndex) => (
+              <div key={itemIndex} className="rounded-lg bg-[#f8f5f0] p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <label className="block min-w-0 flex-1 text-sm text-[#8a7f72]">
+                    小標題
+                    <input
+                      value={item.subtitle}
+                      onChange={(e) => updateSection(active, { items: section.items.map((x, i) => i === itemIndex ? { ...x, subtitle: e.target.value } : x) })}
+                      placeholder="例如：優惠資訊 / Coupon"
+                      className="mt-2 w-full rounded-lg border border-[#e5ded4] bg-white px-3 py-2 text-base text-[#1f1b19]"
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => updateSection(active, { items: section.items.filter((_, i) => i !== itemIndex) })}
+                    className="mt-7 rounded-lg border border-[#e0b4b4] px-3 py-2 text-sm font-semibold text-[#a64d45]"
+                  >
+                    刪除
+                  </button>
+                </div>
+                <label className="mt-3 block text-sm text-[#8a7f72]">
+                  頁面內容
                   <textarea
                     value={item.content}
-                    onChange={(e) => updateSection(sectionIndex, { items: section.items.map((x, i) => i === itemIndex ? { ...x, content: e.target.value } : x) })}
-                    placeholder="內文"
-                    rows={2}
-                    className="rounded-lg border border-[#e5ded4] px-3 py-2 text-sm"
+                    onChange={(e) => updateSection(active, { items: section.items.map((x, i) => i === itemIndex ? { ...x, content: e.target.value } : x) })}
+                    placeholder="輸入這個小標題點開後要顯示的完整內文..."
+                    rows={10}
+                    className="mt-2 w-full rounded-lg border border-[#e5ded4] bg-white px-3 py-3 text-base leading-7 text-[#1f1b19]"
                   />
-                  <div className="flex gap-2">
-                    <input
-                      value={item.url}
-                      onChange={(e) => updateSection(sectionIndex, { items: section.items.map((x, i) => i === itemIndex ? { ...x, url: e.target.value } : x) })}
-                      placeholder="連結網址"
-                      className="min-w-0 flex-1 rounded-lg border border-[#e5ded4] px-3 py-2 text-sm"
-                    />
-                    <button type="button" onClick={() => updateSection(sectionIndex, { items: section.items.filter((_, i) => i !== itemIndex) })} className="px-1 text-sm text-[#a64d45]">
-                      刪除
-                    </button>
-                  </div>
-                </div>
-              ))}
-              <button
-                type="button"
-                onClick={() => updateSection(sectionIndex, { items: [...section.items, { subtitle: '', content: '', url: '' }] })}
-                className="text-sm font-semibold text-[#6d8f73]"
-              >
-                + 新增小標題／內文
-              </button>
-            </div>
+                </label>
+                <label className="mt-3 block text-sm text-[#8a7f72]">
+                  連結網址（選填）
+                  <input
+                    value={item.url}
+                    onChange={(e) => updateSection(active, { items: section.items.map((x, i) => i === itemIndex ? { ...x, url: e.target.value } : x) })}
+                    placeholder="https://..."
+                    className="mt-2 w-full rounded-lg border border-[#e5ded4] bg-white px-3 py-2 text-base text-[#1f1b19]"
+                  />
+                </label>
+              </div>
+            ))}
+            <button
+              type="button"
+              onClick={() => updateSection(active, { items: [...section.items, { subtitle: '新小標題', content: '', url: '' }] })}
+              className="rounded-lg border border-[#7da185] px-3 py-2 text-sm font-semibold text-[#5f8066]"
+            >
+              + 新增小標題
+            </button>
           </div>
-        ))}
-        {sections.length === 0 && <p className="text-sm text-[#8a7f72]">尚未新增自訂欄位，按右上角開始建立。</p>}
-      </div>
+        </div>
+      ) : (
+        <p className="mt-5 text-sm text-[#8a7f72]">尚未新增頁尾大標題，按右上角開始建立。</p>
+      )}
     </div>
   );
 }

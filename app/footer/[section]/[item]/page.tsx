@@ -5,24 +5,15 @@ import type { SiteSettings } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
 
-const TITLES: Record<string, string> = {
-  about: '關於我們 ABOUT US',
-  service: '顧客服務 SERVICE',
-  find: '尋找我們 FOLLOW US',
-};
-
 export default async function FooterContentPage({ params }: { params: Promise<{ section: string; item: string }> }) {
   const { section, item } = await params;
+  const sectionTitle = decodeURIComponent(section);
   const itemTitle = decodeURIComponent(item);
   const supabase = createAdminClient();
   const { data } = await supabase.from('site_settings').select('footer_sections').eq('id', 1).single();
   const settings = data as Pick<SiteSettings, 'footer_sections'> | null;
   const sections = settings?.footer_sections ?? [];
-  const sectionData = sections.find((entry) => {
-    if (section === 'service') return /顧客|客服|service|租屋|隱私|privacy|條款|terms/i.test(entry.title);
-    if (section === 'find') return /尋找|follow|聯絡|contact/i.test(entry.title);
-    return !/顧客|客服|service|租屋|隱私|privacy|條款|terms|尋找|follow|聯絡|contact/i.test(entry.title);
-  });
+  const sectionData = sections.find((entry) => entry.title === sectionTitle);
   const content = sectionData?.items.find((entry) => entry.subtitle === itemTitle);
   if (!content) notFound();
 
@@ -31,7 +22,7 @@ export default async function FooterContentPage({ params }: { params: Promise<{ 
       <header className="border-b border-[#e5ded4] px-6 py-5">
         <div className="mx-auto flex max-w-3xl items-center justify-between">
           <Link href="/" className="text-sm text-[#6b6156]">← 回首頁</Link>
-          <h1 className="text-lg font-bold tracking-wide">{TITLES[section] ?? '頁尾資訊'}</h1>
+          <h1 className="text-lg font-bold tracking-wide">{sectionTitle || '頁尾資訊'}</h1>
           <span className="w-14" />
         </div>
       </header>

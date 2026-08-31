@@ -76,7 +76,7 @@ export default function Home() {
       .then((data: Category[]) => setDbCategories(data))
       .catch(() => setDbCategories([]));
 
-    fetch('/api/settings')
+    fetch('/api/settings', { cache: 'no-store' })
       .then((res) => (res.ok ? res.json() : null))
       .then((s) => {
         if (s?.logo_url) setLogoUrl(s.logo_url);
@@ -571,54 +571,63 @@ function FavoritesDrawer({
 function Footer({ settings }: { settings: SiteSettings | null }) {
   const aboutLinks = settings?.footer_about_links?.length ? settings.footer_about_links : ['優惠資訊 / Coupon', '商店介紹 / Introduction', '與我們合作 / Cooperation'];
   const serviceLinks = settings?.footer_service_links?.length ? settings.footer_service_links : ['加入會員享折扣 / VIP', '挑選尺寸 / About Size', '購物須知 / How To Buy', '退換貨政策 / After-sales Service', '使用者條款 / Terms', '隱私權政策 / Privacy'];
-  const groups = { about: [] as FooterLinkItem[], service: [] as FooterLinkItem[], find: [] as FooterLinkItem[] };
-  for (const item of aboutLinks) groups.about.push({ subtitle: item, content: '', url: '' });
-  for (const item of serviceLinks) groups.service.push({ subtitle: item, content: '', url: '' });
-  for (const section of settings?.footer_sections ?? []) {
-    const key = /顧客|客服|service|租屋|隱私|privacy|條款|terms/i.test(section.title) ? 'service' : /尋找|follow|聯絡|contact/i.test(section.title) ? 'find' : 'about';
-    groups[key].push(...section.items);
-  }
+  const savedSections = (settings?.footer_sections ?? [])
+    .map((section) => ({
+      title: section.title.trim(),
+      items: section.items.filter((item) => item.subtitle.trim()),
+    }))
+    .filter((section) => section.title || section.items.length);
+  const sections = savedSections.length
+    ? savedSections
+    : [
+        { title: '關於我們 ABOUT US', items: aboutLinks.map((subtitle) => ({ subtitle, content: '', url: '' })) },
+        { title: '顧客服務 SERVICE', items: serviceLinks.map((subtitle) => ({ subtitle, content: '', url: '' })) },
+      ];
 
   return (
     <footer className="border-t border-[#e5ded4] bg-white px-6 py-5 text-[#2c2826] sm:px-8">
-      <div className="mx-auto grid max-w-7xl gap-6 sm:grid-cols-3">
-        <FooterGroup title="關於我們 ABOUT US" items={groups.about} sectionKey="about" />
-        <FooterGroup title="顧客服務 SERVICE" items={groups.service} sectionKey="service" />
-        <section>
-          <h2 className="text-base font-bold tracking-wide">尋找我們 FOLLOW US</h2>
-          <nav className="mt-3 space-y-1.5 text-sm leading-5 text-[#494541]">
-            {groups.find.map((item, index) => <FooterLink key={`${item.subtitle}-${index}`} item={item} sectionKey="find" />)}
-          </nav>
-          <div className="mt-3 space-y-1 text-sm leading-5 text-[#494541]">
-            {settings?.footer_service_hours && <p>服務時間：{settings.footer_service_hours}</p>}
-            {settings?.footer_email && <p>信箱:{settings.footer_email}</p>}
-            {settings?.footer_company_name && <p>公司名稱：{settings.footer_company_name}</p>}
-            {settings?.footer_tax_id && <p>統一編號：{settings.footer_tax_id}</p>}
-          </div>
-          <div className="mt-3 flex gap-2.5">
-            {settings?.footer_line_url && (
-              <a
-                href={settings.footer_line_url}
-                className="flex h-9 w-9 items-center justify-center border border-[#e5ded4] text-xs font-semibold"
-                target="_blank"
-                rel="noreferrer"
-              >
-                LINE
-              </a>
-            )}
-            {settings?.footer_instagram_url && (
-              <a
-                href={settings.footer_instagram_url}
-                className="flex h-9 w-9 items-center justify-center border border-[#1f1b19] text-lg font-semibold"
-                target="_blank"
-                rel="noreferrer"
-                aria-label="Instagram"
-              >
-                ◎
-              </a>
-            )}
-          </div>
-        </section>
+      <div className="mx-auto grid max-w-7xl gap-6 sm:grid-cols-2 lg:grid-cols-4">
+        {sections.map((section, index) => (
+          <FooterGroup
+            key={`${section.title}-${index}`}
+            title={section.title || '未命名'}
+            items={section.items}
+          />
+        ))}
+        {!savedSections.length && (
+          <section>
+            <h2 className="text-base font-bold tracking-wide">尋找我們 FOLLOW US</h2>
+            <div className="mt-3 space-y-1 text-sm leading-5 text-[#494541]">
+              {settings?.footer_service_hours && <p>服務時間：{settings.footer_service_hours}</p>}
+              {settings?.footer_email && <p>信箱:{settings.footer_email}</p>}
+              {settings?.footer_company_name && <p>公司名稱：{settings.footer_company_name}</p>}
+              {settings?.footer_tax_id && <p>統一編號：{settings.footer_tax_id}</p>}
+            </div>
+            <div className="mt-3 flex gap-2.5">
+              {settings?.footer_line_url && (
+                <a
+                  href={settings.footer_line_url}
+                  className="flex h-9 w-9 items-center justify-center border border-[#e5ded4] text-xs font-semibold"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  LINE
+                </a>
+              )}
+              {settings?.footer_instagram_url && (
+                <a
+                  href={settings.footer_instagram_url}
+                  className="flex h-9 w-9 items-center justify-center border border-[#1f1b19] text-lg font-semibold"
+                  target="_blank"
+                  rel="noreferrer"
+                  aria-label="Instagram"
+                >
+                  ◎
+                </a>
+              )}
+            </div>
+          </section>
+        )}
       </div>
     </footer>
   );
@@ -626,19 +635,21 @@ function Footer({ settings }: { settings: SiteSettings | null }) {
 
 type FooterLinkItem = { subtitle: string; content: string; url: string };
 
-function FooterGroup({ title, items, sectionKey }: { title: string; items: FooterLinkItem[]; sectionKey: string }) {
+function FooterGroup({ title, items }: { title: string; items: FooterLinkItem[] }) {
   return (
     <section>
       <h2 className="text-base font-bold tracking-wide">{title}</h2>
       <nav className="mt-3 space-y-1.5 text-sm leading-5 text-[#494541]">
-        {items.map((item, index) => <FooterLink key={`${item.subtitle}-${index}`} item={item} sectionKey={sectionKey} />)}
+        {items.map((item, index) => <FooterLink key={`${item.subtitle}-${index}`} item={item} sectionTitle={title} />)}
       </nav>
     </section>
   );
 }
 
-function FooterLink({ item, sectionKey }: { item: FooterLinkItem; sectionKey: string }) {
-  const href = item.content ? `/footer/${sectionKey}/${encodeURIComponent(item.subtitle)}` : item.url || '#';
+function FooterLink({ item, sectionTitle }: { item: FooterLinkItem; sectionTitle: string }) {
+  const href = item.content
+    ? `/footer/${encodeURIComponent(sectionTitle)}/${encodeURIComponent(item.subtitle)}`
+    : item.url || '#';
   return <a href={href} className="block hover:underline">{item.subtitle}</a>;
 }
 

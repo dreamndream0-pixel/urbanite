@@ -38,7 +38,7 @@ export async function GET() {
     .single();
 
   return NextResponse.json({ ...DEFAULT_SETTINGS, ...(data ?? {}) } as SiteSettings, {
-    headers: { 'Cache-Control': 's-maxage=300, stale-while-revalidate=600' },
+    headers: { 'Cache-Control': 'no-store, max-age=0' },
   });
 }
 
