@@ -1464,16 +1464,10 @@ export default function AdminDashboard({
                 }
               >
                 <div className="grid gap-4 lg:grid-cols-2">
-                  <Field label="自訂頁尾欄位(JSON：主標題、內文小標題、內容、連結)">
-                    <textarea
-                      value={footerDraft.sections}
-                      onChange={(e) => setFooterDraft({ ...footerDraft, sections: e.target.value })}
-                      rows={10}
-                      className="w-full rounded-lg border border-[#e5ded4] px-3 py-2 font-mono text-xs"
-                      placeholder={'[{"title":"關於我們","items":[{"subtitle":"商店介紹","content":"品牌故事","url":"/about"}]}]'}
-                    />
-                    <p className="mt-1 text-xs text-[#8a7f72]">可新增任意欄位；每個項目可設定小標題、內文與連結。請保持有效 JSON。</p>
-                  </Field>
+                  <FooterSectionsEditor
+                    value={footerDraft.sections}
+                    onChange={(sections) => setFooterDraft({ ...footerDraft, sections })}
+                  />
                   <Field label="關於我們連結(一行一筆)">
                     <textarea
                       value={footerDraft.about}
@@ -1614,6 +1608,8 @@ function BannerCropModal({
   const [url] = useState(() => URL.createObjectURL(file));
   const [natural, setNatural] = useState({ w: 0, h: 0 });
   const [aspect, setAspect] = useState<number | null>(16 / 9);
+  const [zoom, setZoom] = useState(1);
+  const [background, setBackground] = useState('#8a877f');
   const [crop, setCrop] = useState<CropRect>({ x: 0.08, y: 0.08, w: 0.84, h: 0.47 });
   const cropAreaRef = useRef<HTMLDivElement>(null);
   const imgElRef = useRef<HTMLImageElement>(null);
@@ -1652,7 +1648,19 @@ function BannerCropModal({
 
   function setRatio(value: number | null) {
     setAspect(value);
+    setZoom(1);
     setCrop(centerFor(value));
+  }
+
+  function setZoomLevel(value: number) {
+    setZoom(value);
+    const base = centerFor(aspect);
+    const current = crop;
+    const w = Math.min(base.w, base.w / value);
+    const h = Math.min(base.h, base.h / value);
+    const cx = current.x + current.w / 2;
+    const cy = current.y + current.h / 2;
+    setCrop(clamp({ x: cx - w / 2, y: cy - h / 2, w, h }));
   }
 
   function onPointerDown(mode: CropHandle, e: React.PointerEvent) {
@@ -1762,7 +1770,7 @@ function BannerCropModal({
           ))}
         </div>
 
-        <div className="mt-4 max-h-[58vh] overflow-auto rounded-lg bg-[#8a877f] p-4" style={{ overscrollBehavior: 'contain' }}>
+        <div className="mt-4 max-h-[58vh] overflow-auto rounded-lg p-4" style={{ overscrollBehavior: 'contain', backgroundColor: background }}>
           <div ref={cropAreaRef} className="relative mx-auto inline-block max-w-full touch-none select-none">
             <img
               ref={imgElRef}
@@ -1814,6 +1822,18 @@ function BannerCropModal({
           </div>
         </div>
 
+        <div className="mt-3 flex flex-wrap items-center gap-3 text-sm text-[#6b6156]">
+          <label className="flex items-center gap-2">
+            縮放
+            <input type="range" min="1" max="4" step="0.05" value={zoom} onChange={(e) => setZoomLevel(Number(e.target.value))} className="w-44 accent-[#1f1b19]" />
+            <span className="w-12 text-right">{zoom.toFixed(2)}x</span>
+          </label>
+          <label className="flex items-center gap-2">
+            補底色
+            <input type="color" value={background} onChange={(e) => setBackground(e.target.value)} className="h-8 w-10 cursor-pointer rounded border border-[#d7c9bd] bg-white p-0.5" />
+          </label>
+        </div>
+
         <p className="mt-3 text-sm text-[#6b6156]">
           顯示大小(裁切後):<span className="font-semibold">{outW}×{outH}</span> px
         </p>
@@ -1834,6 +1854,102 @@ function BannerCropModal({
             {busy ? '上傳中…' : '套用並上傳'}
           </button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+type FooterItemDraft = { subtitle: string; content: string; url: string };
+type FooterSectionDraft = { title: string; items: FooterItemDraft[] };
+
+function FooterSectionsEditor({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+  const [sections, setSections] = useState<FooterSectionDraft[]>(() => {
+    try {
+      const parsed = JSON.parse(value);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  });
+
+  function update(next: FooterSectionDraft[]) {
+    setSections(next);
+    onChange(JSON.stringify(next));
+  }
+
+  function addSection() {
+    update([...sections, { title: '新欄位', items: [{ subtitle: '', content: '', url: '' }] }]);
+  }
+
+  function updateSection(index: number, patch: Partial<FooterSectionDraft>) {
+    update(sections.map((section, i) => (i === index ? { ...section, ...patch } : section)));
+  }
+
+  return (
+    <div className="lg:col-span-2 rounded-lg border border-[#e5ded4] p-4">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <h3 className="font-semibold">頁尾自訂欄位</h3>
+          <p className="mt-1 text-xs text-[#8a7f72]">每個欄位可加入多個小標題、內容與網址。</p>
+        </div>
+        <button type="button" onClick={addSection} className="rounded-lg border border-[#1f1b19] px-3 py-2 text-sm font-semibold">
+          + 新增大標題
+        </button>
+      </div>
+      <div className="mt-4 space-y-4">
+        {sections.map((section, sectionIndex) => (
+          <div key={sectionIndex} className="rounded-lg bg-[#f8f5f0] p-3">
+            <div className="flex gap-2">
+              <input
+                value={section.title}
+                onChange={(e) => updateSection(sectionIndex, { title: e.target.value })}
+                placeholder="大標題"
+                className="min-w-0 flex-1 rounded-lg border border-[#e5ded4] bg-white px-3 py-2 font-semibold"
+              />
+              <button type="button" onClick={() => update(sections.filter((_, i) => i !== sectionIndex))} className="px-2 text-sm text-[#a64d45]">
+                刪除
+              </button>
+            </div>
+            <div className="mt-3 space-y-3">
+              {section.items.map((item, itemIndex) => (
+                <div key={itemIndex} className="grid gap-2 rounded-lg border border-[#e5ded4] bg-white p-3 md:grid-cols-3">
+                  <input
+                    value={item.subtitle}
+                    onChange={(e) => updateSection(sectionIndex, { items: section.items.map((x, i) => i === itemIndex ? { ...x, subtitle: e.target.value } : x) })}
+                    placeholder="小標題"
+                    className="rounded-lg border border-[#e5ded4] px-3 py-2 text-sm"
+                  />
+                  <textarea
+                    value={item.content}
+                    onChange={(e) => updateSection(sectionIndex, { items: section.items.map((x, i) => i === itemIndex ? { ...x, content: e.target.value } : x) })}
+                    placeholder="內文"
+                    rows={2}
+                    className="rounded-lg border border-[#e5ded4] px-3 py-2 text-sm"
+                  />
+                  <div className="flex gap-2">
+                    <input
+                      value={item.url}
+                      onChange={(e) => updateSection(sectionIndex, { items: section.items.map((x, i) => i === itemIndex ? { ...x, url: e.target.value } : x) })}
+                      placeholder="連結網址"
+                      className="min-w-0 flex-1 rounded-lg border border-[#e5ded4] px-3 py-2 text-sm"
+                    />
+                    <button type="button" onClick={() => updateSection(sectionIndex, { items: section.items.filter((_, i) => i !== itemIndex) })} className="px-1 text-sm text-[#a64d45]">
+                      刪除
+                    </button>
+                  </div>
+                </div>
+              ))}
+              <button
+                type="button"
+                onClick={() => updateSection(sectionIndex, { items: [...section.items, { subtitle: '', content: '', url: '' }] })}
+                className="text-sm font-semibold text-[#6d8f73]"
+              >
+                + 新增小標題／內文
+              </button>
+            </div>
+          </div>
+        ))}
+        {sections.length === 0 && <p className="text-sm text-[#8a7f72]">尚未新增自訂欄位，按右上角開始建立。</p>}
       </div>
     </div>
   );
