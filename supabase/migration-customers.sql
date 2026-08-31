@@ -6,6 +6,7 @@ create table if not exists public.customers (
   id         uuid primary key default gen_random_uuid(),
   user_id    uuid unique,               -- 對應登入帳號(auth.users)
   email      text,
+  phone      text,
   name       text,
   created_at timestamptz not null default now()
 );

@@ -23,6 +23,8 @@ const DEFAULT_SETTINGS: SiteSettings = {
   footer_line_url: '',
   payment_methods: ['綠界金流', 'Line Pay', 'Apple Pay', '取貨付款', '轉帳匯款'],
   shipping_methods: ['綠界物流-超商取貨', '綠界物流-宅配', '7-11 取貨付款', '全家 取貨付款'],
+  enabled_payment_methods: ['綠界金流', 'Line Pay', 'Apple Pay', '取貨付款', '轉帳匯款'],
+  enabled_shipping_methods: ['綠界物流-超商取貨', '綠界物流-宅配', '7-11 取貨付款', '全家 取貨付款'],
 };
 
 // GET /api/settings — 取得網站設定(前台與後台共用,公開)
@@ -61,6 +63,8 @@ export async function PATCH(request: Request) {
     'footer_line_url',
     'payment_methods',
     'shipping_methods',
+    'enabled_payment_methods',
+    'enabled_shipping_methods',
   ] as const;
 
   for (const key of keys) {

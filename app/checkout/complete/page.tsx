@@ -19,11 +19,10 @@ function CompleteInner() {
   const orderNo = sp.get('order_no') || '';
   const hintStatus = sp.get('status') || ''; // paid / fail(來自綠界導回)
   const [order, setOrder] = useState<OrderStatus | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => Boolean(orderNo));
 
   useEffect(() => {
     if (!orderNo) {
-      setLoading(false);
       return;
     }
     let tries = 0;

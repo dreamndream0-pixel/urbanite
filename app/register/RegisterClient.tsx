@@ -208,7 +208,7 @@ export default function RegisterClient({
                   aria-label={showPassword ? '隱藏密碼' : '顯示密碼'}
                   className="absolute right-0 top-1/2 -translate-y-1/2 p-2 text-[#242830]"
                 >
-                  {showPassword ? '🙈' : '👁'}
+                  <IconEye closed={!showPassword} />
                 </button>
               </div>
               {tab === 'phone' && otpSent && (
@@ -252,10 +252,17 @@ export default function RegisterClient({
           </>
         )}
 
-        <Link href="/" className="mt-8 inline-block text-sm font-semibold text-[#6c565b]">
-          ← 回到商店首頁
-        </Link>
       </div>
     </main>
+  );
+}
+
+function IconEye({ closed }: { closed: boolean }) {
+  return (
+    <svg width="25" height="25" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+      <path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z" />
+      <circle cx="12" cy="12" r="2.5" />
+      {closed && <path d="M4 4l16 16" strokeLinecap="round" />}
+    </svg>
   );
 }

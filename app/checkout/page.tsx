@@ -81,8 +81,10 @@ export default function CheckoutPage() {
   const [orderNo, setOrderNo] = useState('');
 
   useEffect(() => {
-    setCart(readCart());
-    setLoaded(true);
+    Promise.resolve().then(() => {
+      setCart(readCart());
+      setLoaded(true);
+    });
 
     fetch('/api/me')
       .then((res) => (res.ok ? res.json() : null))
@@ -106,8 +108,16 @@ export default function CheckoutPage() {
   const subtotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
   const shipping = subtotal >= FREE_SHIPPING_THRESHOLD ? 0 : subtotal > 0 ? SHIPPING_FEE : 0;
   const total = Math.max(0, subtotal + shipping - (applied?.amount ?? 0));
-  const siteShippingMethods = settings?.shipping_methods?.length ? settings.shipping_methods : SHIPPING_METHODS;
-  const sitePaymentMethods = settings?.payment_methods?.length ? settings.payment_methods : PAYMENT_METHODS;
+  const siteShippingMethods = settings?.enabled_shipping_methods?.length
+    ? settings.enabled_shipping_methods
+    : settings?.shipping_methods?.length
+      ? settings.shipping_methods
+      : SHIPPING_METHODS;
+  const sitePaymentMethods = settings?.enabled_payment_methods?.length
+    ? settings.enabled_payment_methods
+    : settings?.payment_methods?.length
+      ? settings.payment_methods
+      : PAYMENT_METHODS;
   const availableShippingMethods = useMemo(
     () => allowedForCart(siteShippingMethods, products, cart, 'available_shipping_methods'),
     [siteShippingMethods, products, cart],

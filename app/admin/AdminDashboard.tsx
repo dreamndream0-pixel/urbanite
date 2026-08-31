@@ -218,6 +218,16 @@ export default function AdminDashboard({
       ? initialSettings.shipping_methods
       : DEFAULT_SHIPPING_METHODS
     ).join('\n'),
+    enabledPayments: initialSettings?.enabled_payment_methods?.length
+      ? initialSettings.enabled_payment_methods
+      : initialSettings?.payment_methods?.length
+        ? initialSettings.payment_methods
+        : DEFAULT_PAYMENT_METHODS,
+    enabledShippings: initialSettings?.enabled_shipping_methods?.length
+      ? initialSettings.enabled_shipping_methods
+      : initialSettings?.shipping_methods?.length
+        ? initialSettings.shipping_methods
+        : DEFAULT_SHIPPING_METHODS,
   });
   const [savingSettings, setSavingSettings] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -294,6 +304,14 @@ export default function AdminDashboard({
         .map((line) => line.trim())
         .filter(Boolean),
     [footerDraft.shippings],
+  );
+  const enabledPaymentMethods = useMemo(
+    () => paymentMethods,
+    [paymentMethods],
+  );
+  const enabledShippingMethods = useMemo(
+    () => shippingMethods,
+    [shippingMethods],
   );
 
   // ---- 操作 ----
@@ -623,6 +641,8 @@ export default function AdminDashboard({
           footer_line_url: footerDraft.lineUrl.trim(),
           payment_methods: toLines(footerDraft.payments),
           shipping_methods: toLines(footerDraft.shippings),
+          enabled_payment_methods: toLines(footerDraft.payments),
+          enabled_shipping_methods: toLines(footerDraft.shippings),
         }),
       });
       const data = await res.json();
@@ -1306,7 +1326,7 @@ export default function AdminDashboard({
                             title="點圖編輯 / 換圖"
                             className="group relative aspect-[16/13] w-40 shrink-0 cursor-pointer overflow-hidden rounded-lg border border-[#eee5da] bg-[#e9e1d6]"
                           >
-                            <img src={banner.image} alt="" className="h-full w-full object-cover" />
+                            <img src={banner.image} alt="" className="h-full w-full object-contain" />
                             <span className="absolute inset-0 flex items-center justify-center bg-black/0 text-xs font-semibold text-white opacity-0 transition group-hover:bg-black/40 group-hover:opacity-100">
                               點圖編輯
                             </span>
@@ -1525,8 +1545,8 @@ export default function AdminDashboard({
           draft={editing}
           isNew={isNew}
           categories={categories}
-          paymentMethods={paymentMethods}
-          shippingMethods={shippingMethods}
+          paymentMethods={enabledPaymentMethods}
+          shippingMethods={enabledShippingMethods}
           onChange={setEditing}
           onClose={() => setEditing(null)}
           onSave={saveProduct}
@@ -1557,10 +1577,16 @@ export default function AdminDashboard({
   );
 }
 
-// 輪播圖比例(= 首頁輪播固定比例 16:13),裁切框與輸出都用這個
-const BANNER_AW = 16;
-const BANNER_AH = 13;
-const BG_CHOICES = ['#e9e1d6', '#ffffff', '#1f1b19', '#f6f2ec'];
+type CropRect = { x: number; y: number; w: number; h: number };
+type CropHandle = 'move' | 'nw' | 'ne' | 'sw' | 'se';
+
+const ASPECTS: { label: string; value: number | null }[] = [
+  { label: '自由', value: null },
+  { label: '16:9', value: 16 / 9 },
+  { label: '3:2', value: 3 / 2 },
+  { label: '4:3', value: 4 / 3 },
+  { label: '1:1', value: 1 },
+];
 
 function BannerCropModal({
   file,
@@ -1575,84 +1601,116 @@ function BannerCropModal({
 }) {
   const [url] = useState(() => URL.createObjectURL(file));
   const [natural, setNatural] = useState({ w: 0, h: 0 });
-  const [vp, setVp] = useState({ w: 0, h: 0 }); // 裁切框在畫面上的像素尺寸
-  const [scale, setScale] = useState(1); // 使用者縮放(1 = 完整貼合框)
-  const [pan, setPan] = useState({ x: 0, y: 0 }); // 平移(px)
-  const [bg, setBg] = useState(BG_CHOICES[0]);
-  const viewportRef = useRef<HTMLDivElement>(null);
+  const [aspect, setAspect] = useState<number | null>(16 / 9);
+  const [crop, setCrop] = useState<CropRect>({ x: 0.08, y: 0.08, w: 0.84, h: 0.47 });
+  const cropAreaRef = useRef<HTMLDivElement>(null);
   const imgElRef = useRef<HTMLImageElement>(null);
-  const drag = useRef<{ px: number; py: number; sx: number; sy: number } | null>(null);
+  const drag = useRef<{ mode: CropHandle; px: number; py: number; start: CropRect } | null>(null);
   const inited = useRef(false);
 
   useEffect(() => () => URL.revokeObjectURL(url), [url]);
 
-  // 量測裁切框在畫面上的實際尺寸
   useEffect(() => {
-    function measure() {
-      if (viewportRef.current) {
-        const r = viewportRef.current.getBoundingClientRect();
-        setVp({ w: r.width, h: r.height });
-      }
-    }
-    measure();
-    window.addEventListener('resize', measure);
-    return () => window.removeEventListener('resize', measure);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prev;
+    };
   }, []);
 
-  // 完整貼合框(contain)所需的縮放比
-  const fit = natural.w && vp.w ? Math.min(vp.w / natural.w, vp.h / natural.h) : 1;
-  // 填滿框(cover)相對於 contain 的倍率
-  const coverRatio =
-    natural.w && vp.w ? Math.max(vp.w / natural.w, vp.h / natural.h) / fit : 1;
+  function clamp(next: CropRect) {
+    const w = Math.min(1, Math.max(0.12, next.w));
+    const h = Math.min(1, Math.max(0.12, next.h));
+    const x = Math.min(1 - w, Math.max(0, next.x));
+    const y = Math.min(1 - h, Math.max(0, next.y));
+    return { x, y, w, h };
+  }
 
-  // 一開始預設「填滿框」,使用者可再縮放/平移
-  useEffect(() => {
-    if (!inited.current && natural.w && vp.w) {
-      inited.current = true;
-      setScale(coverRatio);
-      setPan({ x: 0, y: 0 });
+  function centerFor(a: number | null) {
+    if (!a || !cropAreaRef.current) return { x: 0.08, y: 0.08, w: 0.84, h: 0.84 };
+    const rect = cropAreaRef.current.getBoundingClientRect();
+    let w = 0.84;
+    let h = (w * rect.width) / a / rect.height;
+    if (h > 0.84) {
+      h = 0.84;
+      w = (h * rect.height * a) / rect.width;
     }
-  }, [natural.w, vp.w, coverRatio]);
-
-  const displayW = natural.w * fit * scale;
-  const displayH = natural.h * fit * scale;
-  const ox = vp.w / 2 - displayW / 2 + pan.x;
-  const oy = vp.h / 2 - displayH / 2 + pan.y;
-
-  function onPointerDown(e: React.PointerEvent) {
-    e.preventDefault();
-    (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
-    drag.current = { px: e.clientX, py: e.clientY, sx: pan.x, sy: pan.y };
+    return { x: (1 - w) / 2, y: (1 - h) / 2, w, h };
   }
+
+  function setRatio(value: number | null) {
+    setAspect(value);
+    setCrop(centerFor(value));
+  }
+
+  function onPointerDown(mode: CropHandle, e: React.PointerEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
+    drag.current = { mode, px: e.clientX, py: e.clientY, start: crop };
+  }
+
   function onPointerMove(e: React.PointerEvent) {
-    if (!drag.current) return;
+    if (!drag.current || !cropAreaRef.current) return;
     e.preventDefault();
-    setPan({ x: drag.current.sx + (e.clientX - drag.current.px), y: drag.current.sy + (e.clientY - drag.current.py) });
+    const area = cropAreaRef.current.getBoundingClientRect();
+    const dx = (e.clientX - drag.current.px) / area.width;
+    const dy = (e.clientY - drag.current.py) / area.height;
+    const start = drag.current.start;
+
+    if (drag.current.mode === 'move') {
+      setCrop(clamp({ ...start, x: start.x + dx, y: start.y + dy }));
+      return;
+    }
+
+    const next = { ...start };
+    if (drag.current.mode.includes('w')) {
+      next.x = start.x + dx;
+      next.w = start.w - dx;
+    }
+    if (drag.current.mode.includes('e')) next.w = start.w + dx;
+    if (drag.current.mode.includes('n')) {
+      next.y = start.y + dy;
+      next.h = start.h - dy;
+    }
+    if (drag.current.mode.includes('s')) next.h = start.h + dy;
+
+    if (aspect) {
+      const widthDriven =
+        Math.abs(dx * area.width) >= Math.abs(dy * area.height) || drag.current.mode === 'ne' || drag.current.mode === 'sw';
+      if (widthDriven) {
+        next.h = (next.w * area.width) / aspect / area.height;
+        if (drag.current.mode.includes('n')) next.y = start.y + (start.h - next.h);
+      } else {
+        next.w = (next.h * area.height * aspect) / area.width;
+        if (drag.current.mode.includes('w')) next.x = start.x + (start.w - next.w);
+      }
+    }
+
+    setCrop(clamp(next));
   }
+
   function onPointerUp(e: React.PointerEvent) {
-    (e.target as HTMLElement).releasePointerCapture?.(e.pointerId);
+    (e.currentTarget as HTMLElement).releasePointerCapture?.(e.pointerId);
     drag.current = null;
   }
 
-  function reset() {
-    setScale(coverRatio);
-    setPan({ x: 0, y: 0 });
-  }
+  const outW = Math.round(crop.w * natural.w);
+  const outH = Math.round(crop.h * natural.h);
 
   function apply() {
     const img = imgElRef.current;
-    if (!img || !vp.w) return;
-    const OUT_W = 1600;
-    const OUT_H = Math.round((OUT_W * BANNER_AH) / BANNER_AW);
-    const k = OUT_W / vp.w;
+    if (!img || !natural.w) return;
+    const sx = crop.x * natural.w;
+    const sy = crop.y * natural.h;
+    const sw = crop.w * natural.w;
+    const sh = crop.h * natural.h;
     const canvas = document.createElement('canvas');
-    canvas.width = OUT_W;
-    canvas.height = OUT_H;
+    canvas.width = Math.max(1, Math.round(sw));
+    canvas.height = Math.max(1, Math.round(sh));
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
-    ctx.fillStyle = bg; // 沒被圖片蓋到的地方補底色
-    ctx.fillRect(0, 0, OUT_W, OUT_H);
-    ctx.drawImage(img, ox * k, oy * k, displayW * k, displayH * k);
+    ctx.drawImage(img, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
     const base = file.name.replace(/\.[^.]+$/, '') || 'banner';
     canvas.toBlob(
       (blob) => {
@@ -1664,72 +1722,89 @@ function BannerCropModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" style={{ overscrollBehavior: 'contain' }}>
       <div
-        className="max-h-[92vh] w-full max-w-lg overflow-auto rounded-2xl bg-white p-6"
-        style={{ overscrollBehavior: 'contain' }}
+        className="max-h-[92vh] w-full max-w-2xl overflow-auto rounded-2xl bg-white p-6"
+        style={{ overscrollBehavior: 'contain', touchAction: 'pan-y' }}
       >
-        <h2 className="text-xl font-semibold">輪播圖 — 調整顯示範圍</h2>
-        <p className="mt-1 text-sm text-[#8a7f72]">
-          框是首頁輪播的固定比例。拖動照片、用下方滑桿放大縮小,選你要顯示的部分。
-        </p>
-
-        {/* 固定比例的裁切框:框不動,照片在後面縮放平移 */}
-        <div
-          ref={viewportRef}
-          className="relative mt-4 aspect-[16/13] w-full select-none overflow-hidden rounded-lg"
-          style={{ backgroundColor: bg, touchAction: 'none', overscrollBehavior: 'contain', cursor: 'move' }}
-          onPointerDown={onPointerDown}
-          onPointerMove={onPointerMove}
-          onPointerUp={onPointerUp}
-          onPointerCancel={onPointerUp}
-        >
-          <img
-            ref={imgElRef}
-            src={url}
-            alt=""
-            draggable={false}
-            onLoad={(e) => setNatural({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight })}
-            className="pointer-events-none absolute max-w-none"
-            style={{ left: `${ox}px`, top: `${oy}px`, width: `${displayW}px`, height: `${displayH}px` }}
-          />
-          {/* 白框提示 */}
-          <div className="pointer-events-none absolute inset-0 rounded-lg ring-2 ring-inset ring-white/80" />
+        <h2 className="text-xl font-semibold">新增輪播圖 — 編輯裁切</h2>
+        <div className="mt-3 grid grid-cols-2 gap-2 rounded-lg bg-[#f6f2ec] p-3 text-xs text-[#6b6156] sm:grid-cols-4">
+          <span className="truncate">檔名：{file.name}</span>
+          <span>類型：{file.type.replace('image/', '') || '-'}</span>
+          <span>原始尺寸：{natural.w}×{natural.h}</span>
+          <span>檔案大小：{(file.size / 1024).toFixed(0)} KB</span>
         </div>
 
-        {/* 縮放滑桿 */}
-        <div className="mt-4 flex items-center gap-3">
-          <span className="text-sm text-[#8a7f72]">縮小</span>
-          <input
-            type="range"
-            min={0.2}
-            max={Math.max(4, coverRatio * 2)}
-            step={0.01}
-            value={scale}
-            onChange={(e) => setScale(Number(e.target.value))}
-            className="flex-1 accent-[#1f1b19]"
-          />
-          <span className="text-sm text-[#8a7f72]">放大</span>
+        <div className="mt-4 flex flex-wrap gap-2">
+          {ASPECTS.map((item) => (
+            <button
+              key={item.label}
+              type="button"
+              onClick={() => setRatio(item.value)}
+              className={`rounded-full border px-3 py-1.5 text-sm font-semibold ${
+                aspect === item.value ? 'border-[#1f1b19] bg-[#1f1b19] text-white' : 'border-[#d7c9bd]'
+              }`}
+            >
+              {item.label}
+            </button>
+          ))}
         </div>
 
-        {/* 底色 + 重設 */}
-        <div className="mt-4 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-[#8a7f72]">底色</span>
-            {BG_CHOICES.map((c) => (
-              <button
-                key={c}
-                onClick={() => setBg(c)}
-                aria-label={`底色 ${c}`}
-                className={`h-7 w-7 rounded-full border ${bg === c ? 'ring-2 ring-[#1f1b19] ring-offset-1' : 'border-[#d7c9bd]'}`}
-                style={{ backgroundColor: c }}
-              />
-            ))}
+        <div className="mt-4 max-h-[58vh] overflow-auto rounded-lg bg-[#8a877f] p-4" style={{ overscrollBehavior: 'contain' }}>
+          <div ref={cropAreaRef} className="relative mx-auto inline-block max-w-full touch-none select-none">
+            <img
+              ref={imgElRef}
+              src={url}
+              alt=""
+              draggable={false}
+              onLoad={(e) => {
+                const img = e.currentTarget;
+                setNatural({ w: img.naturalWidth, h: img.naturalHeight });
+                if (!inited.current) {
+                  inited.current = true;
+                  requestAnimationFrame(() => setCrop(centerFor(aspect)));
+                }
+              }}
+              className="block max-h-[52vh] max-w-full object-contain"
+            />
+            <div className="pointer-events-none absolute inset-0 bg-black/45" />
+            <div
+              className="absolute cursor-move border-2 border-white shadow-[0_0_0_9999px_rgba(0,0,0,0.35)]"
+              style={{
+                left: `${crop.x * 100}%`,
+                top: `${crop.y * 100}%`,
+                width: `${crop.w * 100}%`,
+                height: `${crop.h * 100}%`,
+                touchAction: 'none',
+              }}
+              onPointerDown={(e) => onPointerDown('move', e)}
+              onPointerMove={onPointerMove}
+              onPointerUp={onPointerUp}
+              onPointerCancel={onPointerUp}
+            >
+              {(['nw', 'ne', 'sw', 'se'] as const).map((handle) => (
+                <button
+                  key={handle}
+                  type="button"
+                  aria-label={`調整裁切框 ${handle}`}
+                  className={`absolute h-5 w-5 rounded-full border-2 border-[#1f1b19] bg-white ${
+                    handle.includes('n') ? '-top-3' : '-bottom-3'
+                  } ${handle.includes('w') ? '-left-3' : '-right-3'} ${
+                    handle === 'nw' || handle === 'se' ? 'cursor-nwse-resize' : 'cursor-nesw-resize'
+                  }`}
+                  onPointerDown={(e) => onPointerDown(handle, e)}
+                  onPointerMove={onPointerMove}
+                  onPointerUp={onPointerUp}
+                  onPointerCancel={onPointerUp}
+                />
+              ))}
+            </div>
           </div>
-          <button onClick={reset} className="text-sm font-semibold text-[#6b6156] underline">
-            重設
-          </button>
         </div>
+
+        <p className="mt-3 text-sm text-[#6b6156]">
+          顯示大小(裁切後):<span className="font-semibold">{outW}×{outH}</span> px
+        </p>
 
         <div className="mt-6 flex justify-end gap-3">
           <button

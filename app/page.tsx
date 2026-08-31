@@ -93,8 +93,10 @@ export default function Home() {
 
   // 掛載後才從 localStorage 載入購物車
   useEffect(() => {
-    setCart(readCart());
-    setCartHydrated(true);
+    Promise.resolve().then(() => {
+      setCart(readCart());
+      setCartHydrated(true);
+    });
   }, []);
 
   useEffect(() => {

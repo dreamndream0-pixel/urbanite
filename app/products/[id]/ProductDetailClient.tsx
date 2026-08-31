@@ -51,7 +51,7 @@ export default function ProductDetailClient({ product }: { product: Product }) {
   }
 
   useEffect(() => {
-    refreshCartCount();
+    Promise.resolve().then(refreshCartCount);
 
     fetch('/api/settings')
       .then((res) => (res.ok ? res.json() : null))

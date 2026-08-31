@@ -195,9 +195,6 @@ export default function LoginClient({
           <p className="mt-4 rounded-lg bg-[#fdecec] px-4 py-2 text-sm text-[#c0392b]">{error}</p>
         )}
 
-        <Link href="/" className="mt-6 inline-block text-sm font-semibold text-[#6c565b]">
-          ← 回到商店首頁
-        </Link>
       </div>
     </main>
   );

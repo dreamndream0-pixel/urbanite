@@ -61,6 +61,8 @@ export type SiteSettings = {
   footer_line_url?: string;
   payment_methods?: string[];
   shipping_methods?: string[];
+  enabled_payment_methods?: string[];
+  enabled_shipping_methods?: string[];
   updated_at?: string;
 };
 
@@ -78,6 +80,7 @@ export type Customer = {
   id: string;
   user_id: string;
   email: string;
+  phone?: string;
   name: string;
   created_at?: string;
 };
