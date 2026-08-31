@@ -88,7 +88,12 @@ export default function LoginClient({
       </header>
 
       <div className="mx-auto max-w-md px-8 py-10">
-        <h1 className="text-center text-4xl font-bold tracking-wide">登入</h1>
+        <div className="relative">
+          <Link href="/" aria-label="回首頁" className="absolute left-0 top-1 text-2xl leading-none text-[#717171]">
+            ←
+          </Link>
+          <h1 className="text-center text-4xl font-bold tracking-wide">登入</h1>
+        </div>
 
         {!configured ? (
           <div className="mt-6 rounded-lg bg-[#fdf3e7] p-4 text-sm text-[#9a6a1f]">
