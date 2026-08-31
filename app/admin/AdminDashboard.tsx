@@ -1468,48 +1468,6 @@ export default function AdminDashboard({
                     value={footerDraft.sections}
                     onChange={(sections) => setFooterDraft({ ...footerDraft, sections })}
                   />
-                  <Field label="服務時間">
-                    <input
-                      value={footerDraft.serviceHours}
-                      onChange={(e) => setFooterDraft({ ...footerDraft, serviceHours: e.target.value })}
-                      className="w-full rounded-lg border border-[#e5ded4] px-3 py-2"
-                    />
-                  </Field>
-                  <Field label="信箱">
-                    <input
-                      value={footerDraft.email}
-                      onChange={(e) => setFooterDraft({ ...footerDraft, email: e.target.value })}
-                      className="w-full rounded-lg border border-[#e5ded4] px-3 py-2"
-                    />
-                  </Field>
-                  <Field label="公司名稱">
-                    <input
-                      value={footerDraft.companyName}
-                      onChange={(e) => setFooterDraft({ ...footerDraft, companyName: e.target.value })}
-                      className="w-full rounded-lg border border-[#e5ded4] px-3 py-2"
-                    />
-                  </Field>
-                  <Field label="統一編號">
-                    <input
-                      value={footerDraft.taxId}
-                      onChange={(e) => setFooterDraft({ ...footerDraft, taxId: e.target.value })}
-                      className="w-full rounded-lg border border-[#e5ded4] px-3 py-2"
-                    />
-                  </Field>
-                  <Field label="Instagram 連結">
-                    <input
-                      value={footerDraft.instagramUrl}
-                      onChange={(e) => setFooterDraft({ ...footerDraft, instagramUrl: e.target.value })}
-                      className="w-full rounded-lg border border-[#e5ded4] px-3 py-2"
-                    />
-                  </Field>
-                  <Field label="LINE 連結">
-                    <input
-                      value={footerDraft.lineUrl}
-                      onChange={(e) => setFooterDraft({ ...footerDraft, lineUrl: e.target.value })}
-                      className="w-full rounded-lg border border-[#e5ded4] px-3 py-2"
-                    />
-                  </Field>
                   <MethodToggles
                     label="金流方式(勾選=啟用,可套用到各商品)"
                     defaults={DEFAULT_PAYMENT_METHODS}
