@@ -588,7 +588,7 @@ function Footer({ settings }: { settings: SiteSettings | null }) {
 
   return (
     <footer className="border-t border-[#e5ded4] bg-white px-6 py-5 text-[#2c2826] sm:px-8">
-      <div className="mx-auto flex max-w-5xl flex-wrap justify-center gap-x-20 gap-y-6 text-center">
+      <div className="mx-auto flex max-w-5xl flex-wrap justify-center gap-x-14 gap-y-6 text-center">
         {sections.map((section, index) => (
           <FooterGroup
             key={`${section.title}-${index}`}
@@ -597,7 +597,7 @@ function Footer({ settings }: { settings: SiteSettings | null }) {
           />
         ))}
         {!savedSections.length && (
-          <section className="w-full max-w-xs text-center">
+          <section className="w-full max-w-64 text-center">
             <h2 className="text-base font-bold tracking-wide">尋找我們 FOLLOW US</h2>
             <div className="mt-3 space-y-1 text-sm leading-5 text-[#494541]">
               {settings?.footer_service_hours && <p>服務時間：{settings.footer_service_hours}</p>}
@@ -642,7 +642,7 @@ type FooterLinkItem = { subtitle: string; content: string; url: string };
 
 function FooterGroup({ title, items }: { title: string; items: FooterLinkItem[] }) {
   return (
-    <section className="w-full max-w-xs text-center">
+    <section className="w-full max-w-64 text-center">
       <h2 className="text-base font-bold tracking-wide">{title}</h2>
       <nav className="mt-3 space-y-1.5 text-sm leading-5 text-[#494541]">
         {items.map((item, index) => <FooterLink key={`${item.subtitle}-${index}`} item={item} sectionTitle={title} />)}
