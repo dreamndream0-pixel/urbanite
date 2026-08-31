@@ -569,6 +569,8 @@ function FavoritesDrawer({
 }
 
 function Footer({ settings }: { settings: SiteSettings | null }) {
+  const copyrightStartYear = 2025;
+  const copyrightEndYear = Math.max(copyrightStartYear, new Date().getFullYear());
   const aboutLinks = settings?.footer_about_links?.length ? settings.footer_about_links : ['優惠資訊 / Coupon', '商店介紹 / Introduction', '與我們合作 / Cooperation'];
   const serviceLinks = settings?.footer_service_links?.length ? settings.footer_service_links : ['加入會員享折扣 / VIP', '挑選尺寸 / About Size', '購物須知 / How To Buy', '退換貨政策 / After-sales Service', '使用者條款 / Terms', '隱私權政策 / Privacy'];
   const savedSections = (settings?.footer_sections ?? [])
@@ -586,7 +588,7 @@ function Footer({ settings }: { settings: SiteSettings | null }) {
 
   return (
     <footer className="border-t border-[#e5ded4] bg-white px-6 py-5 text-[#2c2826] sm:px-8">
-      <div className="mx-auto grid max-w-7xl gap-6 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="mx-auto grid max-w-7xl justify-items-center gap-6 text-center sm:grid-cols-2 lg:grid-cols-4">
         {sections.map((section, index) => (
           <FooterGroup
             key={`${section.title}-${index}`}
@@ -595,7 +597,7 @@ function Footer({ settings }: { settings: SiteSettings | null }) {
           />
         ))}
         {!savedSections.length && (
-          <section>
+          <section className="w-full max-w-xs text-center">
             <h2 className="text-base font-bold tracking-wide">尋找我們 FOLLOW US</h2>
             <div className="mt-3 space-y-1 text-sm leading-5 text-[#494541]">
               {settings?.footer_service_hours && <p>服務時間：{settings.footer_service_hours}</p>}
@@ -603,7 +605,7 @@ function Footer({ settings }: { settings: SiteSettings | null }) {
               {settings?.footer_company_name && <p>公司名稱：{settings.footer_company_name}</p>}
               {settings?.footer_tax_id && <p>統一編號：{settings.footer_tax_id}</p>}
             </div>
-            <div className="mt-3 flex gap-2.5">
+            <div className="mt-3 flex justify-center gap-2.5">
               {settings?.footer_line_url && (
                 <a
                   href={settings.footer_line_url}
@@ -629,6 +631,9 @@ function Footer({ settings }: { settings: SiteSettings | null }) {
           </section>
         )}
       </div>
+      <p className="mt-8 text-center text-xs text-[#8a7f72]">
+        Copyright © {copyrightStartYear}-{copyrightEndYear} URBANITE-TW. All rights reserved.
+      </p>
     </footer>
   );
 }
@@ -637,7 +642,7 @@ type FooterLinkItem = { subtitle: string; content: string; url: string };
 
 function FooterGroup({ title, items }: { title: string; items: FooterLinkItem[] }) {
   return (
-    <section>
+    <section className="w-full max-w-xs text-center">
       <h2 className="text-base font-bold tracking-wide">{title}</h2>
       <nav className="mt-3 space-y-1.5 text-sm leading-5 text-[#494541]">
         {items.map((item, index) => <FooterLink key={`${item.subtitle}-${index}`} item={item} sectionTitle={title} />)}
