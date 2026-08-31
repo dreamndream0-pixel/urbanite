@@ -170,7 +170,7 @@ export default function AdminDashboard({
   const [customers] = useState<Customer[]>(initialCustomers);
   const [banners, setBanners] = useState<Banner[]>(initialBanners);
   const [uploadingBanner, setUploadingBanner] = useState(false);
-  const [settingsTab, setSettingsTab] = useState<'general' | 'banners'>('general');
+  const [settingsTab, setSettingsTab] = useState<'general' | 'banners' | 'footer'>('general');
   const [orderFilter, setOrderFilter] = useState<string>('全部');
   const [openOrderId, setOpenOrderId] = useState<string | null>(null);
   const [productsTab, setProductsTab] = useState<'items' | 'categories'>('items');
@@ -1252,6 +1252,7 @@ export default function AdminDashboard({
                 {([
                   { key: 'general', label: '一般設定' },
                   { key: 'banners', label: '輪播圖' },
+                  { key: 'footer', label: '頁尾資訊' },
                 ] as const).map((t) => (
                   <button
                     key={t.key}
@@ -1395,7 +1396,6 @@ export default function AdminDashboard({
               )}
 
               {settingsTab === 'general' && (
-              <>
               <Card title="網站 Logo">
                 <div className="flex flex-wrap items-center gap-5">
                   <div className="flex h-16 w-40 items-center justify-center rounded-lg border border-[#e5ded4] bg-white">
@@ -1426,7 +1426,9 @@ export default function AdminDashboard({
                   </div>
                 </div>
               </Card>
+              )}
 
+              {settingsTab === 'footer' && (
               <Card
                 title="頁尾資訊"
                 action={
@@ -1512,7 +1514,6 @@ export default function AdminDashboard({
                   />
                 </div>
               </Card>
-              </>
               )}
             </div>
           )}

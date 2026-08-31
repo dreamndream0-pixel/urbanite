@@ -582,23 +582,23 @@ function Footer({ settings }: { settings: SiteSettings | null }) {
       ];
 
   return (
-    <footer className="border-t border-[#e5ded4] bg-white px-8 py-12 text-[#2c2826] sm:px-10">
-      <div className="mx-auto grid max-w-7xl gap-14 sm:grid-cols-3">
+    <footer className="border-t border-[#e5ded4] bg-white px-6 py-5 text-[#2c2826] sm:px-8">
+      <div className="mx-auto grid max-w-7xl gap-6 sm:grid-cols-3">
         <FooterGroup title="關於我們 ABOUT US" items={aboutLinks} />
         <FooterGroup title="顧客服務 SERVICE" items={serviceLinks} />
         <section>
-          <h2 className="text-2xl font-bold tracking-wide">尋找我們 FOLLOW US</h2>
-          <div className="mt-8 space-y-3 text-lg leading-7 text-[#494541]">
+          <h2 className="text-base font-bold tracking-wide">尋找我們 FOLLOW US</h2>
+          <div className="mt-3 space-y-1 text-sm leading-5 text-[#494541]">
             {settings?.footer_service_hours && <p>服務時間：{settings.footer_service_hours}</p>}
             {settings?.footer_email && <p>信箱:{settings.footer_email}</p>}
             {settings?.footer_company_name && <p>公司名稱：{settings.footer_company_name}</p>}
             {settings?.footer_tax_id && <p>統一編號：{settings.footer_tax_id}</p>}
           </div>
-          <div className="mt-5 flex gap-3">
+          <div className="mt-3 flex gap-2.5">
             {settings?.footer_line_url && (
               <a
                 href={settings.footer_line_url}
-                className="flex h-12 w-12 items-center justify-center border border-[#e5ded4] text-sm font-semibold"
+                className="flex h-9 w-9 items-center justify-center border border-[#e5ded4] text-xs font-semibold"
                 target="_blank"
                 rel="noreferrer"
               >
@@ -608,7 +608,7 @@ function Footer({ settings }: { settings: SiteSettings | null }) {
             {settings?.footer_instagram_url && (
               <a
                 href={settings.footer_instagram_url}
-                className="flex h-12 w-12 items-center justify-center border border-[#1f1b19] text-2xl font-semibold"
+                className="flex h-9 w-9 items-center justify-center border border-[#1f1b19] text-lg font-semibold"
                 target="_blank"
                 rel="noreferrer"
                 aria-label="Instagram"
@@ -626,8 +626,8 @@ function Footer({ settings }: { settings: SiteSettings | null }) {
 function FooterGroup({ title, items }: { title: string; items: string[] }) {
   return (
     <section>
-      <h2 className="text-2xl font-bold tracking-wide">{title}</h2>
-      <nav className="mt-8 space-y-4 text-lg leading-7 text-[#494541]">
+      <h2 className="text-base font-bold tracking-wide">{title}</h2>
+      <nav className="mt-3 space-y-1.5 text-sm leading-5 text-[#494541]">
         {items.map((item, index) => (
           <a key={`${item}-${index}`} href="#" className={index === 0 ? 'block text-[#b64b43]' : 'block'}>
             {item}
