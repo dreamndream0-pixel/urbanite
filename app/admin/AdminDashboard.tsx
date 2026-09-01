@@ -2829,6 +2829,7 @@ function InventorySection({
     productId: 'all',
   });
   const [selectedInventoryProduct, setSelectedInventoryProduct] = useState<Product | null>(null);
+  const [inventoryTab, setInventoryTab] = useState<'filters' | 'products' | 'stock' | 'movement' | 'history'>('products');
   const catName = (slug: string) => categories.find((c) => c.slug === slug)?.name || slug || '—';
   const nameById = (id: string) => products.find((p) => p.id === id)?.name || id;
   const fmtDate = (s?: string) => (s ? new Date(s).toLocaleDateString('zh-TW') : '—');
@@ -2870,9 +2871,36 @@ function InventorySection({
   const filteredProducts = products.filter((p) => filteredRows.some((r) => r.pid === p.id));
 
   const selProduct = products.find((p) => p.id === mvForm.product_id);
+  const inventoryTabs = [
+    { key: 'filters', label: '庫存篩選' },
+    { key: 'products', label: '商品管理' },
+    { key: 'stock', label: '庫存總表' },
+    { key: 'movement', label: '入庫 / 出庫' },
+    { key: 'history', label: '進出庫紀錄' },
+  ] as const;
 
   return (
     <div className="space-y-6">
+      <div className="overflow-x-auto rounded-2xl border border-[#e5ded4] bg-white p-2">
+        <div className="flex min-w-max gap-2">
+          {inventoryTabs.map((tab) => (
+            <button
+              key={tab.key}
+              type="button"
+              onClick={() => setInventoryTab(tab.key)}
+              className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${
+                inventoryTab === tab.key
+                  ? 'bg-[#1f1b19] text-white'
+                  : 'border border-[#e5ded4] bg-[#faf7f2] text-[#6b6156]'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {inventoryTab === 'filters' && (
       <Card
         title="庫存篩選"
         action={
@@ -2938,7 +2966,9 @@ function InventorySection({
           目前顯示 {filteredProducts.length} 個商品、{filteredRows.length} 筆顏色 / 尺碼庫存。
         </p>
       </Card>
+      )}
 
+      {inventoryTab === 'products' && (
       <ProductInventorySummary
         products={filteredProducts}
         categories={categories}
@@ -2948,8 +2978,10 @@ function InventorySection({
         onEditProduct={onEditProduct}
         onCreateProduct={onCreateProduct}
       />
+      )}
 
       {/* 庫存總表 */}
+      {inventoryTab === 'stock' && (
       <Card title="庫存總表">
         <div className="overflow-x-auto">
           <table className="w-full whitespace-nowrap text-sm">
@@ -3064,8 +3096,10 @@ function InventorySection({
           安全庫存、單位成本、儲位可直接在表格內修改(離開欄位即儲存)。
         </p>
       </Card>
+      )}
 
       {/* 入庫 / 出庫 */}
+      {inventoryTab === 'movement' && (
       <Card title="入庫 / 出庫">
         <div className="grid gap-3 sm:grid-cols-2">
           <label className="block">
@@ -3171,8 +3205,10 @@ function InventorySection({
           登錄{mvForm.type === 'in' ? '入庫' : '出庫'}
         </button>
       </Card>
+      )}
 
       {/* 進出庫紀錄 */}
+      {inventoryTab === 'history' && (
       <Card title="進出庫紀錄">
         {movements.length === 0 ? (
           <Empty>目前沒有進出庫紀錄。</Empty>
@@ -3218,6 +3254,7 @@ function InventorySection({
           </div>
         )}
       </Card>
+      )}
     </div>
   );
 }
