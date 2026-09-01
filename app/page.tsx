@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createBrowserSupabase } from '@/lib/supabase/client';
@@ -421,7 +421,7 @@ export default function Home() {
         </section>
       </div>
 
-      <Footer settings={settings} />
+      <Footer settings={settings} logoUrl={logoUrl} />
 
       {/* 左側分類選單 */}
       <SideMenu
@@ -573,7 +573,7 @@ function FavoritesDrawer({
   );
 }
 
-function Footer({ settings }: { settings: SiteSettings | null }) {
+function Footer({ settings, logoUrl }: { settings: SiteSettings | null; logoUrl: string }) {
   const copyrightStartYear = 2025;
   const copyrightEndYear = Math.max(copyrightStartYear, new Date().getFullYear());
   const aboutLinks = settings?.footer_about_links?.length ? settings.footer_about_links : ['優惠資訊 / Coupon', '商店介紹 / Introduction', '與我們合作 / Cooperation'];
@@ -590,55 +590,87 @@ function Footer({ settings }: { settings: SiteSettings | null }) {
         { title: '關於我們 ABOUT US', items: aboutLinks.map((subtitle) => ({ subtitle, content: '', url: '' })) },
         { title: '顧客服務 SERVICE', items: serviceLinks.map((subtitle) => ({ subtitle, content: '', url: '' })) },
       ];
+  const footerPolicyLinks = ['隱私權政策', '服務條款'].map((label) => {
+    const match = sections
+      .flatMap((section) => section.items.map((item) => ({ sectionTitle: section.title, item })))
+      .find(({ item }) => item.subtitle.includes(label));
+    return match ? { label, href: getFooterLinkHref(match.item, match.sectionTitle) } : null;
+  }).filter(Boolean) as { label: string; href: string }[];
 
   return (
-    <footer className="border-t border-[#e5ded4] bg-white px-6 py-5 text-[#2c2826] sm:px-8">
-      <div className="mx-auto grid max-w-6xl grid-cols-1 gap-x-10 gap-y-6 text-center sm:grid-cols-2 lg:grid-cols-4">
-        {sections.map((section, index) => (
-          <FooterGroup
-            key={`${section.title}-${index}`}
-            title={section.title || '未命名'}
-            items={section.items}
-          />
-        ))}
-        {!savedSections.length && (
-          <section className="min-w-0 text-center">
-            <h2 className="text-base font-bold tracking-wide">尋找我們 FOLLOW US</h2>
-            <div className="mt-3 space-y-1 text-sm leading-5 text-[#494541]">
-              {settings?.footer_service_hours && <p>服務時間：{settings.footer_service_hours}</p>}
-              {settings?.footer_email && <p>信箱:{settings.footer_email}</p>}
-              {settings?.footer_company_name && <p>公司名稱：{settings.footer_company_name}</p>}
-              {settings?.footer_tax_id && <p>統一編號：{settings.footer_tax_id}</p>}
-            </div>
-            <div className="mt-3 flex justify-center gap-2.5">
-              {settings?.footer_line_url && (
-                <a
-                  href={settings.footer_line_url}
-                  className="flex h-9 w-9 items-center justify-center border border-[#e5ded4] text-xs font-semibold"
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  LINE
-                </a>
-              )}
-              {settings?.footer_instagram_url && (
-                <a
-                  href={settings.footer_instagram_url}
-                  className="flex h-9 w-9 items-center justify-center border border-[#1f1b19] text-lg font-semibold"
-                  target="_blank"
-                  rel="noreferrer"
-                  aria-label="Instagram"
-                >
-                  ◎
-                </a>
-              )}
-            </div>
-          </section>
-        )}
+    <footer className="border-t border-[#e5ded4] bg-[#f8f3ec] text-[#2c2826]">
+      <div className="mx-auto grid max-w-7xl gap-10 px-6 py-10 sm:px-8 lg:grid-cols-[1.15fr_3fr_1.3fr] lg:gap-12">
+        <section className="text-center lg:text-left">
+          <Link href="/" aria-label="回首頁" className="inline-flex">
+            {logoUrl ? (
+              <img src={logoUrl} alt={STORE_NAME} className="h-10 w-auto object-contain" />
+            ) : (
+              <span className="text-2xl font-black tracking-tight">urbanite</span>
+            )}
+          </Link>
+          <p className="mt-5 text-sm leading-7 text-[#5f5852]">
+            簡約、質感、日常。
+            <br />
+            打造屬於你的穿搭風格。
+          </p>
+          <div className="mt-5 flex justify-center gap-3 lg:justify-start">
+            <SocialLink href={settings?.footer_instagram_url} label="Instagram">◎</SocialLink>
+            <SocialLink href={settings?.footer_line_url} label="LINE">LINE</SocialLink>
+            <SocialLink href={settings?.footer_email ? `mailto:${settings.footer_email}` : ''} label="Email">@</SocialLink>
+          </div>
+        </section>
+
+        <div className="grid grid-cols-2 gap-8 text-center sm:grid-cols-3 lg:text-left xl:grid-cols-4">
+          {sections.map((section, index) => (
+            <FooterGroup
+              key={`${section.title}-${index}`}
+              title={section.title || '未命名'}
+              items={section.items}
+            />
+          ))}
+          {!savedSections.length && (
+            <section className="min-w-0">
+              <h2 className="text-sm font-bold tracking-wide">尋找我們 FOLLOW US</h2>
+              <div className="mt-4 space-y-2 text-sm leading-6 text-[#5f5852]">
+                {settings?.footer_service_hours && <p>服務時間：{settings.footer_service_hours}</p>}
+                {settings?.footer_email && <p>信箱:{settings.footer_email}</p>}
+                {settings?.footer_company_name && <p>公司名稱：{settings.footer_company_name}</p>}
+                {settings?.footer_tax_id && <p>統一編號：{settings.footer_tax_id}</p>}
+              </div>
+            </section>
+          )}
+        </div>
+
+        <section className="text-center lg:text-left">
+          <h2 className="text-sm font-bold tracking-wide">訂閱最新消息</h2>
+          <p className="mt-4 text-sm leading-7 text-[#5f5852]">
+            訂閱收到新品、優惠與穿搭靈感。
+          </p>
+          <form className="mt-5 space-y-3">
+            <input
+              type="email"
+              placeholder="輸入你的 Email"
+              className="h-12 w-full border border-[#d8cdc1] bg-white px-4 text-sm outline-none focus:border-[#1f1b19]"
+            />
+            <button
+              type="button"
+              className="h-12 w-full bg-[#1f1b19] text-sm font-semibold text-white transition hover:bg-[#3a322e]"
+            >
+              訂閱
+            </button>
+          </form>
+        </section>
       </div>
-      <p className="mt-8 text-center text-xs text-[#8a7f72]">
-        Copyright © {copyrightStartYear}-{copyrightEndYear} URBANITE-TW. All rights reserved.
-      </p>
+      <div className="border-t border-[#e5ded4] px-6 py-5 sm:px-8">
+        <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-4 text-xs text-[#6f675f] sm:flex-row">
+          <p>Copyright © {copyrightStartYear}-{copyrightEndYear} URBANITE-TW. All rights reserved.</p>
+          <div className="flex gap-6">
+            {footerPolicyLinks.map((link) => (
+              <a key={link.label} href={link.href} className="hover:text-[#1f1b19]">{link.label}</a>
+            ))}
+          </div>
+        </div>
+      </div>
     </footer>
   );
 }
@@ -647,9 +679,9 @@ type FooterLinkItem = { subtitle: string; content: string; url: string };
 
 function FooterGroup({ title, items }: { title: string; items: FooterLinkItem[] }) {
   return (
-    <section className="min-w-0 text-center">
-      <h2 className="text-base font-bold tracking-wide">{title}</h2>
-      <nav className="mt-3 space-y-1.5 text-sm leading-5 text-[#494541]">
+    <section className="min-w-0">
+      <h2 className="text-sm font-bold tracking-wide">{title}</h2>
+      <nav className="mt-4 space-y-2 text-sm leading-6 text-[#5f5852]">
         {items.map((item, index) => <FooterLink key={`${item.subtitle}-${index}`} item={item} sectionTitle={title} />)}
       </nav>
     </section>
@@ -657,10 +689,35 @@ function FooterGroup({ title, items }: { title: string; items: FooterLinkItem[] 
 }
 
 function FooterLink({ item, sectionTitle }: { item: FooterLinkItem; sectionTitle: string }) {
-  const href = item.content
+  return <a href={getFooterLinkHref(item, sectionTitle)} className="block hover:text-[#1f1b19] hover:underline">{item.subtitle}</a>;
+}
+
+function getFooterLinkHref(item: FooterLinkItem, sectionTitle: string) {
+  return item.content
     ? `/footer/${encodeURIComponent(sectionTitle)}/${encodeURIComponent(item.subtitle)}`
     : item.url || '#';
-  return <a href={href} className="block hover:underline">{item.subtitle}</a>;
+}
+
+function SocialLink({ href, label, children }: { href?: string; label: string; children: ReactNode }) {
+  const active = href && href.trim();
+  if (!active) {
+    return (
+      <span className="flex h-9 w-9 items-center justify-center rounded-full border border-[#d8cdc1] text-xs font-bold text-[#b8aea3]">
+        {children}
+      </span>
+    );
+  }
+  return (
+    <a
+      href={href}
+      aria-label={label}
+      target={href.startsWith('http') ? '_blank' : undefined}
+      rel={href.startsWith('http') ? 'noreferrer' : undefined}
+      className="flex h-9 w-9 items-center justify-center rounded-full bg-[#1f1b19] text-xs font-bold text-white transition hover:bg-[#3a322e]"
+    >
+      {children}
+    </a>
+  );
 }
 
 function ProductCard({
