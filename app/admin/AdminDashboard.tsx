@@ -1312,7 +1312,7 @@ export default function AdminDashboard({
               {settingsTab === 'banners' && (
                 <Card title="首頁輪播圖">
                   <p className="mb-4 text-sm text-[#8a7f72]">
-                    顯示在首頁最上方,可放多張。第一張(排序小的)先顯示,前台每 4 秒自動切換,也可左右滑動。
+                    顯示在首頁最上方,可放多張。第一張(排序小的)先顯示,前台每 4 秒自動切換,也可左右滑動。頁尾內文頁的背景圖也會使用第一張啟用輪播圖；要修改內文頁圖片,請在這裡替換或調整第一張啟用圖片。
                   </p>
                   <label className="mb-5 inline-flex cursor-pointer items-center rounded-full bg-[#1f1b19] px-5 py-2.5 text-sm font-semibold text-white">
                     {uploadingBanner ? '處理中…' : '+ 新增輪播圖'}

@@ -36,8 +36,8 @@ export default async function FooterContentPage({ params }: { params: Promise<{ 
   return (
     <main className="min-h-screen bg-[#f8f3ec] text-[#2c2826]">
       <section className="relative overflow-hidden border-b border-[#e5ded4]">
-        <div className="mx-auto grid max-w-7xl gap-8 px-6 py-8 sm:px-8 lg:min-h-[680px] lg:grid-cols-[0.92fr_1.08fr] lg:items-start lg:py-12">
-        <div className="relative z-10 rounded-r-[36px] bg-gradient-to-r from-[#f8f3ec] via-[#f8f3ec]/95 to-[#f8f3ec]/35 pb-10 pr-0 lg:pb-16 lg:pr-14">
+        <div className="relative mx-auto max-w-[92rem] px-6 py-8 sm:px-10 lg:min-h-[720px] lg:px-14 lg:py-12">
+        <div className="relative z-10 max-w-3xl pb-10 lg:pb-16">
           <BackButton />
           <p className="mt-12 text-xs font-bold uppercase tracking-[0.28em] text-[#9a8f84]">
             About Urbanite
@@ -46,7 +46,7 @@ export default async function FooterContentPage({ params }: { params: Promise<{ 
             {content.subtitle}
           </h1>
           <div className="mt-6 h-px w-14 bg-[#9a8f84]" />
-          <div className="mt-8 space-y-5 text-sm leading-8 text-[#514b45] sm:text-base">
+          <div className="mt-8 space-y-5 text-sm leading-8 text-[#514b45] sm:text-base lg:text-[17px] lg:leading-9">
             {paragraphs.map((text, index) => (
               <p key={index} className="whitespace-pre-line">{text}</p>
             ))}
@@ -63,7 +63,7 @@ export default async function FooterContentPage({ params }: { params: Promise<{ 
           )}
         </div>
 
-        <div className="relative min-h-[260px] overflow-hidden rounded-[24px] bg-[#e9e1d6] lg:min-h-[620px] lg:rounded-[34px]">
+        <div className="relative mt-6 min-h-[260px] overflow-hidden rounded-[24px] bg-[#e9e1d6] lg:absolute lg:bottom-10 lg:right-8 lg:top-10 lg:mt-0 lg:w-[58%] lg:rounded-[34px]">
           {banner?.image ? (
             <img
               src={banner.image}
@@ -73,7 +73,8 @@ export default async function FooterContentPage({ params }: { params: Promise<{ 
           ) : (
             <div className="absolute inset-0 bg-[linear-gradient(135deg,#e9e1d6,#f8f3ec_48%,#d8cdc1)]" />
           )}
-          <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-[#f8f3ec]/70 via-[#f8f3ec]/18 to-transparent lg:bg-gradient-to-r lg:from-[#f8f3ec] lg:via-[#f8f3ec]/42 lg:to-transparent" />
+          <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-[#f8f3ec]/70 via-[#f8f3ec]/18 to-transparent lg:bg-gradient-to-r lg:from-[#f8f3ec] lg:via-[#f8f3ec]/70 lg:to-[#f8f3ec]/10" />
+          <div className="pointer-events-none absolute inset-y-0 left-0 hidden w-2/5 bg-gradient-to-r from-[#f8f3ec] via-[#f8f3ec]/88 to-transparent lg:block" />
           <div className="pointer-events-none absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-[#f8f3ec] to-transparent lg:hidden" />
         </div>
         </div>
