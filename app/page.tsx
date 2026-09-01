@@ -1009,10 +1009,6 @@ function HeroCarousel({ banners }: { banners: Banner[] }) {
               className="pointer-events-none h-full w-full object-cover"
             />
           );
-          const titleParts = banner.title
-            .split(/\s+/)
-            .map((part) => part.trim())
-            .filter(Boolean);
           return (
             <div
               key={banner.id}
@@ -1024,30 +1020,6 @@ function HeroCarousel({ banners }: { banners: Banner[] }) {
                 </a>
               ) : (
                 img
-              )}
-              {banner.title && (
-                <div className="pointer-events-none absolute inset-0 flex items-center bg-gradient-to-r from-black/45 via-black/10 to-transparent px-7 text-white sm:px-12">
-                  <div>
-                    <p className="font-serif text-5xl leading-none tracking-wide sm:text-7xl">
-                      {titleParts.length > 1 ? (
-                        <>
-                          {titleParts[0]}
-                          <br />
-                          {titleParts.slice(1).join(' ')}
-                        </>
-                      ) : (
-                        banner.title
-                      )}
-                    </p>
-                    <p className="mt-4 text-sm font-medium sm:text-base">Effortless custom wear</p>
-                    {banner.link && (
-                      <span className="mt-6 inline-flex items-center gap-5 bg-[#1f1b19] px-6 py-3 text-xs font-semibold uppercase tracking-wide">
-                        Shop Now
-                        <span aria-hidden="true">→</span>
-                      </span>
-                    )}
-                  </div>
-                </div>
               )}
             </div>
           );
