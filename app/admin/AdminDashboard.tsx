@@ -450,9 +450,7 @@ export default function AdminDashboard({
         safety: Math.max(0, Math.floor(Number(editing.variantSafety[k] ?? 0))),
       };
     });
-    // 有規格時,總庫存 = 各規格庫存加總;沒規格時沿用手填的庫存
-    const inventory =
-      specs.length > 0 ? variants.reduce((n, v) => n + v.inventory, 0) : editing.inventory;
+    const inventory = isNew ? 0 : specs.length > 0 ? variants.reduce((n, v) => n + v.inventory, 0) : editing.inventory;
     // 顏色/尺寸:有對應維度就帶入(向下相容前台舊欄位)
     const colorDim = specs.find((s) => s.name.includes('色'));
     const sizeDim = specs.find((s) => s.name.includes('尺寸') || /size/i.test(s.name));
@@ -3714,6 +3712,7 @@ function ProductModal({
   const [uploadProgress, setUploadProgress] = useState<{ done: number; total: number; percent: number } | null>(
     null,
   );
+  const [specInputs, setSpecInputs] = useState<Record<number, string>>({});
   function set<K extends keyof Draft>(key: K, value: Draft[K]) {
     onChange({ ...draft, [key]: value });
   }
@@ -3738,6 +3737,20 @@ function ProductModal({
   function removeSpec(i: number) {
     onChange({ ...draft, specs: draft.specs.filter((_, idx) => idx !== i) });
   }
+  function addSpecOption(i: number) {
+    const value = (specInputs[i] ?? '').trim();
+    if (!value) return;
+    const current = parseOptions(draft.specs[i]?.optionsText ?? '');
+    if (current.includes(value)) {
+      setSpecInputs({ ...specInputs, [i]: '' });
+      return;
+    }
+    updateSpec(i, { optionsText: [...current, value].join(', ') });
+    setSpecInputs({ ...specInputs, [i]: '' });
+  }
+  function removeSpecOption(i: number, value: string) {
+    updateSpec(i, { optionsText: parseOptions(draft.specs[i]?.optionsText ?? '').filter((item) => item !== value).join(', ') });
+  }
   function toggleMethod(
     key: 'available_payment_methods' | 'available_shipping_methods',
     method: string,
@@ -3746,6 +3759,11 @@ function ProductModal({
     const current = draft[key];
     const next = checked ? [...current, method] : current.filter((item) => item !== method);
     set(key, next);
+  }
+  function toggleFreeShipping(checked: boolean) {
+    const current = draft.available_shipping_methods.filter((item) => item !== '免運');
+    const baseMethods = current.length ? current : shippingMethods;
+    set('available_shipping_methods', checked ? ['免運', ...baseMethods] : current);
   }
 
   async function uploadProductImages(files: File[]) {
@@ -3802,34 +3820,41 @@ function ProductModal({
     onChange({ ...draft, images: [...draft.images, url] });
   }
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="max-h-[90vh] w-full max-w-2xl overflow-auto rounded-2xl bg-white p-6">
-        <h2 className="text-xl font-semibold">{isNew ? '新增商品' : '編輯商品'}</h2>
-        <div className="mt-4 grid gap-3">
-          <Field label="商品代碼(英文,新增後不可改)">
-            <input
+	  return (
+	    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+	      <div className="max-h-[90vh] w-full max-w-5xl overflow-auto rounded-2xl bg-[#f2f5f8] p-4 sm:p-6">
+	        <h2 className="text-xl font-semibold">{isNew ? '新增商品' : '編輯商品'}</h2>
+	        <div className="mt-4 grid gap-5">
+	          <section className="rounded-2xl bg-white p-5">
+	          <Field label="商品代碼(英文,新增後不可改)">
+	            <input
               className="w-full rounded-lg border border-[#e5ded4] px-3 py-2 disabled:bg-[#f5efec]"
               value={draft.id}
               disabled={!isNew}
-              onChange={(e) => set('id', e.target.value)}
-            />
-          </Field>
-          <Field label="名稱">
-            <input
-              className="w-full rounded-lg border border-[#e5ded4] px-3 py-2"
-              value={draft.name}
-              onChange={(e) => set('name', e.target.value)}
-            />
-          </Field>
-          <Field label="介紹">
-            <input
-              className="w-full rounded-lg border border-[#e5ded4] px-3 py-2"
-              value={draft.tagline}
-              onChange={(e) => set('tagline', e.target.value)}
-            />
-          </Field>
-          <div className="grid grid-cols-2 gap-3">
+	              onChange={(e) => set('id', e.target.value)}
+	            />
+	          </Field>
+	          <div className="mt-4">
+	          <Field label="商品名稱">
+	            <input
+	              className="w-full rounded-lg border border-[#e5ded4] px-3 py-2"
+	              value={draft.name}
+	              placeholder="為您的商品命名"
+	              onChange={(e) => set('name', e.target.value)}
+	            />
+	          </Field>
+	          </div>
+	          <div className="mt-4">
+	          <Field label="商品描述">
+	            <textarea
+	              className="min-h-44 w-full rounded-lg border border-[#e5ded4] px-3 py-3"
+	              value={draft.tagline}
+	              placeholder="請在此輸入您的商品描述內容"
+	              onChange={(e) => set('tagline', e.target.value)}
+	            />
+	          </Field>
+	          </div>
+	          <div className="grid grid-cols-2 gap-3">
             <Field label="售價">
               <input
                 type="number"
@@ -3844,20 +3869,11 @@ function ProductModal({
                 className="w-full rounded-lg border border-[#e5ded4] px-3 py-2"
                 value={draft.original_price ?? ''}
                 onChange={(e) => set('original_price', e.target.value === '' ? null : Number(e.target.value))}
-              />
-            </Field>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <Field label={hasSpecs ? '總庫存(各規格加總)' : '庫存'}>
-              <input
-                type="number"
-                className="w-full rounded-lg border border-[#e5ded4] px-3 py-2 disabled:bg-[#f5efec]"
-                value={hasSpecs ? specTotal : draft.inventory}
-                disabled={hasSpecs}
-                onChange={(e) => set('inventory', Number(e.target.value))}
-              />
-            </Field>
-            <Field label="狀態">
+	              />
+	            </Field>
+	          </div>
+	          <div className="grid grid-cols-2 gap-3">
+	            <Field label="狀態">
               <select
                 className="w-full rounded-lg border border-[#e5ded4] px-3 py-2"
                 value={draft.status}
@@ -3868,9 +3884,17 @@ function ProductModal({
                     {s}
                   </option>
                 ))}
-              </select>
-            </Field>
-          </div>
+	              </select>
+	            </Field>
+	            <label className="flex items-end gap-2 pb-2">
+	              <input
+	                type="checkbox"
+	                checked={draft.available_shipping_methods.includes('免運')}
+	                onChange={(e) => toggleFreeShipping(e.target.checked)}
+	              />
+	              <span className="text-sm font-semibold">此商品免運</span>
+	            </label>
+	          </div>
           <Field label="單位(例:件 / 串 / 顆 / 入)">
             <input
               className="w-full rounded-lg border border-[#e5ded4] px-3 py-2"
@@ -3891,9 +3915,9 @@ function ProductModal({
                   {c.name}
                 </option>
               ))}
-            </select>
-          </Field>
-          <div className="grid gap-3 sm:grid-cols-2">
+	              </select>
+	            </Field>
+	          <div className="grid gap-3 sm:grid-cols-2">
             <Field label="可用金流(未勾選=全部)">
               <div className="space-y-2 rounded-lg border border-[#e5ded4] p-3">
                 {paymentMethods.length === 0 ? (
@@ -3929,9 +3953,11 @@ function ProductModal({
                   ))
                 )}
               </div>
-            </Field>
-          </div>
-          <Field label={`商品圖片(最多 ${MAX_PRODUCT_IMAGES} 張,第一張為封面)`}>
+	            </Field>
+	          </div>
+	          </section>
+	          <section className="rounded-2xl bg-white p-5">
+	          <Field label={`商品圖片(最多 ${MAX_PRODUCT_IMAGES} 張,第一張為封面)`}>
             <div className="grid gap-3">
               {draft.images.length > 0 && (
                 <div className="grid grid-cols-4 gap-2 sm:grid-cols-5">
@@ -4017,25 +4043,41 @@ function ProductModal({
               <p className="text-xs text-[#8a7f72]">
                 可一次選多張。圖片會上傳到 Supabase Storage,第一張會成為前台封面圖。
               </p>
-            </div>
-          </Field>
-          <Field label="規格設定(例:顏色→紅,綠,藍;尺寸→S,M,L;規格→3入,5入)">
-            <div className="space-y-2">
-              {draft.specs.map((s, i) => (
-                <div key={i} className="flex gap-2">
-                  <input
-                    placeholder="規格名稱"
-                    value={s.name}
-                    onChange={(e) => updateSpec(i, { name: e.target.value })}
-                    className="w-24 shrink-0 rounded-lg border border-[#e5ded4] px-3 py-2 text-sm"
-                  />
-                  <input
-                    placeholder="選項(用逗號 / 斜線分隔)"
-                    value={s.optionsText}
-                    onChange={(e) => updateSpec(i, { optionsText: e.target.value })}
-                    className="min-w-0 flex-1 rounded-lg border border-[#e5ded4] px-3 py-2 text-sm"
-                  />
-                  <button
+	            </div>
+	          </Field>
+	          </section>
+	          <section className="rounded-2xl bg-white p-5">
+	          <Field label="規格設定(例:顏色→紅,綠,藍;尺寸→S,M,L;規格→3入,5入)">
+	            <div className="space-y-2">
+	              {draft.specs.map((s, i) => (
+	                <div key={i} className="grid gap-3 rounded-xl border border-[#e5ded4] p-3 md:grid-cols-[220px_1fr_auto]">
+	                  <input
+	                    placeholder="規格名稱"
+	                    value={s.name}
+	                    onChange={(e) => updateSpec(i, { name: e.target.value })}
+	                    className="rounded-lg border border-[#e5ded4] px-3 py-2 text-sm"
+	                  />
+	                  <div className="flex min-h-11 flex-wrap items-center gap-2 rounded-lg border border-[#e5ded4] px-2 py-1">
+	                    {parseOptions(s.optionsText).map((option) => (
+	                      <span key={option} className="inline-flex items-center gap-1 rounded-lg bg-[#e9eefc] px-3 py-1.5 text-sm font-semibold text-[#2868d8]">
+	                        {option}
+	                        <button type="button" onClick={() => removeSpecOption(i, option)} className="text-[#88a8ea]">×</button>
+	                      </span>
+	                    ))}
+	                    <input
+	                      placeholder="輸入選項後按 Enter"
+	                      value={specInputs[i] ?? ''}
+	                      onChange={(e) => setSpecInputs({ ...specInputs, [i]: e.target.value })}
+	                      onKeyDown={(e) => {
+	                        if (e.key === 'Enter') {
+	                          e.preventDefault();
+	                          addSpecOption(i);
+	                        }
+	                      }}
+	                      className="min-w-40 flex-1 border-0 px-2 py-1 text-sm outline-none"
+	                    />
+	                  </div>
+	                  <button
                     type="button"
                     onClick={() => removeSpec(i)}
                     aria-label="刪除規格"
@@ -4050,43 +4092,17 @@ function ProductModal({
                 onClick={addSpec}
                 className="rounded-full border border-[#d7c9bd] px-4 py-2 text-sm font-semibold"
               >
-                + 新增規格維度
-              </button>
-            </div>
-          </Field>
-
-          {hasSpecs && (
-            <Field label="各規格庫存(顯示)">
-              <div className="max-h-64 overflow-auto rounded-lg border border-[#eee5da] bg-[#faf7f2] p-2">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="text-left text-xs text-[#8a7f72]">
-                      <th className="px-2 py-1">規格</th>
-                      <th className="px-2 py-1 text-right">目前庫存</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {modalCombos.map((opts) => {
-                      const key = opts.join(' / ');
-                      const inv = Number(draft.variantStock[key] ?? 0);
-                      return (
-                        <tr key={key} className="border-t border-[#efe8dd]">
-                          <td className="px-2 py-1">{key}</td>
-                          <td className={`px-2 py-1 text-right font-medium ${inv <= 0 ? 'text-[#c0392b]' : ''}`}>
-                            {inv}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-              <p className="mt-1 text-xs text-[#8a7f72]">
-                共 {modalCombos.length} 個組合,總庫存 {specTotal}。庫存、成本、安全庫存的異動請到「庫存管理」設定。
-              </p>
-            </Field>
-          )}
-          <div className="grid grid-cols-2 gap-3">
+	                + 新增規格維度
+	              </button>
+	            </div>
+	          </Field>
+	          {hasSpecs && (
+	            <p className="mt-3 text-xs text-[#8a7f72]">
+	              已建立 {modalCombos.length} 個規格組合。新增商品時不建庫存,請到「庫存管理」使用入庫單登錄。
+	            </p>
+	          )}
+	          </section>
+	          <div className="grid grid-cols-2 gap-3">
             <Field label="排序(小的在前)">
               <input
                 type="number"

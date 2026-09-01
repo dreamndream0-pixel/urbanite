@@ -106,7 +106,11 @@ export default function CheckoutPage() {
   }, []);
 
   const subtotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
-  const shipping = subtotal >= FREE_SHIPPING_THRESHOLD ? 0 : subtotal > 0 ? SHIPPING_FEE : 0;
+  const freeShippingItems = cart.some((item) => {
+    const product = products.find((entry) => entry.id === item.productId);
+    return product?.available_shipping_methods?.includes('免運');
+  });
+  const shipping = subtotal >= FREE_SHIPPING_THRESHOLD || freeShippingItems ? 0 : subtotal > 0 ? SHIPPING_FEE : 0;
   const total = Math.max(0, subtotal + shipping - (applied?.amount ?? 0));
   const siteShippingMethods = settings?.enabled_shipping_methods?.length
     ? settings.enabled_shipping_methods
