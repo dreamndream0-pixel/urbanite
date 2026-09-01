@@ -90,6 +90,41 @@ function parseOptions(text: string): string[] {
     .filter(Boolean);
 }
 
+function uniqueValues(values: string[]) {
+  return Array.from(new Set(values.filter(Boolean)));
+}
+
+function getProductVariantRows(product: Product) {
+  if (product.variants.length === 0) {
+    return [
+      {
+        key: `${product.id}-default`,
+        label: '—',
+        color: '',
+        size: '',
+        inventory: product.inventory,
+        safety: 0,
+        cost: 0,
+        location: '',
+      },
+    ];
+  }
+
+  const colorIndex = product.specs.findIndex((spec) => /顏色|色|color/i.test(spec.name));
+  const sizeIndex = product.specs.findIndex((spec) => /尺寸|尺碼|size/i.test(spec.name));
+
+  return product.variants.map((variant, index) => ({
+    key: `${product.id}-${variant.options.join('-') || index}`,
+    label: variant.options.join(' / '),
+    color: colorIndex >= 0 ? variant.options[colorIndex] ?? '' : variant.options[0] ?? '',
+    size: sizeIndex >= 0 ? variant.options[sizeIndex] ?? '' : variant.options[1] ?? '',
+    inventory: variant.inventory ?? 0,
+    safety: variant.safety ?? 0,
+    cost: variant.cost ?? 0,
+    location: variant.location ?? '',
+  }));
+}
+
 function blankDraft(): Draft {
   return {
     id: '',
@@ -1092,6 +1127,14 @@ export default function AdminDashboard({
               setMvForm={setMvForm}
               onAddMovement={addMovement}
               onUpdateVariantMeta={updateVariantMeta}
+              onEditProduct={(product) => {
+                setEditing(toDraft(product));
+                setIsNew(false);
+              }}
+              onCreateProduct={() => {
+                setEditing(blankDraft());
+                setIsNew(true);
+              }}
             />
           )}
 
@@ -2568,6 +2611,136 @@ type MvForm = {
   note: string;
 };
 
+function ProductInventorySummary({
+  products,
+  categories,
+  expandedProduct,
+  onToggleProduct,
+  onEditProduct,
+  onCreateProduct,
+}: {
+  products: Product[];
+  categories: Category[];
+  expandedProduct: string | null;
+  onToggleProduct: (id: string) => void;
+  onEditProduct: (product: Product) => void;
+  onCreateProduct: () => void;
+}) {
+  const catName = (slug: string) => categories.find((c) => c.slug === slug)?.name || slug || '—';
+
+  return (
+    <Card
+      title="商品管理總覽"
+      action={
+        <button
+          type="button"
+          onClick={onCreateProduct}
+          className="rounded-full bg-[#1f1b19] px-3 py-2 text-sm font-semibold text-white"
+        >
+          新增商品
+        </button>
+      }
+    >
+      {products.length === 0 ? (
+        <Empty>沒有符合篩選條件的商品。</Empty>
+      ) : (
+        <div className="space-y-3">
+          {products.map((product) => {
+            const variantRows = getProductVariantRows(product);
+            const totalStock = variantRows.reduce((sum, row) => sum + row.inventory, 0);
+            const stockValue = variantRows.reduce((sum, row) => sum + row.inventory * row.cost, 0);
+            const safetyTotal = variantRows.reduce((sum, row) => sum + row.safety, 0);
+            const colors = uniqueValues(variantRows.map((row) => row.color).filter(Boolean));
+            const sizes = uniqueValues(variantRows.map((row) => row.size).filter(Boolean));
+            const low = variantRows.some((row) => row.inventory <= row.safety);
+            const isOpen = expandedProduct === product.id;
+
+            return (
+              <div key={product.id} className="overflow-hidden rounded-xl border border-[#e5ded4] bg-white">
+                <div className="grid gap-3 p-4 lg:grid-cols-[1.2fr_0.9fr_0.8fr_0.7fr_0.8fr_auto] lg:items-center">
+                  <div className="min-w-0">
+                    <p className="truncate font-semibold">{product.name}</p>
+                    <p className="mt-1 font-mono text-xs text-[#8a7f72]">型號 / 品項：{product.id}</p>
+                  </div>
+                  <div className="text-sm text-[#6b6156]">
+                    <span className="block text-xs text-[#a99e8f]">分類</span>
+                    {catName(product.category)}
+                  </div>
+                  <div className="text-sm text-[#6b6156]">
+                    <span className="block text-xs text-[#a99e8f]">顏色</span>
+                    {colors.length ? colors.join('、') : '—'}
+                  </div>
+                  <div className="text-sm text-[#6b6156]">
+                    <span className="block text-xs text-[#a99e8f]">尺寸</span>
+                    {sizes.length ? sizes.join('、') : '—'}
+                  </div>
+                  <div className="text-sm">
+                    <span className="block text-xs text-[#a99e8f]">庫存 / 安全</span>
+                    <span className="font-semibold">{totalStock}</span>
+                    <span className="text-[#8a7f72]"> / {safetyTotal}</span>
+                    <span className={`ml-2 ${low ? 'text-[#c0392b]' : 'text-[#1f7a44]'}`}>
+                      {low ? '需補貨' : '正常'}
+                    </span>
+                    <p className="mt-1 text-xs text-[#8a7f72]">庫存金額 {stockValue.toLocaleString()}</p>
+                  </div>
+                  <div className="flex flex-wrap gap-2 lg:justify-end">
+                    <button
+                      type="button"
+                      onClick={() => onToggleProduct(product.id)}
+                      className="rounded-full border border-[#d7c9bd] px-3 py-2 text-sm font-semibold"
+                    >
+                      {isOpen ? '收合規格' : `展開 ${variantRows.length} 筆`}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onEditProduct(product)}
+                      className="rounded-full bg-[#1f1b19] px-3 py-2 text-sm font-semibold text-white"
+                    >
+                      編輯商品
+                    </button>
+                  </div>
+                </div>
+                {isOpen && (
+                  <div className="border-t border-[#efe8dd] bg-[#faf7f2] p-4">
+                    <div className="overflow-x-auto">
+                      <table className="w-full whitespace-nowrap text-sm">
+                        <thead>
+                          <tr className="border-b border-[#e5ded4] text-left text-xs text-[#8a7f72]">
+                            <th className="px-2 py-2">規格</th>
+                            <th className="px-2 py-2">顏色</th>
+                            <th className="px-2 py-2">尺寸</th>
+                            <th className="px-2 py-2 text-right">目前庫存</th>
+                            <th className="px-2 py-2 text-right">安全庫存</th>
+                            <th className="px-2 py-2 text-right">單位成本</th>
+                            <th className="px-2 py-2">儲位</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {variantRows.map((row) => (
+                            <tr key={row.key} className="border-b border-[#efe8dd] last:border-0">
+                              <td className="px-2 py-2">{row.label}</td>
+                              <td className="px-2 py-2 text-[#6b6156]">{row.color || '—'}</td>
+                              <td className="px-2 py-2 text-[#6b6156]">{row.size || '—'}</td>
+                              <td className="px-2 py-2 text-right font-semibold">{row.inventory}</td>
+                              <td className="px-2 py-2 text-right">{row.safety}</td>
+                              <td className="px-2 py-2 text-right">{row.cost}</td>
+                              <td className="px-2 py-2 text-[#6b6156]">{row.location || '—'}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </Card>
+  );
+}
+
 function InventorySection({
   products,
   categories,
@@ -2576,6 +2749,8 @@ function InventorySection({
   setMvForm,
   onAddMovement,
   onUpdateVariantMeta,
+  onEditProduct,
+  onCreateProduct,
 }: {
   products: Product[];
   categories: Category[];
@@ -2588,7 +2763,16 @@ function InventorySection({
     variantKey: string,
     patch: Partial<Pick<Variant, 'cost' | 'safety' | 'location'>>,
   ) => void;
+  onEditProduct: (product: Product) => void;
+  onCreateProduct: () => void;
 }) {
+  const [inventoryFilters, setInventoryFilters] = useState({
+    query: '',
+    category: 'all',
+    stockStatus: 'all',
+    productId: 'all',
+  });
+  const [expandedInventoryProduct, setExpandedInventoryProduct] = useState<string | null>(null);
   const catName = (slug: string) => categories.find((c) => c.slug === slug)?.name || slug || '—';
   const nameById = (id: string) => products.find((p) => p.id === id)?.name || id;
   const fmtDate = (s?: string) => (s ? new Date(s).toLocaleDateString('zh-TW') : '—');
@@ -2601,7 +2785,7 @@ function InventorySection({
   }
 
   const rows = products.flatMap((p) => {
-    const base = { pid: p.id, name: p.name, cat: catName(p.category), unit: p.unit || '件' };
+    const base = { pid: p.id, name: p.name, cat: catName(p.category), category: p.category, unit: p.unit || '件' };
     if (p.variants.length > 0) {
       return p.variants.map((v) => ({
         ...base,
@@ -2615,11 +2799,99 @@ function InventorySection({
     }
     return [{ ...base, spec: '—', key: '', inv: p.inventory, safety: 0, cost: 0, location: '—' }];
   });
+  const filteredRows = rows.filter((r) => {
+    const q = inventoryFilters.query.trim().toLowerCase();
+    const low = r.inv <= r.safety;
+    if (inventoryFilters.productId !== 'all' && r.pid !== inventoryFilters.productId) return false;
+    if (inventoryFilters.category !== 'all' && r.category !== inventoryFilters.category) return false;
+    if (inventoryFilters.stockStatus === 'low' && !low) return false;
+    if (inventoryFilters.stockStatus === 'normal' && low) return false;
+    if (!q) return true;
+    return [r.pid, r.name, r.cat, r.spec, r.location].some((value) =>
+      String(value).toLowerCase().includes(q),
+    );
+  });
+  const filteredProducts = products.filter((p) => filteredRows.some((r) => r.pid === p.id));
 
   const selProduct = products.find((p) => p.id === mvForm.product_id);
 
   return (
     <div className="space-y-6">
+      <Card
+        title="庫存篩選"
+        action={
+          <button
+            type="button"
+            onClick={() => setInventoryFilters({ query: '', category: 'all', stockStatus: 'all', productId: 'all' })}
+            className="rounded-full border border-[#d7c9bd] px-3 py-1.5 text-sm font-semibold"
+          >
+            清除篩選
+          </button>
+        }
+      >
+        <div className="grid gap-3 md:grid-cols-4">
+          <label className="block">
+            <span className="mb-1 block text-sm text-[#8a7f72]">搜尋</span>
+            <input
+              value={inventoryFilters.query}
+              onChange={(e) => setInventoryFilters({ ...inventoryFilters, query: e.target.value })}
+              placeholder="品項、品名、規格、儲位"
+              className="w-full rounded-lg border border-[#e5ded4] px-3 py-2"
+            />
+          </label>
+          <label className="block">
+            <span className="mb-1 block text-sm text-[#8a7f72]">商品</span>
+            <select
+              value={inventoryFilters.productId}
+              onChange={(e) => setInventoryFilters({ ...inventoryFilters, productId: e.target.value })}
+              className="w-full rounded-lg border border-[#e5ded4] px-3 py-2"
+            >
+              <option value="all">全部商品</option>
+              {products.map((p) => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </select>
+          </label>
+          <label className="block">
+            <span className="mb-1 block text-sm text-[#8a7f72]">分類</span>
+            <select
+              value={inventoryFilters.category}
+              onChange={(e) => setInventoryFilters({ ...inventoryFilters, category: e.target.value })}
+              className="w-full rounded-lg border border-[#e5ded4] px-3 py-2"
+            >
+              <option value="all">全部分類</option>
+              {categories.map((c) => (
+                <option key={c.id} value={c.slug}>{c.name}</option>
+              ))}
+            </select>
+          </label>
+          <label className="block">
+            <span className="mb-1 block text-sm text-[#8a7f72]">庫存狀態</span>
+            <select
+              value={inventoryFilters.stockStatus}
+              onChange={(e) => setInventoryFilters({ ...inventoryFilters, stockStatus: e.target.value })}
+              className="w-full rounded-lg border border-[#e5ded4] px-3 py-2"
+            >
+              <option value="all">全部狀態</option>
+              <option value="low">需補貨</option>
+              <option value="normal">正常</option>
+            </select>
+          </label>
+        </div>
+        <p className="mt-3 text-sm text-[#8a7f72]">
+          目前顯示 {filteredProducts.length} 個商品、{filteredRows.length} 筆顏色 / 尺碼庫存。
+        </p>
+      </Card>
+
+      <ProductInventorySummary
+        products={filteredProducts}
+        categories={categories}
+        expandedProduct={expandedInventoryProduct}
+        onToggleProduct={(id) => setExpandedInventoryProduct(expandedInventoryProduct === id ? null : id)}
+        onEditProduct={onEditProduct}
+        onCreateProduct={onCreateProduct}
+      />
+
       {/* 庫存總表 */}
       <Card title="庫存總表">
         <div className="overflow-x-auto">
@@ -2641,12 +2913,23 @@ function InventorySection({
               </tr>
             </thead>
             <tbody>
-              {rows.map((r, i) => {
+              {filteredRows.map((r, i) => {
                 const low = r.inv <= r.safety;
                 return (
                   <tr key={`${r.pid}-${r.key}-${i}`} className="border-b border-[#efe8dd]">
                     <td className="px-2 py-2 font-mono text-xs">{r.pid}</td>
-                    <td className="px-2 py-2">{r.name}</td>
+                    <td className="px-2 py-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const product = products.find((p) => p.id === r.pid);
+                          if (product) onEditProduct(product);
+                        }}
+                        className="font-semibold underline-offset-4 hover:underline"
+                      >
+                        {r.name}
+                      </button>
+                    </td>
                     <td className="px-2 py-2 text-[#8a7f72]">{r.cat}</td>
                     <td className="px-2 py-2">{r.spec}</td>
                     <td className="px-2 py-2 text-[#8a7f72]">{r.unit}</td>
@@ -2715,6 +2998,9 @@ function InventorySection({
               })}
             </tbody>
           </table>
+          {filteredRows.length === 0 && (
+            <p className="py-8 text-center text-sm text-[#8a7f72]">沒有符合篩選條件的庫存資料。</p>
+          )}
         </div>
         <p className="mt-2 text-xs text-[#8a7f72]">
           庫存數量由「入庫 / 出庫」自動計算,請用下方表單登錄異動,不要直接改數字。
