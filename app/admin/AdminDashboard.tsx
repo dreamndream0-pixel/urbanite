@@ -2614,19 +2614,25 @@ type MvForm = {
 function ProductInventorySummary({
   products,
   categories,
-  expandedProduct,
-  onToggleProduct,
+  selectedProduct,
+  onSelectProduct,
+  onCloseProduct,
   onEditProduct,
   onCreateProduct,
 }: {
   products: Product[];
   categories: Category[];
-  expandedProduct: string | null;
-  onToggleProduct: (id: string) => void;
+  selectedProduct: Product | null;
+  onSelectProduct: (product: Product) => void;
+  onCloseProduct: () => void;
   onEditProduct: (product: Product) => void;
   onCreateProduct: () => void;
 }) {
   const catName = (slug: string) => categories.find((c) => c.slug === slug)?.name || slug || '—';
+  const selectedRows = selectedProduct ? getProductVariantRows(selectedProduct) : [];
+  const selectedTotalStock = selectedRows.reduce((sum, row) => sum + row.inventory, 0);
+  const selectedStockValue = selectedRows.reduce((sum, row) => sum + row.inventory * row.cost, 0);
+  const selectedSafetyTotal = selectedRows.reduce((sum, row) => sum + row.safety, 0);
 
   return (
     <Card
@@ -2644,97 +2650,147 @@ function ProductInventorySummary({
       {products.length === 0 ? (
         <Empty>沒有符合篩選條件的商品。</Empty>
       ) : (
-        <div className="space-y-3">
-          {products.map((product) => {
-            const variantRows = getProductVariantRows(product);
-            const totalStock = variantRows.reduce((sum, row) => sum + row.inventory, 0);
-            const stockValue = variantRows.reduce((sum, row) => sum + row.inventory * row.cost, 0);
-            const safetyTotal = variantRows.reduce((sum, row) => sum + row.safety, 0);
-            const colors = uniqueValues(variantRows.map((row) => row.color).filter(Boolean));
-            const sizes = uniqueValues(variantRows.map((row) => row.size).filter(Boolean));
-            const low = variantRows.some((row) => row.inventory <= row.safety);
-            const isOpen = expandedProduct === product.id;
+        <div className="overflow-x-auto">
+          <table className="w-full whitespace-nowrap text-sm">
+            <thead>
+              <tr className="border-b border-[#e5ded4] text-left text-xs text-[#8a7f72]">
+                <th className="px-2 py-2">型號</th>
+                <th className="px-2 py-2">商品名稱</th>
+                <th className="px-2 py-2">分類</th>
+                <th className="px-2 py-2 text-right">規格數</th>
+                <th className="px-2 py-2 text-right">總庫存</th>
+                <th className="px-2 py-2 text-right">安全庫存</th>
+                <th className="px-2 py-2">庫存狀態</th>
+                <th className="px-2 py-2 text-right">庫存金額</th>
+                <th className="px-2 py-2 text-right">操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              {products.map((product) => {
+                const variantRows = getProductVariantRows(product);
+                const totalStock = variantRows.reduce((sum, row) => sum + row.inventory, 0);
+                const stockValue = variantRows.reduce((sum, row) => sum + row.inventory * row.cost, 0);
+                const safetyTotal = variantRows.reduce((sum, row) => sum + row.safety, 0);
+                const low = variantRows.some((row) => row.inventory <= row.safety);
 
-            return (
-              <div key={product.id} className="overflow-hidden rounded-xl border border-[#e5ded4] bg-white">
-                <div className="grid gap-3 p-4 lg:grid-cols-[1.2fr_0.9fr_0.8fr_0.7fr_0.8fr_auto] lg:items-center">
-                  <div className="min-w-0">
-                    <p className="truncate font-semibold">{product.name}</p>
-                    <p className="mt-1 font-mono text-xs text-[#8a7f72]">型號 / 品項：{product.id}</p>
-                  </div>
-                  <div className="text-sm text-[#6b6156]">
-                    <span className="block text-xs text-[#a99e8f]">分類</span>
-                    {catName(product.category)}
-                  </div>
-                  <div className="text-sm text-[#6b6156]">
-                    <span className="block text-xs text-[#a99e8f]">顏色</span>
-                    {colors.length ? colors.join('、') : '—'}
-                  </div>
-                  <div className="text-sm text-[#6b6156]">
-                    <span className="block text-xs text-[#a99e8f]">尺寸</span>
-                    {sizes.length ? sizes.join('、') : '—'}
-                  </div>
-                  <div className="text-sm">
-                    <span className="block text-xs text-[#a99e8f]">庫存 / 安全</span>
-                    <span className="font-semibold">{totalStock}</span>
-                    <span className="text-[#8a7f72]"> / {safetyTotal}</span>
-                    <span className={`ml-2 ${low ? 'text-[#c0392b]' : 'text-[#1f7a44]'}`}>
-                      {low ? '需補貨' : '正常'}
-                    </span>
-                    <p className="mt-1 text-xs text-[#8a7f72]">庫存金額 {stockValue.toLocaleString()}</p>
-                  </div>
-                  <div className="flex flex-wrap gap-2 lg:justify-end">
-                    <button
-                      type="button"
-                      onClick={() => onToggleProduct(product.id)}
-                      className="rounded-full border border-[#d7c9bd] px-3 py-2 text-sm font-semibold"
-                    >
-                      {isOpen ? '收合規格' : `展開 ${variantRows.length} 筆`}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => onEditProduct(product)}
-                      className="rounded-full bg-[#1f1b19] px-3 py-2 text-sm font-semibold text-white"
-                    >
-                      編輯商品
-                    </button>
-                  </div>
-                </div>
-                {isOpen && (
-                  <div className="border-t border-[#efe8dd] bg-[#faf7f2] p-4">
-                    <div className="overflow-x-auto">
-                      <table className="w-full whitespace-nowrap text-sm">
-                        <thead>
-                          <tr className="border-b border-[#e5ded4] text-left text-xs text-[#8a7f72]">
-                            <th className="px-2 py-2">規格</th>
-                            <th className="px-2 py-2">顏色</th>
-                            <th className="px-2 py-2">尺寸</th>
-                            <th className="px-2 py-2 text-right">目前庫存</th>
-                            <th className="px-2 py-2 text-right">安全庫存</th>
-                            <th className="px-2 py-2 text-right">單位成本</th>
-                            <th className="px-2 py-2">儲位</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {variantRows.map((row) => (
-                            <tr key={row.key} className="border-b border-[#efe8dd] last:border-0">
-                              <td className="px-2 py-2">{row.label}</td>
-                              <td className="px-2 py-2 text-[#6b6156]">{row.color || '—'}</td>
-                              <td className="px-2 py-2 text-[#6b6156]">{row.size || '—'}</td>
-                              <td className="px-2 py-2 text-right font-semibold">{row.inventory}</td>
-                              <td className="px-2 py-2 text-right">{row.safety}</td>
-                              <td className="px-2 py-2 text-right">{row.cost}</td>
-                              <td className="px-2 py-2 text-[#6b6156]">{row.location || '—'}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                )}
+                return (
+                  <tr key={product.id} className="border-b border-[#efe8dd] last:border-0">
+                    <td className="px-2 py-3 font-mono">
+                      <button
+                        type="button"
+                        onClick={() => onSelectProduct(product)}
+                        className="font-semibold text-[#2687c9] underline-offset-4 hover:underline"
+                      >
+                        {product.id}
+                      </button>
+                    </td>
+                    <td className="max-w-[360px] px-2 py-3">
+                      <span className="block truncate font-semibold">{product.name}</span>
+                    </td>
+                    <td className="px-2 py-3 text-[#8a7f72]">{catName(product.category)}</td>
+                    <td className="px-2 py-3 text-right">{variantRows.length}</td>
+                    <td className="px-2 py-3 text-right font-semibold">{totalStock}</td>
+                    <td className="px-2 py-3 text-right text-[#8a7f72]">{safetyTotal}</td>
+                    <td className="px-2 py-3">
+                      <span className={low ? 'text-[#c0392b]' : 'text-[#1f7a44]'}>
+                        {low ? '需補貨' : '正常'}
+                      </span>
+                    </td>
+                    <td className="px-2 py-3 text-right">{stockValue.toLocaleString()}</td>
+                    <td className="px-2 py-3 text-right">
+                      <button
+                        type="button"
+                        onClick={() => onEditProduct(product)}
+                        className="rounded-full border border-[#d7c9bd] px-3 py-1.5 text-xs font-semibold"
+                      >
+                        編輯
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+      {selectedProduct && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onCloseProduct}>
+          <div
+            className="max-h-[86vh] w-full max-w-5xl overflow-hidden rounded-2xl bg-white shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex flex-wrap items-start justify-between gap-3 border-b border-[#e5ded4] p-5">
+              <div>
+                <p className="font-mono text-sm text-[#2687c9]">{selectedProduct.id}</p>
+                <h3 className="mt-1 text-2xl font-bold">{selectedProduct.name}</h3>
+                <p className="mt-1 text-sm text-[#8a7f72]">
+                  已載入 {selectedRows.length} 筆顏色 / 尺碼庫存資料
+                </p>
               </div>
-            );
-          })}
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => onEditProduct(selectedProduct)}
+                  className="rounded-full bg-[#1f1b19] px-4 py-2 text-sm font-semibold text-white"
+                >
+                  編輯商品
+                </button>
+                <button
+                  type="button"
+                  onClick={onCloseProduct}
+                  className="rounded-full border border-[#d7c9bd] px-4 py-2 text-sm font-semibold"
+                >
+                  關閉
+                </button>
+              </div>
+            </div>
+            <div className="grid gap-3 border-b border-[#efe8dd] bg-[#faf7f2] p-4 text-sm sm:grid-cols-4">
+              <div>
+                <span className="block text-xs text-[#8a7f72]">總庫存</span>
+                <strong className="text-xl">{selectedTotalStock}</strong>
+              </div>
+              <div>
+                <span className="block text-xs text-[#8a7f72]">安全庫存</span>
+                <strong className="text-xl">{selectedSafetyTotal}</strong>
+              </div>
+              <div>
+                <span className="block text-xs text-[#8a7f72]">庫存金額</span>
+                <strong className="text-xl">{selectedStockValue.toLocaleString()}</strong>
+              </div>
+              <div>
+                <span className="block text-xs text-[#8a7f72]">分類</span>
+                <strong className="text-xl">{catName(selectedProduct.category)}</strong>
+              </div>
+            </div>
+            <div className="max-h-[52vh] overflow-auto p-4">
+              <table className="w-full whitespace-nowrap text-sm">
+                <thead>
+                  <tr className="border-b border-[#e5ded4] text-left text-xs text-[#8a7f72]">
+                    <th className="px-2 py-2">規格</th>
+                    <th className="px-2 py-2">顏色</th>
+                    <th className="px-2 py-2">尺寸</th>
+                    <th className="px-2 py-2 text-right">目前庫存</th>
+                    <th className="px-2 py-2 text-right">安全庫存</th>
+                    <th className="px-2 py-2 text-right">單位成本</th>
+                    <th className="px-2 py-2">儲位</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {selectedRows.map((row) => (
+                    <tr key={row.key} className="border-b border-[#efe8dd] last:border-0">
+                      <td className="px-2 py-2">{row.label}</td>
+                      <td className="px-2 py-2 text-[#6b6156]">{row.color || '—'}</td>
+                      <td className="px-2 py-2 text-[#6b6156]">{row.size || '—'}</td>
+                      <td className="px-2 py-2 text-right font-semibold">{row.inventory}</td>
+                      <td className="px-2 py-2 text-right">{row.safety}</td>
+                      <td className="px-2 py-2 text-right">{row.cost}</td>
+                      <td className="px-2 py-2 text-[#6b6156]">{row.location || '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
       )}
     </Card>
@@ -2772,7 +2828,7 @@ function InventorySection({
     stockStatus: 'all',
     productId: 'all',
   });
-  const [expandedInventoryProduct, setExpandedInventoryProduct] = useState<string | null>(null);
+  const [selectedInventoryProduct, setSelectedInventoryProduct] = useState<Product | null>(null);
   const catName = (slug: string) => categories.find((c) => c.slug === slug)?.name || slug || '—';
   const nameById = (id: string) => products.find((p) => p.id === id)?.name || id;
   const fmtDate = (s?: string) => (s ? new Date(s).toLocaleDateString('zh-TW') : '—');
@@ -2886,8 +2942,9 @@ function InventorySection({
       <ProductInventorySummary
         products={filteredProducts}
         categories={categories}
-        expandedProduct={expandedInventoryProduct}
-        onToggleProduct={(id) => setExpandedInventoryProduct(expandedInventoryProduct === id ? null : id)}
+        selectedProduct={selectedInventoryProduct}
+        onSelectProduct={setSelectedInventoryProduct}
+        onCloseProduct={() => setSelectedInventoryProduct(null)}
         onEditProduct={onEditProduct}
         onCreateProduct={onCreateProduct}
       />
