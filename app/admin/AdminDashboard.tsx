@@ -2614,6 +2614,7 @@ type MvForm = {
 function ProductInventorySummary({
   products,
   categories,
+  filters,
   selectedProduct,
   onSelectProduct,
   onCloseProduct,
@@ -2622,6 +2623,7 @@ function ProductInventorySummary({
 }: {
   products: Product[];
   categories: Category[];
+  filters: React.ReactNode;
   selectedProduct: Product | null;
   onSelectProduct: (product: Product) => void;
   onCloseProduct: () => void;
@@ -2647,6 +2649,7 @@ function ProductInventorySummary({
         </button>
       }
     >
+      {filters}
       {products.length === 0 ? (
         <Empty>沒有符合篩選條件的商品。</Empty>
       ) : (
@@ -2829,7 +2832,7 @@ function InventorySection({
     productId: 'all',
   });
   const [selectedInventoryProduct, setSelectedInventoryProduct] = useState<Product | null>(null);
-  const [inventoryTab, setInventoryTab] = useState<'filters' | 'products' | 'stock' | 'movement' | 'history'>('products');
+  const [inventoryTab, setInventoryTab] = useState<'products' | 'stock' | 'movement' | 'history'>('products');
   const catName = (slug: string) => categories.find((c) => c.slug === slug)?.name || slug || '—';
   const nameById = (id: string) => products.find((p) => p.id === id)?.name || id;
   const fmtDate = (s?: string) => (s ? new Date(s).toLocaleDateString('zh-TW') : '—');
@@ -2872,12 +2875,76 @@ function InventorySection({
 
   const selProduct = products.find((p) => p.id === mvForm.product_id);
   const inventoryTabs = [
-    { key: 'filters', label: '庫存篩選' },
     { key: 'products', label: '商品管理' },
     { key: 'stock', label: '庫存總表' },
     { key: 'movement', label: '入庫 / 出庫' },
     { key: 'history', label: '進出庫紀錄' },
   ] as const;
+  const inventoryFilterControls = (
+    <div className="mb-5 rounded-xl border border-[#e5ded4] bg-[#faf7f2] p-4">
+      <div className="grid gap-3 md:grid-cols-4">
+        <label className="block">
+          <span className="mb-1 block text-sm text-[#8a7f72]">搜尋</span>
+          <input
+            value={inventoryFilters.query}
+            onChange={(e) => setInventoryFilters({ ...inventoryFilters, query: e.target.value })}
+            placeholder="品項、品名、規格、儲位"
+            className="w-full rounded-lg border border-[#e5ded4] bg-white px-3 py-2"
+          />
+        </label>
+        <label className="block">
+          <span className="mb-1 block text-sm text-[#8a7f72]">商品</span>
+          <select
+            value={inventoryFilters.productId}
+            onChange={(e) => setInventoryFilters({ ...inventoryFilters, productId: e.target.value })}
+            className="w-full rounded-lg border border-[#e5ded4] bg-white px-3 py-2"
+          >
+            <option value="all">全部商品</option>
+            {products.map((p) => (
+              <option key={p.id} value={p.id}>{p.name}</option>
+            ))}
+          </select>
+        </label>
+        <label className="block">
+          <span className="mb-1 block text-sm text-[#8a7f72]">分類</span>
+          <select
+            value={inventoryFilters.category}
+            onChange={(e) => setInventoryFilters({ ...inventoryFilters, category: e.target.value })}
+            className="w-full rounded-lg border border-[#e5ded4] bg-white px-3 py-2"
+          >
+            <option value="all">全部分類</option>
+            {categories.map((c) => (
+              <option key={c.id} value={c.slug}>{c.name}</option>
+            ))}
+          </select>
+        </label>
+        <label className="block">
+          <span className="mb-1 block text-sm text-[#8a7f72]">庫存狀態</span>
+          <select
+            value={inventoryFilters.stockStatus}
+            onChange={(e) => setInventoryFilters({ ...inventoryFilters, stockStatus: e.target.value })}
+            className="w-full rounded-lg border border-[#e5ded4] bg-white px-3 py-2"
+          >
+            <option value="all">全部狀態</option>
+            <option value="low">需補貨</option>
+            <option value="normal">正常</option>
+          </select>
+        </label>
+      </div>
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+        <p className="text-sm text-[#8a7f72]">
+          目前顯示 {filteredProducts.length} 個商品、{filteredRows.length} 筆顏色 / 尺碼庫存。
+        </p>
+        <button
+          type="button"
+          onClick={() => setInventoryFilters({ query: '', category: 'all', stockStatus: 'all', productId: 'all' })}
+          className="rounded-full border border-[#d7c9bd] bg-white px-3 py-1.5 text-sm font-semibold"
+        >
+          清除篩選
+        </button>
+      </div>
+    </div>
+  );
 
   return (
     <div className="space-y-6">
@@ -2900,78 +2967,11 @@ function InventorySection({
         </div>
       </div>
 
-      {inventoryTab === 'filters' && (
-      <Card
-        title="庫存篩選"
-        action={
-          <button
-            type="button"
-            onClick={() => setInventoryFilters({ query: '', category: 'all', stockStatus: 'all', productId: 'all' })}
-            className="rounded-full border border-[#d7c9bd] px-3 py-1.5 text-sm font-semibold"
-          >
-            清除篩選
-          </button>
-        }
-      >
-        <div className="grid gap-3 md:grid-cols-4">
-          <label className="block">
-            <span className="mb-1 block text-sm text-[#8a7f72]">搜尋</span>
-            <input
-              value={inventoryFilters.query}
-              onChange={(e) => setInventoryFilters({ ...inventoryFilters, query: e.target.value })}
-              placeholder="品項、品名、規格、儲位"
-              className="w-full rounded-lg border border-[#e5ded4] px-3 py-2"
-            />
-          </label>
-          <label className="block">
-            <span className="mb-1 block text-sm text-[#8a7f72]">商品</span>
-            <select
-              value={inventoryFilters.productId}
-              onChange={(e) => setInventoryFilters({ ...inventoryFilters, productId: e.target.value })}
-              className="w-full rounded-lg border border-[#e5ded4] px-3 py-2"
-            >
-              <option value="all">全部商品</option>
-              {products.map((p) => (
-                <option key={p.id} value={p.id}>{p.name}</option>
-              ))}
-            </select>
-          </label>
-          <label className="block">
-            <span className="mb-1 block text-sm text-[#8a7f72]">分類</span>
-            <select
-              value={inventoryFilters.category}
-              onChange={(e) => setInventoryFilters({ ...inventoryFilters, category: e.target.value })}
-              className="w-full rounded-lg border border-[#e5ded4] px-3 py-2"
-            >
-              <option value="all">全部分類</option>
-              {categories.map((c) => (
-                <option key={c.id} value={c.slug}>{c.name}</option>
-              ))}
-            </select>
-          </label>
-          <label className="block">
-            <span className="mb-1 block text-sm text-[#8a7f72]">庫存狀態</span>
-            <select
-              value={inventoryFilters.stockStatus}
-              onChange={(e) => setInventoryFilters({ ...inventoryFilters, stockStatus: e.target.value })}
-              className="w-full rounded-lg border border-[#e5ded4] px-3 py-2"
-            >
-              <option value="all">全部狀態</option>
-              <option value="low">需補貨</option>
-              <option value="normal">正常</option>
-            </select>
-          </label>
-        </div>
-        <p className="mt-3 text-sm text-[#8a7f72]">
-          目前顯示 {filteredProducts.length} 個商品、{filteredRows.length} 筆顏色 / 尺碼庫存。
-        </p>
-      </Card>
-      )}
-
       {inventoryTab === 'products' && (
       <ProductInventorySummary
         products={filteredProducts}
         categories={categories}
+        filters={inventoryFilterControls}
         selectedProduct={selectedInventoryProduct}
         onSelectProduct={setSelectedInventoryProduct}
         onCloseProduct={() => setSelectedInventoryProduct(null)}
