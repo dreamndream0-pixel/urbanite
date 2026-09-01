@@ -76,11 +76,22 @@ export async function PATCH(request: Request) {
   }
 
   const supabase = createAdminClient();
-  const { data, error } = await supabase
+  let { data, error } = await supabase
     .from('site_settings')
     .upsert(update)
     .select()
     .single();
+
+  if (error && 'footer_social_links' in update && error.message.includes('footer_social_links')) {
+    delete update.footer_social_links;
+    const retry = await supabase
+      .from('site_settings')
+      .upsert(update)
+      .select()
+      .single();
+    data = retry.data;
+    error = retry.error;
+  }
 
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
   return NextResponse.json({ ...DEFAULT_SETTINGS, ...data } as SiteSettings);
