@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getAdminUser, getSessionUser } from '@/lib/supabase/server';
-import { calcDiscount } from '@/lib/discount';
-import type { Discount, Order, OrderItem } from '@/lib/types';
+import { evaluateCoupon } from '@/lib/discount';
+import type { Discount, Order, OrderItem, Product } from '@/lib/types';
 
 const FREE_SHIPPING_THRESHOLD = 2000;
 const SHIPPING_FEE = 120;
@@ -97,9 +97,68 @@ export async function POST(request: Request) {
   let discountCode = '';
   let appliedCouponId = '';
   let appliedUserCouponId = '';
+  let couponSnapshot: Record<string, unknown> = {};
   const rawCode = String(body?.discount_code ?? '').trim().toUpperCase();
   const rawUserCouponId = String(body?.user_coupon_id ?? '').trim();
   if (rawCode) {
+    const { count: orderCount } = user
+      ? await supabase.from('orders').select('id', { count: 'exact', head: true }).eq('user_id', user.id)
+      : { count: 0 };
+
+    async function usageCounts(couponId: string) {
+      const [total, perUser] = await Promise.all([
+        supabase.from('coupon_usages').select('id', { count: 'exact', head: true }).eq('coupon_id', couponId),
+        user
+          ? supabase
+              .from('coupon_usages')
+              .select('id', { count: 'exact', head: true })
+              .eq('coupon_id', couponId)
+              .eq('user_id', user.id)
+          : Promise.resolve({ count: 0 }),
+      ]);
+      return { totalUsageCount: total.count ?? 0, userUsageCount: perUser.count ?? 0 };
+    }
+
+    function acceptCoupon(d: Discount, userCouponStatus?: string | null) {
+      return usageCounts(d.id).then((counts) => {
+        const result = evaluateCoupon(d, {
+          subtotal,
+          shipping,
+          items: orderItems,
+          products: (products ?? []) as Product[],
+          userId: user?.id ?? null,
+          isFirstPurchase: (orderCount ?? 0) === 0,
+          userCouponStatus,
+          ...counts,
+        });
+        if (!result.ok) return result.reason ?? '優惠券不可使用';
+        discount = result.finalCouponAmount;
+        discountCode = d.code;
+        appliedCouponId = d.id;
+        couponSnapshot = {
+          id: d.id,
+          name: d.name ?? '',
+          code: d.code,
+          type: d.type,
+          value: d.value,
+          min_spend: d.min_spend,
+          max_discount: d.max_discount ?? null,
+          start_at: d.start_at ?? null,
+          end_at: d.end_at ?? null,
+          total_limit: d.total_limit ?? null,
+          per_user_limit: d.per_user_limit ?? null,
+          applicable_products: d.applicable_products ?? [],
+          applicable_categories: d.applicable_categories ?? [],
+          applicable_users: d.applicable_users ?? 'all',
+          stackable: d.stackable ?? false,
+          discount_amount: result.finalCouponAmount,
+          item_discount: result.discount,
+          shipping_discount: result.shippingDiscount,
+        };
+        return '';
+      });
+    }
+
     if (rawUserCouponId && user) {
       const { data: userCoupon } = await supabase
         .from('user_coupons')
@@ -108,28 +167,25 @@ export async function POST(request: Request) {
         .eq('user_id', user.id)
         .maybeSingle();
       const d = userCoupon?.coupon as Discount | undefined;
-      if (userCoupon?.status === 'available' && d?.active && d.code === rawCode) {
-        discount = calcDiscount(d, subtotal);
-        if (discount > 0) {
-          discountCode = rawCode;
-          appliedCouponId = d.id;
-          appliedUserCouponId = rawUserCouponId;
-        }
+      if (!userCoupon || !d || d.code !== rawCode) {
+        return NextResponse.json({ error: '這張會員優惠券不可使用' }, { status: 400 });
       }
+      const reason = await acceptCoupon(d, userCoupon.status);
+      if (reason) return NextResponse.json({ error: reason }, { status: 400 });
+      appliedUserCouponId = rawUserCouponId;
     } else {
+      if (!user && rawCode) {
+        // 允許全站公開折扣碼未登入使用,但會員限制券會在規則中被擋下。
+      }
       const { data: d } = await supabase
         .from('discounts')
         .select('*')
         .eq('code', rawCode)
         .eq('active', true)
         .maybeSingle();
-      if (d) {
-        discount = calcDiscount(d as Discount, subtotal);
-        if (discount > 0) {
-          discountCode = rawCode;
-          appliedCouponId = (d as Discount).id;
-        }
-      }
+      if (!d) return NextResponse.json({ error: '折扣碼無效或已停用' }, { status: 400 });
+      const reason = await acceptCoupon(d as Discount);
+      if (reason) return NextResponse.json({ error: reason }, { status: 400 });
     }
   }
 
@@ -162,6 +218,9 @@ export async function POST(request: Request) {
       payment_method: paymentMethod,
       discount,
       discount_code: discountCode,
+      coupon_id: appliedCouponId || null,
+      user_coupon_id: appliedUserCouponId || null,
+      coupon_snapshot: couponSnapshot,
       total,
       status: '待出貨',
       paid: false,
@@ -172,16 +231,18 @@ export async function POST(request: Request) {
 
   if (orderErr) return NextResponse.json({ error: orderErr.message }, { status: 400 });
 
-  if (appliedCouponId && appliedUserCouponId && user) {
-    await supabase
-      .from('user_coupons')
-      .update({ status: 'used', used_at: new Date().toISOString(), order_id: order.id })
-      .eq('id', appliedUserCouponId)
-      .eq('user_id', user.id);
+  if (appliedCouponId) {
+    if (appliedUserCouponId) {
+      await supabase
+        .from('user_coupons')
+        .update({ status: 'used', used_at: new Date().toISOString(), order_id: order.id })
+        .eq('id', appliedUserCouponId)
+        .eq('user_id', user?.id ?? '');
+    }
     await supabase.from('coupon_usages').insert({
       coupon_id: appliedCouponId,
-      user_id: user.id,
-      user_coupon_id: appliedUserCouponId,
+      user_id: user?.id ?? null,
+      user_coupon_id: appliedUserCouponId || null,
       order_id: order.id,
       original_amount: subtotal,
       discount_amount: discount,

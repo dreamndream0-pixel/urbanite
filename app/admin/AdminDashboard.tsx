@@ -7,12 +7,14 @@ import { createBrowserSupabase } from '@/lib/supabase/client';
 import type {
   Banner,
   Category,
+  CouponUsage,
   Customer,
   Discount,
   Order,
   Product,
   SiteSettings,
   StockMovement,
+  UserCoupon,
   Variant,
 } from '@/lib/types';
 
@@ -69,6 +71,59 @@ type Draft = {
   is_featured: boolean;
   sort_order: number;
 };
+
+type DiscountDraft = {
+  name: string;
+  code: string;
+  type: 'percent' | 'amount' | 'free_shipping';
+  value: number;
+  min_spend: number;
+  max_discount: number;
+  start_at: string;
+  end_at: string;
+  total_limit: number;
+  per_user_limit: number;
+  applicable_products: string;
+  applicable_categories: string;
+  applicable_users: 'all' | 'new' | 'vip';
+  is_first_purchase_only: boolean;
+  stackable: boolean;
+  status: '草稿' | '啟用' | '停用' | '已結束';
+};
+
+function blankDiscountDraft(): DiscountDraft {
+  return {
+    name: '',
+    code: '',
+    type: 'percent',
+    value: 10,
+    min_spend: 0,
+    max_discount: 0,
+    start_at: '',
+    end_at: '',
+    total_limit: 0,
+    per_user_limit: 1,
+    applicable_products: '',
+    applicable_categories: '',
+    applicable_users: 'all',
+    is_first_purchase_only: false,
+    stackable: false,
+    status: '啟用',
+  };
+}
+
+function splitLines(value: string) {
+  return value
+    .split(/[\n,]/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function couponText(d: Discount) {
+  if (d.type === 'free_shipping') return '免運';
+  if (d.type === 'amount') return `折 ${formatter.format(d.value)}`;
+  return `折 ${d.value}%`;
+}
 
 // 每個商品最多可放的圖片數
 const MAX_PRODUCT_IMAGES = 10;
@@ -258,6 +313,8 @@ export default function AdminDashboard({
   initialCustomers,
   initialBanners,
   initialMovements,
+  initialUserCoupons,
+  initialCouponUsages,
   initialLogoUrl,
   initialSettings,
   userEmail,
@@ -269,6 +326,8 @@ export default function AdminDashboard({
   initialCustomers: Customer[];
   initialBanners: Banner[];
   initialMovements: StockMovement[];
+  initialUserCoupons: UserCoupon[];
+  initialCouponUsages: CouponUsage[];
   initialLogoUrl: string;
   initialSettings: SiteSettings | null;
   userEmail: string;
@@ -307,7 +366,12 @@ export default function AdminDashboard({
   const [cropFile, setCropFile] = useState<File | null>(null);
   const [editBannerId, setEditBannerId] = useState<string | null>(null);
   const [newCat, setNewCat] = useState({ slug: '', name: '', en: '' });
-  const [newDiscount, setNewDiscount] = useState({ name: '', code: '', type: 'percent', value: 0, min_spend: 0, max_discount: 0 });
+  const [newDiscount, setNewDiscount] = useState<DiscountDraft>(blankDiscountDraft());
+  const [discountQuery, setDiscountQuery] = useState('');
+  const [discountStatus, setDiscountStatus] = useState('全部');
+  const [userCoupons, setUserCoupons] = useState<UserCoupon[]>(initialUserCoupons);
+  const [couponUsages] = useState<CouponUsage[]>(initialCouponUsages);
+  const [manualCouponByUser, setManualCouponByUser] = useState<Record<string, string>>({});
   const [logoUrl, setLogoUrl] = useState(initialLogoUrl);
   const [footerDraft, setFooterDraft] = useState({
     sections: JSON.stringify(initialSettings?.footer_sections ?? [], null, 2),
@@ -456,6 +520,24 @@ export default function AdminDashboard({
         return [product.id, product.name, product.status].some((value) => value.toLowerCase().includes(q));
       })
     : [];
+  const filteredDiscounts = useMemo(() => {
+    const q = discountQuery.trim().toLowerCase();
+    return discounts.filter((d) => {
+      const status = d.status ?? (d.active ? '啟用' : '停用');
+      const passStatus = discountStatus === '全部' || status === discountStatus;
+      const passQuery = !q || [d.code, d.name ?? '', d.type].some((value) => String(value).toLowerCase().includes(q));
+      return passStatus && passQuery;
+    });
+  }, [discountQuery, discountStatus, discounts]);
+  const couponStats = useMemo(() => {
+    const month = new Date().toISOString().slice(0, 7);
+    const monthIssued = userCoupons.filter((item) => (item.received_at ?? '').startsWith(month)).length;
+    const claimed = userCoupons.length;
+    const used = couponUsages.length;
+    const discountTotal = couponUsages.reduce((sum, item) => sum + item.discount_amount, 0);
+    const revenue = couponUsages.reduce((sum, item) => sum + item.final_amount, 0);
+    return { monthIssued, claimed, used, usageRate: claimed ? Math.round((used / claimed) * 100) : 0, discountTotal, revenue };
+  }, [couponUsages, userCoupons]);
 
   // ---- 操作 ----
   async function signOut() {
@@ -868,29 +950,115 @@ export default function AdminDashboard({
     const res = await fetch('/api/discounts', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...newDiscount, code }),
+      body: JSON.stringify({
+        ...newDiscount,
+        code,
+        applicable_products: splitLines(newDiscount.applicable_products),
+        applicable_categories: splitLines(newDiscount.applicable_categories),
+        active: newDiscount.status === '啟用',
+      }),
     });
     const data = await res.json();
     if (res.ok) {
       setDiscounts((l) => [data as Discount, ...l]);
-      setNewDiscount({ name: '', code: '', type: 'percent', value: 0, min_spend: 0, max_discount: 0 });
+      setNewDiscount(blankDiscountDraft());
     } else alert(data.error ?? '新增失敗(折扣碼可能重複)');
   }
 
   async function toggleDiscount(id: string, active: boolean) {
-    setDiscounts((l) => l.map((d) => (d.id === id ? { ...d, active } : d)));
+    const status = active ? '啟用' : '停用';
+    setDiscounts((l) => l.map((d) => (d.id === id ? { ...d, active, status } : d)));
     await fetch(`/api/discounts/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ active }),
+      body: JSON.stringify({ active, status }),
     });
   }
 
   async function deleteDiscount(id: string) {
-    if (!confirm('確定刪除這個折扣碼嗎?')) return;
+    const d = discounts.find((item) => item.id === id);
+    const claimed = userCoupons.filter((item) => item.coupon_id === id).length;
+    const used = couponUsages.filter((item) => item.coupon_id === id).length;
+    if (!confirm(`確定刪除優惠券「${d?.code ?? id}」嗎?\n\n會一併刪除/影響:\n- 優惠券主檔\n- ${claimed} 筆會員持券資料\n- ${used} 筆優惠券使用紀錄\n- 後續結帳無法再套用此券\n\n舊訂單仍保留當時的折抵快照。`)) return;
     const res = await fetch(`/api/discounts/${id}`, { method: 'DELETE' });
     if (res.ok) setDiscounts((l) => l.filter((d) => d.id !== id));
     else alert('刪除失敗');
+  }
+
+  async function copyDiscount(d: Discount) {
+    const nextCode = `${d.code}-COPY`;
+    const res = await fetch('/api/discounts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ...d,
+        id: undefined,
+        code: nextCode,
+        name: `${d.name || d.code} 複製`,
+        active: false,
+        status: '草稿',
+      }),
+    });
+    const data = await res.json().catch(() => null);
+    if (!res.ok) return alert(data?.error ?? '複製失敗');
+    setDiscounts((list) => [data as Discount, ...list]);
+  }
+
+  function exportDiscounts() {
+    const rows = [
+      ['優惠碼', '名稱', '類型', '折扣值', '最低消費', '最高折抵', '開始', '結束', '已領取', '已使用', '折抵總額', '帶來營收', '狀態'],
+      ...discounts.map((d) => {
+        const usage = couponUsages.filter((item) => item.coupon_id === d.id);
+        return [
+          d.code,
+          d.name ?? '',
+          d.type,
+          String(d.value),
+          String(d.min_spend ?? 0),
+          String(d.max_discount ?? ''),
+          d.start_at ?? '',
+          d.end_at ?? '',
+          String(userCoupons.filter((item) => item.coupon_id === d.id).length),
+          String(usage.length),
+          String(usage.reduce((sum, item) => sum + item.discount_amount, 0)),
+          String(usage.reduce((sum, item) => sum + item.final_amount, 0)),
+          d.status ?? (d.active ? '啟用' : '停用'),
+        ];
+      }),
+    ];
+    const csv = rows.map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\n');
+    const blob = new Blob([`\ufeff${csv}`], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `urbanite-coupons-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  async function issueCouponToUser(userId: string) {
+    const couponId = manualCouponByUser[userId];
+    if (!couponId) return alert('請選擇要補發的優惠券');
+    const res = await fetch('/api/admin/user-coupons', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user_id: userId, coupon_id: couponId }),
+    });
+    const data = await res.json().catch(() => null);
+    if (!res.ok) return alert(data?.error ?? '補發失敗');
+    setUserCoupons((list) => [data as UserCoupon, ...list.filter((item) => !(item.user_id === userId && item.coupon_id === couponId))]);
+  }
+
+  async function revokeUserCoupon(id: string) {
+    if (!confirm('確定撤回這張尚未使用的會員優惠券嗎?')) return;
+    const res = await fetch('/api/admin/user-coupons', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id }),
+    });
+    const data = await res.json().catch(() => null);
+    if (!res.ok) return alert(data?.error ?? '撤回失敗');
+    setUserCoupons((list) => list.map((item) => (item.id === id ? (data as UserCoupon) : item)));
   }
 
   async function uploadLogo(file: File) {
@@ -1686,6 +1854,60 @@ export default function AdminDashboard({
                                       <p className="font-semibold">{c.address || '-'}</p>
                                     </div>
                                   </div>
+                                  <div className="mb-3 rounded-lg bg-white p-3">
+                                    <div className="flex flex-wrap items-end gap-2">
+                                      <div className="flex-1">
+                                        <p className="mb-1 text-sm font-semibold">會員優惠券</p>
+                                        <select
+                                          value={manualCouponByUser[c.user_id] ?? ''}
+                                          onChange={(e) => setManualCouponByUser((map) => ({ ...map, [c.user_id]: e.target.value }))}
+                                          className="w-full rounded-lg border border-[#e5ded4] px-3 py-2 text-sm"
+                                        >
+                                          <option value="">選擇要補發的優惠券</option>
+                                          {discounts.map((d) => (
+                                            <option key={d.id} value={d.id}>
+                                              {d.code} / {d.name || couponText(d)}
+                                            </option>
+                                          ))}
+                                        </select>
+                                      </div>
+                                      <button
+                                        type="button"
+                                        onClick={() => issueCouponToUser(c.user_id)}
+                                        className="rounded-full bg-[#1f1b19] px-4 py-2 text-sm font-semibold text-white"
+                                      >
+                                        補發優惠券
+                                      </button>
+                                    </div>
+                                    <div className="mt-3 space-y-2">
+                                      {userCoupons.filter((item) => item.user_id === c.user_id).length === 0 ? (
+                                        <p className="text-sm text-[#8a7f72]">尚未領取優惠券。</p>
+                                      ) : (
+                                        userCoupons
+                                          .filter((item) => item.user_id === c.user_id)
+                                          .map((item) => (
+                                            <div key={item.id} className="flex flex-wrap items-center gap-2 rounded border border-[#efe8dd] px-3 py-2 text-sm">
+                                              <span className="font-mono font-semibold">{item.coupon?.code ?? item.coupon_id}</span>
+                                              <span>{item.coupon?.name || (item.coupon ? couponText(item.coupon) : '')}</span>
+                                              <span className="rounded-full bg-[#f3ede4] px-2 py-0.5 text-xs text-[#6b6156]">
+                                                {item.status === 'available' ? '可使用' : item.status === 'used' ? '已使用' : item.status === 'revoked' ? '已撤回' : '已過期'}
+                                              </span>
+                                              {item.used_at ? <span className="text-xs text-[#8a7f72]">使用: {new Date(item.used_at).toLocaleString('zh-TW')}</span> : null}
+                                              {item.order_id ? <span className="text-xs text-[#8a7f72]">訂單: {item.order_id}</span> : null}
+                                              {item.status === 'available' && (
+                                                <button
+                                                  type="button"
+                                                  onClick={() => revokeUserCoupon(item.id)}
+                                                  className="ml-auto font-semibold text-[#c0392b]"
+                                                >
+                                                  撤回
+                                                </button>
+                                              )}
+                                            </div>
+                                          ))
+                                      )}
+                                    </div>
+                                  </div>
                                   {memberOrders.length === 0 ? (
                                     <p className="text-sm text-[#8a7f72]">這位會員還沒有訂單。</p>
                                   ) : (
@@ -1723,104 +1945,134 @@ export default function AdminDashboard({
 
           {/* ===== 促銷管理 ===== */}
           {section === 'promotions' && (
-            <Card title="會員優惠券 / 折扣碼">
-              <div className="space-y-2">
-                {discounts.length === 0 ? (
-                  <Empty>還沒有優惠券,在下方新增一張。</Empty>
-                ) : (
-                  discounts.map((d) => (
-                    <div
-                      key={d.id}
-                      className="flex flex-wrap items-center gap-3 rounded-lg border border-[#e5ded4] p-3"
-                    >
-                      <span className="rounded bg-[#1f1b19] px-2 py-1 text-sm font-semibold text-white">
-                        {d.code}
-                      </span>
-                      {d.name ? <span className="font-semibold">{d.name}</span> : null}
-                      <span className="text-sm text-[#6b6156]">
-                        {d.type === 'percent' ? `折 ${d.value}%` : `折 ${formatter.format(d.value)}`}
-                        {d.min_spend > 0 && ` · 滿 ${formatter.format(d.min_spend)}`}
-                        {d.max_discount ? ` · 最高折 ${formatter.format(d.max_discount)}` : ''}
-                      </span>
-                      <div className="ml-auto flex items-center gap-2">
-                        <button
-                          onClick={() => toggleDiscount(d.id, !d.active)}
-                          className={`rounded-full px-3 py-1 text-sm font-semibold ${
-                            d.active ? 'bg-[#e9f7ee] text-[#1f7a44]' : 'border border-[#d7c9bd] text-[#8a7f72]'
-                          }`}
-                        >
-                          {d.active ? '啟用中' : '已停用'}
-                        </button>
-                        <button
-                          onClick={() => deleteDiscount(d.id)}
-                          className="rounded-full border border-[#e0b4b4] px-3 py-1 text-sm font-semibold text-[#c0392b]"
-                        >
-                          刪除
-                        </button>
-                      </div>
-                    </div>
-                  ))
-                )}
+            <div className="space-y-6">
+              <div className="grid grid-cols-2 gap-4 lg:grid-cols-6">
+                <StatCard label="本月發放" value={`${couponStats.monthIssued} 張`} />
+                <StatCard label="已領取" value={`${couponStats.claimed} 張`} />
+                <StatCard label="已使用" value={`${couponStats.used} 張`} />
+                <StatCard label="使用率" value={`${couponStats.usageRate}%`} />
+                <StatCard label="優惠券折抵" value={formatter.format(couponStats.discountTotal)} />
+                <StatCard label="帶來營收" value={formatter.format(couponStats.revenue)} />
               </div>
-              <div className="mt-4 flex flex-wrap items-end gap-2 border-t border-[#e5ded4] pt-4">
-                <Labeled label="優惠券名稱">
+              <Card title="優惠券管理">
+                <div className="mb-4 flex flex-wrap gap-2">
                   <input
-                    value={newDiscount.name}
-                    onChange={(e) => setNewDiscount({ ...newDiscount, name: e.target.value })}
-                    placeholder="新會員首購"
-                    className="w-36 rounded border border-[#e5ded4] px-2 py-1.5 text-sm"
+                    value={discountQuery}
+                    onChange={(e) => setDiscountQuery(e.target.value)}
+                    placeholder="搜尋優惠碼 / 名稱"
+                    className="min-w-56 rounded-lg border border-[#e5ded4] px-3 py-2 text-sm"
                   />
-                </Labeled>
-                <Labeled label="折扣碼">
-                  <input
-                    value={newDiscount.code}
-                    onChange={(e) => setNewDiscount({ ...newDiscount, code: e.target.value })}
-                    placeholder="SALE10"
-                    className="w-28 rounded border border-[#e5ded4] px-2 py-1.5 text-sm"
-                  />
-                </Labeled>
-                <Labeled label="類型">
                   <select
-                    value={newDiscount.type}
-                    onChange={(e) => setNewDiscount({ ...newDiscount, type: e.target.value })}
-                    className="rounded border border-[#e5ded4] px-2 py-1.5 text-sm"
+                    value={discountStatus}
+                    onChange={(e) => setDiscountStatus(e.target.value)}
+                    className="rounded-lg border border-[#e5ded4] px-3 py-2 text-sm"
                   >
-                    <option value="percent">打折 %</option>
-                    <option value="amount">折抵金額</option>
+                    {['全部', '草稿', '啟用', '停用', '已結束'].map((status) => (
+                      <option key={status}>{status}</option>
+                    ))}
                   </select>
-                </Labeled>
-                <Labeled label={newDiscount.type === 'percent' ? '折幾 %' : '折多少元'}>
-                  <input
-                    type="number"
-                    value={newDiscount.value}
-                    onChange={(e) => setNewDiscount({ ...newDiscount, value: Number(e.target.value) })}
-                    className="w-20 rounded border border-[#e5ded4] px-2 py-1.5 text-sm"
-                  />
-                </Labeled>
-                <Labeled label="最低消費">
-                  <input
-                    type="number"
-                    value={newDiscount.min_spend}
-                    onChange={(e) => setNewDiscount({ ...newDiscount, min_spend: Number(e.target.value) })}
-                    className="w-24 rounded border border-[#e5ded4] px-2 py-1.5 text-sm"
-                  />
-                </Labeled>
-                <Labeled label="最高折抵">
-                  <input
-                    type="number"
-                    value={newDiscount.max_discount}
-                    onChange={(e) => setNewDiscount({ ...newDiscount, max_discount: Number(e.target.value) })}
-                    className="w-24 rounded border border-[#e5ded4] px-2 py-1.5 text-sm"
-                  />
-                </Labeled>
-                <button
-                  onClick={addDiscount}
-                  className="rounded-full bg-[#1f1b19] px-4 py-1.5 text-sm font-semibold text-white"
-                >
-                  新增
-                </button>
-              </div>
-            </Card>
+                  <button
+                    type="button"
+                    onClick={exportDiscounts}
+                    className="rounded-full border border-[#d7c9bd] px-4 py-2 text-sm font-semibold"
+                  >
+                    匯出
+                  </button>
+                </div>
+                {filteredDiscounts.length === 0 ? (
+                  <Empty>沒有符合條件的優惠券。</Empty>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-[#e5ded4] text-left text-[#8a7f72]">
+                          <th className="py-2 pr-3">優惠碼</th>
+                          <th className="py-2 pr-3">內容</th>
+                          <th className="py-2 pr-3">期間</th>
+                          <th className="py-2 pr-3">限制</th>
+                          <th className="py-2 pr-3">已領 / 已用</th>
+                          <th className="py-2 pr-3">折抵 / 營收</th>
+                          <th className="py-2">操作</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredDiscounts.map((d) => {
+                          const usage = couponUsages.filter((item) => item.coupon_id === d.id);
+                          const claimed = userCoupons.filter((item) => item.coupon_id === d.id).length;
+                          const status = d.status ?? (d.active ? '啟用' : '停用');
+                          return (
+                            <tr key={d.id} className="border-b border-[#efe8dd] align-top">
+                              <td className="py-3 pr-3">
+                                <p className="font-mono font-bold text-[#2b8bd8]">{d.code}</p>
+                                <p className="text-xs text-[#8a7f72]">{status}</p>
+                              </td>
+                              <td className="py-3 pr-3">
+                                <p className="font-semibold">{d.name || couponText(d)}</p>
+                                <p className="text-xs text-[#6b6156]">
+                                  {couponText(d)}
+                                  {d.min_spend ? ` / 滿 ${formatter.format(d.min_spend)}` : ''}
+                                  {d.max_discount ? ` / 最高 ${formatter.format(d.max_discount)}` : ''}
+                                </p>
+                              </td>
+                              <td className="py-3 pr-3 text-xs text-[#6b6156]">
+                                <p>{d.start_at ? new Date(d.start_at).toLocaleDateString('zh-TW') : '不限開始'}</p>
+                                <p>{d.end_at ? new Date(d.end_at).toLocaleDateString('zh-TW') : '不限結束'}</p>
+                              </td>
+                              <td className="py-3 pr-3 text-xs text-[#6b6156]">
+                                <p>總上限 {d.total_limit ?? '不限'} / 每會員 {d.per_user_limit ?? 1}</p>
+                                <p>{d.applicable_users === 'new' || d.is_first_purchase_only ? '新會員首購' : d.applicable_users === 'vip' ? 'VIP' : '全部會員'}</p>
+                                <p>{d.stackable ? '可併用' : '單張使用'}</p>
+                              </td>
+                              <td className="py-3 pr-3">{claimed} / {usage.length}</td>
+                              <td className="py-3 pr-3 text-xs">
+                                <p>{formatter.format(usage.reduce((sum, item) => sum + item.discount_amount, 0))}</p>
+                                <p className="text-[#8a7f72]">{formatter.format(usage.reduce((sum, item) => sum + item.final_amount, 0))}</p>
+                              </td>
+                              <td className="py-3">
+                                <div className="flex flex-wrap gap-2">
+                                  <button onClick={() => toggleDiscount(d.id, !d.active)} className="rounded-full border border-[#d7c9bd] px-3 py-1 text-xs font-semibold">
+                                    {d.active ? '暫停' : '啟用'}
+                                  </button>
+                                  <button onClick={() => copyDiscount(d)} className="rounded-full border border-[#d7c9bd] px-3 py-1 text-xs font-semibold">
+                                    複製
+                                  </button>
+                                  <button onClick={() => deleteDiscount(d.id)} className="rounded-full border border-[#e0b4b4] px-3 py-1 text-xs font-semibold text-[#c0392b]">
+                                    刪除
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </Card>
+              <Card title="新增優惠券">
+                <div className="grid gap-4 md:grid-cols-3">
+                  <Labeled label="優惠券名稱"><input value={newDiscount.name} onChange={(e) => setNewDiscount({ ...newDiscount, name: e.target.value })} className="w-full rounded border border-[#e5ded4] px-3 py-2" /></Labeled>
+                  <Labeled label="優惠碼"><input value={newDiscount.code} onChange={(e) => setNewDiscount({ ...newDiscount, code: e.target.value })} className="w-full rounded border border-[#e5ded4] px-3 py-2" /></Labeled>
+                  <Labeled label="狀態"><select value={newDiscount.status} onChange={(e) => setNewDiscount({ ...newDiscount, status: e.target.value as DiscountDraft['status'] })} className="w-full rounded border border-[#e5ded4] px-3 py-2">{['草稿', '啟用', '停用', '已結束'].map((s) => <option key={s}>{s}</option>)}</select></Labeled>
+                  <Labeled label="優惠類型"><select value={newDiscount.type} onChange={(e) => setNewDiscount({ ...newDiscount, type: e.target.value as DiscountDraft['type'] })} className="w-full rounded border border-[#e5ded4] px-3 py-2"><option value="percent">百分比</option><option value="amount">固定金額</option><option value="free_shipping">免運</option></select></Labeled>
+                  <Labeled label="折扣值"><input type="number" value={newDiscount.value} onChange={(e) => setNewDiscount({ ...newDiscount, value: Number(e.target.value) })} disabled={newDiscount.type === 'free_shipping'} className="w-full rounded border border-[#e5ded4] px-3 py-2 disabled:bg-[#f6f2ec]" /></Labeled>
+                  <Labeled label="最低消費"><input type="number" value={newDiscount.min_spend} onChange={(e) => setNewDiscount({ ...newDiscount, min_spend: Number(e.target.value) })} className="w-full rounded border border-[#e5ded4] px-3 py-2" /></Labeled>
+                  <Labeled label="最高折抵"><input type="number" value={newDiscount.max_discount} onChange={(e) => setNewDiscount({ ...newDiscount, max_discount: Number(e.target.value) })} className="w-full rounded border border-[#e5ded4] px-3 py-2" /></Labeled>
+                  <Labeled label="開始時間"><input type="datetime-local" value={newDiscount.start_at} onChange={(e) => setNewDiscount({ ...newDiscount, start_at: e.target.value })} className="w-full rounded border border-[#e5ded4] px-3 py-2" /></Labeled>
+                  <Labeled label="結束時間"><input type="datetime-local" value={newDiscount.end_at} onChange={(e) => setNewDiscount({ ...newDiscount, end_at: e.target.value })} className="w-full rounded border border-[#e5ded4] px-3 py-2" /></Labeled>
+                  <Labeled label="發放 / 使用上限"><input type="number" value={newDiscount.total_limit} onChange={(e) => setNewDiscount({ ...newDiscount, total_limit: Number(e.target.value) })} className="w-full rounded border border-[#e5ded4] px-3 py-2" /></Labeled>
+                  <Labeled label="每會員限用"><input type="number" value={newDiscount.per_user_limit} onChange={(e) => setNewDiscount({ ...newDiscount, per_user_limit: Number(e.target.value) })} className="w-full rounded border border-[#e5ded4] px-3 py-2" /></Labeled>
+                  <Labeled label="適用會員"><select value={newDiscount.applicable_users} onChange={(e) => setNewDiscount({ ...newDiscount, applicable_users: e.target.value as DiscountDraft['applicable_users'] })} className="w-full rounded border border-[#e5ded4] px-3 py-2"><option value="all">全部</option><option value="new">新會員</option><option value="vip">VIP</option></select></Labeled>
+                  <Labeled label="適用商品代碼"><textarea value={newDiscount.applicable_products} onChange={(e) => setNewDiscount({ ...newDiscount, applicable_products: e.target.value })} rows={3} placeholder="一行一個商品代碼,空白代表全站" className="w-full rounded border border-[#e5ded4] px-3 py-2" /></Labeled>
+                  <Labeled label="適用分類代碼"><textarea value={newDiscount.applicable_categories} onChange={(e) => setNewDiscount({ ...newDiscount, applicable_categories: e.target.value })} rows={3} placeholder="一行一個分類 slug,空白代表全站" className="w-full rounded border border-[#e5ded4] px-3 py-2" /></Labeled>
+                  <div className="flex flex-col justify-end gap-3 text-sm font-semibold">
+                    <label className="flex items-center gap-2"><input type="checkbox" checked={newDiscount.is_first_purchase_only} onChange={(e) => setNewDiscount({ ...newDiscount, is_first_purchase_only: e.target.checked })} /> 新會員首購限定</label>
+                    <label className="flex items-center gap-2"><input type="checkbox" checked={newDiscount.stackable} onChange={(e) => setNewDiscount({ ...newDiscount, stackable: e.target.checked })} /> 可與其他優惠併用</label>
+                  </div>
+                </div>
+                <button onClick={addDiscount} className="mt-5 rounded-full bg-[#1f1b19] px-5 py-2.5 text-sm font-semibold text-white">新增優惠券</button>
+              </Card>
+            </div>
           )}
 
           {/* ===== 報表及分析 ===== */}

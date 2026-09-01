@@ -76,6 +76,7 @@ export default function CheckoutPage() {
   const [discountInput, setDiscountInput] = useState('');
   const [memberCoupons, setMemberCoupons] = useState<UserCoupon[]>([]);
   const [applied, setApplied] = useState<{ code: string; amount: number; userCouponId?: string } | null>(null);
+  const [couponChecks, setCouponChecks] = useState<Record<string, { ok: boolean; discount: number; error?: string; label?: string }>>({});
   const [discountMsg, setDiscountMsg] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
@@ -145,6 +146,48 @@ export default function CheckoutPage() {
     ? paymentMethod
     : availablePaymentMethods[0] ?? '';
 
+  useEffect(() => {
+    let alive = true;
+    if (!loaded || memberCoupons.length === 0 || subtotal <= 0) {
+      setCouponChecks({});
+      return;
+    }
+    Promise.all(
+      memberCoupons.map(async (item) => {
+        const coupon = item.coupon;
+        if (!coupon) return [item.id, { ok: false, discount: 0, error: '優惠券資料不完整' }] as const;
+        try {
+          const res = await fetch('/api/discounts/validate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              code: coupon.code,
+              subtotal,
+              shipping,
+              user_coupon_id: item.id,
+              items: cart.map((entry) => ({
+                productId: entry.productId,
+                name: entry.name,
+                variant: entry.variant,
+                price: entry.price,
+                quantity: entry.quantity,
+              })),
+            }),
+          });
+          const data = await res.json();
+          return [item.id, res.ok ? { ok: true, discount: data.discount, label: data.label } : { ok: false, discount: 0, error: data.error ?? '不可使用' }] as const;
+        } catch {
+          return [item.id, { ok: false, discount: 0, error: '檢查失敗' }] as const;
+        }
+      }),
+    ).then((entries) => {
+      if (alive) setCouponChecks(Object.fromEntries(entries));
+    });
+    return () => {
+      alive = false;
+    };
+  }, [cart, loaded, memberCoupons, shipping, subtotal]);
+
   function updateQty(id: string, change: number) {
     setCart((items) => {
       const next = items
@@ -166,13 +209,25 @@ export default function CheckoutPage() {
       const res = await fetch('/api/discounts/validate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code, subtotal, user_coupon_id: userCouponId }),
+        body: JSON.stringify({
+          code,
+          subtotal,
+          shipping,
+          user_coupon_id: userCouponId,
+          items: cart.map((item) => ({
+            productId: item.productId,
+            name: item.name,
+            variant: item.variant,
+            price: item.price,
+            quantity: item.quantity,
+          })),
+        }),
       });
       const data = await res.json();
       if (res.ok) {
         setApplied({ code: data.code, amount: data.discount, userCouponId: data.user_coupon_id });
         setDiscountInput(data.code);
-        setDiscountMsg(`已套用 ${data.code}，折 ${formatter.format(data.discount)}`);
+        setDiscountMsg(`已套用 ${data.code}，此訂單省 ${formatter.format(data.discount)}`);
       } else {
         setApplied(null);
         setDiscountMsg(data.error ?? '折扣碼無效');
@@ -322,21 +377,28 @@ export default function CheckoutPage() {
                   {memberCoupons.map((item) => {
                     const coupon = item.coupon;
                     if (!coupon) return null;
+                    const check = couponChecks[item.id];
                     return (
                       <button
                         key={item.id}
                         type="button"
                         onClick={() => applyDiscount(coupon.code, item.id)}
+                        disabled={check ? !check.ok : false}
                         className={`rounded-xl border p-3 text-left ${
                           applied?.userCouponId === item.id
                             ? 'border-[#1f1b19] bg-[#faf7f2]'
-                            : 'border-[#e5ded4] bg-white'
+                            : check?.ok === false
+                              ? 'border-[#e5ded4] bg-[#f6f2ec] opacity-70'
+                              : 'border-[#e5ded4] bg-white'
                         }`}
                       >
                         <span className="block font-mono font-bold">{coupon.code}</span>
                         <span className="mt-1 block text-xs text-[#8a7f72]">
-                          {coupon.type === 'percent' ? `${coupon.value}% 折扣` : `折抵 ${formatter.format(coupon.value)}`}
+                          {coupon.type === 'free_shipping' ? '免運' : coupon.type === 'percent' ? `${coupon.value}% 折扣` : `折抵 ${formatter.format(coupon.value)}`}
                           {coupon.min_spend > 0 ? ` / 滿 ${formatter.format(coupon.min_spend)}` : ''}
+                        </span>
+                        <span className={`mt-2 block text-xs ${check?.ok ? 'text-[#1f7a44]' : 'text-[#c0392b]'}`}>
+                          {check ? (check.ok ? `此訂單可省 ${formatter.format(check.discount)}` : check.error) : '檢查中...'}
                         </span>
                       </button>
                     );

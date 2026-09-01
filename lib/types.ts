@@ -72,7 +72,7 @@ export type Discount = {
   id: string;
   name?: string;
   code: string;
-  type: string; // percent | amount
+  type: 'percent' | 'amount' | 'free_shipping' | string;
   value: number;
   min_spend: number;
   max_discount?: number | null;
@@ -80,10 +80,15 @@ export type Discount = {
   end_at?: string | null;
   total_limit?: number | null;
   per_user_limit?: number | null;
+  applicable_products?: string[];
+  applicable_categories?: string[];
+  applicable_users?: 'all' | 'new' | 'vip' | string;
+  is_first_purchase_only?: boolean;
   stackable?: boolean;
   status?: string;
   active: boolean;
   created_at?: string;
+  updated_at?: string;
 };
 
 export type Customer = {
@@ -100,12 +105,26 @@ export type UserCoupon = {
   id: string;
   user_id: string;
   coupon_id: string;
-  status: 'available' | 'used' | 'expired' | 'revoked';
+  status: 'available' | 'used' | 'expired' | 'revoked' | 'locked';
   received_at?: string;
   used_at?: string | null;
   expired_at?: string | null;
   order_id?: string | null;
+  locked_at?: string | null;
+  lock_expires_at?: string | null;
   coupon?: Discount;
+};
+
+export type CouponUsage = {
+  id: string;
+  coupon_id: string;
+  user_id?: string | null;
+  user_coupon_id?: string | null;
+  order_id?: string | null;
+  original_amount: number;
+  discount_amount: number;
+  final_amount: number;
+  used_at?: string;
 };
 
 export type Category = {
@@ -152,6 +171,9 @@ export type Order = {
   payment_method?: string;
   discount: number;
   discount_code: string;
+  coupon_id?: string | null;
+  user_coupon_id?: string | null;
+  coupon_snapshot?: Record<string, unknown> | null;
   total: number;
   status: string;
   paid: boolean;

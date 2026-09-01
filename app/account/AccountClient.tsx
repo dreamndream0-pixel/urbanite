@@ -21,8 +21,14 @@ const TABS: { key: TabKey; label: string }[] = [
 ];
 
 function couponLabel(d: Discount) {
-  const base = d.type === 'percent' ? `${d.value}% 折扣` : `折抵 ${formatter.format(d.value)}`;
+  const base = d.type === 'free_shipping' ? '免運' : d.type === 'percent' ? `${d.value}% 折扣` : `折抵 ${formatter.format(d.value)}`;
   return d.min_spend > 0 ? `${base}(滿 ${formatter.format(d.min_spend)})` : base;
+}
+
+function couponScope(d: Discount) {
+  const products = d.applicable_products?.length ? `指定商品 ${d.applicable_products.join(', ')}` : '';
+  const categories = d.applicable_categories?.length ? `指定分類 ${d.applicable_categories.join(', ')}` : '';
+  return [products, categories].filter(Boolean).join(' / ') || '全站適用';
 }
 
 export default function AccountClient({
@@ -298,6 +304,7 @@ function CouponsTab({ coupons }: { coupons: Discount[] }) {
   const [claimable, setClaimable] = useState<Discount[]>(coupons);
   const [ready, setReady] = useState(true);
   const [loading, setLoading] = useState(true);
+  const [couponTab, setCouponTab] = useState<'available' | 'used' | 'expired'>('available');
 
   async function refreshCoupons() {
     setLoading(true);
@@ -341,7 +348,25 @@ function CouponsTab({ coupons }: { coupons: Discount[] }) {
       </div>
 
       <div className="rounded-2xl border border-[#e5ded4] bg-white p-6">
-        <h2 className="text-lg font-semibold">我的優惠券</h2>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-lg font-semibold">我的優惠券</h2>
+          <div className="flex rounded-full bg-[#f6f2ec] p-1 text-sm font-semibold">
+            {[
+              ['available', '可使用'],
+              ['used', '已使用'],
+              ['expired', '已過期'],
+            ].map(([key, label]) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => setCouponTab(key as typeof couponTab)}
+                className={`rounded-full px-3 py-1 ${couponTab === key ? 'bg-[#1f1b19] text-white' : 'text-[#8a7f72]'}`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
         {!ready && (
           <p className="mt-3 rounded-lg bg-[#fff8e8] px-4 py-3 text-sm text-[#8a6d2f]">
             會員領券資料表尚未建立,目前先顯示可輸入的優惠碼。
@@ -349,11 +374,11 @@ function CouponsTab({ coupons }: { coupons: Discount[] }) {
         )}
         {loading ? (
           <p className="mt-4 rounded-lg bg-[#f6f2ec] p-5 text-sm text-[#6b6156]">載入優惠券中...</p>
-        ) : owned.length === 0 ? (
+        ) : owned.filter((item) => (couponTab === 'expired' ? ['expired', 'revoked'].includes(item.status) : item.status === couponTab)).length === 0 ? (
           <p className="mt-4 rounded-lg bg-[#f6f2ec] p-5 text-sm text-[#6b6156]">目前沒有可用的優惠券。</p>
         ) : (
           <div className="mt-4 space-y-3">
-            {owned.map((item) => {
+            {owned.filter((item) => (couponTab === 'expired' ? ['expired', 'revoked'].includes(item.status) : item.status === couponTab)).map((item) => {
               const c = item.coupon;
               if (!c) return null;
               return (
@@ -362,13 +387,19 @@ function CouponsTab({ coupons }: { coupons: Discount[] }) {
                 className="flex items-center justify-between gap-3 rounded-xl border border-dashed border-[#d7c9bd] bg-[#faf7f2] p-4"
               >
                 <div>
-                  <p className="text-xs font-semibold text-[#8a7f72]">{item.status === 'used' ? '已使用' : '可使用'}</p>
+                  <p className="text-xs font-semibold text-[#8a7f72]">{item.status === 'used' ? '已使用' : item.status === 'revoked' ? '已撤回' : item.status === 'expired' ? '已過期' : '可使用'}</p>
                   <p className="font-mono text-lg font-bold tracking-wide">{c.code}</p>
                   <p className="text-sm text-[#8a7f72]">{couponLabel(c)}</p>
+                  <p className="mt-1 text-xs text-[#8a7f72]">
+                    {couponScope(c)}
+                    {c.end_at ? ` / 到 ${new Date(c.end_at).toLocaleDateString('zh-TW')}` : ' / 無期限'}
+                  </p>
                 </div>
-                <span className="rounded-full bg-[#1f1b19] px-3 py-1 text-xs font-semibold text-white">
-                  結帳輸入
-                </span>
+                {item.status === 'available' && (
+                  <span className="rounded-full bg-[#1f1b19] px-3 py-1 text-xs font-semibold text-white">
+                    結帳可用
+                  </span>
+                )}
               </div>
               );
             })}
@@ -386,6 +417,7 @@ function CouponsTab({ coupons }: { coupons: Discount[] }) {
               <div key={c.id} className="rounded-xl border border-[#e5ded4] p-4">
                 <p className="font-mono text-lg font-bold tracking-wide">{c.code}</p>
                 <p className="mt-1 text-sm text-[#8a7f72]">{couponLabel(c)}</p>
+                <p className="mt-1 text-xs text-[#8a7f72]">{couponScope(c)}</p>
                 <button
                   type="button"
                   onClick={() => claimCoupon(c.id)}

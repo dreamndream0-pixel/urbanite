@@ -3,6 +3,35 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { getAdminUser } from '@/lib/supabase/server';
 import type { Discount } from '@/lib/types';
 
+function list(value: unknown): string[] {
+  if (Array.isArray(value)) return value.map((item) => String(item).trim()).filter(Boolean);
+  if (typeof value === 'string') return value.split(',').map((item) => item.trim()).filter(Boolean);
+  return [];
+}
+
+function discountPayload(body: Record<string, unknown>, code: string) {
+  const type = body.type === 'amount' || body.type === 'free_shipping' ? body.type : 'percent';
+  return {
+    name: String(body.name ?? '').trim(),
+    code,
+    type,
+    value: type === 'free_shipping' ? 0 : Number(body.value) || 0,
+    min_spend: Number(body.min_spend) || 0,
+    max_discount: Number(body.max_discount) || null,
+    start_at: body.start_at ? String(body.start_at) : null,
+    end_at: body.end_at ? String(body.end_at) : null,
+    total_limit: Number(body.total_limit) || null,
+    per_user_limit: Number(body.per_user_limit) || 1,
+    applicable_products: list(body.applicable_products),
+    applicable_categories: list(body.applicable_categories),
+    applicable_users: String(body.applicable_users ?? 'all'),
+    is_first_purchase_only: Boolean(body.is_first_purchase_only),
+    stackable: Boolean(body.stackable),
+    status: String(body.status ?? (body.active === false ? '停用' : '啟用')),
+    active: body.active ?? String(body.status ?? '啟用') === '啟用',
+  };
+}
+
 // GET /api/discounts — 折扣碼清單(限管理員)
 export async function GET() {
   const admin = await getAdminUser();
@@ -28,15 +57,7 @@ export async function POST(request: Request) {
   if (!code) return NextResponse.json({ error: '請填寫折扣碼' }, { status: 400 });
 
   const supabase = createAdminClient();
-  const insert = {
-    name: String(body.name ?? '').trim(),
-    code,
-    type: body.type === 'amount' ? 'amount' : 'percent',
-    value: Number(body.value) || 0,
-    min_spend: Number(body.min_spend) || 0,
-    max_discount: Number(body.max_discount) || null,
-    active: body.active ?? true,
-  };
+  const insert = discountPayload(body, code);
   let { data, error } = await supabase
     .from('discounts')
     .insert(insert)
