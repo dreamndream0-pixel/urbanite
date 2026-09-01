@@ -352,7 +352,14 @@ export default function ProductDetailClient({ product }: { product: Product }) {
             <div className="mx-auto max-w-2xl py-10 text-center leading-8 text-[#5d5652]">
               <h2 className="text-2xl font-semibold text-[#2c2826]">商品描述</h2>
               <div className="mx-auto mt-4 h-1 w-10 bg-[#c84767]" />
-              <p className="mt-8">{product.tagline || '精選商品,適合日常穿搭與送禮。'}</p>
+              {product.tagline ? (
+                <div
+                  className="mx-auto mt-8 max-w-none text-left leading-8 [&_a]:text-[#c84767] [&_img]:my-4 [&_img]:max-w-full [&_ol]:list-decimal [&_ol]:pl-6 [&_table]:my-4 [&_table]:w-full [&_table]:border-collapse [&_td]:border [&_td]:border-[#e5ded4] [&_td]:p-2 [&_th]:border [&_th]:border-[#e5ded4] [&_th]:bg-[#f6f2ec] [&_th]:p-2 [&_ul]:list-disc [&_ul]:pl-6"
+                  dangerouslySetInnerHTML={{ __html: product.tagline }}
+                />
+              ) : (
+                <p className="mt-8">精選商品,適合日常穿搭與送禮。</p>
+              )}
               <p className="mt-3">庫存: {product.inventory}</p>
             </div>
           ) : (

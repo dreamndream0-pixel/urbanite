@@ -27,6 +27,10 @@ const formatter = new Intl.NumberFormat('zh-TW', {
   maximumFractionDigits: 0,
 });
 
+function plainText(value = '') {
+  return value.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
 // 前台分類 tab 用的型別(虛擬的「全部」也用同一形狀)
 type CategoryTab = { slug: string; name: string; en: string };
 const ALL_TAB: CategoryTab = { slug: 'all', name: '全部', en: 'ALL' };
@@ -160,7 +164,7 @@ export default function Home() {
     if (query.trim()) {
       const q = query.trim().toLowerCase();
       list = list.filter(
-        (p) => p.name.toLowerCase().includes(q) || p.tagline.toLowerCase().includes(q),
+        (p) => p.name.toLowerCase().includes(q) || plainText(p.tagline).toLowerCase().includes(q),
       );
     }
     return list;
@@ -962,7 +966,7 @@ function ProductCard({
       <div className="mt-3 flex flex-1 flex-col px-1">
         <Link href={productHref} className="hover:text-[#c84767]">
           <h3 className="line-clamp-1 text-sm font-semibold leading-5">{product.name}</h3>
-          <p className="mt-1 line-clamp-1 text-xs text-[#8a7f72]">{product.tagline}</p>
+          <p className="mt-1 line-clamp-1 text-xs text-[#8a7f72]">{plainText(product.tagline)}</p>
         </Link>
         <div className="mt-3 flex items-center justify-between">
           <div className="flex items-baseline gap-2">
@@ -1382,7 +1386,7 @@ function QuickAddModal({
           <div className="min-w-0 flex-1">
             <h2 className="text-lg font-semibold leading-6">{product.name}</h2>
             {product.tagline && (
-              <p className="mt-1 line-clamp-2 text-sm text-[#8a7f72]">{product.tagline}</p>
+              <p className="mt-1 line-clamp-2 text-sm text-[#8a7f72]">{plainText(product.tagline)}</p>
             )}
             <div className="mt-3 flex items-baseline gap-2">
               <span className="text-2xl font-bold text-[#c84767]">{formatter.format(product.price)}</span>

@@ -3905,10 +3905,15 @@ function ProductModal({
     null,
   );
   const [specInputs, setSpecInputs] = useState<Record<number, string>>({});
-  const descriptionRef = useRef<HTMLTextAreaElement | null>(null);
+  const [descriptionExpanded, setDescriptionExpanded] = useState(false);
+  const descriptionRef = useRef<HTMLDivElement | null>(null);
   function set<K extends keyof Draft>(key: K, value: Draft[K]) {
     onChange({ ...draft, [key]: value });
   }
+  useEffect(() => {
+    if (!descriptionRef.current) return;
+    descriptionRef.current.innerHTML = draft.tagline || '';
+  }, [draft.id]);
 
   // 規格制:即時算出組合與各組合庫存
   const modalSpecs = draft.specs
@@ -3958,14 +3963,34 @@ function ProductModal({
     const baseMethods = current.length ? current : shippingMethods;
     set('available_shipping_methods', checked ? ['免運', ...baseMethods] : current);
   }
-  function applyDescriptionFormat(prefix: string, suffix = '') {
-    const input = descriptionRef.current;
-    const start = input?.selectionStart ?? draft.tagline.length;
-    const end = input?.selectionEnd ?? draft.tagline.length;
-    const picked = draft.tagline.slice(start, end) || '文字';
-    const next = `${draft.tagline.slice(0, start)}${prefix}${picked}${suffix}${draft.tagline.slice(end)}`;
-    set('tagline', next);
-    requestAnimationFrame(() => input?.focus());
+  function syncDescription() {
+    set('tagline', descriptionRef.current?.innerHTML ?? '');
+  }
+  function runDescriptionCommand(command: string, value?: string) {
+    descriptionRef.current?.focus();
+    document.execCommand(command, false, value);
+    syncDescription();
+  }
+  function addDescriptionLink() {
+    const url = prompt('貼上連結網址')?.trim();
+    if (!url) return;
+    runDescriptionCommand('createLink', url);
+  }
+  function addDescriptionImage() {
+    const url = prompt('貼上圖片網址')?.trim();
+    if (!url) return;
+    runDescriptionCommand('insertImage', url);
+  }
+  function addDescriptionTable() {
+    runDescriptionCommand(
+      'insertHTML',
+      '<table><tbody><tr><th>欄位</th><th>內容</th></tr><tr><td>文字</td><td>文字</td></tr></tbody></table>',
+    );
+  }
+  function addDescriptionVideo() {
+    const url = prompt('貼上影片網址')?.trim();
+    if (!url) return;
+    runDescriptionCommand('insertHTML', `<p><a href="${url}" target="_blank" rel="noreferrer">影片連結</a></p>`);
   }
 
   async function uploadProductImages(files: File[]) {
@@ -4064,34 +4089,35 @@ function ProductModal({
 	          <div className="mt-4">
 	          <Field label="商品描述">
 	            <div className="rounded-lg border border-[#e5ded4]">
-	              <div className="flex flex-wrap gap-1 border-b border-[#e5ded4] bg-[#f7f9fc] p-2 text-sm text-[#666]">
-	                {[
-	                  ['B', '**', '**'],
-	                  ['I', '_', '_'],
-	                  ['U', '<u>', '</u>'],
-	                  ['標題', '## ', ''],
-	                  ['清單', '- ', ''],
-	                  ['連結', '[', '](https://)'],
-	                  ['圖片', '![圖片](', ')'],
-	                  ['表格', '\n| 欄位 | 內容 |\n| --- | --- |\n| ', ' |\n'],
-	                  ['程式', '`', '`'],
-	                ].map(([label, prefix, suffix]) => (
-	                  <button
-	                    key={label}
-	                    type="button"
-	                    onClick={() => applyDescriptionFormat(prefix, suffix)}
-	                    className="rounded px-2 py-1 font-semibold hover:bg-white"
-	                  >
-	                    {label}
-	                  </button>
-	                ))}
+	              <div className="flex flex-wrap items-center gap-1 border-b border-[#e5ded4] bg-[#f7f9fc] p-2 text-sm text-[#666]">
+	                <EditorButton label="粗體" onClick={() => runDescriptionCommand('bold')}>B</EditorButton>
+	                <EditorButton label="斜體" onClick={() => runDescriptionCommand('italic')}>I</EditorButton>
+	                <EditorButton label="底線" onClick={() => runDescriptionCommand('underline')}>U</EditorButton>
+	                <EditorButton label="標題" onClick={() => runDescriptionCommand('formatBlock', 'H2')}>Aa</EditorButton>
+	                <EditorButton label="文字色" onClick={() => runDescriptionCommand('foreColor', '#1f1b19')}>A</EditorButton>
+	                <EditorButton label="段落" onClick={() => runDescriptionCommand('formatBlock', 'P')}>¶</EditorButton>
+	                <EditorButton label="靠左" onClick={() => runDescriptionCommand('justifyLeft')}>≡</EditorButton>
+	                <EditorButton label="編號清單" onClick={() => runDescriptionCommand('insertOrderedList')}>1.</EditorButton>
+	                <EditorButton label="項目清單" onClick={() => runDescriptionCommand('insertUnorderedList')}>•</EditorButton>
+	                <EditorButton label="分隔線" onClick={() => runDescriptionCommand('insertHorizontalRule')}>—</EditorButton>
+	                <EditorButton label="連結" onClick={addDescriptionLink}>Link</EditorButton>
+	                <EditorButton label="圖片" onClick={addDescriptionImage}>▧</EditorButton>
+	                <EditorButton label="影片" onClick={addDescriptionVideo}>▻</EditorButton>
+	                <EditorButton label="表格" onClick={addDescriptionTable}>▦</EditorButton>
+	                <EditorButton label="清除格式" onClick={() => runDescriptionCommand('removeFormat')}>Tx</EditorButton>
+	                <EditorButton label="程式碼" onClick={() => runDescriptionCommand('formatBlock', 'PRE')}>{'</>'}</EditorButton>
+	                <EditorButton label="展開編輯器" onClick={() => setDescriptionExpanded(!descriptionExpanded)}>⛶</EditorButton>
 	              </div>
-	            <textarea
+	            <div
 	              ref={descriptionRef}
-	              className="min-h-44 w-full border-0 px-3 py-3 outline-none"
-	              value={draft.tagline}
-	              placeholder="請在此輸入您的商品描述內容"
-	              onChange={(e) => set('tagline', e.target.value)}
+	              contentEditable
+	              suppressContentEditableWarning
+	              className={`w-full overflow-auto px-3 py-3 outline-none empty:before:text-[#b9b0a8] empty:before:content-[attr(data-placeholder)] ${
+	                descriptionExpanded ? 'min-h-[420px]' : 'min-h-44'
+	              }`}
+	              data-placeholder="請在此輸入您的商品描述內容"
+	              onInput={syncDescription}
+	              onBlur={syncDescription}
 	            />
 	            </div>
 	          </Field>
@@ -4369,6 +4395,27 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
       <span className="mb-1 block text-sm font-semibold text-[#8a7f72]">{label}</span>
       {children}
     </label>
+  );
+}
+
+function EditorButton({
+  label,
+  onClick,
+  children,
+}: {
+  label: string;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      title={label}
+      onClick={onClick}
+      className="min-w-8 rounded px-2 py-1 font-semibold hover:bg-white"
+    >
+      {children}
+    </button>
   );
 }
 
