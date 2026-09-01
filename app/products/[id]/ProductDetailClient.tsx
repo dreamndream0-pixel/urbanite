@@ -233,17 +233,18 @@ export default function ProductDetailClient({ product }: { product: Product }) {
                     {dim.options.map((opt) => {
                       const selected = specSel[i] === opt;
                       const available = optionAvailable(i, opt);
-                      const disabled = !available && !selected;
+                      // 選中但整組售完也反白;非選中則看該搭配有沒有庫存
+                      const grayed = selected ? soldOut : !available;
                       return (
                         <button
                           key={opt}
-                          disabled={disabled}
+                          disabled={!selected && !available}
                           onClick={() => setSpecSel((prev) => prev.map((v, idx) => (idx === i ? opt : v)))}
                           className={`min-w-16 border px-5 py-3 text-sm font-semibold ${
-                            selected
-                              ? 'border-[#c84767] text-[#c84767]'
-                              : disabled
-                                ? 'cursor-not-allowed border-[#e1d9d3] bg-[#f7f5f2] text-[#3d3935] line-through opacity-30'
+                            grayed
+                              ? 'cursor-not-allowed border-[#e1d9d3] bg-[#f7f5f2] text-[#3d3935] line-through opacity-30'
+                              : selected
+                                ? 'border-[#c84767] text-[#c84767]'
                                 : 'border-[#e1d9d3] bg-[#f7f5f2] text-[#3d3935]'
                           }`}
                         >

@@ -935,6 +935,18 @@ function ProductCard({
   onAdd: () => void;
 }) {
   const productHref = `/products/${encodeURIComponent(product.id)}`;
+  const soldOut =
+    (product.inventory ?? 0) <= 0 && !(product.sale_mode || '').includes('預購');
+  const [flash, setFlash] = useState(false);
+
+  function handleAdd() {
+    if (soldOut) {
+      setFlash(true);
+      window.setTimeout(() => setFlash(false), 1400);
+      return;
+    }
+    onAdd();
+  }
 
   return (
     <div className="group flex flex-col overflow-hidden rounded-2xl bg-[#f6f2ec] p-3 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
@@ -944,7 +956,7 @@ function ProductCard({
             <img
               src={product.image}
               alt={product.name}
-              className="h-full w-full object-contain drop-shadow-[0_14px_16px_rgba(31,27,25,0.22)]"
+              className={`h-full w-full object-contain drop-shadow-[0_14px_16px_rgba(31,27,25,0.22)] ${soldOut ? 'opacity-60' : ''}`}
             />
           ) : (
             <div className="flex h-full w-full items-center justify-center text-sm text-[#a99]">
@@ -952,11 +964,15 @@ function ProductCard({
             </div>
           )}
         </Link>
-        {product.status !== '上架中' && (
+        {soldOut ? (
+          <span className="absolute left-2 top-2 rounded bg-[#c0392b] px-2 py-1 text-xs font-medium text-white">
+            已售完
+          </span>
+        ) : product.status !== '上架中' ? (
           <span className="absolute left-2 top-2 rounded bg-[#1f1b19] px-2 py-1 text-xs font-medium text-white">
             {product.status}
           </span>
-        )}
+        ) : null}
         <button
           onClick={onFavorite}
           aria-label="加入收藏"
@@ -964,6 +980,13 @@ function ProductCard({
         >
           <IconStar filled={favorited} small />
         </button>
+        {flash && (
+          <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
+            <span className="animate-bounce rounded-full bg-[#1f1b19]/85 px-4 py-2 text-sm font-semibold text-white shadow-lg">
+              已售完
+            </span>
+          </div>
+        )}
       </div>
       <div className="mt-3 flex flex-1 flex-col px-1">
         <Link href={productHref} className="hover:text-[#c84767]">
@@ -980,9 +1003,11 @@ function ProductCard({
             ) : null}
           </div>
           <button
-            onClick={onAdd}
-            aria-label={`將 ${product.name} 加入購物車`}
-            className="flex h-10 w-10 items-center justify-center rounded-full bg-[#1f1b19] text-white transition hover:bg-[#3a322e]"
+            onClick={handleAdd}
+            aria-label={soldOut ? `${product.name} 已售完` : `將 ${product.name} 加入購物車`}
+            className={`flex h-10 w-10 items-center justify-center rounded-full text-white transition ${
+              soldOut ? 'bg-[#b5a9a0]' : 'bg-[#1f1b19] hover:bg-[#3a322e]'
+            } ${flash ? 'scale-90' : ''}`}
           >
             <IconCart />
           </button>
