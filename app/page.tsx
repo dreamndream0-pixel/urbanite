@@ -19,6 +19,7 @@ type CartItem = {
 };
 
 const STORE_NAME = process.env.NEXT_PUBLIC_STORE_NAME || 'URBANITE';
+const FOOTER_SOCIAL_SECTION_TITLE = '__footer_social_buttons__';
 
 const formatter = new Intl.NumberFormat('zh-TW', {
   style: 'currency',
@@ -583,7 +584,7 @@ function Footer({ settings, logoUrl }: { settings: SiteSettings | null; logoUrl:
       title: section.title.trim(),
       items: section.items.filter((item) => item.subtitle.trim()),
     }))
-    .filter((section) => section.title || section.items.length);
+    .filter((section) => section.title !== FOOTER_SOCIAL_SECTION_TITLE && (section.title || section.items.length));
   const sections = savedSections.length
     ? savedSections
     : [
@@ -762,6 +763,17 @@ function getFooterSocialLinks(settings: SiteSettings | null) {
       fallback: link.label.trim().slice(0, 4) || '@',
     }));
   if (saved?.length) return saved;
+  const sectionSaved = settings?.footer_sections
+    ?.find((section) => section.title === FOOTER_SOCIAL_SECTION_TITLE)
+    ?.items.filter((item) => item.subtitle?.trim() || item.content?.trim() || item.url?.trim())
+    .slice(0, 3)
+    .map((item) => ({
+      label: item.subtitle.trim() || '社群連結',
+      image: item.content.trim(),
+      url: item.url.trim(),
+      fallback: item.subtitle.trim().slice(0, 4) || '@',
+    }));
+  if (sectionSaved?.length) return sectionSaved;
   return [
     { label: 'Instagram', image: '', url: settings?.footer_instagram_url?.trim() ?? '', fallback: '◎' },
     { label: 'LINE', image: '', url: settings?.footer_line_url?.trim() ?? '', fallback: 'LINE' },

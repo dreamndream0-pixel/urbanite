@@ -31,6 +31,7 @@ const DEFAULT_FOOTER_SOCIAL_LINKS = [
   { label: 'LINE', image: '', url: '' },
   { label: 'Email', image: '', url: '' },
 ];
+const FOOTER_SOCIAL_SECTION_TITLE = '__footer_social_buttons__';
 
 const NAV = [
   { key: 'overview', label: '總覽', Icon: IconGrid },
@@ -219,6 +220,8 @@ export default function AdminDashboard({
     socialLinks: JSON.stringify(
       initialSettings?.footer_social_links?.length
         ? initialSettings.footer_social_links.slice(0, 3)
+        : getFooterSocialLinksFromSections(initialSettings?.footer_sections).length
+          ? getFooterSocialLinksFromSections(initialSettings?.footer_sections)
         : DEFAULT_FOOTER_SOCIAL_LINKS,
       null,
       2,
@@ -640,6 +643,10 @@ export default function AdminDashboard({
           .split('\n')
           .map((line) => line.trim())
           .filter(Boolean);
+      const footerSections = mergeFooterSocialLinksIntoSections(
+        JSON.parse(footerDraft.sections || '[]'),
+        JSON.parse(footerDraft.socialLinks || '[]'),
+      );
       const res = await fetch('/api/settings', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -652,8 +659,7 @@ export default function AdminDashboard({
           footer_tax_id: footerDraft.taxId.trim(),
           footer_instagram_url: footerDraft.instagramUrl.trim(),
           footer_line_url: footerDraft.lineUrl.trim(),
-          footer_social_links: JSON.parse(footerDraft.socialLinks || '[]'),
-          footer_sections: JSON.parse(footerDraft.sections || '[]'),
+          footer_sections: footerSections,
           payment_methods: toLines(footerDraft.payments),
           shipping_methods: toLines(footerDraft.shippings),
           enabled_payment_methods: toLines(footerDraft.payments),
@@ -1990,7 +1996,7 @@ function FooterPagesEditor({ value, onChange }: { value: string; onChange: (valu
               url: typeof item?.url === 'string' ? item.url : '',
             }))
           : [],
-      }));
+      })).filter((section) => section.title !== FOOTER_SOCIAL_SECTION_TITLE);
     } catch {
       return [];
     }
@@ -2234,6 +2240,37 @@ function normalizeFooterSocialLinks(items: Partial<FooterSocialDraft>[]): Footer
   }));
   while (normalized.length < 3) normalized.push({ ...DEFAULT_FOOTER_SOCIAL_LINKS[normalized.length] });
   return normalized;
+}
+
+function getFooterSocialLinksFromSections(sections?: SiteSettings['footer_sections']) {
+  const socialSection = sections?.find((section) => section.title === FOOTER_SOCIAL_SECTION_TITLE);
+  if (!socialSection?.items?.length) return [];
+  return normalizeFooterSocialLinks(
+    socialSection.items.map((item) => ({
+      label: item.subtitle,
+      image: item.content,
+      url: item.url,
+    })),
+  );
+}
+
+function mergeFooterSocialLinksIntoSections(
+  sections: FooterSectionDraft[],
+  socialLinks: Partial<FooterSocialDraft>[],
+) {
+  const visibleSections = sections.filter((section) => section.title !== FOOTER_SOCIAL_SECTION_TITLE);
+  const normalized = normalizeFooterSocialLinks(socialLinks);
+  return [
+    ...visibleSections,
+    {
+      title: FOOTER_SOCIAL_SECTION_TITLE,
+      items: normalized.map((item) => ({
+        subtitle: item.label,
+        content: item.image,
+        url: item.url,
+      })),
+    },
+  ];
 }
 
 function MethodToggles({

@@ -7,11 +7,13 @@ import BackButton from './BackButton';
 export const dynamic = 'force-dynamic';
 
 const copyrightStartYear = 2025;
+const FOOTER_SOCIAL_SECTION_TITLE = '__footer_social_buttons__';
 
 export default async function FooterContentPage({ params }: { params: Promise<{ section: string; item: string }> }) {
   const { section, item } = await params;
   const sectionTitle = decodeURIComponent(section);
   const itemTitle = decodeURIComponent(item);
+  if (sectionTitle === FOOTER_SOCIAL_SECTION_TITLE) notFound();
   const supabase = createAdminClient();
   const [{ data: settingsData }, { data: bannerData }] = await Promise.all([
     supabase.from('site_settings').select('footer_sections,logo_url').eq('id', 1).single(),

@@ -22,7 +22,6 @@ const DEFAULT_SETTINGS: SiteSettings = {
   footer_tax_id: '',
   footer_instagram_url: '',
   footer_line_url: '',
-  footer_social_links: [],
   payment_methods: ['綠界金流', 'Line Pay', 'Apple Pay', '取貨付款', '轉帳匯款'],
   shipping_methods: ['綠界物流-超商取貨', '綠界物流-宅配', '7-11 取貨付款', '全家 取貨付款'],
   enabled_payment_methods: ['綠界金流', 'Line Pay', 'Apple Pay', '取貨付款', '轉帳匯款'],
@@ -64,7 +63,6 @@ export async function PATCH(request: Request) {
     'footer_tax_id',
     'footer_instagram_url',
     'footer_line_url',
-    'footer_social_links',
     'payment_methods',
     'shipping_methods',
     'enabled_payment_methods',
@@ -76,22 +74,11 @@ export async function PATCH(request: Request) {
   }
 
   const supabase = createAdminClient();
-  let { data, error } = await supabase
+  const { data, error } = await supabase
     .from('site_settings')
     .upsert(update)
     .select()
     .single();
-
-  if (error && 'footer_social_links' in update && error.message.includes('footer_social_links')) {
-    delete update.footer_social_links;
-    const retry = await supabase
-      .from('site_settings')
-      .upsert(update)
-      .select()
-      .single();
-    data = retry.data;
-    error = retry.error;
-  }
 
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
   return NextResponse.json({ ...DEFAULT_SETTINGS, ...data } as SiteSettings);
