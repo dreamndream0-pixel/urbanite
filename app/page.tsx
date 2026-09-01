@@ -759,10 +759,10 @@ function getFooterSocialLinks(settings: SiteSettings | null) {
     .map((link) => ({
       label: link.label.trim() || '社群連結',
       image: link.image.trim(),
-      url: link.url.trim(),
+      url: normalizeFooterHref(link.url),
       fallback: link.label.trim().slice(0, 4) || '@',
     }));
-  if (saved?.length) return saved;
+  if (saved?.some((link) => link.url)) return saved;
   const sectionSaved = settings?.footer_sections
     ?.find((section) => section.title === FOOTER_SOCIAL_SECTION_TITLE)
     ?.items.filter((item) => item.subtitle?.trim() || item.content?.trim() || item.url?.trim())
@@ -770,15 +770,43 @@ function getFooterSocialLinks(settings: SiteSettings | null) {
     .map((item) => ({
       label: item.subtitle.trim() || '社群連結',
       image: item.content.trim(),
-      url: item.url.trim(),
+      url: normalizeFooterHref(item.url),
       fallback: item.subtitle.trim().slice(0, 4) || '@',
     }));
-  if (sectionSaved?.length) return sectionSaved;
+  if (sectionSaved?.some((link) => link.url)) return sectionSaved;
+  const followItems = settings?.footer_sections?.find((section) => /尋找我們|追蹤我們|follow us/i.test(section.title))?.items ?? [];
+  const instagram = findFooterContactLink(followItems, /instagram/i) || normalizeFooterHref(settings?.footer_instagram_url);
+  const line = findFooterContactLink(followItems, /line/i) || normalizeFooterHref(settings?.footer_line_url);
+  const contact = findFooterContactLink(followItems, /聯絡客服|contact/i);
+  const email = normalizeFooterEmail(settings?.footer_email) || normalizeFooterEmail(findFooterContactText(followItems, /e-mail|email|信箱/i));
   return [
-    { label: 'Instagram', image: '', url: settings?.footer_instagram_url?.trim() ?? '', fallback: '◎' },
-    { label: 'LINE', image: '', url: settings?.footer_line_url?.trim() ?? '', fallback: 'LINE' },
-    { label: 'Email', image: '', url: settings?.footer_email ? `mailto:${settings.footer_email}` : '', fallback: '@' },
+    { label: 'Instagram', image: '', url: instagram, fallback: '◎' },
+    { label: 'LINE', image: '', url: line, fallback: 'LINE' },
+    { label: 'Contact', image: '', url: contact || email, fallback: '@' },
   ];
+}
+
+function findFooterContactLink(items: FooterLinkItem[], pattern: RegExp) {
+  const item = items.find((entry) => pattern.test(entry.subtitle) && normalizeFooterHref(entry.url));
+  return item ? normalizeFooterHref(item.url) : '';
+}
+
+function findFooterContactText(items: FooterLinkItem[], pattern: RegExp) {
+  return items.find((entry) => pattern.test(entry.subtitle))?.subtitle ?? '';
+}
+
+function normalizeFooterHref(value?: string) {
+  const href = value?.trim() ?? '';
+  if (!href) return '';
+  if (/^(https?:\/\/|mailto:|tel:|\/|#)/i.test(href)) return href;
+  if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(href)) return `mailto:${href}`;
+  return '';
+}
+
+function normalizeFooterEmail(value?: string) {
+  const text = value?.trim() ?? '';
+  const match = text.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i);
+  return match ? `mailto:${match[0]}` : '';
 }
 
 function FooterGroup({ title, items }: { title: string; items: FooterLinkItem[] }) {
