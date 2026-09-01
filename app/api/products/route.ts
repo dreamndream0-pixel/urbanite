@@ -53,6 +53,7 @@ export async function POST(request: Request) {
       specs: Array.isArray(body.specs) ? body.specs : [],
       variants: Array.isArray(body.variants) ? body.variants : [],
       unit: body.unit ?? '',
+      sale_mode: body.sale_mode ?? '現貨',
       is_featured: body.is_featured ?? false,
       sort_order: body.sort_order ?? 0,
     })

@@ -64,6 +64,7 @@ type Draft = {
   colors: string;
   sizes: string;
   unit: string;
+  sale_mode: string;
   specs: { name: string; optionsText: string }[];
   variantStock: Record<string, number>; // key = 各選項用 ' / ' 串起來
   variantCost: Record<string, number>; // 各規格單位成本
@@ -269,6 +270,7 @@ function blankDraft(): Draft {
     colors: '',
     sizes: '',
     unit: '',
+    sale_mode: '現貨',
     specs: [],
     variantStock: {},
     variantCost: {},
@@ -298,6 +300,7 @@ function toDraft(p: Product): Draft {
     colors: p.colors.join(', '),
     sizes: p.sizes.join(', '),
     unit: p.unit ?? '',
+    sale_mode: p.sale_mode ?? '現貨',
     specs,
     variantStock,
     variantCost,
@@ -4937,7 +4940,22 @@ function ProductModal({
 	            </Field>
 	          </div>
 	          <div className="mt-4">
-	          <Field label="商品名稱">
+	          <Field label="銷售模式">
+              <select
+                className="w-full rounded-lg border border-[#e5ded4] px-3 py-2 sm:w-1/2"
+                value={draft.sale_mode}
+                onChange={(e) => set('sale_mode', e.target.value)}
+              >
+                {['現貨', '預購', '預購+現貨'].map((m) => (
+                  <option key={m} value={m}>
+                    {m}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          </div>
+          <div className="mt-4">
+          <Field label="商品名稱">
 	            <input
 	              className="w-full rounded-lg border border-[#e5ded4] px-3 py-2"
 	              value={draft.name}

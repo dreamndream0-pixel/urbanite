@@ -78,6 +78,15 @@ export default function ProductDetailClient({ product }: { product: Product }) {
   const variantInventory = hasSpecs ? selectedVariant?.inventory ?? 0 : product.inventory;
   const soldOut = hasSpecs && allSpecsChosen && variantInventory <= 0;
 
+  // 某規格選項在「其他維度目前的選擇」下是否有庫存;沒有就反白(不可選)
+  function optionAvailable(dimIndex: number, opt: string) {
+    if (!hasSpecs) return true;
+    const candidate = specSel.map((v, idx) => (idx === dimIndex ? opt : v));
+    const key = candidate.join(' / ');
+    const variant = (product.variants ?? []).find((v) => v.options.join(' / ') === key);
+    return (variant?.inventory ?? 0) > 0;
+  }
+
   function addToCart(action: 'cart' | 'buy') {
     if (hasSpecs && !allSpecsChosen) {
       setMessage('請先選擇完整規格');
@@ -193,6 +202,9 @@ export default function ProductDetailClient({ product }: { product: Product }) {
           <h1 className="max-w-3xl text-3xl font-medium leading-tight tracking-wide sm:text-4xl">
             {product.name}
           </h1>
+          {product.sale_mode && (
+            <p className="mt-2 text-xs text-[#8a7f72] opacity-30">{product.sale_mode}</p>
+          )}
 
           <div className="mt-8 border-l-4 border-[#c84767] pl-4 text-sm leading-7 text-[#3d3935]">
             <p>全店,超商滿1500免運費</p>
@@ -216,19 +228,27 @@ export default function ProductDetailClient({ product }: { product: Product }) {
                     {dim.name}：{specSel[i] || '請選擇'}
                   </p>
                   <div className="flex flex-wrap gap-2">
-                    {dim.options.map((opt) => (
-                      <button
-                        key={opt}
-                        onClick={() => setSpecSel((prev) => prev.map((v, idx) => (idx === i ? opt : v)))}
-                        className={`min-w-16 border px-5 py-3 text-sm font-semibold ${
-                          specSel[i] === opt
-                            ? 'border-[#c84767] text-[#c84767]'
-                            : 'border-[#e1d9d3] bg-[#f7f5f2] text-[#3d3935]'
-                        }`}
-                      >
-                        {opt}
-                      </button>
-                    ))}
+                    {dim.options.map((opt) => {
+                      const selected = specSel[i] === opt;
+                      const available = optionAvailable(i, opt);
+                      const disabled = !available && !selected;
+                      return (
+                        <button
+                          key={opt}
+                          disabled={disabled}
+                          onClick={() => setSpecSel((prev) => prev.map((v, idx) => (idx === i ? opt : v)))}
+                          className={`min-w-16 border px-5 py-3 text-sm font-semibold ${
+                            selected
+                              ? 'border-[#c84767] text-[#c84767]'
+                              : disabled
+                                ? 'cursor-not-allowed border-[#e1d9d3] bg-[#f7f5f2] text-[#3d3935] line-through opacity-30'
+                                : 'border-[#e1d9d3] bg-[#f7f5f2] text-[#3d3935]'
+                          }`}
+                        >
+                          {opt}
+                        </button>
+                      );
+                    })}
                   </div>
                 </section>
               ))}

@@ -43,6 +43,7 @@ export type Product = {
   specs: SpecDim[];
   variants: Variant[];
   unit?: string;
+  sale_mode?: string; // 現貨 / 預購 / 預購+現貨
   is_featured: boolean;
   sort_order: number;
   created_at?: string;
