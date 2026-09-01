@@ -171,6 +171,32 @@ function parseMovementNote(note?: string) {
   return result;
 }
 
+function todayDocumentPrefix() {
+  const date = new Date();
+  const yyyy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, '0');
+  const dd = String(date.getDate()).padStart(2, '0');
+  return `${yyyy}${mm}${dd}`;
+}
+
+function currentDateTimeValue() {
+  const date = new Date();
+  const offset = date.getTimezoneOffset();
+  const local = new Date(date.getTime() - offset * 60 * 1000);
+  return local.toISOString().slice(0, 16);
+}
+
+function nextDocumentNo(movements: StockMovement[]) {
+  const prefix = todayDocumentPrefix();
+  const used = movements
+    .map((movement) => parseMovementNote(movement.note).document_no)
+    .filter((no) => no.startsWith(prefix))
+    .map((no) => Number(no.slice(prefix.length)))
+    .filter((n) => Number.isFinite(n));
+  const next = Math.max(0, ...used) + 1;
+  return `${prefix}${String(next).padStart(3, '0')}`;
+}
+
 function blankDraft(): Draft {
   return {
     id: '',
@@ -496,10 +522,72 @@ export default function AdminDashboard({
   }
 
   async function deleteProduct(id: string) {
-    if (!confirm('確定要刪除這個商品嗎?')) return;
+    const product = products.find((p) => p.id === id);
+    const relatedMovements = movements.filter((m) => m.product_id === id).length;
+    const variantCount = product?.variants.length ?? 0;
+    if (!confirm(
+      `確定刪除商品「${product?.name ?? id}」嗎?\n\n會一併刪除/影響:\n- 商品管理中的商品資料\n- ${variantCount} 筆規格資料與庫存列\n- 前台商品頁與購物車可選商品\n\n既有進出庫紀錄 ${relatedMovements} 筆會保留作為歷史紀錄。`,
+    )) return;
     const res = await fetch(`/api/products/${id}`, { method: 'DELETE' });
     if (res.ok) setProducts((l) => l.filter((p) => p.id !== id));
     else alert('刪除失敗');
+  }
+
+  async function deleteStockRow(productId: string, variantKey: string) {
+    const product = products.find((p) => p.id === productId);
+    if (!product) return;
+    if (variantKey) {
+      if (!confirm(
+        `確定刪除庫存列「${product.name} / ${variantKey}」嗎?\n\n會一併刪除/影響:\n- 此商品的這一筆顏色/尺寸規格\n- 商品管理的規格組合\n- 入庫單可選規格\n\n商品本身與進出庫歷史紀錄會保留。`,
+      )) return;
+      const variants = product.variants.filter((v) => v.options.join(' / ') !== variantKey);
+      const inventory = variants.reduce((sum, variant) => sum + (variant.inventory ?? 0), 0);
+      const res = await fetch(`/api/products/${productId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ variants, inventory }),
+      });
+      if (!res.ok) return alert('刪除庫存列失敗');
+      setProducts((list) => list.map((p) => (p.id === productId ? { ...p, variants, inventory } : p)));
+      return;
+    }
+
+    if (!confirm(
+      `確定刪除庫存列「${product.name}」嗎?\n\n此商品沒有規格,刪除庫存列會將目前庫存歸零。\n商品資料與進出庫歷史紀錄會保留。`,
+    )) return;
+    const res = await fetch(`/api/products/${productId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ inventory: 0 }),
+    });
+    if (!res.ok) return alert('刪除庫存列失敗');
+    setProducts((list) => list.map((p) => (p.id === productId ? { ...p, inventory: 0 } : p)));
+  }
+
+  async function deleteMovement(movement: StockMovement) {
+    const doc = parseMovementNote(movement.note);
+    if (!confirm(
+      `確定刪除進出庫紀錄「${doc.document_no || movement.id}」嗎?\n\n會一併刪除/影響:\n- 這筆進出庫紀錄\n- 商品 ${movement.product_id} 的庫存會反向調整\n- ${movement.variant_key || '無規格'} 數量會${movement.type === 'in' ? '扣回' : '加回'} ${movement.quantity}\n\n商品資料本身會保留。`,
+    )) return;
+    const res = await fetch(`/api/stock-movements?id=${encodeURIComponent(movement.id)}`, { method: 'DELETE' });
+    const data = await res.json().catch(() => null);
+    if (!res.ok) return alert(data?.error ?? '刪除進出庫紀錄失敗');
+    const delta = movement.type === 'in' ? -movement.quantity : movement.quantity;
+    setMovements((list) => list.filter((m) => m.id !== movement.id));
+    setProducts((list) =>
+      list.map((p) => {
+        if (p.id !== movement.product_id) return p;
+        if (p.variants.length && movement.variant_key) {
+          const variants = p.variants.map((v) =>
+            v.options.join(' / ') === movement.variant_key
+              ? { ...v, inventory: Math.max(0, (v.inventory ?? 0) + delta) }
+              : v,
+          );
+          return { ...p, variants, inventory: variants.reduce((sum, v) => sum + (v.inventory ?? 0), 0) };
+        }
+        return { ...p, inventory: Math.max(0, (p.inventory ?? 0) + delta) };
+      }),
+    );
   }
 
   async function adjustInventory(id: string, inventory: number) {
@@ -529,6 +617,10 @@ export default function AdminDashboard({
 
   // 進出庫:新增一筆入庫/出庫,後端會自動更新庫存
   async function addMovement() {
+    if (!mvForm.document_no.trim()) return alert('請填寫單號');
+    if (!mvForm.document_date.trim()) return alert('請填寫日期');
+    if (!mvForm.status.trim()) return alert('請填寫狀態');
+    if (!mvForm.handler.trim()) return alert(`請填寫${mvForm.type === 'in' ? '入庫人' : '出庫人'}`);
     const validLines = movementLines.filter((line) => line.product_id && line.quantity > 0);
     if (validLines.length === 0) return alert('請至少新增一筆商品明細');
 
@@ -1215,6 +1307,9 @@ export default function AdminDashboard({
               setMovementLines={setMovementLines}
               onAddMovement={addMovement}
               onUpdateVariantMeta={updateVariantMeta}
+              onDeleteProduct={deleteProduct}
+              onDeleteStockRow={deleteStockRow}
+              onDeleteMovement={deleteMovement}
               onEditProduct={(product) => {
                 setEditing(toDraft(product));
                 setIsNew(false);
@@ -2721,6 +2816,7 @@ function ProductInventorySummary({
   onCloseProduct,
   onEditProduct,
   onCreateProduct,
+  onDeleteProduct,
 }: {
   products: Product[];
   categories: Category[];
@@ -2730,6 +2826,7 @@ function ProductInventorySummary({
   onCloseProduct: () => void;
   onEditProduct: (product: Product) => void;
   onCreateProduct: () => void;
+  onDeleteProduct: (id: string) => void;
 }) {
   const catName = (slug: string) => categories.find((c) => c.slug === slug)?.name || slug || '—';
   const selectedRows = selectedProduct ? getProductVariantRows(selectedProduct) : [];
@@ -2802,13 +2899,22 @@ function ProductInventorySummary({
                     </td>
                     <td className="px-2 py-3 text-right">{stockValue.toLocaleString()}</td>
                     <td className="px-2 py-3 text-right">
-                      <button
-                        type="button"
-                        onClick={() => onEditProduct(product)}
-                        className="rounded-full border border-[#d7c9bd] px-3 py-1.5 text-xs font-semibold"
-                      >
-                        編輯
-                      </button>
+                      <div className="flex justify-end gap-2">
+                        <button
+                          type="button"
+                          onClick={() => onEditProduct(product)}
+                          className="rounded-full border border-[#d7c9bd] px-3 py-1.5 text-xs font-semibold"
+                        >
+                          編輯
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => onDeleteProduct(product.id)}
+                          className="rounded-full border border-[#e0b4b4] px-3 py-1.5 text-xs font-semibold text-[#c0392b]"
+                        >
+                          刪除
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 );
@@ -2911,6 +3017,9 @@ function InventorySection({
   setMovementLines,
   onAddMovement,
   onUpdateVariantMeta,
+  onDeleteProduct,
+  onDeleteStockRow,
+  onDeleteMovement,
   onEditProduct,
   onCreateProduct,
 }: {
@@ -2927,6 +3036,9 @@ function InventorySection({
     variantKey: string,
     patch: Partial<Pick<Variant, 'cost' | 'safety' | 'location'>>,
   ) => void;
+  onDeleteProduct: (id: string) => void;
+  onDeleteStockRow: (productId: string, variantKey: string) => void;
+  onDeleteMovement: (movement: StockMovement) => void;
   onEditProduct: (product: Product) => void;
   onCreateProduct: () => void;
 }) {
@@ -2942,6 +3054,7 @@ function InventorySection({
     lineId: string;
     field: 'product' | 'color' | 'size';
   } | null>(null);
+  const [pickerQuery, setPickerQuery] = useState('');
   const [stockSort, setStockSort] = useState<{ key: StockSortKey; dir: 'asc' | 'desc' }>({
     key: 'pid',
     dir: 'asc',
@@ -3035,6 +3148,35 @@ function InventorySection({
   const removeMovementLine = (id: string) => {
     setMovementLines(movementLines.length <= 1 ? movementLines : movementLines.filter((line) => line.id !== id));
   };
+  const clearMovementDocument = () => {
+    if (!confirm(
+      `確定刪除此${mvForm.type === 'in' ? '入庫單' : '出庫單'}嗎?\n\n會一併清除:\n- 單號、日期、狀態、人員等單頭資料\n- 目前尚未送出的所有商品明細列\n\n已送出的進出庫紀錄不會被刪除。`,
+    )) return;
+    setMvForm({
+      document_no: nextDocumentNo(movements),
+      document_date: currentDateTimeValue(),
+      type: mvForm.type,
+      status: mvForm.type === 'in' ? '進貨' : '出貨',
+      payment_status: '',
+      payment_no: '',
+      location: '',
+      handler: '',
+      note: '',
+    });
+    setMovementLines([{ id: `line-${Date.now()}`, product_id: '', variant_key: '', color: '', size: '', quantity: 1, unit_price: 0 }]);
+  };
+  useEffect(() => {
+    if (inventoryTab !== 'movement') return;
+    if (mvForm.document_no && mvForm.document_date) return;
+    setMvForm({
+      ...mvForm,
+      document_no: mvForm.document_no || nextDocumentNo(movements),
+      document_date: mvForm.document_date || currentDateTimeValue(),
+    });
+  }, [inventoryTab, mvForm, movements, setMvForm]);
+  useEffect(() => {
+    setPickerQuery('');
+  }, [movementPicker?.lineId, movementPicker?.field]);
   const stockHeaders: { key: StockSortKey; label: string; align?: 'right' }[] = [
     { key: 'pid', label: '品項編號' },
     { key: 'name', label: '品名' },
@@ -3053,6 +3195,16 @@ function InventorySection({
   const pickerProduct = pickerLine ? products.find((p) => p.id === pickerLine.product_id) : null;
   const pickerRows = pickerProduct ? getProductVariantRows(pickerProduct) : [];
   const pickerColors = uniqueValues(pickerRows.map((row) => row.color));
+  const filteredPickerProducts = products.filter((product) => {
+    const q = pickerQuery.trim().toLowerCase();
+    if (!q) return true;
+    return [product.id, product.name, catName(product.category)].some((value) =>
+      String(value).toLowerCase().includes(q),
+    );
+  });
+  const filteredPickerColors = pickerColors.filter((color) =>
+    color.toLowerCase().includes(pickerQuery.trim().toLowerCase()),
+  );
   const pickerSizes = uniqueValues(
     pickerRows
       .filter((row) => !pickerLine?.color || row.color === pickerLine.color)
@@ -3171,6 +3323,7 @@ function InventorySection({
         onCloseProduct={() => setSelectedInventoryProduct(null)}
         onEditProduct={onEditProduct}
         onCreateProduct={onCreateProduct}
+        onDeleteProduct={onDeleteProduct}
       />
       )}
 
@@ -3196,6 +3349,7 @@ function InventorySection({
                     </button>
                   </th>
                 ))}
+                <th className="px-2 py-2 text-right">操作</th>
               </tr>
             </thead>
             <tbody>
@@ -3279,6 +3433,15 @@ function InventorySection({
                     <td className="px-2 py-2 text-[#8a7f72]">
                       {fmtDate(lastMv.get(`${r.pid}${r.key}`))}
                     </td>
+                    <td className="px-2 py-2 text-right">
+                      <button
+                        type="button"
+                        onClick={() => onDeleteStockRow(r.pid, r.key)}
+                        className="rounded-full border border-[#e0b4b4] px-3 py-1.5 text-xs font-semibold text-[#c0392b]"
+                      >
+                        刪除
+                      </button>
+                    </td>
                   </tr>
                 );
               })}
@@ -3300,7 +3463,7 @@ function InventorySection({
         <Card
           title={mvForm.type === 'in' ? '入庫單' : '出庫單'}
           action={
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               {(['in', 'out'] as const).map((t) => (
                 <button
                   key={t}
@@ -3313,13 +3476,21 @@ function InventorySection({
                   {t === 'in' ? '入庫單' : '出庫單'}
                 </button>
               ))}
+              <button
+                type="button"
+                onClick={clearMovementDocument}
+                className="rounded-full border border-[#e0b4b4] px-4 py-2 text-sm font-semibold text-[#c0392b]"
+              >
+                刪除此單
+              </button>
             </div>
           }
         >
           <div className="grid gap-3 rounded-xl border border-[#e5ded4] bg-[#faf7f2] p-4 lg:grid-cols-4">
             <label className="block">
-              <span className="mb-1 block text-sm font-semibold text-[#8a7f72]">單號</span>
+              <span className="mb-1 block text-sm font-semibold text-[#8a7f72]">* 單號</span>
               <input
+                required
                 value={mvForm.document_no}
                 onChange={(e) => setMvForm({ ...mvForm, document_no: e.target.value })}
                 placeholder={mvForm.type === 'in' ? 'WI-202609001' : 'WO-202609001'}
@@ -3327,8 +3498,9 @@ function InventorySection({
               />
             </label>
             <label className="block">
-              <span className="mb-1 block text-sm font-semibold text-[#8a7f72]">日期</span>
+              <span className="mb-1 block text-sm font-semibold text-[#8a7f72]">* 日期</span>
               <input
+                required
                 type="datetime-local"
                 value={mvForm.document_date}
                 onChange={(e) => setMvForm({ ...mvForm, document_date: e.target.value })}
@@ -3336,8 +3508,9 @@ function InventorySection({
               />
             </label>
             <label className="block">
-              <span className="mb-1 block text-sm font-semibold text-[#8a7f72]">狀態</span>
+              <span className="mb-1 block text-sm font-semibold text-[#8a7f72]">* 狀態</span>
               <select
+                required
                 value={mvForm.status}
                 onChange={(e) => setMvForm({ ...mvForm, status: e.target.value })}
                 className="w-full rounded-lg border border-[#e5ded4] bg-white px-3 py-2"
@@ -3348,8 +3521,9 @@ function InventorySection({
               </select>
             </label>
             <label className="block">
-              <span className="mb-1 block text-sm font-semibold text-[#8a7f72]">{mvForm.type === 'in' ? '入庫人' : '出庫人'}</span>
+              <span className="mb-1 block text-sm font-semibold text-[#8a7f72]">* {mvForm.type === 'in' ? '入庫人' : '出庫人'}</span>
               <input
+                required
                 value={mvForm.handler}
                 onChange={(e) => setMvForm({ ...mvForm, handler: e.target.value })}
                 className="w-full rounded-lg border border-[#e5ded4] bg-white px-3 py-2"
@@ -3532,6 +3706,7 @@ function InventorySection({
                   <th className="px-2 py-2">地點 / 對象</th>
                   <th className="px-2 py-2">經手人</th>
                   <th className="px-2 py-2">備註</th>
+                  <th className="px-2 py-2 text-right">操作</th>
                 </tr>
               </thead>
               <tbody>
@@ -3560,6 +3735,15 @@ function InventorySection({
                       <td className="px-2 py-2 text-[#8a7f72]">{m.location || '—'}</td>
                       <td className="px-2 py-2 text-[#8a7f72]">{m.handler || '—'}</td>
                       <td className="px-2 py-2 text-[#8a7f72]">{doc.note || '—'}</td>
+                      <td className="px-2 py-2 text-right">
+                        <button
+                          type="button"
+                          onClick={() => onDeleteMovement(m)}
+                          className="rounded-full border border-[#e0b4b4] px-3 py-1.5 text-xs font-semibold text-[#c0392b]"
+                        >
+                          刪除
+                        </button>
+                      </td>
                     </tr>
                   );
                 })}
@@ -3595,9 +3779,17 @@ function InventorySection({
               </button>
             </div>
             <div className="max-h-[62vh] overflow-auto p-4">
+              {movementPicker.field !== 'size' && (
+                <input
+                  value={pickerQuery}
+                  onChange={(e) => setPickerQuery(e.target.value)}
+                  placeholder={movementPicker.field === 'product' ? '搜尋型號、品名、分類' : '搜尋顏色'}
+                  className="mb-4 w-full rounded-xl border border-[#e5ded4] px-4 py-3"
+                />
+              )}
               {movementPicker.field === 'product' && (
                 <div className="grid gap-2">
-                  {products.map((product) => (
+                  {filteredPickerProducts.map((product) => (
                     <button
                       key={product.id}
                       type="button"
@@ -3613,7 +3805,7 @@ function InventorySection({
               )}
               {movementPicker.field === 'color' && (
                 <div className="grid gap-2 sm:grid-cols-2">
-                  {pickerColors.map((color) => (
+                  {filteredPickerColors.map((color) => (
                     <button
                       key={color}
                       type="button"
@@ -3713,6 +3905,7 @@ function ProductModal({
     null,
   );
   const [specInputs, setSpecInputs] = useState<Record<number, string>>({});
+  const descriptionRef = useRef<HTMLTextAreaElement | null>(null);
   function set<K extends keyof Draft>(key: K, value: Draft[K]) {
     onChange({ ...draft, [key]: value });
   }
@@ -3764,6 +3957,15 @@ function ProductModal({
     const current = draft.available_shipping_methods.filter((item) => item !== '免運');
     const baseMethods = current.length ? current : shippingMethods;
     set('available_shipping_methods', checked ? ['免運', ...baseMethods] : current);
+  }
+  function applyDescriptionFormat(prefix: string, suffix = '') {
+    const input = descriptionRef.current;
+    const start = input?.selectionStart ?? draft.tagline.length;
+    const end = input?.selectionEnd ?? draft.tagline.length;
+    const picked = draft.tagline.slice(start, end) || '文字';
+    const next = `${draft.tagline.slice(0, start)}${prefix}${picked}${suffix}${draft.tagline.slice(end)}`;
+    set('tagline', next);
+    requestAnimationFrame(() => input?.focus());
   }
 
   async function uploadProductImages(files: File[]) {
@@ -3826,14 +4028,29 @@ function ProductModal({
 	        <h2 className="text-xl font-semibold">{isNew ? '新增商品' : '編輯商品'}</h2>
 	        <div className="mt-4 grid gap-5">
 	          <section className="rounded-2xl bg-white p-5">
-	          <Field label="商品代碼(英文,新增後不可改)">
-	            <input
-              className="w-full rounded-lg border border-[#e5ded4] px-3 py-2 disabled:bg-[#f5efec]"
-              value={draft.id}
-              disabled={!isNew}
-	              onChange={(e) => set('id', e.target.value)}
-	            />
-	          </Field>
+	          <div className="grid gap-3 sm:grid-cols-2">
+	            <Field label="商品代碼(英文,新增後不可改)">
+	              <input
+	                className="w-full rounded-lg border border-[#e5ded4] px-3 py-2 disabled:bg-[#f5efec]"
+	                value={draft.id}
+	                disabled={!isNew}
+	                onChange={(e) => set('id', e.target.value)}
+	              />
+	            </Field>
+	            <Field label="狀態">
+	              <select
+	                className="w-full rounded-lg border border-[#e5ded4] px-3 py-2"
+	                value={draft.status}
+	                onChange={(e) => set('status', e.target.value)}
+	              >
+	                {PRODUCT_STATUSES.map((s) => (
+	                  <option key={s} value={s}>
+	                    {s}
+	                  </option>
+	                ))}
+	              </select>
+	            </Field>
+	          </div>
 	          <div className="mt-4">
 	          <Field label="商品名稱">
 	            <input
@@ -3846,12 +4063,37 @@ function ProductModal({
 	          </div>
 	          <div className="mt-4">
 	          <Field label="商品描述">
+	            <div className="rounded-lg border border-[#e5ded4]">
+	              <div className="flex flex-wrap gap-1 border-b border-[#e5ded4] bg-[#f7f9fc] p-2 text-sm text-[#666]">
+	                {[
+	                  ['B', '**', '**'],
+	                  ['I', '_', '_'],
+	                  ['U', '<u>', '</u>'],
+	                  ['標題', '## ', ''],
+	                  ['清單', '- ', ''],
+	                  ['連結', '[', '](https://)'],
+	                  ['圖片', '![圖片](', ')'],
+	                  ['表格', '\n| 欄位 | 內容 |\n| --- | --- |\n| ', ' |\n'],
+	                  ['程式', '`', '`'],
+	                ].map(([label, prefix, suffix]) => (
+	                  <button
+	                    key={label}
+	                    type="button"
+	                    onClick={() => applyDescriptionFormat(prefix, suffix)}
+	                    className="rounded px-2 py-1 font-semibold hover:bg-white"
+	                  >
+	                    {label}
+	                  </button>
+	                ))}
+	              </div>
 	            <textarea
-	              className="min-h-44 w-full rounded-lg border border-[#e5ded4] px-3 py-3"
+	              ref={descriptionRef}
+	              className="min-h-44 w-full border-0 px-3 py-3 outline-none"
 	              value={draft.tagline}
 	              placeholder="請在此輸入您的商品描述內容"
 	              onChange={(e) => set('tagline', e.target.value)}
 	            />
+	            </div>
 	          </Field>
 	          </div>
 	          <div className="grid grid-cols-2 gap-3">
@@ -3872,51 +4114,86 @@ function ProductModal({
 	              />
 	            </Field>
 	          </div>
-	          <div className="grid grid-cols-2 gap-3">
-	            <Field label="狀態">
-              <select
-                className="w-full rounded-lg border border-[#e5ded4] px-3 py-2"
-                value={draft.status}
-                onChange={(e) => set('status', e.target.value)}
-              >
-                {PRODUCT_STATUSES.map((s) => (
-                  <option key={s} value={s}>
-                    {s}
-                  </option>
-                ))}
-	              </select>
+	          <div className="mt-4 rounded-xl border border-[#e5ded4] p-4">
+	            <Field label="商品規格">
+	              <div className="space-y-2">
+	                {draft.specs.map((s, i) => (
+	                  <div key={i} className="grid gap-3 rounded-xl border border-[#e5ded4] p-3 md:grid-cols-[220px_1fr_auto]">
+	                    <input
+	                      placeholder="規格"
+	                      value={s.name}
+	                      onChange={(e) => updateSpec(i, { name: e.target.value })}
+	                      className="rounded-lg border border-[#e5ded4] px-3 py-2 text-sm"
+	                    />
+	                    <div className="flex min-h-11 flex-wrap items-center gap-2 rounded-lg border border-[#e5ded4] px-2 py-1">
+	                      {parseOptions(s.optionsText).map((option) => (
+	                        <span key={option} className="inline-flex items-center gap-1 rounded-lg bg-[#e9eefc] px-3 py-1.5 text-sm font-semibold text-[#2868d8]">
+	                          {option}
+	                          <button type="button" onClick={() => removeSpecOption(i, option)} className="text-[#88a8ea]">×</button>
+	                        </span>
+	                      ))}
+	                      <input
+	                        placeholder="輸入選項後按 Enter"
+	                        value={specInputs[i] ?? ''}
+	                        onChange={(e) => setSpecInputs({ ...specInputs, [i]: e.target.value })}
+	                        onKeyDown={(e) => {
+	                          if (e.key === 'Enter') {
+	                            e.preventDefault();
+	                            addSpecOption(i);
+	                          }
+	                        }}
+	                        className="min-w-40 flex-1 border-0 px-2 py-1 text-sm outline-none"
+	                      />
+	                    </div>
+	                    <button
+	                      type="button"
+	                      onClick={() => removeSpec(i)}
+	                      aria-label="刪除規格"
+	                      className="shrink-0 rounded-lg border border-[#e0b4b4] px-3 text-sm font-semibold text-[#c0392b]"
+	                    >
+	                      刪除
+	                    </button>
+	                  </div>
+	                ))}
+	                <button
+	                  type="button"
+	                  onClick={addSpec}
+	                  className="rounded-full border border-[#d7c9bd] px-4 py-2 text-sm font-semibold"
+	                >
+	                  為商品新增更多規格
+	                </button>
+	              </div>
 	            </Field>
-	            <label className="flex items-end gap-2 pb-2">
-	              <input
-	                type="checkbox"
-	                checked={draft.available_shipping_methods.includes('免運')}
-	                onChange={(e) => toggleFreeShipping(e.target.checked)}
-	              />
-	              <span className="text-sm font-semibold">此商品免運</span>
-	            </label>
+	            {hasSpecs && (
+	              <p className="mt-3 text-xs text-[#8a7f72]">
+	                已建立 {modalCombos.length} 個規格組合。新增商品時不建庫存,請到「庫存管理」使用入庫單登錄。
+	              </p>
+	            )}
 	          </div>
-          <Field label="單位(例:件 / 串 / 顆 / 入)">
-            <input
-              className="w-full rounded-lg border border-[#e5ded4] px-3 py-2"
-              value={draft.unit}
-              placeholder="件"
-              onChange={(e) => set('unit', e.target.value)}
-            />
-          </Field>
-          <Field label="分類(首頁篩選用)">
-            <select
-              className="w-full rounded-lg border border-[#e5ded4] px-3 py-2"
-              value={draft.category}
-              onChange={(e) => set('category', e.target.value)}
-            >
-              <option value="">未分類</option>
-              {categories.map((c) => (
-                <option key={c.id} value={c.slug}>
-                  {c.name}
-                </option>
-              ))}
+	          <div className="grid gap-3 sm:grid-cols-2">
+	            <Field label="分類(首頁篩選用)">
+	              <select
+	                className="w-full rounded-lg border border-[#e5ded4] px-3 py-2"
+	                value={draft.category}
+	                onChange={(e) => set('category', e.target.value)}
+	              >
+	                <option value="">未分類</option>
+	                {categories.map((c) => (
+	                  <option key={c.id} value={c.slug}>
+	                    {c.name}
+	                  </option>
+	                ))}
 	              </select>
 	            </Field>
+	            <Field label="單位(例:件 / 串 / 顆 / 入)">
+	              <input
+	                className="w-full rounded-lg border border-[#e5ded4] px-3 py-2"
+	                value={draft.unit}
+	                placeholder="件"
+	                onChange={(e) => set('unit', e.target.value)}
+	              />
+	            </Field>
+	          </div>
 	          <div className="grid gap-3 sm:grid-cols-2">
             <Field label="可用金流(未勾選=全部)">
               <div className="space-y-2 rounded-lg border border-[#e5ded4] p-3">
@@ -4046,63 +4323,7 @@ function ProductModal({
 	            </div>
 	          </Field>
 	          </section>
-	          <section className="rounded-2xl bg-white p-5">
-	          <Field label="規格設定(例:顏色→紅,綠,藍;尺寸→S,M,L;規格→3入,5入)">
-	            <div className="space-y-2">
-	              {draft.specs.map((s, i) => (
-	                <div key={i} className="grid gap-3 rounded-xl border border-[#e5ded4] p-3 md:grid-cols-[220px_1fr_auto]">
-	                  <input
-	                    placeholder="規格名稱"
-	                    value={s.name}
-	                    onChange={(e) => updateSpec(i, { name: e.target.value })}
-	                    className="rounded-lg border border-[#e5ded4] px-3 py-2 text-sm"
-	                  />
-	                  <div className="flex min-h-11 flex-wrap items-center gap-2 rounded-lg border border-[#e5ded4] px-2 py-1">
-	                    {parseOptions(s.optionsText).map((option) => (
-	                      <span key={option} className="inline-flex items-center gap-1 rounded-lg bg-[#e9eefc] px-3 py-1.5 text-sm font-semibold text-[#2868d8]">
-	                        {option}
-	                        <button type="button" onClick={() => removeSpecOption(i, option)} className="text-[#88a8ea]">×</button>
-	                      </span>
-	                    ))}
-	                    <input
-	                      placeholder="輸入選項後按 Enter"
-	                      value={specInputs[i] ?? ''}
-	                      onChange={(e) => setSpecInputs({ ...specInputs, [i]: e.target.value })}
-	                      onKeyDown={(e) => {
-	                        if (e.key === 'Enter') {
-	                          e.preventDefault();
-	                          addSpecOption(i);
-	                        }
-	                      }}
-	                      className="min-w-40 flex-1 border-0 px-2 py-1 text-sm outline-none"
-	                    />
-	                  </div>
-	                  <button
-                    type="button"
-                    onClick={() => removeSpec(i)}
-                    aria-label="刪除規格"
-                    className="shrink-0 rounded-lg border border-[#e0b4b4] px-3 text-sm font-semibold text-[#c0392b]"
-                  >
-                    ✕
-                  </button>
-                </div>
-              ))}
-              <button
-                type="button"
-                onClick={addSpec}
-                className="rounded-full border border-[#d7c9bd] px-4 py-2 text-sm font-semibold"
-              >
-	                + 新增規格維度
-	              </button>
-	            </div>
-	          </Field>
-	          {hasSpecs && (
-	            <p className="mt-3 text-xs text-[#8a7f72]">
-	              已建立 {modalCombos.length} 個規格組合。新增商品時不建庫存,請到「庫存管理」使用入庫單登錄。
-	            </p>
-	          )}
-	          </section>
-	          <div className="grid grid-cols-2 gap-3">
+		          <div className="grid gap-3 sm:grid-cols-3">
             <Field label="排序(小的在前)">
               <input
                 type="number"
@@ -4111,15 +4332,23 @@ function ProductModal({
                 onChange={(e) => set('sort_order', Number(e.target.value))}
               />
             </Field>
-            <label className="flex items-end gap-2 pb-2">
-              <input
-                type="checkbox"
-                checked={draft.is_featured}
-                onChange={(e) => set('is_featured', e.target.checked)}
-              />
-              <span className="text-sm font-semibold">設為首頁主打</span>
-            </label>
-          </div>
+	            <label className="flex items-end gap-2 pb-2">
+	              <input
+	                type="checkbox"
+	                checked={draft.is_featured}
+	                onChange={(e) => set('is_featured', e.target.checked)}
+	              />
+	              <span className="text-sm font-semibold">設為首頁主打</span>
+	            </label>
+	            <label className="flex items-end gap-2 pb-2">
+	              <input
+	                type="checkbox"
+	                checked={draft.available_shipping_methods.includes('免運')}
+	                onChange={(e) => toggleFreeShipping(e.target.checked)}
+	              />
+	              <span className="text-sm font-semibold">此商品免運</span>
+	            </label>
+	          </div>
         </div>
         <div className="mt-6 flex justify-end gap-3">
           <button onClick={onClose} className="rounded-full border border-[#d7c9bd] px-5 py-2 text-sm font-semibold">
