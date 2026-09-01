@@ -125,6 +125,52 @@ function getProductVariantRows(product: Product) {
   }));
 }
 
+function getVariantOptionIndexes(product: Product) {
+  const colorIndex = product.specs.findIndex((spec) => /顏色|色|color/i.test(spec.name));
+  const sizeIndex = product.specs.findIndex((spec) => /尺寸|尺碼|size/i.test(spec.name));
+  return {
+    colorIndex: colorIndex >= 0 ? colorIndex : 0,
+    sizeIndex: sizeIndex >= 0 ? sizeIndex : 1,
+  };
+}
+
+function getLineVariantKey(product: Product | undefined, line: MovementLine) {
+  if (!product?.variants.length) return '';
+  const { colorIndex, sizeIndex } = getVariantOptionIndexes(product);
+  const variant = product.variants.find((item) => {
+    const colorMatched = !line.color || item.options[colorIndex] === line.color;
+    const sizeMatched = !line.size || item.options[sizeIndex] === line.size;
+    return colorMatched && sizeMatched;
+  });
+  return variant?.options.join(' / ') ?? '';
+}
+
+function parseMovementNote(note?: string) {
+  const result = {
+    document_no: '',
+    document_date: '',
+    status: '',
+    payment_status: '',
+    payment_no: '',
+    note: '',
+  };
+  if (!note) return result;
+  const parts = note.split(' | ').map((part) => part.trim()).filter(Boolean);
+  const loose: string[] = [];
+  for (const part of parts) {
+    const [key, ...rest] = part.split(':');
+    const value = rest.join(':').trim();
+    if (key === '單號') result.document_no = value;
+    else if (key === '日期') result.document_date = value;
+    else if (key === '狀態') result.status = value;
+    else if (key === '請款狀態') result.payment_status = value;
+    else if (key === '請款單號') result.payment_no = value;
+    else loose.push(part);
+  }
+  result.note = loose.join(' | ');
+  return result;
+}
+
 function blankDraft(): Draft {
   return {
     id: '',
@@ -228,7 +274,7 @@ export default function AdminDashboard({
     note: '',
   });
   const [movementLines, setMovementLines] = useState<MovementLine[]>([
-    { id: 'line-1', product_id: '', variant_key: '', quantity: 1, unit_price: 0 },
+    { id: 'line-1', product_id: '', variant_key: '', color: '', size: '', quantity: 1, unit_price: 0 },
   ]);
   const [cropFile, setCropFile] = useState<File | null>(null);
   const [editBannerId, setEditBannerId] = useState<string | null>(null);
@@ -490,7 +536,11 @@ export default function AdminDashboard({
 
     for (const line of validLines) {
       const product = products.find((p) => p.id === line.product_id);
-      if (product?.variants.length && !line.variant_key) return alert(`請選擇 ${product.name} 的規格`);
+      if (product?.variants.length) {
+        if (!line.color) return alert(`請選擇 ${product.name} 的顏色`);
+        if (!line.size) return alert(`請選擇 ${product.name} 的尺寸`);
+        if (!getLineVariantKey(product, line)) return alert(`${product.name} 找不到符合的顏色 / 尺寸`);
+      }
     }
 
     const documentNote = [
@@ -509,7 +559,7 @@ export default function AdminDashboard({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           product_id: line.product_id,
-          variant_key: line.variant_key,
+          variant_key: getLineVariantKey(products.find((p) => p.id === line.product_id), line),
           type: mvForm.type,
           quantity: line.quantity,
           unit_price: line.unit_price,
@@ -530,9 +580,10 @@ export default function AdminDashboard({
         const delta = mvForm.type === 'in' ? line.quantity : -line.quantity;
         nextProducts = nextProducts.map((p) => {
           if (p.id !== line.product_id) return p;
-          if (p.variants.length > 0 && line.variant_key) {
-            const variants = p.variants.map((v) =>
-              v.options.join(' / ') === line.variant_key
+        const lineVariantKey = getLineVariantKey(p, line);
+        if (p.variants.length > 0 && lineVariantKey) {
+          const variants = p.variants.map((v) =>
+            v.options.join(' / ') === lineVariantKey
                 ? { ...v, inventory: Math.max(0, v.inventory + delta) }
                 : v,
             );
@@ -543,7 +594,7 @@ export default function AdminDashboard({
       }
       return nextProducts;
     });
-    setMovementLines([{ id: `line-${Date.now()}`, product_id: '', variant_key: '', quantity: 1, unit_price: 0 }]);
+    setMovementLines([{ id: `line-${Date.now()}`, product_id: '', variant_key: '', color: '', size: '', quantity: 1, unit_price: 0 }]);
     setMvForm({ ...mvForm, document_no: '', payment_status: '', payment_no: '', location: '', note: '' });
   }
 
@@ -2655,9 +2706,13 @@ type MovementLine = {
   id: string;
   product_id: string;
   variant_key: string;
+  color: string;
+  size: string;
   quantity: number;
   unit_price: number;
 };
+
+type StockSortKey = 'pid' | 'name' | 'cat' | 'spec' | 'unit' | 'inv' | 'safety' | 'status' | 'cost' | 'value' | 'location' | 'last';
 
 function ProductInventorySummary({
   products,
@@ -2885,6 +2940,14 @@ function InventorySection({
   });
   const [selectedInventoryProduct, setSelectedInventoryProduct] = useState<Product | null>(null);
   const [inventoryTab, setInventoryTab] = useState<'products' | 'stock' | 'movement' | 'history'>('products');
+  const [movementPicker, setMovementPicker] = useState<{
+    lineId: string;
+    field: 'product' | 'color' | 'size';
+  } | null>(null);
+  const [stockSort, setStockSort] = useState<{ key: StockSortKey; dir: 'asc' | 'desc' }>({
+    key: 'pid',
+    dir: 'asc',
+  });
   const catName = (slug: string) => categories.find((c) => c.slug === slug)?.name || slug || '—';
   const nameById = (id: string) => products.find((p) => p.id === id)?.name || id;
   const fmtDate = (s?: string) => (s ? new Date(s).toLocaleDateString('zh-TW') : '—');
@@ -2899,17 +2962,20 @@ function InventorySection({
   const rows = products.flatMap((p) => {
     const base = { pid: p.id, name: p.name, cat: catName(p.category), category: p.category, unit: p.unit || '件' };
     if (p.variants.length > 0) {
+      const { colorIndex, sizeIndex } = getVariantOptionIndexes(p);
       return p.variants.map((v) => ({
         ...base,
         spec: v.options.join(' / '),
         key: v.options.join(' / '),
+        color: v.options[colorIndex] ?? '',
+        size: v.options[sizeIndex] ?? '',
         inv: v.inventory,
         safety: v.safety ?? 0,
         cost: v.cost ?? 0,
         location: v.location || '—',
       }));
     }
-    return [{ ...base, spec: '—', key: '', inv: p.inventory, safety: 0, cost: 0, location: '—' }];
+    return [{ ...base, spec: '—', key: '', color: '', size: '', inv: p.inventory, safety: 0, cost: 0, location: '—' }];
   });
   const filteredRows = rows.filter((r) => {
     const q = inventoryFilters.query.trim().toLowerCase();
@@ -2923,6 +2989,26 @@ function InventorySection({
       String(value).toLowerCase().includes(q),
     );
   });
+  const sortedRows = [...filteredRows].sort((a, b) => {
+    const valueFor = (row: (typeof filteredRows)[number]) => {
+      if (stockSort.key === 'status') return row.inv <= row.safety ? '需補貨' : '正常';
+      if (stockSort.key === 'value') return row.inv * row.cost;
+      if (stockSort.key === 'last') return lastMv.get(`${row.pid}${row.key}`) ?? '';
+      return row[stockSort.key];
+    };
+    const av = valueFor(a);
+    const bv = valueFor(b);
+    const result = typeof av === 'number' && typeof bv === 'number'
+      ? av - bv
+      : String(av).localeCompare(String(bv), 'zh-Hant');
+    return stockSort.dir === 'asc' ? result : -result;
+  });
+  const setStockSortKey = (key: StockSortKey) => {
+    setStockSort((current) => ({
+      key,
+      dir: current.key === key && current.dir === 'asc' ? 'desc' : 'asc',
+    }));
+  };
   const filteredProducts = products.filter((p) => filteredRows.some((r) => r.pid === p.id));
 
   const inventoryTabs = [
@@ -2937,11 +3023,58 @@ function InventorySection({
   const addMovementLine = () => {
     setMovementLines([
       ...movementLines,
-      { id: `line-${Date.now()}-${movementLines.length}`, product_id: '', variant_key: '', quantity: 1, unit_price: 0 },
+      {
+        id: `line-${Date.now()}-${movementLines.length}`,
+        product_id: '',
+        variant_key: '',
+        color: '',
+        size: '',
+        quantity: 1,
+        unit_price: 0,
+      },
     ]);
   };
   const removeMovementLine = (id: string) => {
     setMovementLines(movementLines.length <= 1 ? movementLines : movementLines.filter((line) => line.id !== id));
+  };
+  const stockHeaders: { key: StockSortKey; label: string; align?: 'right' }[] = [
+    { key: 'pid', label: '品項編號' },
+    { key: 'name', label: '品名' },
+    { key: 'cat', label: '分類' },
+    { key: 'spec', label: '規格' },
+    { key: 'unit', label: '單位' },
+    { key: 'inv', label: '目前庫存', align: 'right' },
+    { key: 'safety', label: '安全庫存', align: 'right' },
+    { key: 'status', label: '庫存狀態' },
+    { key: 'cost', label: '單位成本', align: 'right' },
+    { key: 'value', label: '庫存金額', align: 'right' },
+    { key: 'location', label: '儲位' },
+    { key: 'last', label: '最後異動' },
+  ];
+  const pickerLine = movementPicker ? movementLines.find((line) => line.id === movementPicker.lineId) : null;
+  const pickerProduct = pickerLine ? products.find((p) => p.id === pickerLine.product_id) : null;
+  const pickerRows = pickerProduct ? getProductVariantRows(pickerProduct) : [];
+  const pickerColors = uniqueValues(pickerRows.map((row) => row.color));
+  const pickerSizes = uniqueValues(
+    pickerRows
+      .filter((row) => !pickerLine?.color || row.color === pickerLine.color)
+      .map((row) => row.size),
+  );
+  const chooseMovementOption = (value: string) => {
+    if (!movementPicker) return;
+    if (movementPicker.field === 'product') {
+      updateMovementLine(movementPicker.lineId, { product_id: value, variant_key: '', color: '', size: '' });
+    } else if (movementPicker.field === 'color') {
+      updateMovementLine(movementPicker.lineId, { color: value, size: '', variant_key: '' });
+    } else {
+      const product = products.find((p) => p.id === pickerLine?.product_id);
+      const nextLine = { ...(pickerLine as MovementLine), size: value };
+      updateMovementLine(movementPicker.lineId, {
+        size: value,
+        variant_key: getLineVariantKey(product, nextLine),
+      });
+    }
+    setMovementPicker(null);
   };
   const inventoryFilterControls = (
     <div className="mb-5 rounded-xl border border-[#e5ded4] bg-[#faf7f2] p-4">
@@ -3046,26 +3179,29 @@ function InventorySection({
       {/* 庫存總表 */}
       {inventoryTab === 'stock' && (
       <Card title="庫存總表">
+        {inventoryFilterControls}
         <div className="overflow-x-auto">
           <table className="w-full whitespace-nowrap text-sm">
             <thead>
               <tr className="border-b border-[#e5ded4] text-left text-xs text-[#8a7f72]">
-                <th className="px-2 py-2">品項編號</th>
-                <th className="px-2 py-2">品名</th>
-                <th className="px-2 py-2">分類</th>
-                <th className="px-2 py-2">規格</th>
-                <th className="px-2 py-2">單位</th>
-                <th className="px-2 py-2 text-right">目前庫存</th>
-                <th className="px-2 py-2 text-right">安全庫存</th>
-                <th className="px-2 py-2">庫存狀態</th>
-                <th className="px-2 py-2 text-right">單位成本</th>
-                <th className="px-2 py-2 text-right">庫存金額</th>
-                <th className="px-2 py-2">儲位</th>
-                <th className="px-2 py-2">最後異動</th>
+                {stockHeaders.map((header) => (
+                  <th key={header.key} className={`px-2 py-2 ${header.align === 'right' ? 'text-right' : ''}`}>
+                    <button
+                      type="button"
+                      onClick={() => setStockSortKey(header.key)}
+                      className="inline-flex items-center gap-1 font-semibold hover:text-[#1f1b19]"
+                    >
+                      {header.label}
+                      <span className="text-[10px]">
+                        {stockSort.key === header.key ? (stockSort.dir === 'asc' ? '▲' : '▼') : '↕'}
+                      </span>
+                    </button>
+                  </th>
+                ))}
               </tr>
             </thead>
             <tbody>
-              {filteredRows.map((r, i) => {
+              {sortedRows.map((r, i) => {
                 const low = r.inv <= r.safety;
                 return (
                   <tr key={`${r.pid}-${r.key}-${i}`} className="border-b border-[#efe8dd]">
@@ -3257,11 +3393,13 @@ function InventorySection({
           </div>
 
           <div className="mt-5 overflow-x-auto">
-            <table className="w-full min-w-[980px] whitespace-nowrap text-sm">
+            <table className="w-full min-w-[1180px] whitespace-nowrap text-sm">
               <thead>
                 <tr className="border-b border-[#e5ded4] bg-[#f3eee7] text-left text-xs text-[#6b6156]">
-                  <th className="px-3 py-3">商品</th>
-                  <th className="px-3 py-3">規格 / 顏色 / 尺寸</th>
+                  <th className="px-3 py-3">型號</th>
+                  <th className="px-3 py-3">品名</th>
+                  <th className="px-3 py-3">顏色</th>
+                  <th className="px-3 py-3">尺寸</th>
                   <th className="px-3 py-3 text-right">數量</th>
                   <th className="px-3 py-3 text-right">單價</th>
                   <th className="px-3 py-3 text-right">小計</th>
@@ -3271,41 +3409,45 @@ function InventorySection({
               <tbody>
                 {movementLines.map((line) => {
                   const lineProduct = products.find((p) => p.id === line.product_id);
+                  const lineVariantRows = lineProduct ? getProductVariantRows(lineProduct) : [];
+                  const selectedVariant = lineVariantRows.find(
+                    (row) => (!line.color || row.color === line.color) && (!line.size || row.size === line.size),
+                  );
                   return (
                     <tr key={line.id} className="border-b border-[#efe8dd]">
                       <td className="px-3 py-3">
-                        <select
-                          value={line.product_id}
-                          onChange={(e) => updateMovementLine(line.id, { product_id: e.target.value, variant_key: '' })}
-                          className="w-64 rounded-lg border border-[#e5ded4] px-3 py-2"
+                        <button
+                          type="button"
+                          onClick={() => setMovementPicker({ lineId: line.id, field: 'product' })}
+                          className="w-44 rounded-lg border border-[#e5ded4] bg-white px-3 py-2 text-left font-semibold"
                         >
-                          <option value="">請選擇商品</option>
-                          {products.map((p) => (
-                            <option key={p.id} value={p.id}>
-                              {p.id} / {p.name}
-                            </option>
-                          ))}
-                        </select>
+                          {line.product_id || '選擇型號'}
+                        </button>
                       </td>
                       <td className="px-3 py-3">
-                        {lineProduct?.variants.length ? (
-                          <select
-                            value={line.variant_key}
-                            onChange={(e) => updateMovementLine(line.id, { variant_key: e.target.value })}
-                            className="w-56 rounded-lg border border-[#e5ded4] px-3 py-2"
-                          >
-                            <option value="">請選擇規格</option>
-                            {lineProduct.variants.map((v) => {
-                              const key = v.options.join(' / ');
-                              return (
-                                <option key={key} value={key}>
-                                  {key}，庫存 {v.inventory}
-                                </option>
-                              );
-                            })}
-                          </select>
-                        ) : (
-                          <span className="text-[#8a7f72]">—</span>
+                        <span className="block w-56 truncate font-semibold">{lineProduct?.name || '—'}</span>
+                      </td>
+                      <td className="px-3 py-3">
+                        <button
+                          type="button"
+                          disabled={!lineProduct?.variants.length}
+                          onClick={() => setMovementPicker({ lineId: line.id, field: 'color' })}
+                          className="w-36 rounded-lg border border-[#e5ded4] bg-white px-3 py-2 text-left disabled:bg-[#f3eee7] disabled:text-[#aaa]"
+                        >
+                          {line.color || (lineProduct?.variants.length ? '選擇顏色' : '—')}
+                        </button>
+                      </td>
+                      <td className="px-3 py-3">
+                        <button
+                          type="button"
+                          disabled={!lineProduct?.variants.length || !line.color}
+                          onClick={() => setMovementPicker({ lineId: line.id, field: 'size' })}
+                          className="w-28 rounded-lg border border-[#e5ded4] bg-white px-3 py-2 text-left disabled:bg-[#f3eee7] disabled:text-[#aaa]"
+                        >
+                          {line.size || (line.color ? '選擇尺寸' : '先選顏色')}
+                        </button>
+                        {selectedVariant && (
+                          <p className="mt-1 text-xs text-[#8a7f72]">庫存 {selectedVariant.inventory}</p>
                         )}
                       </td>
                       <td className="px-3 py-3 text-right">
@@ -3378,43 +3520,130 @@ function InventorySection({
             <table className="w-full whitespace-nowrap text-sm">
               <thead>
                 <tr className="border-b border-[#e5ded4] text-left text-xs text-[#8a7f72]">
-                  <th className="px-2 py-2">日期</th>
+                  <th className="px-2 py-2">單號</th>
+                  <th className="px-2 py-2">單據日期</th>
+                  <th className="px-2 py-2">登錄日期</th>
+                  <th className="px-2 py-2">狀態</th>
                   <th className="px-2 py-2">品項</th>
                   <th className="px-2 py-2">規格</th>
                   <th className="px-2 py-2">類型</th>
                   <th className="px-2 py-2 text-right">數量</th>
                   <th className="px-2 py-2 text-right">單價</th>
+                  <th className="px-2 py-2">請款狀態</th>
+                  <th className="px-2 py-2">請款單號</th>
                   <th className="px-2 py-2">地點 / 對象</th>
                   <th className="px-2 py-2">經手人</th>
                   <th className="px-2 py-2">備註</th>
                 </tr>
               </thead>
               <tbody>
-                {movements.map((m) => (
-                  <tr key={m.id} className="border-b border-[#efe8dd]">
-                    <td className="px-2 py-2 text-[#8a7f72]">{fmtDate(m.created_at)}</td>
-                    <td className="px-2 py-2">{nameById(m.product_id)}</td>
-                    <td className="px-2 py-2 text-[#8a7f72]">{m.variant_key || '—'}</td>
-                    <td className="px-2 py-2">
-                      <span className={m.type === 'in' ? 'text-[#1f7a44]' : 'text-[#c0392b]'}>
-                        {m.type === 'in' ? '入庫' : '出庫'}
-                      </span>
-                    </td>
-                    <td className="px-2 py-2 text-right font-semibold">
-                      {m.type === 'in' ? '+' : '−'}
-                      {m.quantity}
-                    </td>
-                    <td className="px-2 py-2 text-right">{m.unit_price}</td>
-                    <td className="px-2 py-2 text-[#8a7f72]">{m.location || '—'}</td>
-                    <td className="px-2 py-2 text-[#8a7f72]">{m.handler || '—'}</td>
-                    <td className="px-2 py-2 text-[#8a7f72]">{m.note || '—'}</td>
-                  </tr>
-                ))}
+                {movements.map((m) => {
+                  const doc = parseMovementNote(m.note);
+                  return (
+                    <tr key={m.id} className="border-b border-[#efe8dd]">
+                      <td className="px-2 py-2 font-mono text-xs text-[#2687c9]">{doc.document_no || '—'}</td>
+                      <td className="px-2 py-2 text-[#8a7f72]">{doc.document_date || '—'}</td>
+                      <td className="px-2 py-2 text-[#8a7f72]">{fmtDate(m.created_at)}</td>
+                      <td className="px-2 py-2 text-[#8a7f72]">{doc.status || '—'}</td>
+                      <td className="px-2 py-2">{nameById(m.product_id)}</td>
+                      <td className="px-2 py-2 text-[#8a7f72]">{m.variant_key || '—'}</td>
+                      <td className="px-2 py-2">
+                        <span className={m.type === 'in' ? 'text-[#1f7a44]' : 'text-[#c0392b]'}>
+                          {m.type === 'in' ? '入庫' : '出庫'}
+                        </span>
+                      </td>
+                      <td className="px-2 py-2 text-right font-semibold">
+                        {m.type === 'in' ? '+' : '−'}
+                        {m.quantity}
+                      </td>
+                      <td className="px-2 py-2 text-right">{m.unit_price}</td>
+                      <td className="px-2 py-2 text-[#8a7f72]">{doc.payment_status || '—'}</td>
+                      <td className="px-2 py-2 text-[#8a7f72]">{doc.payment_no || '—'}</td>
+                      <td className="px-2 py-2 text-[#8a7f72]">{m.location || '—'}</td>
+                      <td className="px-2 py-2 text-[#8a7f72]">{m.handler || '—'}</td>
+                      <td className="px-2 py-2 text-[#8a7f72]">{doc.note || '—'}</td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
         )}
       </Card>
+      )}
+
+      {movementPicker && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          onClick={() => setMovementPicker(null)}
+        >
+          <div
+            className="max-h-[82vh] w-full max-w-2xl overflow-hidden rounded-2xl bg-white shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-[#e5ded4] p-5">
+              <div>
+                <p className="text-sm text-[#8a7f72]">點選項目</p>
+                <h3 className="text-2xl font-bold">
+                  {movementPicker.field === 'product' ? '選擇型號' : movementPicker.field === 'color' ? '選擇顏色' : '選擇尺寸'}
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setMovementPicker(null)}
+                className="rounded-full border border-[#d7c9bd] px-4 py-2 text-sm font-semibold"
+              >
+                關閉
+              </button>
+            </div>
+            <div className="max-h-[62vh] overflow-auto p-4">
+              {movementPicker.field === 'product' && (
+                <div className="grid gap-2">
+                  {products.map((product) => (
+                    <button
+                      key={product.id}
+                      type="button"
+                      onClick={() => chooseMovementOption(product.id)}
+                      className="rounded-xl border border-[#e5ded4] p-4 text-left hover:border-[#1f1b19]"
+                    >
+                      <span className="block font-mono text-sm text-[#2687c9]">{product.id}</span>
+                      <span className="mt-1 block font-semibold">{product.name}</span>
+                      <span className="mt-1 block text-xs text-[#8a7f72]">{catName(product.category)}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+              {movementPicker.field === 'color' && (
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {pickerColors.map((color) => (
+                    <button
+                      key={color}
+                      type="button"
+                      onClick={() => chooseMovementOption(color)}
+                      className="rounded-xl border border-[#e5ded4] p-4 text-left font-semibold hover:border-[#1f1b19]"
+                    >
+                      {color}
+                    </button>
+                  ))}
+                </div>
+              )}
+              {movementPicker.field === 'size' && (
+                <div className="grid gap-2 sm:grid-cols-3">
+                  {pickerSizes.map((size) => (
+                    <button
+                      key={size}
+                      type="button"
+                      onClick={() => chooseMovementOption(size)}
+                      className="rounded-xl border border-[#e5ded4] p-4 text-left font-semibold hover:border-[#1f1b19]"
+                    >
+                      {size}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
