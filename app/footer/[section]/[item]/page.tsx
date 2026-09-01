@@ -28,12 +28,11 @@ export default async function FooterContentPage({ params }: { params: Promise<{ 
     .split(/\n{2,}/)
     .map((text) => text.trim())
     .filter(Boolean);
-  const intro = paragraphs.slice(0, 3);
   const copyrightEndYear = Math.max(copyrightStartYear, new Date().getFullYear());
 
   return (
     <main className="min-h-screen bg-[#f8f3ec] text-[#2c2826]">
-      <section className="mx-auto grid max-w-7xl gap-8 px-6 py-8 sm:px-8 lg:min-h-[520px] lg:grid-cols-[0.9fr_1.1fr] lg:items-center lg:py-12">
+      <section className="mx-auto grid max-w-7xl gap-8 px-6 py-8 sm:px-8 lg:min-h-[560px] lg:grid-cols-[0.9fr_1.1fr] lg:items-center lg:py-12">
         <div className="order-2 lg:order-1">
           <Link href="/" className="text-sm font-semibold text-[#6f675f] hover:text-[#1f1b19]">
             ← 回首頁
@@ -46,18 +45,30 @@ export default async function FooterContentPage({ params }: { params: Promise<{ 
           </h1>
           <div className="mt-6 h-px w-14 bg-[#9a8f84]" />
           <div className="mt-8 space-y-5 text-sm leading-8 text-[#514b45] sm:text-base">
-            {intro.map((text, index) => (
+            {paragraphs.map((text, index) => (
               <p key={index} className="whitespace-pre-line">{text}</p>
             ))}
           </div>
+          {content.url && (
+            <a
+              href={content.url}
+              className="mt-10 inline-flex bg-[#1f1b19] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#3a322e]"
+              target={content.url.startsWith('http') ? '_blank' : undefined}
+              rel={content.url.startsWith('http') ? 'noreferrer' : undefined}
+            >
+              前往相關連結
+            </a>
+          )}
         </div>
 
-        <div className="order-1 overflow-hidden rounded-[28px] bg-[#e9e1d6] shadow-sm lg:order-2">
+        <div className="relative order-1 overflow-hidden rounded-[28px] bg-[#e9e1d6] shadow-sm lg:order-2">
           {banner?.image ? (
             <img src={banner.image} alt={banner.title || 'URBANITE'} className="aspect-[4/3] h-full w-full object-cover lg:aspect-[5/4]" />
           ) : (
             <div className="aspect-[4/3] bg-[linear-gradient(135deg,#e9e1d6,#f8f3ec_48%,#d8cdc1)] lg:aspect-[5/4]" />
           )}
+          <div className="pointer-events-none absolute inset-y-0 left-0 w-1/4 bg-gradient-to-r from-[#f8f3ec] via-[#f8f3ec]/55 to-transparent" />
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-[#f8f3ec]/45 to-transparent" />
         </div>
       </section>
 
@@ -69,24 +80,6 @@ export default async function FooterContentPage({ params }: { params: Promise<{ 
           <FeatureItem icon="service" title="貼心服務" text="任何問題歡迎聯繫，我們會盡快協助。" />
         </div>
       </section>
-
-      <article className="mx-auto max-w-4xl px-6 py-12 sm:px-8">
-        <p className="text-xs font-bold uppercase tracking-[0.24em] text-[#9a8f84]">{sectionTitle}</p>
-        <h2 className="mt-4 text-2xl font-bold sm:text-3xl">{content.subtitle}</h2>
-        <div className="mt-8 whitespace-pre-wrap text-base leading-9 text-[#494541]">
-          {body}
-        </div>
-        {content.url && (
-          <a
-            href={content.url}
-            className="mt-10 inline-flex bg-[#1f1b19] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#3a322e]"
-            target={content.url.startsWith('http') ? '_blank' : undefined}
-            rel={content.url.startsWith('http') ? 'noreferrer' : undefined}
-          >
-            前往相關連結
-          </a>
-        )}
-      </article>
 
       <footer className="border-t border-[#e5ded4] px-6 py-6 sm:px-8">
         <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-4 text-xs text-[#6f675f] sm:flex-row">

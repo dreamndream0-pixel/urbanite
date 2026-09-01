@@ -590,16 +590,41 @@ function Footer({ settings, logoUrl }: { settings: SiteSettings | null; logoUrl:
         { title: '關於我們 ABOUT US', items: aboutLinks.map((subtitle) => ({ subtitle, content: '', url: '' })) },
         { title: '顧客服務 SERVICE', items: serviceLinks.map((subtitle) => ({ subtitle, content: '', url: '' })) },
       ];
-  const footerPolicyLinks = ['隱私權政策', '服務條款'].map((label) => {
+  const footerPolicyLinks = ['隱私權政策', '使用者條款'].map((label) => {
     const match = sections
       .flatMap((section) => section.items.map((item) => ({ sectionTitle: section.title, item })))
-      .find(({ item }) => item.subtitle.includes(label));
+      .find(({ item }) => isPolicyItem(item.subtitle, label));
     return match ? { label, href: getFooterLinkHref(match.item, match.sectionTitle) } : null;
   }).filter(Boolean) as { label: string; href: string }[];
+  const displaySections = sections
+    .map((section) => ({
+      ...section,
+      items: section.items.filter((item) => !isPolicyItem(item.subtitle)),
+    }))
+    .filter((section) => section.title || section.items.length);
+  const followSection = {
+    title: '尋找我們 FOLLOW US',
+    items: [
+      settings?.footer_service_hours ? `服務時間：${settings.footer_service_hours}` : '',
+      settings?.footer_email ? `E-MAIL：${settings.footer_email}` : '',
+      settings?.footer_instagram_url ? 'Instagram' : '',
+      settings?.footer_line_url ? 'LINE 官方帳號' : '',
+      settings?.footer_company_name ? `公司名稱：${settings.footer_company_name}` : '',
+      settings?.footer_tax_id ? `統一編號：${settings.footer_tax_id}` : '',
+    ]
+      .filter(Boolean)
+      .map((subtitle) => ({ subtitle, content: '', url: '' })),
+  };
+  const hasFollowSection = displaySections.some((section) => /尋找我們|追蹤我們|follow us/i.test(section.title));
+  const mobileSections = [
+    ...displaySections,
+    ...(hasFollowSection ? [] : [followSection]),
+    { title: '訂閱最新消息', items: [{ subtitle: '訂閱收到新品、優惠與穿搭靈感。', content: '', url: '' }] },
+  ];
 
   return (
     <footer className="border-t border-[#e5ded4] bg-[#f8f3ec] text-[#2c2826]">
-      <div className="mx-auto grid max-w-7xl gap-10 px-6 py-10 sm:px-8 lg:grid-cols-[1.15fr_3fr_1.3fr] lg:gap-12">
+      <div className="mx-auto hidden max-w-[88rem] gap-12 px-8 py-11 lg:grid lg:grid-cols-[1fr_minmax(0,4.5fr)_1.35fr]">
         <section className="text-center lg:text-left">
           <Link href="/" aria-label="回首頁" className="inline-flex">
             {logoUrl ? (
@@ -620,8 +645,8 @@ function Footer({ settings, logoUrl }: { settings: SiteSettings | null; logoUrl:
           </div>
         </section>
 
-        <div className="grid grid-cols-2 gap-8 text-center sm:grid-cols-3 lg:text-left xl:grid-cols-4">
-          {sections.map((section, index) => (
+        <div className="grid min-w-0 grid-cols-4 gap-x-8 gap-y-8 text-left">
+          {displaySections.map((section, index) => (
             <FooterGroup
               key={`${section.title}-${index}`}
               title={section.title || '未命名'}
@@ -661,6 +686,42 @@ function Footer({ settings, logoUrl }: { settings: SiteSettings | null; logoUrl:
           </form>
         </section>
       </div>
+      <div className="mx-auto max-w-3xl px-8 py-10 lg:hidden">
+        <div className="divide-y divide-[#e1d8cd] border-y border-[#e1d8cd]">
+          {mobileSections.map((section, index) => (
+            <MobileFooterGroup
+              key={`${section.title}-${index}`}
+              title={section.title || '未命名'}
+              items={section.items}
+            />
+          ))}
+        </div>
+        <div className="grid grid-cols-4 gap-3 border-b border-[#e1d8cd] py-8 text-center text-xs font-semibold text-[#5f5852]">
+          <FooterFeature icon="shirt" label="質感選品" />
+          <FooterFeature icon="box" label="快速出貨" />
+          <FooterFeature icon="truck" label="安心購物" />
+          <FooterFeature icon="service" label="貼心客服" />
+        </div>
+        <section className="border-b border-[#e1d8cd] py-8 text-center">
+          <Link href="/" aria-label="回首頁" className="inline-flex justify-center">
+            {logoUrl ? (
+              <img src={logoUrl} alt={STORE_NAME} className="h-11 w-auto object-contain" />
+            ) : (
+              <span className="text-3xl font-black tracking-tight">urbanite</span>
+            )}
+          </Link>
+          <p className="mt-5 text-sm leading-7 text-[#5f5852]">
+            簡約 × 質感 × 日常
+            <br />
+            打造屬於你的穿搭風格。
+          </p>
+          <div className="mt-5 flex justify-center gap-4">
+            <SocialLink href={settings?.footer_instagram_url} label="Instagram">◎</SocialLink>
+            <SocialLink href={settings?.footer_line_url} label="LINE">LINE</SocialLink>
+            <SocialLink href={settings?.footer_email ? `mailto:${settings.footer_email}` : ''} label="Email">@</SocialLink>
+          </div>
+        </section>
+      </div>
       <div className="border-t border-[#e5ded4] px-6 py-5 sm:px-8">
         <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-4 text-xs text-[#6f675f] sm:flex-row">
           <p>Copyright © {copyrightStartYear}-{copyrightEndYear} URBANITE-TW. All rights reserved.</p>
@@ -677,14 +738,86 @@ function Footer({ settings, logoUrl }: { settings: SiteSettings | null; logoUrl:
 
 type FooterLinkItem = { subtitle: string; content: string; url: string };
 
+function isPolicyItem(subtitle: string, target?: string) {
+  const isPrivacy = subtitle.includes('隱私權政策') || subtitle.toLowerCase().includes('privacy');
+  const isTerms = subtitle.includes('使用者條款') || subtitle.includes('服務條款') || subtitle.toLowerCase().includes('terms');
+  if (target === '隱私權政策') return isPrivacy;
+  if (target === '使用者條款') return isTerms;
+  return isPrivacy || isTerms;
+}
+
 function FooterGroup({ title, items }: { title: string; items: FooterLinkItem[] }) {
   return (
     <section className="min-w-0">
-      <h2 className="text-sm font-bold tracking-wide">{title}</h2>
+      <h2 className="text-sm font-bold leading-5 tracking-wide">{title}</h2>
       <nav className="mt-4 space-y-2 text-sm leading-6 text-[#5f5852]">
         {items.map((item, index) => <FooterLink key={`${item.subtitle}-${index}`} item={item} sectionTitle={title} />)}
       </nav>
     </section>
+  );
+}
+
+function MobileFooterGroup({ title, items }: { title: string; items: FooterLinkItem[] }) {
+  return (
+    <details className="group">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-4 py-4 text-left text-sm font-bold tracking-wide [&::-webkit-details-marker]:hidden">
+        <span>{title}</span>
+        <span className="text-xl font-light leading-none transition group-open:rotate-180">⌄</span>
+      </summary>
+      <nav className="space-y-3 pb-5 text-sm leading-7 text-[#5f5852]">
+        {items.map((item, index) => (
+          item.url || item.content ? (
+            <FooterLink key={`${item.subtitle}-${index}`} item={item} sectionTitle={title} />
+          ) : (
+            <p key={`${item.subtitle}-${index}`}>{item.subtitle}</p>
+          )
+        ))}
+      </nav>
+    </details>
+  );
+}
+
+function FooterFeature({ icon, label }: { icon: 'box' | 'shirt' | 'truck' | 'service'; label: string }) {
+  return (
+    <div className="flex min-w-0 flex-col items-center gap-2">
+      <span className="flex h-10 w-10 items-center justify-center text-[#5f5852]">
+        <FooterFeatureIcon icon={icon} />
+      </span>
+      <span>{label}</span>
+    </div>
+  );
+}
+
+function FooterFeatureIcon({ icon }: { icon: 'box' | 'shirt' | 'truck' | 'service' }) {
+  if (icon === 'shirt') {
+    return (
+      <svg className="h-8 w-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7">
+        <path d="M8 4l4 2 4-2 4 4-3 3v9H7v-9L4 8l4-4z" />
+      </svg>
+    );
+  }
+  if (icon === 'truck') {
+    return (
+      <svg className="h-8 w-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7">
+        <path d="M3 7h11v9H3zM14 10h4l3 3v3h-7z" />
+        <circle cx="7" cy="18" r="1.7" />
+        <circle cx="18" cy="18" r="1.7" />
+      </svg>
+    );
+  }
+  if (icon === 'service') {
+    return (
+      <svg className="h-8 w-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7">
+        <path d="M5 12a7 7 0 0 1 14 0v4a3 3 0 0 1-3 3h-2" />
+        <path d="M5 12v4h3v-5H5zM19 12v4h-3v-5h3z" />
+      </svg>
+    );
+  }
+  return (
+    <svg className="h-8 w-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7">
+      <path d="M4 7l8-4 8 4-8 4-8-4zM4 7v10l8 4 8-4V7" />
+      <path d="M12 11v10" />
+    </svg>
   );
 }
 
