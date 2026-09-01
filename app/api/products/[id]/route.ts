@@ -22,6 +22,7 @@ const EDITABLE: (keyof Product)[] = [
   'variants',
   'unit',
   'sale_mode',
+  'color_images',
   'is_featured',
   'sort_order',
 ];

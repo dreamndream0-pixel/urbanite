@@ -44,6 +44,7 @@ export type Product = {
   variants: Variant[];
   unit?: string;
   sale_mode?: string; // 現貨 / 預購 / 預購+現貨
+  color_images?: Record<string, string>; // 顏色名稱 → 圖片網址
   is_featured: boolean;
   sort_order: number;
   created_at?: string;

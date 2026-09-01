@@ -65,6 +65,7 @@ type Draft = {
   sizes: string;
   unit: string;
   sale_mode: string;
+  colorImages: Record<string, string>;
   specs: { name: string; optionsText: string }[];
   variantStock: Record<string, number>; // key = 各選項用 ' / ' 串起來
   variantCost: Record<string, number>; // 各規格單位成本
@@ -271,6 +272,7 @@ function blankDraft(): Draft {
     sizes: '',
     unit: '',
     sale_mode: '現貨',
+    colorImages: {},
     specs: [],
     variantStock: {},
     variantCost: {},
@@ -301,6 +303,7 @@ function toDraft(p: Product): Draft {
     sizes: p.sizes.join(', '),
     unit: p.unit ?? '',
     sale_mode: p.sale_mode ?? '現貨',
+    colorImages: p.color_images ?? {},
     specs,
     variantStock,
     variantCost,
@@ -589,6 +592,7 @@ export default function AdminDashboard({
       inventory,
       specs,
       variants,
+      color_images: editing.colorImages,
       colors: colorDim
         ? colorDim.options
         : editing.colors.split(',').map((s) => s.trim()).filter(Boolean),
@@ -4812,6 +4816,17 @@ function ProductModal({
   function removeSpecOption(i: number, value: string) {
     updateSpec(i, { optionsText: parseOptions(draft.specs[i]?.optionsText ?? '').filter((item) => item !== value).join(', ') });
   }
+  async function uploadColorImage(color: string, file: File) {
+    const fd = new FormData();
+    fd.append('file', file);
+    fd.append('folder', 'products');
+    fd.append('productId', draft.id || 'new');
+    const res = await fetch('/api/products/image', { method: 'POST', body: fd });
+    const data = await res.json();
+    if (res.ok) set('colorImages', { ...draft.colorImages, [color]: data.image_url });
+    else alert(data.error ?? '圖片上傳失敗');
+  }
+  const colorDim = modalSpecs.find((s) => s.name.includes('色'));
   function toggleMethod(
     key: 'available_payment_methods' | 'available_shipping_methods',
     method: string,
@@ -5066,6 +5081,51 @@ function ProductModal({
 	                >
 	                  為商品新增更多規格
 	                </button>
+                {colorDim && colorDim.options.length > 0 && (
+                  <div className="mt-3 rounded-xl border border-[#e5ded4] p-3">
+                    <p className="mb-2 text-sm font-semibold text-[#8a7f72]">
+                      顏色圖片(前台點該顏色會切換主圖)
+                    </p>
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      {colorDim.options.map((color) => (
+                        <div key={color} className="flex items-center gap-3 rounded-lg border border-[#e5ded4] p-2">
+                          <div className="h-14 w-14 shrink-0 overflow-hidden rounded-md bg-[#f1e3dc]">
+                            {draft.colorImages[color] && (
+                              <img src={draft.colorImages[color]} alt={color} className="h-full w-full object-cover" />
+                            )}
+                          </div>
+                          <span className="flex-1 truncate text-sm font-medium">{color}</span>
+                          <label className="cursor-pointer rounded-full border border-[#d7c9bd] px-3 py-1.5 text-xs font-semibold hover:bg-[#f3ede4]">
+                            上傳
+                            <input
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              onChange={(e) => {
+                                const f = e.target.files?.[0];
+                                if (f) uploadColorImage(color, f);
+                                e.target.value = '';
+                              }}
+                            />
+                          </label>
+                          {draft.colorImages[color] && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const next = { ...draft.colorImages };
+                                delete next[color];
+                                set('colorImages', next);
+                              }}
+                              className="text-xs font-semibold text-[#c0392b]"
+                            >
+                              移除
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 	              </div>
 	            </Field>
 	            {hasSpecs && (

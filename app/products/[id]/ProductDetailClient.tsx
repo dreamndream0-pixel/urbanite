@@ -242,7 +242,12 @@ export default function ProductDetailClient({ product }: { product: Product }) {
                         <button
                           key={opt}
                           disabled={!selected && !available}
-                          onClick={() => setSpecSel((prev) => prev.map((v, idx) => (idx === i ? opt : v)))}
+                          onClick={() => {
+                            setSpecSel((prev) => prev.map((v, idx) => (idx === i ? opt : v)));
+                            if (dim.name.includes('色') && product.color_images?.[opt]) {
+                              setActiveImage(product.color_images[opt]);
+                            }
+                          }}
                           className={`min-w-16 border px-5 py-3 text-sm font-semibold ${
                             grayed
                               ? 'cursor-not-allowed border-[#e1d9d3] bg-[#f7f5f2] text-[#3d3935] line-through opacity-30'
