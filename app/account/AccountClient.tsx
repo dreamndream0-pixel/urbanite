@@ -1,10 +1,10 @@
 'use client';
 
-import { useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createBrowserSupabase } from '@/lib/supabase/client';
-import type { Discount, Order, Product } from '@/lib/types';
+import type { Discount, Order, Product, UserCoupon } from '@/lib/types';
 
 const formatter = new Intl.NumberFormat('zh-TW', {
   style: 'currency',
@@ -29,6 +29,7 @@ export default function AccountClient({
   userName,
   userEmail,
   userPhone,
+  userAddress,
   provider,
   orders,
   products,
@@ -38,6 +39,7 @@ export default function AccountClient({
   userName: string;
   userEmail: string;
   userPhone: string;
+  userAddress: string;
   provider: string;
   orders: Order[];
   products: Product[];
@@ -152,6 +154,7 @@ export default function AccountClient({
             name={userName}
             email={userEmail}
             phone={userPhone}
+            address={userAddress}
             provider={provider}
             onSaved={() => router.refresh()}
           />
@@ -183,20 +186,23 @@ function ProfileTab({
   name,
   email,
   phone,
+  address,
   provider,
   onSaved,
 }: {
   name: string;
   email: string;
   phone: string;
+  address: string;
   provider: string;
   onSaved: () => void;
 }) {
   const [draftName, setDraftName] = useState(name);
   const [draftPhone, setDraftPhone] = useState(phone);
+  const [draftAddress, setDraftAddress] = useState(address);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
-  const dirty = draftName !== name || draftPhone !== phone;
+  const dirty = draftName !== name || draftPhone !== phone || draftAddress !== address;
 
   async function save() {
     setSaving(true);
@@ -205,7 +211,7 @@ function ProfileTab({
       const res = await fetch('/api/customers', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: draftName, phone: draftPhone }),
+        body: JSON.stringify({ name: draftName, phone: draftPhone, address: draftAddress }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? '儲存失敗');
@@ -247,6 +253,16 @@ function ProfileTab({
             className="w-full rounded-lg border border-[#e5ded4] px-3 py-2.5"
           />
         </label>
+        <label className="block">
+          <span className="mb-1 block text-sm text-[#8a7f72]">常用地址</span>
+          <textarea
+            value={draftAddress}
+            onChange={(e) => setDraftAddress(e.target.value)}
+            placeholder="收件地址或常用門市"
+            rows={3}
+            className="w-full rounded-lg border border-[#e5ded4] px-3 py-2.5"
+          />
+        </label>
         <div>
           <span className="mb-1 block text-sm text-[#8a7f72]">註冊方式</span>
           <span className="inline-block rounded-full bg-[#f3ede4] px-3 py-1 text-sm font-medium capitalize text-[#6b6156]">
@@ -278,6 +294,44 @@ function ProfileTab({
 
 /* ---------- 優惠券及購物金 ---------- */
 function CouponsTab({ coupons }: { coupons: Discount[] }) {
+  const [owned, setOwned] = useState<UserCoupon[]>([]);
+  const [claimable, setClaimable] = useState<Discount[]>(coupons);
+  const [ready, setReady] = useState(true);
+  const [loading, setLoading] = useState(true);
+
+  async function refreshCoupons() {
+    setLoading(true);
+    try {
+      const res = await fetch('/api/user-coupons');
+      const data = await res.json();
+      if (res.ok) {
+        setOwned(data.owned ?? []);
+        setClaimable(data.ready === false ? coupons : data.claimable ?? []);
+        setReady(data.ready !== false);
+      }
+    } catch {
+      setReady(false);
+      setClaimable(coupons);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function claimCoupon(couponId: string) {
+    const res = await fetch('/api/user-coupons', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ coupon_id: couponId }),
+    });
+    const data = await res.json().catch(() => null);
+    if (!res.ok) return alert(data?.error ?? '領取失敗');
+    refreshCoupons();
+  }
+
+  useEffect(() => {
+    refreshCoupons();
+  }, []);
+
   return (
     <div className="space-y-6">
       <div className="rounded-2xl border border-[#e5ded4] bg-white p-6">
@@ -287,23 +341,59 @@ function CouponsTab({ coupons }: { coupons: Discount[] }) {
       </div>
 
       <div className="rounded-2xl border border-[#e5ded4] bg-white p-6">
-        <h2 className="text-lg font-semibold">可用優惠券</h2>
-        {coupons.length === 0 ? (
+        <h2 className="text-lg font-semibold">我的優惠券</h2>
+        {!ready && (
+          <p className="mt-3 rounded-lg bg-[#fff8e8] px-4 py-3 text-sm text-[#8a6d2f]">
+            會員領券資料表尚未建立,目前先顯示可輸入的優惠碼。
+          </p>
+        )}
+        {loading ? (
+          <p className="mt-4 rounded-lg bg-[#f6f2ec] p-5 text-sm text-[#6b6156]">載入優惠券中...</p>
+        ) : owned.length === 0 ? (
           <p className="mt-4 rounded-lg bg-[#f6f2ec] p-5 text-sm text-[#6b6156]">目前沒有可用的優惠券。</p>
         ) : (
           <div className="mt-4 space-y-3">
-            {coupons.map((c) => (
+            {owned.map((item) => {
+              const c = item.coupon;
+              if (!c) return null;
+              return (
               <div
-                key={c.id}
+                key={item.id}
                 className="flex items-center justify-between gap-3 rounded-xl border border-dashed border-[#d7c9bd] bg-[#faf7f2] p-4"
               >
                 <div>
+                  <p className="text-xs font-semibold text-[#8a7f72]">{item.status === 'used' ? '已使用' : '可使用'}</p>
                   <p className="font-mono text-lg font-bold tracking-wide">{c.code}</p>
                   <p className="text-sm text-[#8a7f72]">{couponLabel(c)}</p>
                 </div>
                 <span className="rounded-full bg-[#1f1b19] px-3 py-1 text-xs font-semibold text-white">
                   結帳輸入
                 </span>
+              </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      <div className="rounded-2xl border border-[#e5ded4] bg-white p-6">
+        <h2 className="text-lg font-semibold">可領取優惠券</h2>
+        {claimable.length === 0 ? (
+          <p className="mt-4 rounded-lg bg-[#f6f2ec] p-5 text-sm text-[#6b6156]">目前沒有可領取的優惠券。</p>
+        ) : (
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            {claimable.map((c) => (
+              <div key={c.id} className="rounded-xl border border-[#e5ded4] p-4">
+                <p className="font-mono text-lg font-bold tracking-wide">{c.code}</p>
+                <p className="mt-1 text-sm text-[#8a7f72]">{couponLabel(c)}</p>
+                <button
+                  type="button"
+                  onClick={() => claimCoupon(c.id)}
+                  disabled={!ready}
+                  className="mt-4 rounded-full bg-[#1f1b19] px-4 py-2 text-sm font-semibold text-white disabled:opacity-40"
+                >
+                  領取
+                </button>
               </div>
             ))}
           </div>

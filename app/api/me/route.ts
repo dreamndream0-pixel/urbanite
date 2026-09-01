@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getSessionUser } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 
 // GET /api/me — 目前登入者資訊,含是否為主管理員(白名單判斷)
 export async function GET() {
@@ -17,5 +18,18 @@ export async function GET() {
     user.email ||
     '';
 
-  return NextResponse.json({ email: user.email, name, isAdmin });
+  const supabase = createAdminClient();
+  const { data: customer } = await supabase
+    .from('customers')
+    .select('*')
+    .eq('user_id', user.id)
+    .maybeSingle();
+
+  return NextResponse.json({
+    email: customer?.email || user.email,
+    name: customer?.name || name,
+    phone: customer?.phone || user.phone || '',
+    address: customer?.address || '',
+    isAdmin,
+  });
 }

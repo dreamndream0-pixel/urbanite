@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import type { Product, SiteSettings } from '@/lib/types';
+import type { Product, SiteSettings, UserCoupon } from '@/lib/types';
 
 const STORE_NAME = process.env.NEXT_PUBLIC_STORE_NAME || 'URBANITE';
 const CART_KEY = 'cart';
@@ -74,7 +74,8 @@ export default function CheckoutPage() {
   const [shippingMethod, setShippingMethod] = useState(SHIPPING_METHODS[0]);
   const [paymentMethod, setPaymentMethod] = useState(PAYMENT_METHODS[0]);
   const [discountInput, setDiscountInput] = useState('');
-  const [applied, setApplied] = useState<{ code: string; amount: number } | null>(null);
+  const [memberCoupons, setMemberCoupons] = useState<UserCoupon[]>([]);
+  const [applied, setApplied] = useState<{ code: string; amount: number; userCouponId?: string } | null>(null);
   const [discountMsg, setDiscountMsg] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
@@ -91,6 +92,8 @@ export default function CheckoutPage() {
       .then((data) => {
         if (data?.email) setEmail(data.email);
         if (data?.name) setName(data.name);
+        if (data?.phone) setPhone(data.phone);
+        if (data?.address) setAddress(data.address);
       })
       .catch(() => {});
 
@@ -103,6 +106,11 @@ export default function CheckoutPage() {
       .then((res) => (res.ok ? res.json() : null))
       .then((data: SiteSettings | null) => setSettings(data))
       .catch(() => setSettings(null));
+
+    fetch('/api/user-coupons')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => setMemberCoupons((data?.owned ?? []).filter((item: UserCoupon) => item.status === 'available')))
+      .catch(() => setMemberCoupons([]));
   }, []);
 
   const subtotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
@@ -151,18 +159,19 @@ export default function CheckoutPage() {
     });
   }
 
-  async function applyDiscount() {
+  async function applyDiscount(code = discountInput, userCouponId = '') {
     setDiscountMsg('');
-    if (!discountInput.trim()) return;
+    if (!code.trim()) return;
     try {
       const res = await fetch('/api/discounts/validate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code: discountInput, subtotal }),
+        body: JSON.stringify({ code, subtotal, user_coupon_id: userCouponId }),
       });
       const data = await res.json();
       if (res.ok) {
-        setApplied({ code: data.code, amount: data.discount });
+        setApplied({ code: data.code, amount: data.discount, userCouponId: data.user_coupon_id });
+        setDiscountInput(data.code);
         setDiscountMsg(`已套用 ${data.code}，折 ${formatter.format(data.discount)}`);
       } else {
         setApplied(null);
@@ -201,6 +210,7 @@ export default function CheckoutPage() {
           shipping_method: selectedShippingMethod,
           payment_method: selectedPaymentMethod,
           discount_code: applied?.code ?? '',
+          user_coupon_id: applied?.userCouponId ?? '',
           items: cart.map((item) => ({
             productId: item.productId,
             variant: item.variant,
@@ -307,6 +317,32 @@ export default function CheckoutPage() {
             {/* 優惠券 */}
             <section className="rounded-2xl bg-white p-5 shadow-sm">
               <h2 className="mb-3 font-semibold">優惠券 / 優惠碼</h2>
+              {memberCoupons.length > 0 && (
+                <div className="mb-4 grid gap-2 sm:grid-cols-2">
+                  {memberCoupons.map((item) => {
+                    const coupon = item.coupon;
+                    if (!coupon) return null;
+                    return (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => applyDiscount(coupon.code, item.id)}
+                        className={`rounded-xl border p-3 text-left ${
+                          applied?.userCouponId === item.id
+                            ? 'border-[#1f1b19] bg-[#faf7f2]'
+                            : 'border-[#e5ded4] bg-white'
+                        }`}
+                      >
+                        <span className="block font-mono font-bold">{coupon.code}</span>
+                        <span className="mt-1 block text-xs text-[#8a7f72]">
+                          {coupon.type === 'percent' ? `${coupon.value}% 折扣` : `折抵 ${formatter.format(coupon.value)}`}
+                          {coupon.min_spend > 0 ? ` / 滿 ${formatter.format(coupon.min_spend)}` : ''}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
               <div className="flex gap-2">
                 <input
                   value={discountInput}
@@ -315,7 +351,7 @@ export default function CheckoutPage() {
                   className="flex-1 rounded-lg border border-[#e5ded4] px-4 py-2.5 text-sm"
                 />
                 <button
-                  onClick={applyDiscount}
+                  onClick={() => applyDiscount()}
                   className="rounded-lg border border-[#1f1b19] px-5 py-2.5 text-sm font-semibold"
                 >
                   套用

@@ -70,10 +70,18 @@ export type SiteSettings = {
 
 export type Discount = {
   id: string;
+  name?: string;
   code: string;
   type: string; // percent | amount
   value: number;
   min_spend: number;
+  max_discount?: number | null;
+  start_at?: string | null;
+  end_at?: string | null;
+  total_limit?: number | null;
+  per_user_limit?: number | null;
+  stackable?: boolean;
+  status?: string;
   active: boolean;
   created_at?: string;
 };
@@ -84,7 +92,20 @@ export type Customer = {
   email: string;
   phone?: string;
   name: string;
+  address?: string;
   created_at?: string;
+};
+
+export type UserCoupon = {
+  id: string;
+  user_id: string;
+  coupon_id: string;
+  status: 'available' | 'used' | 'expired' | 'revoked';
+  received_at?: string;
+  used_at?: string | null;
+  expired_at?: string | null;
+  order_id?: string | null;
+  coupon?: Discount;
 };
 
 export type Category = {

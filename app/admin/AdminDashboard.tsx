@@ -307,7 +307,7 @@ export default function AdminDashboard({
   const [cropFile, setCropFile] = useState<File | null>(null);
   const [editBannerId, setEditBannerId] = useState<string | null>(null);
   const [newCat, setNewCat] = useState({ slug: '', name: '', en: '' });
-  const [newDiscount, setNewDiscount] = useState({ code: '', type: 'percent', value: 0, min_spend: 0 });
+  const [newDiscount, setNewDiscount] = useState({ name: '', code: '', type: 'percent', value: 0, min_spend: 0, max_discount: 0 });
   const [logoUrl, setLogoUrl] = useState(initialLogoUrl);
   const [footerDraft, setFooterDraft] = useState({
     sections: JSON.stringify(initialSettings?.footer_sections ?? [], null, 2),
@@ -392,6 +392,8 @@ export default function AdminDashboard({
         user_id: c.user_id,
         email: c.email,
         name: c.name,
+        phone: c.phone ?? '',
+        address: c.address ?? '',
         joined: c.created_at ?? '',
         ...(stat.get(c.user_id) ?? { count: 0, total: 0, last: '' }),
       }))
@@ -871,7 +873,7 @@ export default function AdminDashboard({
     const data = await res.json();
     if (res.ok) {
       setDiscounts((l) => [data as Discount, ...l]);
-      setNewDiscount({ code: '', type: 'percent', value: 0, min_spend: 0 });
+      setNewDiscount({ name: '', code: '', type: 'percent', value: 0, min_spend: 0, max_discount: 0 });
     } else alert(data.error ?? '新增失敗(折扣碼可能重複)');
   }
 
@@ -1630,6 +1632,8 @@ export default function AdminDashboard({
                     <thead>
                       <tr className="border-b border-[#e5ded4] text-left text-[#8a7f72]">
                         <th className="py-2 pr-4">會員</th>
+                        <th className="py-2 pr-4">電話</th>
+                        <th className="py-2 pr-4">地址</th>
                         <th className="py-2 pr-4">訂單數</th>
                         <th className="py-2 pr-4">總消費</th>
                         <th className="py-2 pr-4">最近下單</th>
@@ -1652,6 +1656,10 @@ export default function AdminDashboard({
                                 <p className="font-semibold">{c.name}</p>
                                 <p className="text-xs text-[#8a7f72]">{c.email}</p>
                               </td>
+                              <td className="py-3 pr-4 text-[#6b6156]">{c.phone || '-'}</td>
+                              <td className="max-w-xs py-3 pr-4 text-[#6b6156]">
+                                <span className="line-clamp-2">{c.address || '-'}</span>
+                              </td>
                               <td className="py-3 pr-4">{c.count}</td>
                               <td className="py-3 pr-4 font-semibold">{formatter.format(c.total)}</td>
                               <td className="py-3 pr-4 text-[#6b6156]">
@@ -1663,7 +1671,21 @@ export default function AdminDashboard({
                             </tr>
                             {isOpen && (
                               <tr>
-                                <td colSpan={5} className="bg-[#faf7f2] px-4 py-3">
+                                <td colSpan={7} className="bg-[#faf7f2] px-4 py-3">
+                                  <div className="mb-3 grid gap-2 rounded-lg bg-white p-3 text-sm text-[#6b6156] md:grid-cols-3">
+                                    <div>
+                                      <p className="text-xs text-[#8a7f72]">姓名</p>
+                                      <p className="font-semibold">{c.name || '-'}</p>
+                                    </div>
+                                    <div>
+                                      <p className="text-xs text-[#8a7f72]">電話</p>
+                                      <p className="font-semibold">{c.phone || '-'}</p>
+                                    </div>
+                                    <div>
+                                      <p className="text-xs text-[#8a7f72]">地址</p>
+                                      <p className="font-semibold">{c.address || '-'}</p>
+                                    </div>
+                                  </div>
                                   {memberOrders.length === 0 ? (
                                     <p className="text-sm text-[#8a7f72]">這位會員還沒有訂單。</p>
                                   ) : (
@@ -1701,10 +1723,10 @@ export default function AdminDashboard({
 
           {/* ===== 促銷管理 ===== */}
           {section === 'promotions' && (
-            <Card title="折扣碼">
+            <Card title="會員優惠券 / 折扣碼">
               <div className="space-y-2">
                 {discounts.length === 0 ? (
-                  <Empty>還沒有折扣碼,在下方新增一個。</Empty>
+                  <Empty>還沒有優惠券,在下方新增一張。</Empty>
                 ) : (
                   discounts.map((d) => (
                     <div
@@ -1714,9 +1736,11 @@ export default function AdminDashboard({
                       <span className="rounded bg-[#1f1b19] px-2 py-1 text-sm font-semibold text-white">
                         {d.code}
                       </span>
+                      {d.name ? <span className="font-semibold">{d.name}</span> : null}
                       <span className="text-sm text-[#6b6156]">
                         {d.type === 'percent' ? `折 ${d.value}%` : `折 ${formatter.format(d.value)}`}
                         {d.min_spend > 0 && ` · 滿 ${formatter.format(d.min_spend)}`}
+                        {d.max_discount ? ` · 最高折 ${formatter.format(d.max_discount)}` : ''}
                       </span>
                       <div className="ml-auto flex items-center gap-2">
                         <button
@@ -1739,6 +1763,14 @@ export default function AdminDashboard({
                 )}
               </div>
               <div className="mt-4 flex flex-wrap items-end gap-2 border-t border-[#e5ded4] pt-4">
+                <Labeled label="優惠券名稱">
+                  <input
+                    value={newDiscount.name}
+                    onChange={(e) => setNewDiscount({ ...newDiscount, name: e.target.value })}
+                    placeholder="新會員首購"
+                    className="w-36 rounded border border-[#e5ded4] px-2 py-1.5 text-sm"
+                  />
+                </Labeled>
                 <Labeled label="折扣碼">
                   <input
                     value={newDiscount.code}
@@ -1770,6 +1802,14 @@ export default function AdminDashboard({
                     type="number"
                     value={newDiscount.min_spend}
                     onChange={(e) => setNewDiscount({ ...newDiscount, min_spend: Number(e.target.value) })}
+                    className="w-24 rounded border border-[#e5ded4] px-2 py-1.5 text-sm"
+                  />
+                </Labeled>
+                <Labeled label="最高折抵">
+                  <input
+                    type="number"
+                    value={newDiscount.max_discount}
+                    onChange={(e) => setNewDiscount({ ...newDiscount, max_discount: Number(e.target.value) })}
                     className="w-24 rounded border border-[#e5ded4] px-2 py-1.5 text-sm"
                   />
                 </Labeled>
@@ -3007,8 +3047,8 @@ function AdminOrderModal({
         className="flex max-h-[90dvh] w-full max-w-lg flex-col overflow-hidden rounded-t-2xl bg-white sm:rounded-2xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex shrink-0 items-center justify-between border-b border-[#e5ded4] px-5 py-4">
-          <h2 className="text-lg font-semibold">{order.order_no}</h2>
+        <div className="flex shrink-0 items-center justify-between border-b border-[#e5ded4] bg-white px-5 py-4">
+          <h2 className="text-lg font-semibold">合計：{formatter.format(order.total)}</h2>
           <button onClick={onClose} aria-label="關閉" className="rounded-md p-1 text-2xl leading-none hover:bg-[#efe8dd]">
             ×
           </button>

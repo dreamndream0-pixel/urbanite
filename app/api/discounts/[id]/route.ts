@@ -15,8 +15,10 @@ export async function PATCH(
   const body = await request.json();
 
   const update: Record<string, unknown> = {};
+  if (typeof body.name === 'string') update.name = body.name.trim();
   if (typeof body.value === 'number') update.value = body.value;
   if (typeof body.min_spend === 'number') update.min_spend = body.min_spend;
+  if (typeof body.max_discount === 'number') update.max_discount = body.max_discount || null;
   if (typeof body.active === 'boolean') update.active = body.active;
   if (body.type === 'percent' || body.type === 'amount') update.type = body.type;
   if (Object.keys(update).length === 0) {

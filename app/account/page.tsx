@@ -39,6 +39,7 @@ export default async function AccountPage() {
     '';
   const email = customer?.email || user.email || '';
   const phone = customer?.phone || user.phone || '';
+  const address = customer?.address || '';
   const provider = (user.app_metadata?.provider as string) || 'email';
   const favoriteIds = (favRows ?? []).map((r) => r.product_id as string);
 
@@ -47,6 +48,7 @@ export default async function AccountPage() {
       userName={name}
       userEmail={email}
       userPhone={phone}
+      userAddress={address}
       provider={provider}
       orders={(orders ?? []) as Order[]}
       products={(products ?? []) as Product[]}

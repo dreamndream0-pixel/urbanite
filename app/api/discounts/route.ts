@@ -28,17 +28,36 @@ export async function POST(request: Request) {
   if (!code) return NextResponse.json({ error: '請填寫折扣碼' }, { status: 400 });
 
   const supabase = createAdminClient();
-  const { data, error } = await supabase
+  const insert = {
+    name: String(body.name ?? '').trim(),
+    code,
+    type: body.type === 'amount' ? 'amount' : 'percent',
+    value: Number(body.value) || 0,
+    min_spend: Number(body.min_spend) || 0,
+    max_discount: Number(body.max_discount) || null,
+    active: body.active ?? true,
+  };
+  let { data, error } = await supabase
     .from('discounts')
-    .insert({
-      code,
-      type: body.type === 'amount' ? 'amount' : 'percent',
-      value: Number(body.value) || 0,
-      min_spend: Number(body.min_spend) || 0,
-      active: body.active ?? true,
-    })
+    .insert(insert)
     .select()
     .single();
+
+  if (error && /name|max_discount|schema cache/i.test(error.message)) {
+    const retry = await supabase
+      .from('discounts')
+      .insert({
+        code,
+        type: insert.type,
+        value: insert.value,
+        min_spend: insert.min_spend,
+        active: insert.active,
+      })
+      .select()
+      .single();
+    data = retry.data;
+    error = retry.error;
+  }
 
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
   return NextResponse.json(data as Discount, { status: 201 });

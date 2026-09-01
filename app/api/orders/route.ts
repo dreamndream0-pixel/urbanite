@@ -56,6 +56,7 @@ export async function POST(request: Request) {
   if (prodErr) return NextResponse.json({ error: prodErr.message }, { status: 500 });
 
   const priceMap = new Map((products ?? []).map((p) => [p.id, p]));
+  const user = await getSessionUser();
 
   // 依資料庫價格組出明細並計算金額
   const orderItems: OrderItem[] = [];
@@ -94,17 +95,41 @@ export async function POST(request: Request) {
   // 折扣碼(可選):由後端重新驗證計算,避免竄改
   let discount = 0;
   let discountCode = '';
+  let appliedCouponId = '';
+  let appliedUserCouponId = '';
   const rawCode = String(body?.discount_code ?? '').trim().toUpperCase();
+  const rawUserCouponId = String(body?.user_coupon_id ?? '').trim();
   if (rawCode) {
-    const { data: d } = await supabase
-      .from('discounts')
-      .select('*')
-      .eq('code', rawCode)
-      .eq('active', true)
-      .maybeSingle();
-    if (d) {
-      discount = calcDiscount(d as Discount, subtotal);
-      if (discount > 0) discountCode = rawCode;
+    if (rawUserCouponId && user) {
+      const { data: userCoupon } = await supabase
+        .from('user_coupons')
+        .select('*, coupon:discounts(*)')
+        .eq('id', rawUserCouponId)
+        .eq('user_id', user.id)
+        .maybeSingle();
+      const d = userCoupon?.coupon as Discount | undefined;
+      if (userCoupon?.status === 'available' && d?.active && d.code === rawCode) {
+        discount = calcDiscount(d, subtotal);
+        if (discount > 0) {
+          discountCode = rawCode;
+          appliedCouponId = d.id;
+          appliedUserCouponId = rawUserCouponId;
+        }
+      }
+    } else {
+      const { data: d } = await supabase
+        .from('discounts')
+        .select('*')
+        .eq('code', rawCode)
+        .eq('active', true)
+        .maybeSingle();
+      if (d) {
+        discount = calcDiscount(d as Discount, subtotal);
+        if (discount > 0) {
+          discountCode = rawCode;
+          appliedCouponId = (d as Discount).id;
+        }
+      }
     }
   }
 
@@ -119,9 +144,6 @@ export async function POST(request: Request) {
     .select('order_no', { count: 'exact', head: true })
     .like('order_no', `${prefix}%`);
   const orderNo = `${prefix}${String((todayCount ?? 0) + 1).padStart(4, '0')}`;
-
-  // 若客人已登入,把訂單關聯到他的帳號(訪客下單則為 null)
-  const user = await getSessionUser();
 
   // 寫入訂單
   const { data: order, error: orderErr } = await supabase
@@ -149,6 +171,23 @@ export async function POST(request: Request) {
     .single();
 
   if (orderErr) return NextResponse.json({ error: orderErr.message }, { status: 400 });
+
+  if (appliedCouponId && appliedUserCouponId && user) {
+    await supabase
+      .from('user_coupons')
+      .update({ status: 'used', used_at: new Date().toISOString(), order_id: order.id })
+      .eq('id', appliedUserCouponId)
+      .eq('user_id', user.id);
+    await supabase.from('coupon_usages').insert({
+      coupon_id: appliedCouponId,
+      user_id: user.id,
+      user_coupon_id: appliedUserCouponId,
+      order_id: order.id,
+      original_amount: subtotal,
+      discount_amount: discount,
+      final_amount: total,
+    });
+  }
 
   // 扣減庫存(用工作副本累積,避免同商品多規格互相覆蓋),最後每個商品寫一次
   type WorkProduct = { inventory: number; variants: { options: string[]; inventory: number }[] };

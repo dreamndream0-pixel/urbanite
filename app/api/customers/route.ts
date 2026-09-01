@@ -27,10 +27,20 @@ export async function POST() {
   const { error } = await supabase
     .from('customers')
     .upsert(
-      { user_id: user.id, email: user.email ?? '', name, phone: user.phone ?? '' },
+      { user_id: user.id, email: user.email ?? '', name, phone: user.phone ?? '', address: '' },
       { onConflict: 'user_id' },
     );
 
+  if (error && /address|schema cache/i.test(error.message)) {
+    const retry = await supabase
+      .from('customers')
+      .upsert(
+        { user_id: user.id, email: user.email ?? '', name, phone: user.phone ?? '' },
+        { onConflict: 'user_id' },
+      );
+    if (retry.error) return NextResponse.json({ error: retry.error.message }, { status: 400 });
+    return NextResponse.json({ ok: true });
+  }
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
   return NextResponse.json({ ok: true });
 }
@@ -44,6 +54,7 @@ export async function PATCH(request: Request) {
   const update: Record<string, unknown> = { user_id: user.id, email: user.email ?? '' };
   if (typeof body.name === 'string') update.name = body.name.trim();
   if (typeof body.phone === 'string') update.phone = body.phone.trim();
+  if (typeof body.address === 'string') update.address = body.address.trim();
 
   const supabase = createAdminClient();
   const { error } = await supabase
