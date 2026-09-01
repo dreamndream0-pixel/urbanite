@@ -533,7 +533,7 @@ function FavoritesDrawer({
                   className="h-20 w-20 shrink-0 overflow-hidden rounded-md bg-[#e9e1d6]"
                 >
                   {product.image ? (
-                    <img src={product.image} alt={product.name} className="h-full w-full object-contain" />
+                    <img src={product.image} alt={product.name} className="h-full w-full object-contain drop-shadow-[0_10px_12px_rgba(31,27,25,0.2)]" />
                   ) : (
                     <span className="flex h-full w-full items-center justify-center text-xs text-[#a99]">
                       無圖片
@@ -684,7 +684,7 @@ function ProductCard({
             <img
               src={product.image}
               alt={product.name}
-              className="h-full w-full object-contain"
+              className="h-full w-full object-contain drop-shadow-[0_14px_16px_rgba(31,27,25,0.22)]"
             />
           ) : (
             <div className="flex h-full w-full items-center justify-center text-sm text-[#a99]">
@@ -874,7 +874,7 @@ function CartDrawer({
                       className="h-14 w-14 shrink-0 overflow-hidden rounded-md bg-[#e9e1d6]"
                     >
                       {product.image ? (
-                        <img src={product.image} alt={product.name} className="h-full w-full object-contain" />
+                        <img src={product.image} alt={product.name} className="h-full w-full object-contain drop-shadow-[0_8px_10px_rgba(31,27,25,0.18)]" />
                       ) : null}
                     </Link>
                     <div className="min-w-0 flex-1">
@@ -1120,7 +1120,7 @@ function QuickAddModal({
         <div className="flex gap-4">
           <div className="h-40 w-40 shrink-0 overflow-hidden rounded-lg bg-[#e9e1d6]">
             {product.image ? (
-              <img src={product.image} alt={product.name} className="h-full w-full object-contain" />
+              <img src={product.image} alt={product.name} className="h-full w-full object-contain drop-shadow-[0_12px_14px_rgba(31,27,25,0.2)]" />
             ) : (
               <div className="flex h-full w-full items-center justify-center text-sm text-[#a99]">無圖片</div>
             )}

@@ -3004,7 +3004,7 @@ function ProductModal({
                       key={`${url}-${index}`}
                       className="group relative aspect-[3/4] overflow-hidden rounded-lg border border-[#e5ded4] bg-[#f6f2ec]"
                     >
-                      <img src={url} alt="" className="h-full w-full object-contain" />
+                      <img src={url} alt="" className="h-full w-full object-contain drop-shadow-[0_10px_12px_rgba(31,27,25,0.2)]" />
                       {index === 0 ? (
                         <span className="absolute left-1 top-1 rounded bg-[#1f1b19] px-1.5 py-0.5 text-[10px] font-semibold text-white">
                           封面
