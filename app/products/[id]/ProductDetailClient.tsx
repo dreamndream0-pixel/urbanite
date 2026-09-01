@@ -203,7 +203,9 @@ export default function ProductDetailClient({ product }: { product: Product }) {
             {product.name}
           </h1>
           {product.sale_mode && (
-            <p className="mt-2 text-xs text-[#8a7f72] opacity-30">{product.sale_mode}</p>
+            <span className="mt-3 inline-block rounded-full bg-[#6b6156]/40 px-3 py-1 text-xs font-medium text-white">
+              {product.sale_mode}
+            </span>
           )}
 
           <div className="mt-8 border-l-4 border-[#c84767] pl-4 text-sm leading-7 text-[#3d3935]">
