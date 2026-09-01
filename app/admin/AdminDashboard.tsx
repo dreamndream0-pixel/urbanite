@@ -217,15 +217,19 @@ export default function AdminDashboard({
   const [productsTab, setProductsTab] = useState<'items' | 'categories'>('items');
   const [movements, setMovements] = useState<StockMovement[]>(initialMovements);
   const [mvForm, setMvForm] = useState({
-    product_id: '',
-    variant_key: '',
+    document_no: '',
+    document_date: '',
     type: 'in' as 'in' | 'out',
-    quantity: 1,
-    unit_price: 0,
+    status: '進貨',
+    payment_status: '',
+    payment_no: '',
     location: '',
     handler: '',
     note: '',
   });
+  const [movementLines, setMovementLines] = useState<MovementLine[]>([
+    { id: 'line-1', product_id: '', variant_key: '', quantity: 1, unit_price: 0 },
+  ]);
   const [cropFile, setCropFile] = useState<File | null>(null);
   const [editBannerId, setEditBannerId] = useState<string | null>(null);
   const [newCat, setNewCat] = useState({ slug: '', name: '', en: '' });
@@ -481,33 +485,66 @@ export default function AdminDashboard({
 
   // 進出庫:新增一筆入庫/出庫,後端會自動更新庫存
   async function addMovement() {
-    if (!mvForm.product_id) return alert('請選擇品項');
-    if (mvForm.quantity <= 0) return alert('數量需大於 0');
-    const res = await fetch('/api/stock-movements', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(mvForm),
+    const validLines = movementLines.filter((line) => line.product_id && line.quantity > 0);
+    if (validLines.length === 0) return alert('請至少新增一筆商品明細');
+
+    for (const line of validLines) {
+      const product = products.find((p) => p.id === line.product_id);
+      if (product?.variants.length && !line.variant_key) return alert(`請選擇 ${product.name} 的規格`);
+    }
+
+    const documentNote = [
+      mvForm.document_no ? `單號:${mvForm.document_no}` : '',
+      mvForm.document_date ? `日期:${mvForm.document_date}` : '',
+      mvForm.status ? `狀態:${mvForm.status}` : '',
+      mvForm.payment_status ? `請款狀態:${mvForm.payment_status}` : '',
+      mvForm.payment_no ? `請款單號:${mvForm.payment_no}` : '',
+      mvForm.note,
+    ].filter(Boolean).join(' | ');
+    const createdMovements: StockMovement[] = [];
+
+    for (const line of validLines) {
+      const res = await fetch('/api/stock-movements', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          product_id: line.product_id,
+          variant_key: line.variant_key,
+          type: mvForm.type,
+          quantity: line.quantity,
+          unit_price: line.unit_price,
+          location: mvForm.location,
+          handler: mvForm.handler,
+          note: documentNote,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) return alert(data.error ?? '新增失敗');
+      createdMovements.push(data as StockMovement);
+    }
+
+    setMovements((l) => [...createdMovements.reverse(), ...l]);
+    setProducts((l) => {
+      let nextProducts = l;
+      for (const line of validLines) {
+        const delta = mvForm.type === 'in' ? line.quantity : -line.quantity;
+        nextProducts = nextProducts.map((p) => {
+          if (p.id !== line.product_id) return p;
+          if (p.variants.length > 0 && line.variant_key) {
+            const variants = p.variants.map((v) =>
+              v.options.join(' / ') === line.variant_key
+                ? { ...v, inventory: Math.max(0, v.inventory + delta) }
+                : v,
+            );
+            return { ...p, variants, inventory: variants.reduce((n, v) => n + v.inventory, 0) };
+          }
+          return { ...p, inventory: Math.max(0, p.inventory + delta) };
+        });
+      }
+      return nextProducts;
     });
-    const data = await res.json();
-    if (!res.ok) return alert(data.error ?? '新增失敗');
-    setMovements((l) => [data as StockMovement, ...l]);
-    // 同步本地庫存
-    const delta = mvForm.type === 'in' ? mvForm.quantity : -mvForm.quantity;
-    setProducts((l) =>
-      l.map((p) => {
-        if (p.id !== mvForm.product_id) return p;
-        if (p.variants.length > 0 && mvForm.variant_key) {
-          const variants = p.variants.map((v) =>
-            v.options.join(' / ') === mvForm.variant_key
-              ? { ...v, inventory: Math.max(0, v.inventory + delta) }
-              : v,
-          );
-          return { ...p, variants, inventory: variants.reduce((n, v) => n + v.inventory, 0) };
-        }
-        return { ...p, inventory: Math.max(0, p.inventory + delta) };
-      }),
-    );
-    setMvForm({ ...mvForm, quantity: 1, unit_price: 0, location: '', note: '' });
+    setMovementLines([{ id: `line-${Date.now()}`, product_id: '', variant_key: '', quantity: 1, unit_price: 0 }]);
+    setMvForm({ ...mvForm, document_no: '', payment_status: '', payment_no: '', location: '', note: '' });
   }
 
   // 在庫存管理直接修改某規格的成本 / 安全庫存 / 儲位(不動庫存數量)
@@ -1125,6 +1162,8 @@ export default function AdminDashboard({
               movements={movements}
               mvForm={mvForm}
               setMvForm={setMvForm}
+              movementLines={movementLines}
+              setMovementLines={setMovementLines}
               onAddMovement={addMovement}
               onUpdateVariantMeta={updateVariantMeta}
               onEditProduct={(product) => {
@@ -2601,14 +2640,23 @@ function AdminOrderModal({
 }
 
 type MvForm = {
-  product_id: string;
-  variant_key: string;
+  document_no: string;
+  document_date: string;
   type: 'in' | 'out';
-  quantity: number;
-  unit_price: number;
+  status: string;
+  payment_status: string;
+  payment_no: string;
   location: string;
   handler: string;
   note: string;
+};
+
+type MovementLine = {
+  id: string;
+  product_id: string;
+  variant_key: string;
+  quantity: number;
+  unit_price: number;
 };
 
 function ProductInventorySummary({
@@ -2806,6 +2854,8 @@ function InventorySection({
   movements,
   mvForm,
   setMvForm,
+  movementLines,
+  setMovementLines,
   onAddMovement,
   onUpdateVariantMeta,
   onEditProduct,
@@ -2816,6 +2866,8 @@ function InventorySection({
   movements: StockMovement[];
   mvForm: MvForm;
   setMvForm: (f: MvForm) => void;
+  movementLines: MovementLine[];
+  setMovementLines: (lines: MovementLine[]) => void;
   onAddMovement: () => void;
   onUpdateVariantMeta: (
     productId: string,
@@ -2873,13 +2925,24 @@ function InventorySection({
   });
   const filteredProducts = products.filter((p) => filteredRows.some((r) => r.pid === p.id));
 
-  const selProduct = products.find((p) => p.id === mvForm.product_id);
   const inventoryTabs = [
     { key: 'products', label: '商品管理' },
     { key: 'stock', label: '庫存總表' },
     { key: 'movement', label: '入庫 / 出庫' },
     { key: 'history', label: '進出庫紀錄' },
   ] as const;
+  const updateMovementLine = (id: string, patch: Partial<MovementLine>) => {
+    setMovementLines(movementLines.map((line) => (line.id === id ? { ...line, ...patch } : line)));
+  };
+  const addMovementLine = () => {
+    setMovementLines([
+      ...movementLines,
+      { id: `line-${Date.now()}-${movementLines.length}`, product_id: '', variant_key: '', quantity: 1, unit_price: 0 },
+    ]);
+  };
+  const removeMovementLine = (id: string) => {
+    setMovementLines(movementLines.length <= 1 ? movementLines : movementLines.filter((line) => line.id !== id));
+  };
   const inventoryFilterControls = (
     <div className="mb-5 rounded-xl border border-[#e5ded4] bg-[#faf7f2] p-4">
       <div className="grid gap-3 md:grid-cols-4">
@@ -3100,111 +3163,209 @@ function InventorySection({
 
       {/* 入庫 / 出庫 */}
       {inventoryTab === 'movement' && (
-      <Card title="入庫 / 出庫">
-        <div className="grid gap-3 sm:grid-cols-2">
-          <label className="block">
-            <span className="mb-1 block text-sm text-[#8a7f72]">類型</span>
+        <Card
+          title={mvForm.type === 'in' ? '入庫單' : '出庫單'}
+          action={
             <div className="flex gap-2">
               {(['in', 'out'] as const).map((t) => (
                 <button
                   key={t}
-                  onClick={() => setMvForm({ ...mvForm, type: t })}
-                  className={`flex-1 rounded-lg border px-3 py-2 text-sm font-semibold ${
+                  type="button"
+                  onClick={() => setMvForm({ ...mvForm, type: t, status: t === 'in' ? '進貨' : '出貨' })}
+                  className={`rounded-full border px-4 py-2 text-sm font-semibold ${
                     mvForm.type === t ? 'border-[#1f1b19] bg-[#1f1b19] text-white' : 'border-[#d7c9bd]'
                   }`}
                 >
-                  {t === 'in' ? '入庫 +' : '出庫 −'}
+                  {t === 'in' ? '入庫單' : '出庫單'}
                 </button>
               ))}
             </div>
-          </label>
-          <label className="block">
-            <span className="mb-1 block text-sm text-[#8a7f72]">品項</span>
-            <select
-              value={mvForm.product_id}
-              onChange={(e) => setMvForm({ ...mvForm, product_id: e.target.value, variant_key: '' })}
-              className="w-full rounded-lg border border-[#e5ded4] px-3 py-2"
-            >
-              <option value="">請選擇</option>
-              {products.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          {selProduct && selProduct.variants.length > 0 && (
+          }
+        >
+          <div className="grid gap-3 rounded-xl border border-[#e5ded4] bg-[#faf7f2] p-4 lg:grid-cols-4">
             <label className="block">
-              <span className="mb-1 block text-sm text-[#8a7f72]">規格</span>
+              <span className="mb-1 block text-sm font-semibold text-[#8a7f72]">單號</span>
+              <input
+                value={mvForm.document_no}
+                onChange={(e) => setMvForm({ ...mvForm, document_no: e.target.value })}
+                placeholder={mvForm.type === 'in' ? 'WI-202609001' : 'WO-202609001'}
+                className="w-full rounded-lg border border-[#e5ded4] bg-white px-3 py-2"
+              />
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-sm font-semibold text-[#8a7f72]">日期</span>
+              <input
+                type="datetime-local"
+                value={mvForm.document_date}
+                onChange={(e) => setMvForm({ ...mvForm, document_date: e.target.value })}
+                className="w-full rounded-lg border border-[#e5ded4] bg-white px-3 py-2"
+              />
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-sm font-semibold text-[#8a7f72]">狀態</span>
               <select
-                value={mvForm.variant_key}
-                onChange={(e) => setMvForm({ ...mvForm, variant_key: e.target.value })}
-                className="w-full rounded-lg border border-[#e5ded4] px-3 py-2"
+                value={mvForm.status}
+                onChange={(e) => setMvForm({ ...mvForm, status: e.target.value })}
+                className="w-full rounded-lg border border-[#e5ded4] bg-white px-3 py-2"
               >
-                <option value="">請選擇</option>
-                {selProduct.variants.map((v) => {
-                  const k = v.options.join(' / ');
-                  return (
-                    <option key={k} value={k}>
-                      {k}(庫存 {v.inventory})
-                    </option>
-                  );
-                })}
+                <option value={mvForm.type === 'in' ? '進貨' : '出貨'}>{mvForm.type === 'in' ? '進貨' : '出貨'}</option>
+                <option value="暫存">暫存</option>
+                <option value="完成">完成</option>
               </select>
             </label>
-          )}
-          <label className="block">
-            <span className="mb-1 block text-sm text-[#8a7f72]">數量</span>
-            <input
-              type="number"
-              min={1}
-              value={mvForm.quantity}
-              onChange={(e) => setMvForm({ ...mvForm, quantity: Math.max(1, Number(e.target.value)) })}
-              className="w-full rounded-lg border border-[#e5ded4] px-3 py-2"
-            />
-          </label>
-          <label className="block">
-            <span className="mb-1 block text-sm text-[#8a7f72]">單價</span>
-            <input
-              type="number"
-              min={0}
-              value={mvForm.unit_price}
-              onChange={(e) => setMvForm({ ...mvForm, unit_price: Math.max(0, Number(e.target.value)) })}
-              className="w-full rounded-lg border border-[#e5ded4] px-3 py-2"
-            />
-          </label>
-          <label className="block">
-            <span className="mb-1 block text-sm text-[#8a7f72]">使用地點 / 對象</span>
-            <input
-              value={mvForm.location}
-              onChange={(e) => setMvForm({ ...mvForm, location: e.target.value })}
-              className="w-full rounded-lg border border-[#e5ded4] px-3 py-2"
-            />
-          </label>
-          <label className="block">
-            <span className="mb-1 block text-sm text-[#8a7f72]">經手人</span>
-            <input
-              value={mvForm.handler}
-              onChange={(e) => setMvForm({ ...mvForm, handler: e.target.value })}
-              className="w-full rounded-lg border border-[#e5ded4] px-3 py-2"
-            />
-          </label>
-          <label className="block sm:col-span-2">
-            <span className="mb-1 block text-sm text-[#8a7f72]">備註</span>
-            <input
-              value={mvForm.note}
-              onChange={(e) => setMvForm({ ...mvForm, note: e.target.value })}
-              className="w-full rounded-lg border border-[#e5ded4] px-3 py-2"
-            />
-          </label>
-        </div>
-        <button
-          onClick={onAddMovement}
-          className="mt-4 rounded-full bg-[#1f1b19] px-6 py-2.5 text-sm font-semibold text-white"
-        >
-          登錄{mvForm.type === 'in' ? '入庫' : '出庫'}
-        </button>
-      </Card>
+            <label className="block">
+              <span className="mb-1 block text-sm font-semibold text-[#8a7f72]">{mvForm.type === 'in' ? '入庫人' : '出庫人'}</span>
+              <input
+                value={mvForm.handler}
+                onChange={(e) => setMvForm({ ...mvForm, handler: e.target.value })}
+                className="w-full rounded-lg border border-[#e5ded4] bg-white px-3 py-2"
+              />
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-sm font-semibold text-[#8a7f72]">倉別 / 對象</span>
+              <input
+                value={mvForm.location}
+                onChange={(e) => setMvForm({ ...mvForm, location: e.target.value })}
+                placeholder="主倉"
+                className="w-full rounded-lg border border-[#e5ded4] bg-white px-3 py-2"
+              />
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-sm font-semibold text-[#8a7f72]">請款狀態</span>
+              <input
+                value={mvForm.payment_status}
+                onChange={(e) => setMvForm({ ...mvForm, payment_status: e.target.value })}
+                className="w-full rounded-lg border border-[#e5ded4] bg-white px-3 py-2"
+              />
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-sm font-semibold text-[#8a7f72]">請款單號</span>
+              <input
+                value={mvForm.payment_no}
+                onChange={(e) => setMvForm({ ...mvForm, payment_no: e.target.value })}
+                className="w-full rounded-lg border border-[#e5ded4] bg-white px-3 py-2"
+              />
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-sm font-semibold text-[#8a7f72]">備註</span>
+              <input
+                value={mvForm.note}
+                onChange={(e) => setMvForm({ ...mvForm, note: e.target.value })}
+                className="w-full rounded-lg border border-[#e5ded4] bg-white px-3 py-2"
+              />
+            </label>
+          </div>
+
+          <div className="mt-5 overflow-x-auto">
+            <table className="w-full min-w-[980px] whitespace-nowrap text-sm">
+              <thead>
+                <tr className="border-b border-[#e5ded4] bg-[#f3eee7] text-left text-xs text-[#6b6156]">
+                  <th className="px-3 py-3">商品</th>
+                  <th className="px-3 py-3">規格 / 顏色 / 尺寸</th>
+                  <th className="px-3 py-3 text-right">數量</th>
+                  <th className="px-3 py-3 text-right">單價</th>
+                  <th className="px-3 py-3 text-right">小計</th>
+                  <th className="px-3 py-3 text-right">操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                {movementLines.map((line) => {
+                  const lineProduct = products.find((p) => p.id === line.product_id);
+                  return (
+                    <tr key={line.id} className="border-b border-[#efe8dd]">
+                      <td className="px-3 py-3">
+                        <select
+                          value={line.product_id}
+                          onChange={(e) => updateMovementLine(line.id, { product_id: e.target.value, variant_key: '' })}
+                          className="w-64 rounded-lg border border-[#e5ded4] px-3 py-2"
+                        >
+                          <option value="">請選擇商品</option>
+                          {products.map((p) => (
+                            <option key={p.id} value={p.id}>
+                              {p.id} / {p.name}
+                            </option>
+                          ))}
+                        </select>
+                      </td>
+                      <td className="px-3 py-3">
+                        {lineProduct?.variants.length ? (
+                          <select
+                            value={line.variant_key}
+                            onChange={(e) => updateMovementLine(line.id, { variant_key: e.target.value })}
+                            className="w-56 rounded-lg border border-[#e5ded4] px-3 py-2"
+                          >
+                            <option value="">請選擇規格</option>
+                            {lineProduct.variants.map((v) => {
+                              const key = v.options.join(' / ');
+                              return (
+                                <option key={key} value={key}>
+                                  {key}，庫存 {v.inventory}
+                                </option>
+                              );
+                            })}
+                          </select>
+                        ) : (
+                          <span className="text-[#8a7f72]">—</span>
+                        )}
+                      </td>
+                      <td className="px-3 py-3 text-right">
+                        <input
+                          type="number"
+                          min={1}
+                          value={line.quantity}
+                          onChange={(e) => updateMovementLine(line.id, { quantity: Math.max(1, Number(e.target.value) || 1) })}
+                          className="w-24 rounded-lg border border-[#e5ded4] px-3 py-2 text-right"
+                        />
+                      </td>
+                      <td className="px-3 py-3 text-right">
+                        <input
+                          type="number"
+                          min={0}
+                          value={line.unit_price}
+                          onChange={(e) => updateMovementLine(line.id, { unit_price: Math.max(0, Number(e.target.value) || 0) })}
+                          className="w-28 rounded-lg border border-[#e5ded4] px-3 py-2 text-right"
+                        />
+                      </td>
+                      <td className="px-3 py-3 text-right font-semibold">
+                        {(line.quantity * line.unit_price).toLocaleString()}
+                      </td>
+                      <td className="px-3 py-3 text-right">
+                        <button
+                          type="button"
+                          onClick={() => removeMovementLine(line.id)}
+                          className="rounded-full border border-[#d7c9bd] px-3 py-1.5 text-xs font-semibold"
+                        >
+                          刪除
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+            <button
+              type="button"
+              onClick={addMovementLine}
+              className="rounded-full border border-[#d7c9bd] px-4 py-2 text-sm font-semibold"
+            >
+              新增明細列
+            </button>
+            <div className="flex items-center gap-4">
+              <p className="text-sm text-[#8a7f72]">
+                合計 {movementLines.reduce((sum, line) => sum + line.quantity * line.unit_price, 0).toLocaleString()}
+              </p>
+              <button
+                type="button"
+                onClick={onAddMovement}
+                className="rounded-full bg-[#1f1b19] px-6 py-2.5 text-sm font-semibold text-white"
+              >
+                登錄{mvForm.type === 'in' ? '入庫單' : '出庫單'}
+              </button>
+            </div>
+          </div>
+        </Card>
       )}
 
       {/* 進出庫紀錄 */}
