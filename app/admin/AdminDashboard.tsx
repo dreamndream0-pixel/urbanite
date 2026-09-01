@@ -283,7 +283,7 @@ export default function AdminDashboard({
   const [customers] = useState<Customer[]>(initialCustomers);
   const [banners, setBanners] = useState<Banner[]>(initialBanners);
   const [uploadingBanner, setUploadingBanner] = useState(false);
-  const [settingsTab, setSettingsTab] = useState<'general' | 'banners' | 'footer'>('general');
+  const [settingsTab, setSettingsTab] = useState<'general' | 'banners' | 'footer' | 'payments' | 'shippings'>('general');
   const [orderFilter, setOrderFilter] = useState<string>('全部');
   const [openOrderId, setOpenOrderId] = useState<string | null>(null);
   const [productsTab, setProductsTab] = useState<'items' | 'categories'>('items');
@@ -721,6 +721,68 @@ export default function AdminDashboard({
     });
   }
 
+  async function importInventoryRows(rows: InventoryImportRow[]) {
+    if (rows.length === 0) return alert('匯入檔沒有資料');
+    if (!confirm(`確定匯入 ${rows.length} 筆庫存資料嗎?\n\n會直接更新資料庫中的目前庫存、安全庫存、單位成本與儲位。`)) return;
+
+    const productMap = new Map(products.map((product) => [product.id, product]));
+    const nextById = new Map<string, Product>();
+    let changed = 0;
+    const missing: string[] = [];
+
+    for (const row of rows) {
+      const product = nextById.get(row.productId) ?? productMap.get(row.productId);
+      if (!product) {
+        missing.push(row.productId);
+        continue;
+      }
+      if (row.variantKey) {
+        const variants = product.variants.map((variant) =>
+          variant.options.join(' / ') === row.variantKey
+            ? {
+                ...variant,
+                inventory: row.inventory,
+                safety: row.safety,
+                cost: row.cost,
+                location: row.location,
+              }
+            : variant,
+        );
+        if (!variants.some((variant) => variant.options.join(' / ') === row.variantKey)) {
+          missing.push(`${row.productId} / ${row.variantKey}`);
+          continue;
+        }
+        nextById.set(row.productId, {
+          ...product,
+          variants,
+          inventory: variants.reduce((sum, variant) => sum + (variant.inventory ?? 0), 0),
+        });
+      } else {
+        nextById.set(row.productId, {
+          ...product,
+          inventory: row.inventory,
+        });
+      }
+      changed += 1;
+    }
+
+    for (const product of nextById.values()) {
+      const res = await fetch(`/api/products/${product.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          inventory: product.inventory,
+          variants: product.variants,
+        }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) return alert(data?.error ?? `匯入 ${product.id} 失敗`);
+    }
+
+    setProducts((list) => list.map((product) => nextById.get(product.id) ?? product));
+    alert(`匯入完成: 更新 ${changed} 筆庫存${missing.length ? `,略過 ${missing.length} 筆找不到的資料` : ''}`);
+  }
+
   async function saveNewCategory() {
     const slug = newCat.slug.trim().toLowerCase();
     if (!slug || !newCat.name.trim()) return alert('請填寫代碼(英文)與名稱');
@@ -937,6 +999,34 @@ export default function AdminDashboard({
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? '儲存失敗');
       alert('頁尾資訊已更新');
+    } catch (error) {
+      alert(error instanceof Error ? error.message : '儲存失敗');
+    } finally {
+      setSavingSettings(false);
+    }
+  }
+
+  async function saveMethodSettings(kind: 'payments' | 'shippings') {
+    setSavingSettings(true);
+    try {
+      const toLines = (value: string) =>
+        value
+          .split('\n')
+          .map((line) => line.trim())
+          .filter(Boolean);
+      const methods = kind === 'payments' ? toLines(footerDraft.payments) : toLines(footerDraft.shippings);
+      const res = await fetch('/api/settings', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(
+          kind === 'payments'
+            ? { payment_methods: methods, enabled_payment_methods: methods }
+            : { shipping_methods: methods, enabled_shipping_methods: methods },
+        ),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? '儲存失敗');
+      alert(kind === 'payments' ? '金流設定已更新' : '物流設定已更新');
     } catch (error) {
       alert(error instanceof Error ? error.message : '儲存失敗');
     } finally {
@@ -1517,6 +1607,7 @@ export default function AdminDashboard({
               onDeleteProduct={deleteProduct}
               onDeleteStockRow={deleteStockRow}
               onDeleteMovement={deleteMovement}
+              onImportInventory={importInventoryRows}
               onEditProduct={(product) => {
                 setEditing(toDraft(product));
                 setIsNew(false);
@@ -1727,6 +1818,8 @@ export default function AdminDashboard({
                   { key: 'general', label: '一般設定' },
                   { key: 'banners', label: '輪播圖' },
                   { key: 'footer', label: '頁尾資訊' },
+                  { key: 'payments', label: '金流設定' },
+                  { key: 'shippings', label: '物流設定' },
                 ] as const).map((t) => (
                   <button
                     key={t.key}
@@ -1924,19 +2017,50 @@ export default function AdminDashboard({
                     value={footerDraft.socialLinks}
                     onChange={(socialLinks) => setFooterDraft({ ...footerDraft, socialLinks })}
                   />
-                  <MethodToggles
-                    label="金流方式(勾選=啟用,可套用到各商品)"
-                    defaults={DEFAULT_PAYMENT_METHODS}
-                    value={footerDraft.payments}
-                    onChange={(v) => setFooterDraft({ ...footerDraft, payments: v })}
-                  />
-                  <MethodToggles
-                    label="物流方式(勾選=啟用,可套用到各商品)"
-                    defaults={DEFAULT_SHIPPING_METHODS}
-                    value={footerDraft.shippings}
-                    onChange={(v) => setFooterDraft({ ...footerDraft, shippings: v })}
-                  />
                 </div>
+              </Card>
+              )}
+              {settingsTab === 'payments' && (
+              <Card
+                title="金流設定"
+                action={
+                  <button
+                    onClick={() => saveMethodSettings('payments')}
+                    disabled={savingSettings}
+                    className="rounded-full bg-[#1f1b19] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+                  >
+                    {savingSettings ? '儲存中...' : '儲存金流'}
+                  </button>
+                }
+              >
+                <MethodToggles
+                  label="金流方式(勾選=啟用,可套用到各商品)"
+                  defaults={DEFAULT_PAYMENT_METHODS}
+                  value={footerDraft.payments}
+                  onChange={(v) => setFooterDraft({ ...footerDraft, payments: v })}
+                />
+              </Card>
+              )}
+
+              {settingsTab === 'shippings' && (
+              <Card
+                title="物流設定"
+                action={
+                  <button
+                    onClick={() => saveMethodSettings('shippings')}
+                    disabled={savingSettings}
+                    className="rounded-full bg-[#1f1b19] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+                  >
+                    {savingSettings ? '儲存中...' : '儲存物流'}
+                  </button>
+                }
+              >
+                <MethodToggles
+                  label="物流方式(勾選=啟用,可套用到各商品)"
+                  defaults={DEFAULT_SHIPPING_METHODS}
+                  value={footerDraft.shippings}
+                  onChange={(v) => setFooterDraft({ ...footerDraft, shippings: v })}
+                />
               </Card>
               )}
             </div>
@@ -3012,6 +3136,15 @@ type MovementLine = {
   unit_price: number;
 };
 
+type InventoryImportRow = {
+  productId: string;
+  variantKey: string;
+  inventory: number;
+  safety: number;
+  cost: number;
+  location: string;
+};
+
 type StockSortKey = 'pid' | 'name' | 'cat' | 'spec' | 'unit' | 'inv' | 'safety' | 'status' | 'cost' | 'value' | 'location' | 'last';
 
 function ProductInventorySummary({
@@ -3227,6 +3360,7 @@ function InventorySection({
   onDeleteProduct,
   onDeleteStockRow,
   onDeleteMovement,
+  onImportInventory,
   onEditProduct,
   onCreateProduct,
 }: {
@@ -3246,6 +3380,7 @@ function InventorySection({
   onDeleteProduct: (id: string) => void;
   onDeleteStockRow: (productId: string, variantKey: string) => void;
   onDeleteMovement: (movement: StockMovement) => void;
+  onImportInventory: (rows: InventoryImportRow[]) => void;
   onEditProduct: (product: Product) => void;
   onCreateProduct: () => void;
 }) {
@@ -3266,6 +3401,8 @@ function InventorySection({
     key: 'pid',
     dir: 'asc',
   });
+  const [selectedDocumentNo, setSelectedDocumentNo] = useState<string | null>(null);
+  const inventoryImportRef = useRef<HTMLInputElement | null>(null);
   const catName = (slug: string) => categories.find((c) => c.slug === slug)?.name || slug || '—';
   const nameById = (id: string) => products.find((p) => p.id === id)?.name || id;
   const fmtDate = (s?: string) => (s ? new Date(s).toLocaleDateString('zh-TW') : '—');
@@ -3398,6 +3535,13 @@ function InventorySection({
     { key: 'location', label: '儲位' },
     { key: 'last', label: '最後異動' },
   ];
+  const documentGroups = movements.reduce<Record<string, StockMovement[]>>((groups, movement) => {
+    const documentNo = parseMovementNote(movement.note).document_no || '';
+    if (!documentNo) return groups;
+    groups[documentNo] = [...(groups[documentNo] ?? []), movement];
+    return groups;
+  }, {});
+  const selectedDocumentMovements = selectedDocumentNo ? documentGroups[selectedDocumentNo] ?? [] : [];
   const pickerLine = movementPicker ? movementLines.find((line) => line.id === movementPicker.lineId) : null;
   const pickerProduct = pickerLine ? products.find((p) => p.id === pickerLine.product_id) : null;
   const pickerRows = pickerProduct ? getProductVariantRows(pickerProduct) : [];
@@ -3432,6 +3576,78 @@ function InventorySection({
       });
     }
     setMovementPicker(null);
+  };
+  const csvEscape = (value: string | number) => `"${String(value ?? '').replace(/"/g, '""')}"`;
+  const splitCsvLine = (line: string) => {
+    const cells: string[] = [];
+    let cell = '';
+    let quoted = false;
+    for (let i = 0; i < line.length; i++) {
+      const char = line[i];
+      const next = line[i + 1];
+      if (char === '"' && quoted && next === '"') {
+        cell += '"';
+        i += 1;
+      } else if (char === '"') {
+        quoted = !quoted;
+      } else if (char === ',' && !quoted) {
+        cells.push(cell);
+        cell = '';
+      } else {
+        cell += char;
+      }
+    }
+    cells.push(cell);
+    return cells;
+  };
+  const exportInventoryCsv = () => {
+    const headers = ['品項編號', '品名', '分類', '規格', '單位', '目前庫存', '安全庫存', '單位成本', '儲位'];
+    const body = sortedRows.map((row) => [
+      row.pid,
+      row.name,
+      row.cat,
+      row.key,
+      row.unit,
+      row.inv,
+      row.safety,
+      row.cost,
+      row.location === '—' ? '' : row.location,
+    ]);
+    const csv = [headers, ...body].map((line) => line.map(csvEscape).join(',')).join('\n');
+    const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `urbanite-inventory-${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+  const importInventoryCsv = async (file: File) => {
+    const text = await file.text();
+    const lines = text.replace(/^\uFEFF/, '').split(/\r?\n/).filter((line) => line.trim());
+    if (lines.length < 2) return alert('匯入檔沒有資料');
+    const headers = splitCsvLine(lines[0]).map((header) => header.trim());
+    const indexOf = (names: string[]) => names.map((name) => headers.indexOf(name)).find((index) => index >= 0) ?? -1;
+    const productIdIndex = indexOf(['品項編號', '商品編號', 'product_id']);
+    const variantIndex = indexOf(['規格', 'variant_key']);
+    const inventoryIndex = indexOf(['目前庫存', '可用庫存', 'inventory']);
+    const safetyIndex = indexOf(['安全庫存', 'safety']);
+    const costIndex = indexOf(['單位成本', 'cost']);
+    const locationIndex = indexOf(['儲位', 'location']);
+    if (productIdIndex < 0 || inventoryIndex < 0) return alert('CSV 需要包含「品項編號」與「目前庫存」欄位');
+
+    const rows = lines.slice(1).map((line) => {
+      const cells = splitCsvLine(line);
+      return {
+        productId: cells[productIdIndex]?.trim() ?? '',
+        variantKey: variantIndex >= 0 ? cells[variantIndex]?.trim() ?? '' : '',
+        inventory: Math.max(0, Math.floor(Number(cells[inventoryIndex]) || 0)),
+        safety: Math.max(0, Math.floor(Number(cells[safetyIndex]) || 0)),
+        cost: Math.max(0, Math.floor(Number(cells[costIndex]) || 0)),
+        location: locationIndex >= 0 ? cells[locationIndex]?.trim() ?? '' : '',
+      };
+    }).filter((row) => row.productId);
+    onImportInventory(rows);
   };
   const inventoryFilterControls = (
     <div className="mb-5 rounded-xl border border-[#e5ded4] bg-[#faf7f2] p-4">
@@ -3536,7 +3752,38 @@ function InventorySection({
 
       {/* 庫存總表 */}
       {inventoryTab === 'stock' && (
-      <Card title="庫存總表">
+      <Card
+        title="庫存總表"
+        action={
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={exportInventoryCsv}
+              className="rounded-full border border-[#d7c9bd] px-4 py-2 text-sm font-semibold"
+            >
+              匯出庫存
+            </button>
+            <button
+              type="button"
+              onClick={() => inventoryImportRef.current?.click()}
+              className="rounded-full bg-[#1f1b19] px-4 py-2 text-sm font-semibold text-white"
+            >
+              匯入庫存
+            </button>
+            <input
+              ref={inventoryImportRef}
+              type="file"
+              accept=".csv,text/csv"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                e.target.value = '';
+                if (file) importInventoryCsv(file);
+              }}
+            />
+          </div>
+        }
+      >
         {inventoryFilterControls}
         <div className="overflow-x-auto">
           <table className="w-full whitespace-nowrap text-sm">
@@ -3921,7 +4168,19 @@ function InventorySection({
                   const doc = parseMovementNote(m.note);
                   return (
                     <tr key={m.id} className="border-b border-[#efe8dd]">
-                      <td className="px-2 py-2 font-mono text-xs text-[#2687c9]">{doc.document_no || '—'}</td>
+                      <td className="px-2 py-2 font-mono text-xs">
+                        {doc.document_no ? (
+                          <button
+                            type="button"
+                            onClick={() => setSelectedDocumentNo(doc.document_no)}
+                            className="text-[#2687c9] underline-offset-4 hover:underline"
+                          >
+                            {doc.document_no}
+                          </button>
+                        ) : (
+                          <span className="text-[#2687c9]">—</span>
+                        )}
+                      </td>
                       <td className="px-2 py-2 text-[#8a7f72]">{doc.document_date || '—'}</td>
                       <td className="px-2 py-2 text-[#8a7f72]">{fmtDate(m.created_at)}</td>
                       <td className="px-2 py-2 text-[#8a7f72]">{doc.status || '—'}</td>
@@ -3959,6 +4218,108 @@ function InventorySection({
           </div>
         )}
       </Card>
+      )}
+
+      {selectedDocumentNo && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          onClick={() => setSelectedDocumentNo(null)}
+        >
+          <div
+            className="max-h-[86vh] w-full max-w-5xl overflow-hidden rounded-2xl bg-white shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex flex-wrap items-start justify-between gap-3 border-b border-[#e5ded4] p-5">
+              <div>
+                <p className="text-sm text-[#8a7f72]">進出庫單據</p>
+                <h3 className="font-mono text-2xl font-bold">{selectedDocumentNo}</h3>
+                <p className="mt-1 text-sm text-[#8a7f72]">
+                  共 {selectedDocumentMovements.length} 筆明細
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const first = selectedDocumentMovements[0];
+                    const doc = parseMovementNote(first?.note);
+                    setMvForm({
+                      document_no: selectedDocumentNo,
+                      document_date: doc.document_date || currentDateTimeValue(),
+                      type: first?.type ?? 'in',
+                      status: doc.status || (first?.type === 'out' ? '出貨' : '進貨'),
+                      payment_status: doc.payment_status || '',
+                      payment_no: doc.payment_no || '',
+                      location: first?.location || '',
+                      handler: first?.handler || '',
+                      note: doc.note || '',
+                    });
+                    setMovementLines([{ id: `line-${Date.now()}`, product_id: '', variant_key: '', color: '', size: '', quantity: 1, unit_price: 0 }]);
+                    setInventoryTab('movement');
+                    setSelectedDocumentNo(null);
+                  }}
+                  className="rounded-full bg-[#1f1b19] px-4 py-2 text-sm font-semibold text-white"
+                >
+                  用此單號新增明細
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedDocumentNo(null)}
+                  className="rounded-full border border-[#d7c9bd] px-4 py-2 text-sm font-semibold"
+                >
+                  關閉
+                </button>
+              </div>
+            </div>
+            <div className="max-h-[68vh] overflow-auto p-5">
+              <table className="w-full min-w-[820px] whitespace-nowrap text-sm">
+                <thead>
+                  <tr className="border-b border-[#e5ded4] bg-[#f3eee7] text-left text-xs text-[#6b6156]">
+                    <th className="px-3 py-3">商品</th>
+                    <th className="px-3 py-3">規格</th>
+                    <th className="px-3 py-3">類型</th>
+                    <th className="px-3 py-3 text-right">數量</th>
+                    <th className="px-3 py-3 text-right">單價</th>
+                    <th className="px-3 py-3 text-right">小計</th>
+                    <th className="px-3 py-3">地點 / 對象</th>
+                    <th className="px-3 py-3">經手人</th>
+                    <th className="px-3 py-3 text-right">操作</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {selectedDocumentMovements.map((movement) => (
+                    <tr key={movement.id} className="border-b border-[#efe8dd]">
+                      <td className="px-3 py-3 font-semibold">{nameById(movement.product_id)}</td>
+                      <td className="px-3 py-3 text-[#8a7f72]">{movement.variant_key || '—'}</td>
+                      <td className="px-3 py-3">
+                        <span className={movement.type === 'in' ? 'text-[#1f7a44]' : 'text-[#c0392b]'}>
+                          {movement.type === 'in' ? '入庫' : '出庫'}
+                        </span>
+                      </td>
+                      <td className="px-3 py-3 text-right font-semibold">
+                        {movement.type === 'in' ? '+' : '−'}
+                        {movement.quantity}
+                      </td>
+                      <td className="px-3 py-3 text-right">{movement.unit_price}</td>
+                      <td className="px-3 py-3 text-right">{(movement.quantity * movement.unit_price).toLocaleString()}</td>
+                      <td className="px-3 py-3 text-[#8a7f72]">{movement.location || '—'}</td>
+                      <td className="px-3 py-3 text-[#8a7f72]">{movement.handler || '—'}</td>
+                      <td className="px-3 py-3 text-right">
+                        <button
+                          type="button"
+                          onClick={() => onDeleteMovement(movement)}
+                          className="rounded-full border border-[#e0b4b4] px-3 py-1.5 text-xs font-semibold text-[#c0392b]"
+                        >
+                          刪除
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
       )}
 
       {movementPicker && (
