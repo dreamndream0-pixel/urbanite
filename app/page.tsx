@@ -231,8 +231,8 @@ export default function Home() {
   return (
     <main className="min-h-screen bg-[#f6f2ec] text-[#1f1b19]">
       {/* 頂部導覽 */}
-      <header className="sticky top-0 z-30 border-b border-[#e5ded4] bg-[#faf7f2]/95 backdrop-blur">
-        <nav className="mx-auto grid max-w-7xl grid-cols-[1fr_auto_1fr] items-center px-4 py-4 sm:px-6">
+      <header className="sticky top-0 z-30 bg-[#faf7f2]/95 backdrop-blur">
+        <nav className="mx-auto grid max-w-6xl grid-cols-[1fr_auto_1fr] items-center px-4 py-4 sm:px-6 sm:py-5">
           {/* 左:漢堡選單 + 搜尋 */}
           <div className="flex items-center gap-1 sm:gap-2">
             <button
@@ -364,57 +364,62 @@ export default function Home() {
         )}
       </header>
 
-      {/* 首頁輪播圖 */}
-      <HeroCarousel banners={banners.filter((b) => b.active)} />
+      <div className="mx-auto max-w-6xl px-4 pb-8 pt-5 sm:px-6 sm:pt-8">
+        {/* 首頁輪播圖 */}
+        <HeroCarousel banners={banners.filter((b) => b.active)} />
 
-      {/* 標題 */}
-      <section className="mx-auto max-w-7xl px-4 pb-4 pt-10 text-center sm:px-6 sm:pt-14">
-        <h1 className="text-4xl font-semibold tracking-[0.15em] sm:text-5xl">
-          {activeCategory.slug === 'all' ? '全部商品' : activeCategory.name}
-        </h1>
-      </section>
-
-      {/* 分類篩選列 */}
-      <div className="mx-auto max-w-7xl px-4 sm:px-6">
-        <div className="-mx-4 overflow-x-auto border-b border-[#e5ded4] px-4 pb-4 sm:mx-0 sm:px-0">
-          <div className="flex w-max min-w-full items-center gap-7 whitespace-nowrap sm:justify-center">
+        {/* 分類篩選列 */}
+        <div className="-mx-4 mt-5 overflow-x-auto px-4 sm:mx-0 sm:px-0">
+          <div className="flex w-max min-w-full items-center gap-3 whitespace-nowrap sm:justify-center">
             {categoryTabs.map((c) => (
               <button
                 key={c.slug}
                 onClick={() => setCategory(c.slug)}
-                className={`shrink-0 text-sm tracking-wide transition ${
+                className={`shrink-0 rounded-full border px-5 py-3 text-sm font-semibold tracking-wide transition sm:px-7 ${
                   category === c.slug
-                    ? 'font-semibold text-[#1f1b19]'
-                    : 'text-[#8a7f72] hover:text-[#1f1b19]'
+                    ? 'border-[#1f1b19] bg-[#1f1b19] text-white shadow-sm'
+                    : 'border-[#e0d7cc] bg-[#faf7f2] text-[#8a7f72] hover:border-[#cfc1b3] hover:text-[#1f1b19]'
                 }`}
               >
-                {c.en} <span className="ml-0.5">{c.name}</span>
+                {c.slug === 'all' ? '全部商品' : c.name}
               </button>
             ))}
           </div>
         </div>
-      </div>
 
-      {/* 商品格狀排列 */}
-      <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6 sm:py-10">
-        {loading ? (
-          <p className="py-20 text-center text-[#8a7f72]">商品載入中…</p>
-        ) : visibleProducts.length === 0 ? (
-          <p className="py-20 text-center text-[#8a7f72]">這個分類目前沒有商品。</p>
-        ) : (
-          <div className="grid grid-cols-2 gap-x-4 gap-y-8 sm:grid-cols-3 lg:grid-cols-4">
-            {visibleProducts.map((product) => (
-              <ProductCard
-                key={product.id}
-                product={product}
-                favorited={favorites.has(product.id)}
-                onFavorite={() => toggleFavorite(product.id)}
-                onAdd={() => setQuickAdd(product)}
-              />
-            ))}
+        {/* 商品格狀排列 */}
+        <section className="mt-6 rounded-3xl border border-[#e5ded4] bg-[#faf7f2]/80 p-4 shadow-sm sm:p-6">
+          <div className="mb-5 flex items-center justify-between gap-4">
+            <h1 className="text-2xl font-semibold tracking-wide sm:text-3xl">
+              {activeCategory.slug === 'all' ? '本週精選' : activeCategory.name}
+            </h1>
+            <button
+              type="button"
+              onClick={() => setCategory('all')}
+              className="shrink-0 text-sm font-semibold text-[#6b6156] hover:text-[#1f1b19]"
+            >
+              查看更多 ›
+            </button>
           </div>
-        )}
-      </section>
+          {loading ? (
+            <p className="py-20 text-center text-[#8a7f72]">商品載入中…</p>
+          ) : visibleProducts.length === 0 ? (
+            <p className="py-20 text-center text-[#8a7f72]">這個分類目前沒有商品。</p>
+          ) : (
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+              {visibleProducts.map((product) => (
+                <ProductCard
+                  key={product.id}
+                  product={product}
+                  favorited={favorites.has(product.id)}
+                  onFavorite={() => toggleFavorite(product.id)}
+                  onAdd={() => setQuickAdd(product)}
+                />
+              ))}
+            </div>
+          )}
+        </section>
+      </div>
 
       <Footer settings={settings} />
 
@@ -672,8 +677,8 @@ function ProductCard({
   const productHref = `/products/${encodeURIComponent(product.id)}`;
 
   return (
-    <div className="group flex flex-col">
-      <div className="relative aspect-[3/4] overflow-hidden rounded-lg bg-[#e9e1d6]">
+    <div className="group flex flex-col overflow-hidden rounded-2xl bg-[#f6f2ec] p-3 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
+      <div className="relative aspect-[3/4] overflow-hidden rounded-xl bg-[#e9e1d6]">
         <Link href={productHref} aria-label={`查看 ${product.name}`}>
           {product.image ? (
             <img
@@ -695,19 +700,19 @@ function ProductCard({
         <button
           onClick={onFavorite}
           aria-label="加入收藏"
-          className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full bg-white/50 shadow-sm backdrop-blur-sm transition hover:bg-white/70"
+          className="absolute right-2 top-2 flex h-9 w-9 items-center justify-center rounded-full bg-white/65 shadow-sm backdrop-blur-sm transition hover:bg-white/85"
         >
           <IconStar filled={favorited} small />
         </button>
       </div>
-      <div className="mt-3 flex flex-1 flex-col">
+      <div className="mt-3 flex flex-1 flex-col px-1">
         <Link href={productHref} className="hover:text-[#c84767]">
-          <h3 className="text-sm font-medium leading-5">{product.name}</h3>
+          <h3 className="line-clamp-1 text-sm font-semibold leading-5">{product.name}</h3>
           <p className="mt-1 line-clamp-1 text-xs text-[#8a7f72]">{product.tagline}</p>
         </Link>
-        <div className="mt-2 flex items-center justify-between">
+        <div className="mt-3 flex items-center justify-between">
           <div className="flex items-baseline gap-2">
-            <span className="font-semibold">{formatter.format(product.price)}</span>
+            <span className="font-semibold tracking-wide">{formatter.format(product.price)}</span>
             {product.original_price ? (
               <span className="text-xs text-[#b3a897] line-through">
                 {formatter.format(product.original_price)}
@@ -717,7 +722,7 @@ function ProductCard({
           <button
             onClick={onAdd}
             aria-label={`將 ${product.name} 加入購物車`}
-            className="flex h-9 w-9 items-center justify-center rounded-full bg-[#1f1b19] text-white transition hover:bg-[#3a322e]"
+            className="flex h-10 w-10 items-center justify-center rounded-full bg-[#1f1b19] text-white transition hover:bg-[#3a322e]"
           >
             <IconCart />
           </button>
@@ -974,7 +979,7 @@ function HeroCarousel({ banners }: { banners: Banner[] }) {
   const dragPercent = widthPx ? (dragX / widthPx) * 100 : 0;
 
   return (
-    <section className="group relative w-full select-none overflow-hidden bg-[#e9e1d6]">
+    <section className="group relative w-full select-none overflow-hidden rounded-3xl bg-[#e9e1d6] shadow-sm">
       <div
         className={`flex ${dragging ? '' : 'transition-transform duration-500 ease-out'}`}
         style={{ transform: `translateX(calc(-${safeIndex * 100}% + ${dragPercent}%))` }}
@@ -1004,6 +1009,10 @@ function HeroCarousel({ banners }: { banners: Banner[] }) {
               className="pointer-events-none h-full w-full object-cover"
             />
           );
+          const titleParts = banner.title
+            .split(/\s+/)
+            .map((part) => part.trim())
+            .filter(Boolean);
           return (
             <div
               key={banner.id}
@@ -1015,6 +1024,30 @@ function HeroCarousel({ banners }: { banners: Banner[] }) {
                 </a>
               ) : (
                 img
+              )}
+              {banner.title && (
+                <div className="pointer-events-none absolute inset-0 flex items-center bg-gradient-to-r from-black/45 via-black/10 to-transparent px-7 text-white sm:px-12">
+                  <div>
+                    <p className="font-serif text-5xl leading-none tracking-wide sm:text-7xl">
+                      {titleParts.length > 1 ? (
+                        <>
+                          {titleParts[0]}
+                          <br />
+                          {titleParts.slice(1).join(' ')}
+                        </>
+                      ) : (
+                        banner.title
+                      )}
+                    </p>
+                    <p className="mt-4 text-sm font-medium sm:text-base">Effortless custom wear</p>
+                    {banner.link && (
+                      <span className="mt-6 inline-flex items-center gap-5 bg-[#1f1b19] px-6 py-3 text-xs font-semibold uppercase tracking-wide">
+                        Shop Now
+                        <span aria-hidden="true">→</span>
+                      </span>
+                    )}
+                  </div>
+                </div>
               )}
             </div>
           );
@@ -1037,14 +1070,14 @@ function HeroCarousel({ banners }: { banners: Banner[] }) {
           >
             <IconChevron dir="right" />
           </button>
-          <div className="absolute inset-x-0 bottom-3 flex items-center justify-center gap-2">
+          <div className="absolute inset-x-0 bottom-6 flex items-center justify-center gap-2">
             {banners.map((banner, i) => (
               <button
                 key={banner.id}
                 onClick={() => setIndex(i)}
                 aria-label={`第 ${i + 1} 張`}
-                className={`h-2 rounded-full transition-all ${
-                  i === index ? 'w-5 bg-white' : 'w-2 bg-white/60 hover:bg-white/80'
+                className={`h-2 rounded-full border border-white/80 transition-all ${
+                  i === index ? 'w-2 bg-white' : 'w-2 bg-transparent hover:bg-white/60'
                 }`}
               />
             ))}
