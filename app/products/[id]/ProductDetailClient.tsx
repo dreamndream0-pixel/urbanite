@@ -170,8 +170,10 @@ export default function ProductDetailClient({ product }: { product: Product }) {
         </nav>
       </header>
 
-      <section className="mx-auto max-w-5xl">
-        <div className="mx-auto aspect-[3/4] w-full max-w-md overflow-hidden bg-[#eee8e1] sm:max-w-lg">
+      <section className="mx-auto max-w-6xl px-4 py-4 sm:px-6 lg:py-8">
+        <div className="grid gap-8 lg:grid-cols-[1.05fr_0.95fr] lg:items-start">
+        <div className="lg:sticky lg:top-24">
+        <div className="mx-auto aspect-[3/4] w-full max-w-md overflow-hidden rounded-xl bg-[#eee8e1] sm:max-w-lg lg:max-w-none">
           {activeImage ? (
             <img src={activeImage} alt={product.name} className="h-full w-full object-contain drop-shadow-[0_18px_22px_rgba(31,27,25,0.22)]" />
           ) : (
@@ -194,8 +196,9 @@ export default function ProductDetailClient({ product }: { product: Product }) {
             ))}
           </div>
         )}
+        </div>
 
-        <div className="px-5 py-8 sm:px-8">
+        <div className="px-1 py-6 sm:px-2 lg:py-0">
           <p className="mb-3 text-xs font-semibold uppercase tracking-[0.25em] text-[#c84767]">
             {product.category || 'Urbanite'}
           </p>
@@ -354,8 +357,9 @@ export default function ProductDetailClient({ product }: { product: Product }) {
             </p>
           )}
         </div>
+        </div>
 
-        <section className="border-t border-[#e5ded4] px-5 pb-16 sm:px-8">
+        <section className="border-t border-[#e5ded4] px-5 pb-16 sm:px-8 lg:mt-12">
           <div className="grid grid-cols-2 border-b border-[#e5ded4] text-center">
             <button
               onClick={() => setTab('description')}

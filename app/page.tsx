@@ -1370,6 +1370,15 @@ function QuickAddModal({
   const inv = hasSpecs ? variant?.inventory ?? 0 : product.inventory;
   const soldOut = hasSpecs && allChosen && inv <= 0;
 
+  // 某規格選項在「其他維度目前選擇」下有沒有庫存;沒有就反白
+  function optionAvailable(dimIndex: number, opt: string) {
+    if (!hasSpecs) return true;
+    const candidate = specSel.map((v, idx) => (idx === dimIndex ? opt : v));
+    const key = candidate.join(' / ');
+    const found = (product.variants ?? []).find((v) => v.options.join(' / ') === key);
+    return (found?.inventory ?? 0) > 0;
+  }
+
   return (
     <div
       className="fixed inset-0 z-[60] flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4"
@@ -1417,19 +1426,27 @@ function QuickAddModal({
                   {dim.name}：{specSel[i] || '請選擇'}
                 </p>
                 <div className="flex flex-wrap gap-2">
-                  {dim.options.map((opt) => (
-                    <button
-                      key={opt}
-                      onClick={() => setSpecSel((prev) => prev.map((v, idx) => (idx === i ? opt : v)))}
-                      className={`min-w-14 border px-4 py-2 text-sm font-semibold ${
-                        specSel[i] === opt
-                          ? 'border-[#c84767] text-[#c84767]'
-                          : 'border-[#e1d9d3] bg-[#f7f5f2] text-[#3d3935]'
-                      }`}
-                    >
-                      {opt}
-                    </button>
-                  ))}
+                  {dim.options.map((opt) => {
+                    const selected = specSel[i] === opt;
+                    const available = optionAvailable(i, opt);
+                    const grayed = selected ? soldOut : !available;
+                    return (
+                      <button
+                        key={opt}
+                        disabled={!selected && !available}
+                        onClick={() => setSpecSel((prev) => prev.map((v, idx) => (idx === i ? opt : v)))}
+                        className={`min-w-14 border px-4 py-2 text-sm font-semibold ${
+                          grayed
+                            ? 'cursor-not-allowed border-[#e1d9d3] bg-[#f7f5f2] text-[#3d3935] line-through opacity-30'
+                            : selected
+                              ? 'border-[#c84767] text-[#c84767]'
+                              : 'border-[#e1d9d3] bg-[#f7f5f2] text-[#3d3935]'
+                        }`}
+                      >
+                        {opt}
+                      </button>
+                    );
+                  })}
                 </div>
               </section>
             ))}
