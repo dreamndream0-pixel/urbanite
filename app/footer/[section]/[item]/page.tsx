@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { createAdminClient } from '@/lib/supabase/admin';
 import type { Banner, SiteSettings } from '@/lib/types';
+import BackButton from './BackButton';
 
 export const dynamic = 'force-dynamic';
 
@@ -32,11 +33,10 @@ export default async function FooterContentPage({ params }: { params: Promise<{ 
 
   return (
     <main className="min-h-screen bg-[#f8f3ec] text-[#2c2826]">
-      <section className="mx-auto grid max-w-7xl gap-8 px-6 py-8 sm:px-8 lg:min-h-[560px] lg:grid-cols-[0.9fr_1.1fr] lg:items-center lg:py-12">
-        <div className="order-2 lg:order-1">
-          <Link href="/" className="text-sm font-semibold text-[#6f675f] hover:text-[#1f1b19]">
-            ← 回首頁
-          </Link>
+      <section className="relative overflow-hidden border-b border-[#e5ded4]">
+        <div className="mx-auto grid max-w-7xl gap-8 px-6 py-8 sm:px-8 lg:min-h-[680px] lg:grid-cols-[0.92fr_1.08fr] lg:items-start lg:py-12">
+        <div className="relative z-10 rounded-r-[36px] bg-gradient-to-r from-[#f8f3ec] via-[#f8f3ec]/95 to-[#f8f3ec]/35 pb-10 pr-0 lg:pb-16 lg:pr-14">
+          <BackButton />
           <p className="mt-12 text-xs font-bold uppercase tracking-[0.28em] text-[#9a8f84]">
             About Urbanite
           </p>
@@ -61,14 +61,19 @@ export default async function FooterContentPage({ params }: { params: Promise<{ 
           )}
         </div>
 
-        <div className="relative order-1 overflow-hidden rounded-[28px] bg-[#e9e1d6] shadow-sm lg:order-2">
+        <div className="relative min-h-[260px] overflow-hidden rounded-[24px] bg-[#e9e1d6] lg:min-h-[620px] lg:rounded-[34px]">
           {banner?.image ? (
-            <img src={banner.image} alt={banner.title || 'URBANITE'} className="aspect-[4/3] h-full w-full object-cover lg:aspect-[5/4]" />
+            <img
+              src={banner.image}
+              alt={banner.title || 'URBANITE'}
+              className="absolute inset-0 h-full w-full object-cover"
+            />
           ) : (
-            <div className="aspect-[4/3] bg-[linear-gradient(135deg,#e9e1d6,#f8f3ec_48%,#d8cdc1)] lg:aspect-[5/4]" />
+            <div className="absolute inset-0 bg-[linear-gradient(135deg,#e9e1d6,#f8f3ec_48%,#d8cdc1)]" />
           )}
-          <div className="pointer-events-none absolute inset-y-0 left-0 w-1/4 bg-gradient-to-r from-[#f8f3ec] via-[#f8f3ec]/55 to-transparent" />
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-[#f8f3ec]/45 to-transparent" />
+          <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-[#f8f3ec]/70 via-[#f8f3ec]/18 to-transparent lg:bg-gradient-to-r lg:from-[#f8f3ec] lg:via-[#f8f3ec]/42 lg:to-transparent" />
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-[#f8f3ec] to-transparent lg:hidden" />
+        </div>
         </div>
       </section>
 

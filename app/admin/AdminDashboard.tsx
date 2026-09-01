@@ -26,6 +26,11 @@ const ORDER_STATUSES = ['尚未付款', '待出貨', '已出貨', '已完成', '
 const PRODUCT_STATUSES = ['上架中', '加購品', '已下架'];
 const DEFAULT_PAYMENT_METHODS = ['綠界金流', 'Line Pay', 'Apple Pay', '取貨付款', '轉帳匯款'];
 const DEFAULT_SHIPPING_METHODS = ['綠界物流-超商取貨', '綠界物流-宅配', '7-11 取貨付款', '全家 取貨付款'];
+const DEFAULT_FOOTER_SOCIAL_LINKS = [
+  { label: 'Instagram', image: '', url: '' },
+  { label: 'LINE', image: '', url: '' },
+  { label: 'Email', image: '', url: '' },
+];
 
 const NAV = [
   { key: 'overview', label: '總覽', Icon: IconGrid },
@@ -211,6 +216,13 @@ export default function AdminDashboard({
     taxId: initialSettings?.footer_tax_id ?? '',
     instagramUrl: initialSettings?.footer_instagram_url ?? '',
     lineUrl: initialSettings?.footer_line_url ?? '',
+    socialLinks: JSON.stringify(
+      initialSettings?.footer_social_links?.length
+        ? initialSettings.footer_social_links.slice(0, 3)
+        : DEFAULT_FOOTER_SOCIAL_LINKS,
+      null,
+      2,
+    ),
     payments: (initialSettings?.payment_methods?.length
       ? initialSettings.payment_methods
       : DEFAULT_PAYMENT_METHODS
@@ -640,6 +652,7 @@ export default function AdminDashboard({
           footer_tax_id: footerDraft.taxId.trim(),
           footer_instagram_url: footerDraft.instagramUrl.trim(),
           footer_line_url: footerDraft.lineUrl.trim(),
+          footer_social_links: JSON.parse(footerDraft.socialLinks || '[]'),
           footer_sections: JSON.parse(footerDraft.sections || '[]'),
           payment_methods: toLines(footerDraft.payments),
           shipping_methods: toLines(footerDraft.shippings),
@@ -1468,6 +1481,10 @@ export default function AdminDashboard({
                     value={footerDraft.sections}
                     onChange={(sections) => setFooterDraft({ ...footerDraft, sections })}
                   />
+                  <FooterSocialLinksEditor
+                    value={footerDraft.socialLinks}
+                    onChange={(socialLinks) => setFooterDraft({ ...footerDraft, socialLinks })}
+                  />
                   <MethodToggles
                     label="金流方式(勾選=啟用,可套用到各商品)"
                     defaults={DEFAULT_PAYMENT_METHODS}
@@ -1956,6 +1973,7 @@ function BannerCropModal({
 
 type FooterItemDraft = { subtitle: string; content: string; url: string };
 type FooterSectionDraft = { title: string; items: FooterItemDraft[] };
+type FooterSocialDraft = { label: string; image: string; url: string };
 
 function FooterPagesEditor({ value, onChange }: { value: string; onChange: (value: string) => void }) {
   const [active, setActive] = useState(0);
@@ -2105,6 +2123,117 @@ function FooterPagesEditor({ value, onChange }: { value: string; onChange: (valu
       )}
     </div>
   );
+}
+
+function FooterSocialLinksEditor({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+  const [items, setItems] = useState<FooterSocialDraft[]>(() => parseFooterSocialLinks(value));
+  const [uploadingIndex, setUploadingIndex] = useState<number | null>(null);
+
+  function update(next: FooterSocialDraft[]) {
+    const normalized = normalizeFooterSocialLinks(next);
+    setItems(normalized);
+    onChange(JSON.stringify(normalized, null, 2));
+  }
+
+  function updateItem(index: number, patch: Partial<FooterSocialDraft>) {
+    update(items.map((item, i) => (i === index ? { ...item, ...patch } : item)));
+  }
+
+  async function uploadSocialImage(index: number, file: File) {
+    setUploadingIndex(index);
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      fd.append('productId', `footer-social-${index + 1}`);
+      const res = await fetch('/api/products/image', { method: 'POST', body: fd });
+      const data = await res.json();
+      if (!res.ok || !data.image_url) throw new Error(data.error ?? '上傳失敗');
+      updateItem(index, { image: data.image_url });
+    } catch (error) {
+      alert(error instanceof Error ? error.message : '上傳發生問題');
+    } finally {
+      setUploadingIndex(null);
+    }
+  }
+
+  return (
+    <div className="lg:col-span-2 rounded-lg border border-[#e5ded4] p-4">
+      <div>
+        <h3 className="text-lg font-bold">頁尾三個按鈕</h3>
+        <p className="mt-1 text-sm text-[#8a7f72]">設定頁尾最下方三個圓形按鈕的圖片與連結。</p>
+      </div>
+
+      <div className="mt-5 grid gap-4 md:grid-cols-3">
+        {items.map((item, index) => (
+          <div key={index} className="rounded-lg border border-[#e5ded4] bg-white p-4">
+            <div className="mx-auto flex h-16 w-16 items-center justify-center overflow-hidden rounded-full bg-[#1f1b19] text-xs font-bold text-white">
+              {item.image ? <img src={item.image} alt="" className="h-full w-full object-cover" /> : item.label.slice(0, 4) || '@'}
+            </div>
+            <label className="mt-4 block text-sm text-[#8a7f72]">
+              按鈕名稱
+              <input
+                value={item.label}
+                onChange={(e) => updateItem(index, { label: e.target.value })}
+                className="mt-2 w-full rounded-lg border border-[#e5ded4] px-3 py-2 text-[#1f1b19]"
+              />
+            </label>
+            <label className="mt-3 block text-sm text-[#8a7f72]">
+              連結網址
+              <input
+                value={item.url}
+                onChange={(e) => updateItem(index, { url: e.target.value })}
+                placeholder="https:// 或 mailto:"
+                className="mt-2 w-full rounded-lg border border-[#e5ded4] px-3 py-2 text-[#1f1b19]"
+              />
+            </label>
+            <label className="mt-3 block text-sm text-[#8a7f72]">
+              圖片網址
+              <input
+                value={item.image}
+                onChange={(e) => updateItem(index, { image: e.target.value })}
+                placeholder="可貼圖片網址"
+                className="mt-2 w-full rounded-lg border border-[#e5ded4] px-3 py-2 text-[#1f1b19]"
+              />
+            </label>
+            <label className="mt-4 inline-block cursor-pointer rounded-full bg-[#1f1b19] px-4 py-2 text-sm font-semibold text-white">
+              {uploadingIndex === index ? '上傳中...' : '上傳圖片'}
+              <input
+                type="file"
+                accept="image/png,image/jpeg,image/webp,image/svg+xml,image/gif"
+                className="hidden"
+                disabled={uploadingIndex !== null}
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  e.target.value = '';
+                  if (file) uploadSocialImage(index, file);
+                }}
+              />
+            </label>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function parseFooterSocialLinks(value: string): FooterSocialDraft[] {
+  try {
+    const parsed = JSON.parse(value);
+    if (Array.isArray(parsed)) return normalizeFooterSocialLinks(parsed as Partial<FooterSocialDraft>[]);
+  } catch {
+    /* 使用預設值 */
+  }
+  return normalizeFooterSocialLinks(DEFAULT_FOOTER_SOCIAL_LINKS);
+}
+
+function normalizeFooterSocialLinks(items: Partial<FooterSocialDraft>[]): FooterSocialDraft[] {
+  const normalized = items.slice(0, 3).map((item, index) => ({
+    label: typeof item.label === 'string' ? item.label : DEFAULT_FOOTER_SOCIAL_LINKS[index]?.label ?? '',
+    image: typeof item.image === 'string' ? item.image : '',
+    url: typeof item.url === 'string' ? item.url : '',
+  }));
+  while (normalized.length < 3) normalized.push({ ...DEFAULT_FOOTER_SOCIAL_LINKS[normalized.length] });
+  return normalized;
 }
 
 function MethodToggles({

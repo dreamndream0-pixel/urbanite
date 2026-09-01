@@ -602,6 +602,7 @@ function Footer({ settings, logoUrl }: { settings: SiteSettings | null; logoUrl:
       items: section.items.filter((item) => !isPolicyItem(item.subtitle)),
     }))
     .filter((section) => section.title || section.items.length);
+  const socialLinks = getFooterSocialLinks(settings);
   const followSection = {
     title: '尋找我們 FOLLOW US',
     items: [
@@ -639,9 +640,11 @@ function Footer({ settings, logoUrl }: { settings: SiteSettings | null; logoUrl:
             打造屬於你的穿搭風格。
           </p>
           <div className="mt-5 flex justify-center gap-3 lg:justify-start">
-            <SocialLink href={settings?.footer_instagram_url} label="Instagram">◎</SocialLink>
-            <SocialLink href={settings?.footer_line_url} label="LINE">LINE</SocialLink>
-            <SocialLink href={settings?.footer_email ? `mailto:${settings.footer_email}` : ''} label="Email">@</SocialLink>
+            {socialLinks.map((link, index) => (
+              <SocialLink key={`${link.label}-${index}`} href={link.url} label={link.label} image={link.image}>
+                {link.fallback}
+              </SocialLink>
+            ))}
           </div>
         </section>
 
@@ -716,9 +719,11 @@ function Footer({ settings, logoUrl }: { settings: SiteSettings | null; logoUrl:
             打造屬於你的穿搭風格。
           </p>
           <div className="mt-5 flex justify-center gap-4">
-            <SocialLink href={settings?.footer_instagram_url} label="Instagram">◎</SocialLink>
-            <SocialLink href={settings?.footer_line_url} label="LINE">LINE</SocialLink>
-            <SocialLink href={settings?.footer_email ? `mailto:${settings.footer_email}` : ''} label="Email">@</SocialLink>
+            {socialLinks.map((link, index) => (
+              <SocialLink key={`${link.label}-${index}`} href={link.url} label={link.label} image={link.image}>
+                {link.fallback}
+              </SocialLink>
+            ))}
           </div>
         </section>
       </div>
@@ -744,6 +749,24 @@ function isPolicyItem(subtitle: string, target?: string) {
   if (target === '隱私權政策') return isPrivacy;
   if (target === '使用者條款') return isTerms;
   return isPrivacy || isTerms;
+}
+
+function getFooterSocialLinks(settings: SiteSettings | null) {
+  const saved = settings?.footer_social_links
+    ?.filter((link) => link.label?.trim() || link.image?.trim() || link.url?.trim())
+    .slice(0, 3)
+    .map((link) => ({
+      label: link.label.trim() || '社群連結',
+      image: link.image.trim(),
+      url: link.url.trim(),
+      fallback: link.label.trim().slice(0, 4) || '@',
+    }));
+  if (saved?.length) return saved;
+  return [
+    { label: 'Instagram', image: '', url: settings?.footer_instagram_url?.trim() ?? '', fallback: '◎' },
+    { label: 'LINE', image: '', url: settings?.footer_line_url?.trim() ?? '', fallback: 'LINE' },
+    { label: 'Email', image: '', url: settings?.footer_email ? `mailto:${settings.footer_email}` : '', fallback: '@' },
+  ];
 }
 
 function FooterGroup({ title, items }: { title: string; items: FooterLinkItem[] }) {
@@ -831,12 +854,13 @@ function getFooterLinkHref(item: FooterLinkItem, sectionTitle: string) {
     : item.url || '#';
 }
 
-function SocialLink({ href, label, children }: { href?: string; label: string; children: ReactNode }) {
+function SocialLink({ href, label, image, children }: { href?: string; label: string; image?: string; children: ReactNode }) {
   const active = href && href.trim();
+  const content = image ? <img src={image} alt="" className="h-full w-full rounded-full object-cover" /> : children;
   if (!active) {
     return (
-      <span className="flex h-9 w-9 items-center justify-center rounded-full border border-[#d8cdc1] text-xs font-bold text-[#b8aea3]">
-        {children}
+      <span className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full border border-[#d8cdc1] text-xs font-bold text-[#b8aea3]">
+        {content}
       </span>
     );
   }
@@ -846,9 +870,9 @@ function SocialLink({ href, label, children }: { href?: string; label: string; c
       aria-label={label}
       target={href.startsWith('http') ? '_blank' : undefined}
       rel={href.startsWith('http') ? 'noreferrer' : undefined}
-      className="flex h-9 w-9 items-center justify-center rounded-full bg-[#1f1b19] text-xs font-bold text-white transition hover:bg-[#3a322e]"
+      className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full bg-[#1f1b19] text-xs font-bold text-white transition hover:bg-[#3a322e]"
     >
-      {children}
+      {content}
     </a>
   );
 }

@@ -60,6 +60,7 @@ export type SiteSettings = {
   footer_tax_id?: string;
   footer_instagram_url?: string;
   footer_line_url?: string;
+  footer_social_links?: { label: string; image: string; url: string }[];
   payment_methods?: string[];
   shipping_methods?: string[];
   enabled_payment_methods?: string[];
