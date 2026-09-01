@@ -153,7 +153,9 @@ export default function Home() {
 
   const categoryTabs: CategoryTab[] = [
     ALL_TAB,
-    ...dbCategories.map((c) => ({ slug: c.slug, name: c.name, en: c.en || c.slug.toUpperCase() })),
+    ...dbCategories
+      .filter((c) => c.sort_order >= 0)
+      .map((c) => ({ slug: c.slug, name: c.name, en: c.en || c.slug.toUpperCase() })),
   ];
 
   const liveProducts = products.filter((p) => p.status !== '已下架');

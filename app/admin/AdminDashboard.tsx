@@ -287,6 +287,8 @@ export default function AdminDashboard({
   const [orderFilter, setOrderFilter] = useState<string>('全部');
   const [openOrderId, setOpenOrderId] = useState<string | null>(null);
   const [productsTab, setProductsTab] = useState<'items' | 'categories'>('items');
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
+  const [categoryProductQuery, setCategoryProductQuery] = useState('');
   const [movements, setMovements] = useState<StockMovement[]>(initialMovements);
   const [mvForm, setMvForm] = useState({
     document_no: '',
@@ -440,6 +442,18 @@ export default function AdminDashboard({
     () => shippingMethods,
     [shippingMethods],
   );
+  const selectedCategory = categories.find((category) => category.id === selectedCategoryId) ?? null;
+  const selectedCategoryProducts = selectedCategory
+    ? products.filter((product) => product.category === selectedCategory.slug)
+    : [];
+  const categoryCandidateProducts = selectedCategory
+    ? products.filter((product) => {
+        if (product.category === selectedCategory.slug) return false;
+        const q = categoryProductQuery.trim().toLowerCase();
+        if (!q) return true;
+        return [product.id, product.name, product.status].some((value) => value.toLowerCase().includes(q));
+      })
+    : [];
 
   // ---- 操作 ----
   async function signOut() {
@@ -736,8 +750,49 @@ export default function AdminDashboard({
     });
   }
 
+  async function setCategoryVisible(category: Category, visible: boolean) {
+    const value = Math.max(1, Math.abs(category.sort_order || categories.length + 1));
+    await patchCategory(category.id, { sort_order: visible ? value : -value });
+  }
+
+  async function moveCategory(category: Category, direction: -1 | 1) {
+    const sorted = [...categories].sort((a, b) => Math.abs(a.sort_order) - Math.abs(b.sort_order));
+    const index = sorted.findIndex((item) => item.id === category.id);
+    const swap = sorted[index + direction];
+    if (!swap) return;
+    const currentSign = category.sort_order < 0 ? -1 : 1;
+    const swapSign = swap.sort_order < 0 ? -1 : 1;
+    const currentOrder = Math.abs(category.sort_order || 1);
+    const swapOrder = Math.abs(swap.sort_order || 1);
+    await patchCategory(category.id, { sort_order: swapOrder * currentSign });
+    await patchCategory(swap.id, { sort_order: currentOrder * swapSign });
+  }
+
+  async function assignProductCategory(product: Product, slug: string) {
+    const res = await fetch(`/api/products/${product.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ category: slug }),
+    });
+    const data = await res.json().catch(() => null);
+    if (!res.ok) return alert(data?.error ?? '更新商品分類失敗');
+    setProducts((list) => list.map((item) => (item.id === product.id ? (data as Product) : item)));
+  }
+
   async function deleteCategory(id: string) {
-    if (!confirm('確定刪除這個分類嗎?(商品不會被刪,只是失去這個分類標籤)')) return;
+    const category = categories.find((c) => c.id === id);
+    const count = products.filter((product) => product.category === category?.slug).length;
+    if (!confirm(`確定刪除分類「${category?.name ?? id}」嗎?\n\n會一併影響:\n- 此分類會從分類管理消失\n- ${count} 個商品會失去這個分類標籤\n- 首頁分類選單不再顯示此分類\n\n商品本身不會被刪除。`)) return;
+    if (category) {
+      await Promise.all(products
+        .filter((product) => product.category === category.slug)
+        .map((product) => fetch(`/api/products/${product.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ category: '' }),
+        })));
+      setProducts((list) => list.map((product) => (product.category === category.slug ? { ...product, category: '' } : product)));
+    }
     const res = await fetch(`/api/categories/${id}`, { method: 'DELETE' });
     if (res.ok) setCategories((l) => l.filter((c) => c.id !== id));
     else alert('刪除失敗');
@@ -1218,79 +1273,231 @@ export default function AdminDashboard({
               )}
 
               {productsTab === 'categories' && (
-              <Card title="分類管理(首頁分類選單)">
-                <div className="space-y-2">
-                  {categories.map((c) => (
-                    <div
-                      key={c.id}
-                      className="flex flex-wrap items-center gap-2 rounded-lg border border-[#e5ded4] p-3"
+              <Card
+                title="我的賣場分類"
+                action={
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const ordered = [...categories].sort((a, b) => Math.abs(a.sort_order) - Math.abs(b.sort_order));
+                        ordered.forEach((category, index) => {
+                          const sign = category.sort_order < 0 ? -1 : 1;
+                          patchCategory(category.id, { sort_order: (index + 1) * sign });
+                        });
+                      }}
+                      className="rounded-lg border border-[#ef4b31] px-4 py-2 text-sm font-semibold text-[#ef4b31]"
                     >
-                      <input
-                        value={c.en}
-                        onChange={(e) =>
-                          setCategories((l) => l.map((x) => (x.id === c.id ? { ...x, en: e.target.value } : x)))
-                        }
-                        onBlur={() => patchCategory(c.id, { name: c.name, en: c.en, sort_order: c.sort_order })}
-                        placeholder="EN"
-                        className="w-20 rounded border border-[#e5ded4] px-2 py-1 text-sm"
-                      />
-                      <input
-                        value={c.name}
-                        onChange={(e) =>
-                          setCategories((l) => l.map((x) => (x.id === c.id ? { ...x, name: e.target.value } : x)))
-                        }
-                        onBlur={() => patchCategory(c.id, { name: c.name, en: c.en, sort_order: c.sort_order })}
-                        placeholder="名稱"
-                        className="min-w-24 flex-1 rounded border border-[#e5ded4] px-2 py-1 text-sm"
-                      />
-                      <span className="text-xs text-[#a99e8f]">{c.slug}</span>
-                      <input
-                        type="number"
-                        value={c.sort_order}
-                        onChange={(e) =>
-                          setCategories((l) =>
-                            l.map((x) => (x.id === c.id ? { ...x, sort_order: Number(e.target.value) } : x)),
-                          )
-                        }
-                        onBlur={() => patchCategory(c.id, { name: c.name, en: c.en, sort_order: c.sort_order })}
-                        className="w-14 rounded border border-[#e5ded4] px-2 py-1 text-sm"
-                      />
-                      <button
-                        onClick={() => deleteCategory(c.id)}
-                        className="rounded-full border border-[#e0b4b4] px-3 py-1 text-sm font-semibold text-[#c0392b]"
-                      >
-                        刪除
-                      </button>
-                    </div>
-                  ))}
+                      調整順序
+                    </button>
+                    <button
+                      type="button"
+                      onClick={saveNewCategory}
+                      className="rounded-lg bg-[#ef4b31] px-4 py-2 text-sm font-semibold text-white"
+                    >
+                      新增分類
+                    </button>
+                  </div>
+                }
+              >
+                <div className="mb-4 rounded-lg border border-[#ffcf54] bg-[#fff8e8] px-4 py-3 text-sm text-[#8a7f72]">
+                  新增分類前請先在下方填好分類代碼與名稱；詳情可加入或移出商品。
                 </div>
-                <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-[#e5ded4] pt-4">
+                <div className="mb-4 grid gap-2 md:grid-cols-3">
                   <input
                     value={newCat.slug}
                     onChange={(e) => setNewCat({ ...newCat, slug: e.target.value })}
-                    placeholder="代碼(英文,如 dress)"
-                    className="w-44 rounded border border-[#e5ded4] px-2 py-1.5 text-sm"
+                    placeholder="分類代碼,如 tops"
+                    className="rounded border border-[#e5ded4] px-3 py-2 text-sm"
                   />
                   <input
                     value={newCat.name}
                     onChange={(e) => setNewCat({ ...newCat, name: e.target.value })}
-                    placeholder="名稱(如 洋裝)"
-                    className="w-32 rounded border border-[#e5ded4] px-2 py-1.5 text-sm"
+                    placeholder="分類顯示名稱"
+                    className="rounded border border-[#e5ded4] px-3 py-2 text-sm"
                   />
                   <input
                     value={newCat.en}
                     onChange={(e) => setNewCat({ ...newCat, en: e.target.value })}
-                    placeholder="EN(可空)"
-                    className="w-24 rounded border border-[#e5ded4] px-2 py-1.5 text-sm"
+                    placeholder="英文名稱"
+                    className="rounded border border-[#e5ded4] px-3 py-2 text-sm"
                   />
-                  <button
-                    onClick={saveNewCategory}
-                    className="rounded-full bg-[#1f1b19] px-4 py-1.5 text-sm font-semibold text-white"
-                  >
-                    新增分類
-                  </button>
+                </div>
+                <div className="overflow-x-auto rounded-lg border border-[#e5ded4]">
+                  <table className="w-full min-w-[760px] whitespace-nowrap text-sm">
+                    <thead>
+                      <tr className="border-b border-[#e5ded4] bg-[#f7f7f7] text-left text-[#8a7f72]">
+                        <th className="px-4 py-3">分類顯示名稱</th>
+                        <th className="px-4 py-3 text-center">商品</th>
+                        <th className="px-4 py-3 text-center">顯示</th>
+                        <th className="px-4 py-3 text-center">排序</th>
+                        <th className="px-4 py-3 text-center">操作</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {[...categories].sort((a, b) => Math.abs(a.sort_order) - Math.abs(b.sort_order)).map((c) => {
+                        const count = products.filter((product) => product.category === c.slug).length;
+                        const image = products.find((product) => product.category === c.slug && product.image)?.image;
+                        const visible = c.sort_order >= 0;
+                        return (
+                          <tr key={c.id} className="border-b border-[#e5ded4] last:border-0">
+                            <td className="px-4 py-4">
+                              <div className="flex items-center gap-4">
+                                <div className="flex h-14 w-14 items-center justify-center overflow-hidden rounded bg-[#f1f1f1]">
+                                  {image ? <img src={image} alt="" className="h-full w-full object-cover" /> : <span className="text-xs text-[#bbb]">無圖</span>}
+                                </div>
+                                <div className="min-w-0">
+                                  <input
+                                    value={c.name}
+                                    onChange={(e) =>
+                                      setCategories((l) => l.map((x) => (x.id === c.id ? { ...x, name: e.target.value } : x)))
+                                    }
+                                    onBlur={() => patchCategory(c.id, { name: c.name, en: c.en, sort_order: c.sort_order })}
+                                    className="w-56 rounded border border-transparent px-2 py-1 font-semibold hover:border-[#e5ded4]"
+                                  />
+                                  <p className="mt-1 text-xs text-[#8a7f72]">{c.slug} / {c.en}</p>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-4 py-4 text-center font-semibold">{count}</td>
+                            <td className="px-4 py-4 text-center">
+                              <button
+                                type="button"
+                                onClick={() => setCategoryVisible(c, !visible)}
+                                className={`relative inline-flex h-8 w-16 items-center rounded-full transition ${visible ? 'bg-[#51cc78]' : 'bg-[#d8d0c8]'}`}
+                              >
+                                <span className={`h-7 w-7 rounded-full bg-white shadow transition ${visible ? 'translate-x-8' : 'translate-x-1'}`} />
+                              </button>
+                            </td>
+                            <td className="px-4 py-4 text-center">
+                              <div className="flex justify-center gap-1">
+                                <button type="button" onClick={() => moveCategory(c, -1)} className="rounded border border-[#d7c9bd] px-2 py-1">上</button>
+                                <button type="button" onClick={() => moveCategory(c, 1)} className="rounded border border-[#d7c9bd] px-2 py-1">下</button>
+                              </div>
+                            </td>
+                            <td className="px-4 py-4 text-center">
+                              <div className="flex justify-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setSelectedCategoryId(c.id);
+                                    setCategoryProductQuery('');
+                                  }}
+                                  className="font-semibold text-[#2868d8]"
+                                >
+                                  查看詳情
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => deleteCategory(c.id)}
+                                  className="font-semibold text-[#c0392b]"
+                                >
+                                  刪除
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
                 </div>
               </Card>
+              )}
+              {selectedCategory && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setSelectedCategoryId(null)}>
+                  <div
+                    className="max-h-[86vh] w-full max-w-5xl overflow-hidden rounded-2xl bg-white shadow-2xl"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <div className="flex flex-wrap items-start justify-between gap-3 border-b border-[#e5ded4] p-5">
+                      <div>
+                        <p className="text-sm text-[#8a7f72]">分類詳情</p>
+                        <h3 className="text-2xl font-bold">{selectedCategory.name}</h3>
+                        <p className="mt-1 text-sm text-[#8a7f72]">
+                          {selectedCategory.slug} / 目前 {selectedCategoryProducts.length} 個商品
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedCategoryId(null)}
+                        className="rounded-full border border-[#d7c9bd] px-4 py-2 text-sm font-semibold"
+                      >
+                        關閉
+                      </button>
+                    </div>
+                    <div className="grid max-h-[72vh] gap-5 overflow-auto p-5 lg:grid-cols-2">
+                      <section>
+                        <h4 className="mb-3 font-semibold">此分類商品</h4>
+                        {selectedCategoryProducts.length === 0 ? (
+                          <Empty>此分類目前沒有商品。</Empty>
+                        ) : (
+                          <div className="space-y-2">
+                            {selectedCategoryProducts.map((product) => (
+                              <div key={product.id} className="flex items-center gap-3 rounded-lg border border-[#e5ded4] p-3">
+                                {product.image ? (
+                                  <img src={product.image} alt="" className="h-12 w-12 rounded object-cover" />
+                                ) : (
+                                  <div className="h-12 w-12 rounded bg-[#f1e3dc]" />
+                                )}
+                                <div className="min-w-0 flex-1">
+                                  <p className="truncate font-semibold">{product.name}</p>
+                                  <p className="text-xs text-[#8a7f72]">{product.id} / {product.status}</p>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => assignProductCategory(product, '')}
+                                  className="rounded-full border border-[#e0b4b4] px-3 py-1.5 text-xs font-semibold text-[#c0392b]"
+                                >
+                                  移出
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </section>
+                      <section>
+                        <div className="mb-3 flex items-center justify-between gap-3">
+                          <h4 className="font-semibold">加入商品</h4>
+                          <input
+                            value={categoryProductQuery}
+                            onChange={(e) => setCategoryProductQuery(e.target.value)}
+                            placeholder="搜尋商品"
+                            className="w-52 rounded-lg border border-[#e5ded4] px-3 py-2 text-sm"
+                          />
+                        </div>
+                        {categoryCandidateProducts.length === 0 ? (
+                          <Empty>沒有可加入的商品。</Empty>
+                        ) : (
+                          <div className="space-y-2">
+                            {categoryCandidateProducts.map((product) => (
+                              <div key={product.id} className="flex items-center gap-3 rounded-lg border border-[#e5ded4] p-3">
+                                {product.image ? (
+                                  <img src={product.image} alt="" className="h-12 w-12 rounded object-cover" />
+                                ) : (
+                                  <div className="h-12 w-12 rounded bg-[#f1e3dc]" />
+                                )}
+                                <div className="min-w-0 flex-1">
+                                  <p className="truncate font-semibold">{product.name}</p>
+                                  <p className="text-xs text-[#8a7f72]">
+                                    {product.id} / {product.category ? categories.find((c) => c.slug === product.category)?.name ?? product.category : '未分類'}
+                                  </p>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => assignProductCategory(product, selectedCategory.slug)}
+                                  className="rounded-full bg-[#1f1b19] px-3 py-1.5 text-xs font-semibold text-white"
+                                >
+                                  加入
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </section>
+                    </div>
+                  </div>
+                </div>
               )}
             </div>
           )}
