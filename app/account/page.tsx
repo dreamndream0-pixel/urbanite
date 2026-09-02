@@ -2,7 +2,7 @@ import { redirect } from 'next/navigation';
 import { getSessionUser } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import AccountClient from './AccountClient';
-import type { Discount, Order, Product } from '@/lib/types';
+import type { Customer, Discount, Order, Product } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
 
@@ -49,6 +49,7 @@ export default async function AccountPage() {
       userEmail={email}
       userPhone={phone}
       userAddress={address}
+      customer={(customer ?? null) as Customer | null}
       provider={provider}
       orders={(orders ?? []) as Order[]}
       products={(products ?? []) as Product[]}

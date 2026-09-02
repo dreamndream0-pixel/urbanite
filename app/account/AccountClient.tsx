@@ -4,7 +4,8 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createBrowserSupabase } from '@/lib/supabase/client';
-import type { Discount, Order, Product, UserCoupon } from '@/lib/types';
+import type { Customer, Discount, Order, Product, Recipient, UserCoupon } from '@/lib/types';
+import { TW_CITIES, TW_REGIONS } from '@/lib/tw-regions';
 
 const formatter = new Intl.NumberFormat('zh-TW', {
   style: 'currency',
@@ -41,6 +42,7 @@ export default function AccountClient({
   products,
   favoriteIds,
   coupons,
+  customer,
 }: {
   userName: string;
   userEmail: string;
@@ -51,6 +53,7 @@ export default function AccountClient({
   products: Product[];
   favoriteIds: string[];
   coupons: Discount[];
+  customer: Customer | null;
 }) {
   const router = useRouter();
   const [tab, setTab] = useState<TabKey>('profile');
@@ -157,10 +160,11 @@ export default function AccountClient({
       <section className="mx-auto max-w-4xl px-4 py-8 sm:px-6">
         {tab === 'profile' && (
           <ProfileTab
-            name={userName}
+            customer={customer}
+            fallbackName={userName}
             email={userEmail}
-            phone={userPhone}
-            address={userAddress}
+            fallbackPhone={userPhone}
+            fallbackAddress={userAddress}
             provider={provider}
             onSaved={() => router.refresh()}
           />
@@ -189,26 +193,54 @@ export default function AccountClient({
 
 /* ---------- 個人資訊 ---------- */
 function ProfileTab({
-  name,
+  customer,
+  fallbackName,
   email,
-  phone,
-  address,
+  fallbackPhone,
+  fallbackAddress,
   provider,
   onSaved,
 }: {
-  name: string;
+  customer: Customer | null;
+  fallbackName: string;
   email: string;
-  phone: string;
-  address: string;
+  fallbackPhone: string;
+  fallbackAddress: string;
   provider: string;
   onSaved: () => void;
 }) {
-  const [draftName, setDraftName] = useState(name);
-  const [draftPhone, setDraftPhone] = useState(phone);
-  const [draftAddress, setDraftAddress] = useState(address);
+  const [name, setName] = useState(customer?.name || fallbackName || '');
+  const [nickname, setNickname] = useState(customer?.nickname || '');
+  const [gender, setGender] = useState(customer?.gender || '');
+  const [birthday, setBirthday] = useState(customer?.birthday || '');
+  const [phone, setPhone] = useState(customer?.phone || fallbackPhone || '');
+  const [recipients, setRecipients] = useState<Recipient[]>(
+    customer?.recipients?.length
+      ? customer.recipients
+      : fallbackAddress
+        ? [{ name: '', phone: '', city: '', district: '', address: fallbackAddress }]
+        : [],
+  );
+  const [marketing, setMarketing] = useState({
+    email: customer?.marketing?.email ?? false,
+    sms: customer?.marketing?.sms ?? false,
+  });
+  const [privacy, setPrivacy] = useState({
+    personalization: customer?.privacy?.personalization ?? true,
+    show_activity: customer?.privacy?.show_activity ?? false,
+  });
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
-  const dirty = draftName !== name || draftPhone !== phone || draftAddress !== address;
+
+  function updateRecipient(i: number, patch: Partial<Recipient>) {
+    setRecipients((list) => list.map((r, idx) => (idx === i ? { ...r, ...patch } : r)));
+  }
+  function addRecipient() {
+    setRecipients((list) => [...list, { name: '', phone: '', city: '', district: '', address: '' }]);
+  }
+  function removeRecipient(i: number) {
+    setRecipients((list) => list.filter((_, idx) => idx !== i));
+  }
 
   async function save() {
     setSaving(true);
@@ -217,7 +249,7 @@ function ProfileTab({
       const res = await fetch('/api/customers', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: draftName, phone: draftPhone, address: draftAddress }),
+        body: JSON.stringify({ name, nickname, gender, birthday, phone, recipients, marketing, privacy }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? '儲存失敗');
@@ -230,71 +262,144 @@ function ProfileTab({
     }
   }
 
+  const field = 'w-full rounded-lg border border-[#e5ded4] px-3 py-2.5';
+  const labelText = 'mb-1 block text-sm text-[#8a7f72]';
+
   return (
-    <div className="rounded-2xl border border-[#e5ded4] bg-white p-6">
-      <h2 className="text-lg font-semibold">會員資料</h2>
-      <div className="mt-5 grid gap-4">
-        <label className="block">
-          <span className="mb-1 block text-sm text-[#8a7f72]">姓名</span>
-          <input
-            value={draftName}
-            onChange={(e) => setDraftName(e.target.value)}
-            className="w-full rounded-lg border border-[#e5ded4] px-3 py-2.5"
-          />
-        </label>
-        <label className="block">
-          <span className="mb-1 block text-sm text-[#8a7f72]">電郵</span>
-          <input
-            value={email}
-            disabled
-            className="w-full rounded-lg border border-[#e5ded4] bg-[#f6f2ec] px-3 py-2.5 text-[#8a7f72]"
-          />
-        </label>
-        <label className="block">
-          <span className="mb-1 block text-sm text-[#8a7f72]">手機號碼</span>
-          <input
-            value={draftPhone}
-            onChange={(e) => setDraftPhone(e.target.value)}
-            placeholder="09xxxxxxxx 或 +8869xxxxxxxx"
-            className="w-full rounded-lg border border-[#e5ded4] px-3 py-2.5"
-          />
-        </label>
-        <label className="block">
-          <span className="mb-1 block text-sm text-[#8a7f72]">常用地址</span>
-          <textarea
-            value={draftAddress}
-            onChange={(e) => setDraftAddress(e.target.value)}
-            placeholder="收件地址或常用門市"
-            rows={3}
-            className="w-full rounded-lg border border-[#e5ded4] px-3 py-2.5"
-          />
-        </label>
-        <div>
-          <span className="mb-1 block text-sm text-[#8a7f72]">註冊方式</span>
-          <span className="inline-block rounded-full bg-[#f3ede4] px-3 py-1 text-sm font-medium capitalize text-[#6b6156]">
-            {provider}
-          </span>
+    <div className="space-y-6">
+      <div className="rounded-2xl border border-[#e5ded4] bg-white p-6">
+        <h2 className="text-lg font-semibold">會員資料</h2>
+        <div className="mt-5 grid gap-4 sm:grid-cols-2">
+          <label className="block">
+            <span className={labelText}>姓名</span>
+            <input value={name} onChange={(e) => setName(e.target.value)} className={field} />
+          </label>
+          <label className="block">
+            <span className={labelText}>暱稱</span>
+            <input value={nickname} onChange={(e) => setNickname(e.target.value)} className={field} />
+          </label>
+          <label className="block">
+            <span className={labelText}>性別</span>
+            <select value={gender} onChange={(e) => setGender(e.target.value)} className={field}>
+              <option value="">不透露</option>
+              <option value="female">女</option>
+              <option value="male">男</option>
+              <option value="other">其他</option>
+            </select>
+          </label>
+          <label className="block">
+            <span className={labelText}>生日</span>
+            <input type="date" value={birthday ?? ''} onChange={(e) => setBirthday(e.target.value)} className={field} />
+          </label>
+          <label className="block">
+            <span className={labelText}>手機號碼</span>
+            <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="09xxxxxxxx" className={field} />
+          </label>
+          <label className="block">
+            <span className={labelText}>Email</span>
+            <input value={email} disabled className={field + ' bg-[#f6f2ec] text-[#8a7f72]'} />
+          </label>
+        </div>
+        <p className="mt-3 text-xs text-[#a99e8f]">註冊方式:{provider}</p>
+      </div>
+
+      <div className="rounded-2xl border border-[#e5ded4] bg-white p-6">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-semibold">常用收件人</h2>
+          <button type="button" onClick={addRecipient} className="rounded-full border border-[#d7c9bd] px-4 py-1.5 text-sm font-semibold">
+            新增收件人
+          </button>
+        </div>
+        {recipients.length === 0 ? (
+          <p className="mt-4 text-sm text-[#8a7f72]">尚未設定,點「新增收件人」加入常用地址。</p>
+        ) : (
+          <div className="mt-4 space-y-4">
+            {recipients.map((r, i) => (
+              <div key={i} className="rounded-xl border border-[#e5ded4] p-4">
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <label className="block">
+                    <span className={labelText}>收件人姓名</span>
+                    <input value={r.name} onChange={(e) => updateRecipient(i, { name: e.target.value })} className={field} />
+                  </label>
+                  <label className="block">
+                    <span className={labelText}>收件人電話</span>
+                    <input value={r.phone} onChange={(e) => updateRecipient(i, { phone: e.target.value })} className={field} />
+                  </label>
+                  <label className="block">
+                    <span className={labelText}>縣市</span>
+                    <select value={r.city} onChange={(e) => updateRecipient(i, { city: e.target.value, district: '' })} className={field}>
+                      <option value="">請選擇縣市</option>
+                      {TW_CITIES.map((city) => (
+                        <option key={city} value={city}>{city}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="block">
+                    <span className={labelText}>行政區</span>
+                    <select
+                      value={r.district}
+                      onChange={(e) => updateRecipient(i, { district: e.target.value })}
+                      disabled={!r.city}
+                      className={field + ' disabled:bg-[#f6f2ec]'}
+                    >
+                      <option value="">{r.city ? '請選擇行政區' : '請先選縣市'}</option>
+                      {(TW_REGIONS[r.city] ?? []).map((d) => (
+                        <option key={d} value={d}>{d}</option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+                <label className="mt-3 block">
+                  <span className={labelText}>詳細地址</span>
+                  <input value={r.address} onChange={(e) => updateRecipient(i, { address: e.target.value })} placeholder="路 / 街 / 巷弄 / 號 / 樓" className={field} />
+                </label>
+                <button type="button" onClick={() => removeRecipient(i)} className="mt-3 text-sm font-semibold text-[#c0392b]">
+                  刪除此收件人
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="rounded-2xl border border-[#e5ded4] bg-white p-6">
+        <h2 className="text-lg font-semibold">行銷訊息訂閱</h2>
+        <div className="mt-4 space-y-3">
+          <ToggleRow label="訂閱 Email 電子報" checked={marketing.email} onChange={(v) => setMarketing((m) => ({ ...m, email: v }))} />
+          <ToggleRow label="接收簡訊優惠通知" checked={marketing.sms} onChange={(v) => setMarketing((m) => ({ ...m, sms: v }))} />
+        </div>
+        <h2 className="mt-6 text-lg font-semibold">隱私權設定</h2>
+        <div className="mt-4 space-y-3">
+          <ToggleRow label="允許依購物紀錄提供個人化推薦" checked={privacy.personalization} onChange={(v) => setPrivacy((p) => ({ ...p, personalization: v }))} />
+          <ToggleRow label="公開我的追蹤清單活動" checked={privacy.show_activity} onChange={(v) => setPrivacy((p) => ({ ...p, show_activity: v }))} />
         </div>
       </div>
 
       {msg && (
-        <p
-          className={`mt-4 rounded-lg px-4 py-2 text-sm ${
-            msg.type === 'ok' ? 'bg-[#e9f7ee] text-[#1f7a44]' : 'bg-[#fdecec] text-[#c0392b]'
-          }`}
-        >
+        <p className={'rounded-lg px-4 py-2 text-sm ' + (msg.type === 'ok' ? 'bg-[#e9f7ee] text-[#1f7a44]' : 'bg-[#fdecec] text-[#c0392b]')}>
           {msg.text}
         </p>
       )}
-
-      <button
-        onClick={save}
-        disabled={saving || !dirty}
-        className="mt-6 rounded-full bg-[#1f1b19] px-6 py-2.5 text-sm font-semibold text-white disabled:opacity-40"
-      >
+      <button onClick={save} disabled={saving} className="rounded-full bg-[#1f1b19] px-6 py-2.5 text-sm font-semibold text-white disabled:opacity-40">
         {saving ? '儲存中…' : '儲存變更'}
       </button>
     </div>
+  );
+}
+
+function ToggleRow({ label, checked, onChange }: { label: string; checked: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <label className="flex items-center justify-between gap-4">
+      <span className="text-sm text-[#3d3935]">{label}</span>
+      <button
+        type="button"
+        onClick={() => onChange(!checked)}
+        aria-pressed={checked}
+        className={'relative h-6 w-11 shrink-0 rounded-full transition ' + (checked ? 'bg-[#1f7a44]' : 'bg-[#d7c9bd]')}
+      >
+        <span className={'absolute top-0.5 h-5 w-5 rounded-full bg-white transition ' + (checked ? 'left-[22px]' : 'left-0.5')} />
+      </button>
+    </label>
   );
 }
 

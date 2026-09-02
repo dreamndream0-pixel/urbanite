@@ -55,6 +55,12 @@ export async function PATCH(request: Request) {
   if (typeof body.name === 'string') update.name = body.name.trim();
   if (typeof body.phone === 'string') update.phone = body.phone.trim();
   if (typeof body.address === 'string') update.address = body.address.trim();
+  if (typeof body.nickname === 'string') update.nickname = body.nickname.trim();
+  if (typeof body.gender === 'string') update.gender = body.gender;
+  if (typeof body.birthday === 'string') update.birthday = body.birthday || null;
+  if (Array.isArray(body.recipients)) update.recipients = body.recipients;
+  if (body.marketing && typeof body.marketing === 'object') update.marketing = body.marketing;
+  if (body.privacy && typeof body.privacy === 'object') update.privacy = body.privacy;
 
   const supabase = createAdminClient();
   const { error } = await supabase

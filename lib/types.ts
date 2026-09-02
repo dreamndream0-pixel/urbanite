@@ -93,13 +93,27 @@ export type Discount = {
   updated_at?: string;
 };
 
+export type Recipient = {
+  name: string;
+  phone: string;
+  city: string;
+  district: string;
+  address: string;
+};
+
 export type Customer = {
   id: string;
   user_id: string;
   email: string;
   phone?: string;
   name: string;
+  nickname?: string;
+  gender?: string; // male / female / other / ''
+  birthday?: string | null;
   address?: string;
+  recipients?: Recipient[];
+  marketing?: { email?: boolean; sms?: boolean };
+  privacy?: { personalization?: boolean; show_activity?: boolean };
   created_at?: string;
 };
 
