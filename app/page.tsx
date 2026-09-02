@@ -54,7 +54,7 @@ export default function Home() {
   const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [settings, setSettings] = useState<SiteSettings | null>(null);
   const [loading, setLoading] = useState(true);
-  const [category, setCategory] = useState('all');
+  const [category, setCategory] = useState('spring'); // 開啟頁面預設停在「精選商品」
   const [displayCount, setDisplayCount] = useState(12);
   const [menuOpen, setMenuOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
