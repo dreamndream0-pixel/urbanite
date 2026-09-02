@@ -55,6 +55,7 @@ export default function Home() {
   const [settings, setSettings] = useState<SiteSettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [category, setCategory] = useState('all');
+  const [displayCount, setDisplayCount] = useState(12);
   const [menuOpen, setMenuOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [query, setQuery] = useState('');
@@ -171,6 +172,30 @@ export default function Home() {
     }
     return list;
   }, [liveProducts, category, query]);
+
+  const shown = visibleProducts.slice(0, displayCount);
+  const hasMore = displayCount < visibleProducts.length;
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+
+  // 切換分類/搜尋時,顯示數量重設回 12
+  useEffect(() => {
+    setDisplayCount(12);
+  }, [category, query]);
+
+  // 下滑到接近底部時自動載入更多(每次 +12)
+  useEffect(() => {
+    if (!hasMore) return;
+    const el = sentinelRef.current;
+    if (!el) return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) setDisplayCount((c) => c + 12);
+      },
+      { rootMargin: '300px' },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [hasMore]);
 
   const cartCount = cart.reduce((sum, item) => sum + item.quantity, 0);
   const subtotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
@@ -396,34 +421,30 @@ export default function Home() {
 
         {/* 商品格狀排列 */}
         <section className="mt-6 rounded-3xl border border-[#e5ded4] bg-[#faf7f2]/80 p-4 shadow-sm sm:p-6">
-          <div className="mb-5 flex items-center justify-between gap-4">
+          <div className="mb-5">
             <h1 className="text-2xl font-semibold tracking-wide sm:text-3xl">
-              {activeCategory.slug === 'all' ? '本週精選' : activeCategory.name}
+              {activeCategory.slug === 'all' ? '全部商品' : activeCategory.name}
             </h1>
-            <button
-              type="button"
-              onClick={() => setCategory('all')}
-              className="shrink-0 text-sm font-semibold text-[#6b6156] hover:text-[#1f1b19]"
-            >
-              查看更多 ›
-            </button>
           </div>
           {loading ? (
             <p className="py-20 text-center text-[#8a7f72]">商品載入中…</p>
           ) : visibleProducts.length === 0 ? (
             <p className="py-20 text-center text-[#8a7f72]">這個分類目前沒有商品。</p>
           ) : (
-            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-              {visibleProducts.map((product) => (
-                <ProductCard
-                  key={product.id}
-                  product={product}
-                  favorited={favorites.has(product.id)}
-                  onFavorite={() => toggleFavorite(product.id)}
-                  onAdd={() => setQuickAdd(product)}
-                />
-              ))}
-            </div>
+            <>
+              <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+                {shown.map((product) => (
+                  <ProductCard
+                    key={product.id}
+                    product={product}
+                    favorited={favorites.has(product.id)}
+                    onFavorite={() => toggleFavorite(product.id)}
+                    onAdd={() => setQuickAdd(product)}
+                  />
+                ))}
+              </div>
+              {hasMore && <div ref={sentinelRef} className="h-12" />}
+            </>
           )}
         </section>
       </div>
