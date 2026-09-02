@@ -4768,6 +4768,7 @@ function ProductModal({
   onSave: () => void;
 }) {
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [removeBg, setRemoveBg] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<{ done: number; total: number; percent: number } | null>(
     null,
   );
@@ -4883,10 +4884,22 @@ function ProductModal({
     try {
       const uploaded: string[] = [];
       for (let i = 0; i < picked.length; i++) {
-        const prepared = await prepareProductImage(picked[i], i);
+        let blob: Blob;
+        let filename: string;
+        if (removeBg) {
+          // 在瀏覽器端去背(第一次會下載去背模型,需要幾秒)
+          setUploadProgress({ done: i, total: picked.length, percent: 0 });
+          const { removeBackground } = await import('@imgly/background-removal');
+          blob = await removeBackground(picked[i]);
+          filename = `product-${Date.now()}-${i}.png`;
+        } else {
+          const prepared = await prepareProductImage(picked[i], i);
+          blob = prepared.blob;
+          filename = prepared.filename;
+        }
         const url = await uploadImageWithProgress(
-          prepared.blob,
-          prepared.filename,
+          blob,
+          filename,
           draft.id || 'new-product',
           (p) => setUploadProgress({ done: i, total: picked.length, percent: Math.round(p * 100) }),
         );
@@ -5234,12 +5247,21 @@ function ProductModal({
                 </div>
               )}
               <div className="flex flex-wrap items-center gap-3">
+                <label className="inline-flex cursor-pointer items-center gap-2 text-sm font-medium text-[#3d3935]">
+                  <input
+                    type="checkbox"
+                    checked={removeBg}
+                    onChange={(e) => setRemoveBg(e.target.checked)}
+                    className="h-4 w-4"
+                  />
+                  上傳時自動去背
+                </label>
                 <label
                   className={`inline-flex cursor-pointer items-center rounded-full bg-[#1f1b19] px-4 py-2 text-sm font-semibold text-white ${
                     draft.images.length >= MAX_PRODUCT_IMAGES ? 'pointer-events-none opacity-40' : ''
                   }`}
                 >
-                  {uploadingImage ? '上傳中...' : '上傳圖片'}
+                  {uploadingImage ? (removeBg ? '去背並上傳中...' : '上傳中...') : '上傳圖片'}
                   <input
                     type="file"
                     multiple
