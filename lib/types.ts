@@ -168,6 +168,8 @@ export type OrderItem = {
   price: number;
   quantity: number;
   productId?: string;
+  sku?: string;
+  item_status?: string; // NORMAL / RETURNING / RETURNED / REFUNDED
   image?: string;
   original_price?: number | null;
 };
@@ -193,6 +195,71 @@ export type Order = {
   total: number;
   status: string;
   paid: boolean;
+  order_status?: string;       // PENDING / CONFIRMED / PROCESSING / COMPLETED / CANCELLED / CLOSED
+  payment_status?: string;     // UNPAID / PENDING / PAID / PARTIALLY_REFUNDED / REFUNDED / FAILED / CANCELLED
+  fulfillment_status?: string; // UNFULFILLED / PREPARING / READY_TO_SHIP / SHIPPED / IN_TRANSIT / DELIVERED / RETURNING / RETURNED
   user_id?: string | null;
   created_at?: string;
+};
+
+export type Payment = {
+  id: string;
+  order_id: string;
+  provider?: string;
+  payment_method?: string;
+  transaction_id?: string;
+  amount: number;
+  status: string; // PENDING / PAID / FAILED / CANCELLED / REFUNDED
+  failure_code?: string;
+  failure_message?: string;
+  raw_response?: Record<string, unknown> | null;
+  requested_at?: string;
+  paid_at?: string | null;
+  failed_at?: string | null;
+  created_at?: string;
+};
+
+export type ShipmentEvent = {
+  id: string;
+  shipment_id: string;
+  status?: string;
+  description?: string;
+  location?: string;
+  event_at: string;
+  created_at?: string;
+};
+
+export type Shipment = {
+  id: string;
+  order_id: string;
+  provider?: string;
+  shipping_method?: string;
+  tracking_number?: string;
+  recipient_name?: string;
+  recipient_phone?: string;
+  status: string; // PREPARING / READY_TO_SHIP / SHIPPED / IN_TRANSIT / DELIVERED
+  shipped_at?: string | null;
+  delivered_at?: string | null;
+  created_at?: string;
+  updated_at?: string;
+  events?: ShipmentEvent[];
+};
+
+export type OrderStatusHistory = {
+  id: string;
+  order_id: string;
+  type: string; // order / payment / fulfillment
+  from_status?: string;
+  to_status?: string;
+  note?: string;
+  created_by?: string;
+  created_at: string;
+};
+
+// 後台訂單詳情:主檔 + 關聯資料
+export type OrderDetail = {
+  order: Order;
+  payments: Payment[];
+  shipments: Shipment[];
+  history: OrderStatusHistory[];
 };

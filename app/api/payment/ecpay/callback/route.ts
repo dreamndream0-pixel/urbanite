@@ -37,8 +37,32 @@ export async function POST(request: Request) {
       if (!order.paid) {
         await supabase
           .from('orders')
-          .update({ paid: true })
+          .update({ paid: true, payment_status: 'PAID' })
           .eq('order_no', orderNo);
+        // 更新付款紀錄 + 寫入付款完成歷程(失敗不影響回應綠界)
+        try {
+          const nowIso = new Date().toISOString();
+          await supabase
+            .from('payments')
+            .update({
+              status: 'PAID',
+              transaction_id: String(params.TradeNo || ''),
+              paid_at: nowIso,
+              raw_response: params as Record<string, unknown>,
+            })
+            .eq('order_id', order.id)
+            .eq('status', 'PENDING');
+          await supabase.from('order_status_history').insert({
+            order_id: order.id,
+            type: 'payment',
+            from_status: 'UNPAID',
+            to_status: 'PAID',
+            note: '綠界付款完成',
+            created_by: 'ECPay',
+          });
+        } catch {
+          /* 紀錄失敗不影響回應綠界 */
+        }
       }
     } else {
       console.error('[ECPay callback] 找不到訂單', orderNo);

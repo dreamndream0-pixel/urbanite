@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { createBrowserSupabase } from '@/lib/supabase/client';
 import type { Customer, Discount, Order, Product, Recipient, UserCoupon } from '@/lib/types';
 import { TW_CITIES, TW_REGIONS } from '@/lib/tw-regions';
+import { buildProgress } from '@/lib/order-status';
 
 const formatter = new Intl.NumberFormat('zh-TW', {
   style: 'currency',
@@ -683,6 +684,9 @@ function OrderModal({
         </div>
 
         <div className="flex-1 space-y-6 overflow-y-auto overscroll-contain p-5">
+          {/* 訂單進度 */}
+          <OrderProgress order={order} />
+
           {/* 品項(含縮圖、原價劃線) */}
           <div className="space-y-3">
             {order.items.map((it, i) => {
@@ -765,6 +769,38 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
     <div className="border-t border-[#efe8dd] pt-4">
       <h3 className="mb-2 font-semibold">{title}</h3>
       <div className="space-y-1.5 text-sm text-[#6b6156]">{children}</div>
+    </div>
+  );
+}
+
+function OrderProgress({ order }: { order: Order }) {
+  const steps = buildProgress(order);
+  const cancelled = order.status === '取消';
+  return (
+    <div className="rounded-xl bg-[#faf7f2] p-4">
+      <div className="flex items-start">
+        {steps.map((s, i) => {
+          const active = s.done || s.current;
+          const color = cancelled ? '#c0392b' : active ? '#ada265' : '#d7c9bd';
+          return (
+            <div key={s.key} className="flex flex-1 flex-col items-center">
+              <div className="flex w-full items-center">
+                <div className={`h-0.5 flex-1 ${i === 0 ? 'opacity-0' : ''}`} style={{ background: active ? color : '#e5ded4' }} />
+                <div
+                  className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold text-white"
+                  style={{ background: color }}
+                >
+                  {s.done ? '✓' : ''}
+                </div>
+                <div className={`h-0.5 flex-1 ${i === steps.length - 1 ? 'opacity-0' : ''}`} style={{ background: steps[i + 1]?.done || steps[i + 1]?.current ? color : '#e5ded4' }} />
+              </div>
+              <span className={`mt-1.5 text-center text-[11px] ${active ? 'font-semibold text-[#6b6156]' : 'text-[#a99e8f]'}`}>
+                {s.label}
+              </span>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }

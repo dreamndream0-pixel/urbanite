@@ -1,6 +1,6 @@
 'use client';
 
-import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createBrowserSupabase } from '@/lib/supabase/client';
@@ -11,12 +11,19 @@ import type {
   Customer,
   Discount,
   Order,
+  OrderDetail,
+  OrderStatusHistory,
   Product,
   SiteSettings,
   StockMovement,
   UserCoupon,
   Variant,
 } from '@/lib/types';
+import {
+  ORDER_STATUS_LABEL,
+  PAYMENT_STATUS_LABEL,
+  FULFILLMENT_STATUS_LABEL,
+} from '@/lib/order-status';
 
 const formatter = new Intl.NumberFormat('zh-TW', {
   style: 'currency',
@@ -3300,6 +3307,68 @@ function AdminOrderModal({
       </div>
     ) : null;
 
+  const [detail, setDetail] = useState<Pick<OrderDetail, 'payments' | 'shipments' | 'history'> | null>(null);
+  const [detailLoading, setDetailLoading] = useState(true);
+  const [shipForm, setShipForm] = useState({ provider: '', tracking_number: '' });
+  const [eventForm, setEventForm] = useState({ status: '', description: '', location: '' });
+  const [busy, setBusy] = useState(false);
+
+  const loadDetail = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/orders/${order.id}`);
+      if (res.ok) {
+        const d = (await res.json()) as OrderDetail;
+        setDetail({ payments: d.payments, shipments: d.shipments, history: d.history });
+      }
+    } finally {
+      setDetailLoading(false);
+    }
+  }, [order.id]);
+  useEffect(() => { loadDetail(); }, [loadDetail]);
+
+  async function createShipment() {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/orders/${order.id}/shipment`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(shipForm),
+      });
+      if (!res.ok) { alert((await res.json()).error ?? '建立出貨失敗'); return; }
+      onUpdate({ status: '已出貨' });
+      setShipForm({ provider: '', tracking_number: '' });
+      await loadDetail();
+    } finally { setBusy(false); }
+  }
+
+  async function addEvent(shipmentId: string) {
+    if (busy || (!eventForm.status && !eventForm.description)) return;
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/orders/${order.id}/shipment`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ shipment_id: shipmentId, ...eventForm }),
+      });
+      if (!res.ok) { alert((await res.json()).error ?? '新增失敗'); return; }
+      setEventForm({ status: '', description: '', location: '' });
+      await loadDetail();
+    } finally { setBusy(false); }
+  }
+
+  const badge = (text: string, tone: 'gray' | 'green' | 'amber') => (
+    <span
+      className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
+        tone === 'green' ? 'bg-[#e9f7ee] text-[#1f7a44]'
+        : tone === 'amber' ? 'bg-[#fbf1dd] text-[#8a6d1b]'
+        : 'bg-[#f3ede4] text-[#6b6156]'
+      }`}
+    >
+      {text}
+    </span>
+  );
+
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center sm:p-4" onClick={onClose}>
       <div
@@ -3314,7 +3383,14 @@ function AdminOrderModal({
         </div>
 
         <div className="flex-1 space-y-5 overflow-y-auto overscroll-contain p-5">
-          {/* 出貨狀態 / 付款(管理操作,藏在訂單資訊內) */}
+          {/* 狀態總覽 */}
+          <div className="flex flex-wrap gap-2">
+            {badge(`訂單：${ORDER_STATUS_LABEL[order.order_status ?? ''] ?? order.status}`, 'gray')}
+            {badge(`付款：${PAYMENT_STATUS_LABEL[order.payment_status ?? ''] ?? (order.paid ? '已付款' : '未付款')}`, order.paid ? 'green' : 'amber')}
+            {badge(`物流：${FULFILLMENT_STATUS_LABEL[order.fulfillment_status ?? ''] ?? '未出貨'}`, order.fulfillment_status && order.fulfillment_status !== 'UNFULFILLED' ? 'green' : 'gray')}
+          </div>
+
+          {/* 出貨狀態 / 付款(管理操作) */}
           <div className="rounded-xl bg-[#faf7f2] p-4">
             <p className="mb-2 text-sm font-semibold text-[#6b6156]">出貨狀態</p>
             <div className="flex flex-wrap items-center gap-2">
@@ -3338,21 +3414,82 @@ function AdminOrderModal({
                 {order.paid ? '已付款' : '未付款'}
               </button>
             </div>
-            <div className="mt-3 flex flex-wrap gap-2">
-              <button
-                disabled
-                className="rounded-full border border-dashed border-[#d7c9bd] px-3 py-1.5 text-xs text-[#a99e8f]"
-              >
-                串接物流(開發中)
-              </button>
-              <button
-                disabled
-                className="rounded-full border border-dashed border-[#d7c9bd] px-3 py-1.5 text-xs text-[#a99e8f]"
-              >
-                串接金流(開發中)
-              </button>
-            </div>
-            <p className="mt-2 text-xs text-[#a99e8f]">串接物流與金流後,出貨與付款狀態可自動更新。</p>
+          </div>
+
+          {/* 物流 */}
+          <div className="rounded-xl border border-[#efe8dd] p-4">
+            <p className="mb-2 text-sm font-semibold text-[#6b6156]">物流</p>
+            {detailLoading ? (
+              <p className="text-xs text-[#a99e8f]">載入中…</p>
+            ) : detail && detail.shipments.length > 0 ? (
+              <div className="space-y-3">
+                {detail.shipments.map((s) => (
+                  <div key={s.id} className="rounded-lg bg-[#faf7f2] p-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+                      <span className="font-medium">{s.provider || '物流'}</span>
+                      <span className="text-[#8a7f72]">{FULFILLMENT_STATUS_LABEL[s.status] ?? s.status}</span>
+                    </div>
+                    {s.tracking_number ? <p className="mt-1 text-xs text-[#6b6156]">單號：{s.tracking_number}</p> : null}
+                    {s.events && s.events.length > 0 ? (
+                      <ul className="mt-2 space-y-1 border-t border-[#efe8dd] pt-2 text-xs text-[#6b6156]">
+                        {s.events.map((ev) => (
+                          <li key={ev.id} className="flex gap-2">
+                            <span className="shrink-0 text-[#a99e8f]">{new Date(ev.event_at).toLocaleString('zh-TW')}</span>
+                            <span>{ev.description || (FULFILLMENT_STATUS_LABEL[ev.status ?? ''] ?? ev.status)}{ev.location ? `（${ev.location}）` : ''}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : null}
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      <select
+                        value={eventForm.status}
+                        onChange={(e) => setEventForm({ ...eventForm, status: e.target.value })}
+                        className="rounded-lg border border-[#d7c9bd] bg-white px-2 py-1 text-xs"
+                      >
+                        <option value="">狀態…</option>
+                        <option value="IN_TRANSIT">配送中</option>
+                        <option value="DELIVERED">已送達</option>
+                      </select>
+                      <input
+                        value={eventForm.description}
+                        onChange={(e) => setEventForm({ ...eventForm, description: e.target.value })}
+                        placeholder="說明(例:已抵達門市)"
+                        className="min-w-0 flex-1 rounded-lg border border-[#d7c9bd] px-2 py-1 text-xs"
+                      />
+                      <button
+                        onClick={() => addEvent(s.id)}
+                        disabled={busy}
+                        className="rounded-full bg-[#1f1b19] px-3 py-1 text-xs font-semibold text-white disabled:opacity-50"
+                      >
+                        新增
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="flex flex-wrap items-center gap-2">
+                <input
+                  value={shipForm.provider}
+                  onChange={(e) => setShipForm({ ...shipForm, provider: e.target.value })}
+                  placeholder="物流商(例:黑貓)"
+                  className="min-w-0 flex-1 rounded-lg border border-[#d7c9bd] px-2.5 py-1.5 text-sm"
+                />
+                <input
+                  value={shipForm.tracking_number}
+                  onChange={(e) => setShipForm({ ...shipForm, tracking_number: e.target.value })}
+                  placeholder="物流單號"
+                  className="min-w-0 flex-1 rounded-lg border border-[#d7c9bd] px-2.5 py-1.5 text-sm"
+                />
+                <button
+                  onClick={createShipment}
+                  disabled={busy}
+                  className="rounded-full bg-[#ada265] px-4 py-1.5 text-sm font-semibold text-white disabled:opacity-50"
+                >
+                  建立出貨
+                </button>
+              </div>
+            )}
           </div>
 
           {/* 品項 */}
@@ -3407,10 +3544,39 @@ function AdminOrderModal({
               {row('付款方式', order.payment_method)}
             </div>
           </div>
+
+          {detail && detail.history.length > 0 ? (
+            <div className="border-t border-[#efe8dd] pt-4">
+              <h3 className="mb-3 font-semibold">訂單歷程</h3>
+              <ol className="space-y-3">
+                {detail.history.map((h: OrderStatusHistory) => (
+                  <li key={h.id} className="flex gap-3">
+                    <div className="mt-1 h-2 w-2 shrink-0 rounded-full bg-[#ada265]" />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm text-[#3f3a34]">{historyLabel(h)}</p>
+                      <p className="text-xs text-[#a99e8f]">
+                        {new Date(h.created_at).toLocaleString('zh-TW')} · {h.created_by || 'SYSTEM'}
+                      </p>
+                    </div>
+                  </li>
+                ))}
+              </ol>
+            </div>
+          ) : null}
         </div>
       </div>
     </div>
   );
+}
+
+function historyLabel(h: OrderStatusHistory): string {
+  const map =
+    h.type === 'payment' ? PAYMENT_STATUS_LABEL
+    : h.type === 'fulfillment' ? FULFILLMENT_STATUS_LABEL
+    : ORDER_STATUS_LABEL;
+  const to = map[h.to_status ?? ''] ?? h.to_status ?? '';
+  const kind = h.type === 'payment' ? '付款' : h.type === 'fulfillment' ? '物流' : '訂單';
+  return h.note ? `${kind}：${h.note}` : `${kind}狀態 → ${to}`;
 }
 
 type MvForm = {

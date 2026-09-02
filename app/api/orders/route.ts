@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getAdminUser, getSessionUser } from '@/lib/supabase/server';
 import { evaluateCoupon } from '@/lib/discount';
+import { deriveStatuses } from '@/lib/order-status';
 import type { Discount, Order, OrderItem, Product } from '@/lib/types';
 
 const FREE_SHIPPING_THRESHOLD = 2000;
@@ -79,12 +80,15 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: `「${product.name}」庫存不足` }, { status: 409 });
     }
     subtotal += product.price * quantity;
+    const label = item.variant ?? '標準款';
     orderItems.push({
       name: product.name,
-      variant: item.variant ?? '標準款',
+      variant: label,
       price: product.price,
       quantity,
       productId: product.id,
+      sku: label && label !== '標準款' ? `${product.id}::${label}` : product.id,
+      item_status: 'NORMAL',
       image: product.image ?? '',
       original_price: product.original_price ?? null,
     });
@@ -191,10 +195,10 @@ export async function POST(request: Request) {
 
   const total = Math.max(0, subtotal + shipping - discount);
 
-  // 訂單編號:UB + 台灣日期(YYYYMMDD) + 當日流水號(4 碼),例如 UB202608290001
+  // 訂單編號:UR + 台灣日期(YYYYMMDD) + 當日流水號(4 碼),例如 UR202608290001
   const tw = new Date(Date.now() + 8 * 3600 * 1000);
   const ymd = tw.toISOString().slice(0, 10).replace(/-/g, '');
-  const prefix = `UB${ymd}`;
+  const prefix = `UR${ymd}`;
   const { count: todayCount } = await supabase
     .from('orders')
     .select('order_no', { count: 'exact', head: true })
@@ -224,12 +228,37 @@ export async function POST(request: Request) {
       total,
       status: '待出貨',
       paid: false,
+      ...deriveStatuses('待出貨', false),
       user_id: user?.id ?? null,
     })
     .select()
     .single();
 
   if (orderErr) return NextResponse.json({ error: orderErr.message }, { status: 400 });
+
+  // 建立初始付款紀錄 + 訂單成立歷程(失敗不影響下單)
+  try {
+    const providerMap: Record<string, string> = {
+      credit_card: 'ECPay', atm: 'ECPay', line_pay: 'LINE Pay', cod: '貨到付款',
+    };
+    await supabase.from('payments').insert({
+      order_id: order.id,
+      provider: providerMap[paymentMethod] ?? '',
+      payment_method: paymentMethod,
+      amount: total,
+      status: 'PENDING',
+    });
+    await supabase.from('order_status_history').insert({
+      order_id: order.id,
+      type: 'order',
+      from_status: '',
+      to_status: 'PENDING',
+      note: '訂單成立',
+      created_by: 'SYSTEM',
+    });
+  } catch {
+    /* 紀錄失敗不影響下單 */
+  }
 
   if (appliedCouponId) {
     if (appliedUserCouponId) {
