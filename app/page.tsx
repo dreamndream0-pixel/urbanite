@@ -958,8 +958,8 @@ function ProductCard({
     (product.inventory ?? 0) <= 0 && !(product.sale_mode || '').includes('預購');
 
   return (
-    <div className="product-card group flex flex-col overflow-hidden rounded-2xl bg-white p-3 shadow-sm ring-1 ring-[#efece7] hover:shadow-md">
-      <div className="relative aspect-[3/4] overflow-hidden rounded-xl border border-[#f0eeea] bg-[#fafafa]">
+    <div className="product-card group flex flex-col overflow-hidden rounded-2xl bg-[#f3f2ef] p-3 shadow-sm hover:shadow-md">
+      <div className="relative aspect-[3/4] overflow-hidden rounded-xl bg-white">
         <Link href={productHref} aria-label={`查看 ${product.name}`}>
           {product.image ? (
             <img
