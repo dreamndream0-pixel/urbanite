@@ -175,26 +175,22 @@ export default function Home() {
 
   const shown = visibleProducts.slice(0, displayCount);
   const hasMore = displayCount < visibleProducts.length;
-  const sentinelRef = useRef<HTMLDivElement | null>(null);
 
   // 切換分類/搜尋時,顯示數量重設回 12
   useEffect(() => {
     setDisplayCount(12);
   }, [category, query]);
 
-  // 下滑到接近底部時自動載入更多(每次 +12)
+  // 捲動到接近底部時,載入下一批 12 個(每次捲到底加一批,不會一次全載)
   useEffect(() => {
     if (!hasMore) return;
-    const el = sentinelRef.current;
-    if (!el) return;
-    const io = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting) setDisplayCount((c) => c + 12);
-      },
-      { rootMargin: '300px' },
-    );
-    io.observe(el);
-    return () => io.disconnect();
+    function onScroll() {
+      const nearBottom =
+        window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 400;
+      if (nearBottom) setDisplayCount((c) => c + 12);
+    }
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
   }, [hasMore]);
 
   const cartCount = cart.reduce((sum, item) => sum + item.quantity, 0);
@@ -443,7 +439,9 @@ export default function Home() {
                   />
                 ))}
               </div>
-              {hasMore && <div ref={sentinelRef} className="h-12" />}
+              {hasMore && (
+                <p className="mt-5 text-center text-sm text-[#a99e8f]">下滑載入更多…</p>
+              )}
             </>
           )}
         </section>
