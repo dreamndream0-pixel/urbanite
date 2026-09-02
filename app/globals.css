@@ -44,3 +44,33 @@ img {
   background: #c84767;
   color: #ffffff;
 }
+
+/* 商品卡:滑入或點擊時稍微放大 + 抖動 */
+@keyframes card-wiggle {
+  0% {
+    transform: scale(1.03) rotate(0deg);
+  }
+  20% {
+    transform: scale(1.03) rotate(-1.4deg);
+  }
+  50% {
+    transform: scale(1.03) rotate(1.4deg);
+  }
+  80% {
+    transform: scale(1.03) rotate(-0.8deg);
+  }
+  100% {
+    transform: scale(1.03) rotate(0deg);
+  }
+}
+.product-card {
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+.product-card:hover,
+.product-card:focus-within {
+  transform: scale(1.03);
+  animation: card-wiggle 0.5s ease-in-out;
+}
+.product-card:active {
+  animation: card-wiggle 0.4s ease-in-out;
+}
