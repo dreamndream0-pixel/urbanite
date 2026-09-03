@@ -14,12 +14,12 @@ const LOGISTIC_PATHS = {
 export type NewebpayLogisticsAction = keyof typeof LOGISTIC_PATHS;
 
 export function getNewebpayLogisticsConfig() {
-  const env = (process.env.NEWEBPAY_LOGISTICS_ENV || process.env.NEWEBPAY_ENV || 'stage').toLowerCase();
+  const env = (process.env.NEWEBPAY_LOGISTICS_ENV || 'stage').toLowerCase();
   const isProd = env === 'production' || env === 'prod';
   return {
-    uid: process.env.NEWEBPAY_LOGISTICS_UID || process.env.NEWEBPAY_MERCHANT_ID || '',
-    hashKey: process.env.NEWEBPAY_LOGISTICS_HASH_KEY || process.env.NEWEBPAY_HASH_KEY || '',
-    hashIv: process.env.NEWEBPAY_LOGISTICS_HASH_IV || process.env.NEWEBPAY_HASH_IV || '',
+    uid: process.env.NEWEBPAY_LOGISTICS_UID || '',
+    hashKey: process.env.NEWEBPAY_LOGISTICS_HASH_KEY || '',
+    hashIv: process.env.NEWEBPAY_LOGISTICS_HASH_IV || '',
     apiBase: isProd ? 'https://core.newebpay.com/API/Logistic' : 'https://ccore.newebpay.com/API/Logistic',
     siteUrl: getConfiguredSiteUrl(),
   };
@@ -28,7 +28,7 @@ export function getNewebpayLogisticsConfig() {
 function requireLogisticsConfig() {
   const cfg = getNewebpayLogisticsConfig();
   if (!cfg.uid || !cfg.hashKey || !cfg.hashIv) {
-    throw new Error('缺少藍新物流設定，請設定 NEWEBPAY_LOGISTICS_UID/HASH_KEY/HASH_IV 或沿用 NEWEBPAY_MERCHANT_ID/HASH_KEY/HASH_IV');
+    throw new Error('缺少藍新物流設定，請設定 NEWEBPAY_LOGISTICS_UID、NEWEBPAY_LOGISTICS_HASH_KEY、NEWEBPAY_LOGISTICS_HASH_IV');
   }
   return cfg;
 }
