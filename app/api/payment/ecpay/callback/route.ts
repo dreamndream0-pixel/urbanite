@@ -37,7 +37,7 @@ export async function POST(request: Request) {
       if (!order.paid) {
         await supabase
           .from('orders')
-          .update({ paid: true, payment_status: 'PAID' })
+          .update({ paid: true, payment_status: 'PAID', paid_amount: Number(order.total) })
           .eq('order_no', orderNo);
         // 更新付款紀錄 + 寫入付款完成歷程(失敗不影響回應綠界)
         try {

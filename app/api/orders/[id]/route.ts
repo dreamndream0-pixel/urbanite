@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getAdminUser } from '@/lib/supabase/server';
 import { deriveStatuses } from '@/lib/order-status';
+import { restoreOrderStock } from '@/lib/inventory';
 import type { Order, Payment, Shipment, ShipmentEvent, OrderStatusHistory } from '@/lib/types';
 
 // GET /api/orders/[id] — 取得訂單完整資訊(主檔 + 付款 + 物流 + 歷程),限管理員
@@ -63,7 +64,7 @@ export async function PATCH(
   const supabase = createAdminClient();
   const { data: current } = await supabase
     .from('orders')
-    .select('status, paid, order_status, payment_status, fulfillment_status')
+    .select('status, paid, total, order_status, payment_status, fulfillment_status')
     .eq('id', id)
     .maybeSingle();
   if (!current) return NextResponse.json({ error: '找不到訂單' }, { status: 404 });
@@ -74,6 +75,7 @@ export async function PATCH(
   const update: Record<string, unknown> = {};
   if (typeof body.status === 'string') update.status = body.status;
   if (typeof body.paid === 'boolean') update.paid = body.paid;
+  if (typeof body.admin_note === 'string') update.admin_note = body.admin_note;
   if (Object.keys(update).length === 0) {
     return NextResponse.json({ error: '沒有可更新的欄位' }, { status: 400 });
   }
@@ -106,6 +108,25 @@ export async function PATCH(
   }
   if (rows.length) {
     try { await supabase.from('order_status_history').insert(rows); } catch { /* 歷程失敗不影響更新 */ }
+  }
+
+  // §25 取消 / 退貨 → 回補庫存(冪等);已付款則記錄應退款金額(實際退刷仍需人工處理)
+  const nowCancelled = nextStatus === '取消' || nextStatus === '退貨';
+  const wasCancelled = current.status === '取消' || current.status === '退貨';
+  if (nowCancelled && !wasCancelled) {
+    try {
+      await restoreOrderStock(supabase, id, actor);
+      if (current.paid) {
+        await supabase
+          .from('orders')
+          .update({ refund_amount: current.total, net_amount: 0, payment_status: 'REFUNDED' })
+          .eq('id', id);
+        await supabase.from('order_status_history').insert({
+          order_id: id, type: 'payment', from_status: 'PAID', to_status: 'REFUNDED',
+          note: '訂單取消,需退款(請至金流後台退刷)', created_by: actor,
+        });
+      }
+    } catch { /* 回補失敗不影響狀態更新 */ }
   }
 
   return NextResponse.json(data as Order);

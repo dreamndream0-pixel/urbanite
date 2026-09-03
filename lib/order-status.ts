@@ -84,3 +84,46 @@ export function buildProgress(order: {
     current: i === lastDone && !completed,
   }));
 }
+
+// 會員「我的訂單」分頁
+export type OrderTab = 'all' | 'unpaid' | 'to_ship' | 'shipping' | 'done' | 'cancelled';
+
+export const ORDER_TABS: { key: OrderTab; label: string }[] = [
+  { key: 'all', label: '全部' },
+  { key: 'unpaid', label: '待付款' },
+  { key: 'to_ship', label: '待出貨' },
+  { key: 'shipping', label: '配送中' },
+  { key: 'done', label: '已完成' },
+  { key: 'cancelled', label: '取消/退貨' },
+];
+
+type TabOrder = {
+  status: string;
+  paid: boolean;
+  fulfillment_status?: string;
+  cancel_status?: string;
+};
+
+export function orderTabOf(order: TabOrder): Exclude<OrderTab, 'all'> {
+  if (order.status === '取消' || order.status === '退貨' || order.cancel_status === 'APPROVED') return 'cancelled';
+  const f = order.fulfillment_status ?? '';
+  if (order.status === '已完成' || f === 'DELIVERED') return 'done';
+  if (['SHIPPED', 'IN_TRANSIT'].includes(f) || order.status === '已出貨') return 'shipping';
+  if (!order.paid) return 'unpaid';
+  return 'to_ship';
+}
+
+// 客人是否可提出取消申請:尚未出貨、未完成/取消、且沒有待審核或已核准的申請。
+export function canRequestCancel(order: TabOrder): boolean {
+  if (order.status === '取消' || order.status === '退貨' || order.status === '已完成') return false;
+  if (order.cancel_status === 'REQUESTED' || order.cancel_status === 'APPROVED') return false;
+  const f = order.fulfillment_status ?? '';
+  if (['SHIPPED', 'IN_TRANSIT', 'DELIVERED'].includes(f)) return false;
+  return true;
+}
+
+export const CANCEL_STATUS_LABEL: Record<string, string> = {
+  REQUESTED: '取消審核中',
+  APPROVED: '已核准取消',
+  REJECTED: '取消申請被婉拒',
+};

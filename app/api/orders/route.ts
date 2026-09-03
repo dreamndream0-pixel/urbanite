@@ -226,8 +226,13 @@ export async function POST(request: Request) {
       user_coupon_id: appliedUserCouponId || null,
       coupon_snapshot: couponSnapshot,
       total,
+      shipping_discount: Number(couponSnapshot.shipping_discount ?? 0) || 0,
+      paid_amount: 0,
+      refund_amount: 0,
+      net_amount: total,
       status: '待出貨',
       paid: false,
+      stock_committed: true,
       ...deriveStatuses('待出貨', false),
       user_id: user?.id ?? null,
     })

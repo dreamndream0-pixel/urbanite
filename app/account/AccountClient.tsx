@@ -6,7 +6,14 @@ import { useRouter } from 'next/navigation';
 import { createBrowserSupabase } from '@/lib/supabase/client';
 import type { Customer, Discount, Order, Product, Recipient, UserCoupon } from '@/lib/types';
 import { TW_CITIES, TW_REGIONS } from '@/lib/tw-regions';
-import { buildProgress } from '@/lib/order-status';
+import {
+  buildProgress,
+  orderTabOf,
+  canRequestCancel,
+  ORDER_TABS,
+  CANCEL_STATUS_LABEL,
+  type OrderTab,
+} from '@/lib/order-status';
 
 const formatter = new Intl.NumberFormat('zh-TW', {
   style: 'currency',
@@ -58,7 +65,13 @@ export default function AccountClient({
 }) {
   const router = useRouter();
   const [tab, setTab] = useState<TabKey>('profile');
+  const [orderList, setOrderList] = useState<Order[]>(orders);
   const [openOrder, setOpenOrder] = useState<Order | null>(null);
+
+  function applyOrderUpdate(updated: Order) {
+    setOrderList((list) => list.map((o) => (o.id === updated.id ? updated : o)));
+    setOpenOrder((o) => (o && o.id === updated.id ? updated : o));
+  }
 
   // 用商品名稱對應到商品圖(訂單品項沒有存圖片,靠名稱對照)
   const imageByName = useMemo(() => {
@@ -174,7 +187,7 @@ export default function AccountClient({
         {tab === 'coupons' && <CouponsTab coupons={coupons} />}
 
         {tab === 'orders' && (
-          <OrdersTab orders={orders} imageByName={imageByName} onOpen={setOpenOrder} />
+          <OrdersTab orders={orderList} imageByName={imageByName} onOpen={setOpenOrder} onUpdated={applyOrderUpdate} />
         )}
 
         {tab === 'favorites' && <FavoritesTab products={favoriteProducts} />}
@@ -186,6 +199,7 @@ export default function AccountClient({
           imageByName={imageByName}
           onClose={() => setOpenOrder(null)}
           onReorder={() => reorder(openOrder)}
+          onUpdated={applyOrderUpdate}
         />
       )}
     </main>
@@ -577,15 +591,36 @@ function CouponsTab({ coupons }: { coupons: Discount[] }) {
 }
 
 /* ---------- 訂單紀錄(列表) ---------- */
+async function requestCancel(order: Order, onUpdated: (o: Order) => void) {
+  const reason = window.prompt(`要對訂單 ${order.order_no} 提出「取消申請」嗎?\n請簡述取消原因(選填),送出後由賣家審核:`, '');
+  if (reason === null) return; // 按取消
+  try {
+    const res = await fetch(`/api/orders/${order.id}/cancel`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reason: reason.trim() }),
+    });
+    const data = await res.json();
+    if (!res.ok) { alert(data.error ?? '申請失敗'); return; }
+    onUpdated(data as Order);
+    alert('已送出取消申請,請等候賣家審核。');
+  } catch {
+    alert('申請失敗,請稍後再試。');
+  }
+}
+
 function OrdersTab({
   orders,
   imageByName,
   onOpen,
+  onUpdated,
 }: {
   orders: Order[];
   imageByName: Map<string, string>;
   onOpen: (o: Order) => void;
+  onUpdated: (o: Order) => void;
 }) {
+  const [tab, setTab] = useState<OrderTab>('all');
   if (orders.length === 0) {
     return (
       <p className="rounded-2xl border border-[#e5ded4] bg-white p-8 text-center text-[#6b6156]">
@@ -596,55 +631,108 @@ function OrdersTab({
       </p>
     );
   }
+  const shown = tab === 'all' ? orders : orders.filter((o) => orderTabOf(o) === tab);
+  const actionBtn = 'rounded-full border border-[#d7c9bd] px-3 py-1.5 text-xs font-semibold text-[#6b6156] hover:bg-[#efe8dd]';
   return (
-    <div className="space-y-3">
-      {orders.map((order) => (
-        <button
-          key={order.id}
-          onClick={() => onOpen(order)}
-          className="block w-full rounded-xl border border-[#e5ded4] bg-white p-5 text-left transition hover:border-[#c9b8a8] hover:shadow-sm"
-        >
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div>
-              <p className="font-semibold">{order.order_no}</p>
-              <p className="text-sm text-[#8a7f72]">
-                {order.created_at ? new Date(order.created_at).toLocaleString('zh-TW') : ''} ·{' '}
-                {order.items.reduce((n, it) => n + it.quantity, 0)} 件
-              </p>
-            </div>
-            <div className="flex items-center gap-3">
-              <span className="rounded-full bg-[#f3ede4] px-3 py-1 text-sm font-semibold text-[#6b6156]">
-                {order.status}
-              </span>
-              <span className="font-semibold">{formatter.format(order.total)}</span>
-              <span className="text-[#c9b8a8]">›</span>
-            </div>
-          </div>
+    <div className="space-y-4">
+      {/* 分頁 */}
+      <div className="flex flex-wrap gap-2">
+        {ORDER_TABS.map((t) => {
+          const n = t.key === 'all' ? orders.length : orders.filter((o) => orderTabOf(o) === t.key).length;
+          return (
+            <button
+              key={t.key}
+              onClick={() => setTab(t.key)}
+              className={`rounded-full px-3 py-1.5 text-sm font-semibold transition ${
+                tab === t.key ? 'bg-[#1f1b19] text-white' : 'border border-[#e5ded4] bg-white text-[#6b6156] hover:bg-[#efe8dd]'
+              }`}
+            >
+              {t.label}
+              <span className={`ml-1 ${tab === t.key ? 'text-white/70' : 'text-[#a99e8f]'}`}>{n}</span>
+            </button>
+          );
+        })}
+      </div>
 
-          {/* 所有商品縮圖 */}
-          <div className="mt-3 flex flex-wrap gap-2">
-            {order.items.map((it, i) => (
+      {shown.length === 0 ? (
+        <p className="rounded-2xl border border-[#e5ded4] bg-white p-8 text-center text-[#6b6156]">此分類目前沒有訂單。</p>
+      ) : (
+        <div className="space-y-3">
+          {shown.map((order) => {
+            const shipped = ['SHIPPED', 'IN_TRANSIT', 'DELIVERED'].includes(order.fulfillment_status ?? '');
+            return (
               <div
-                key={i}
-                className="relative h-14 w-14 shrink-0 overflow-hidden rounded-md border border-[#eee5da] bg-[#e9e1d6]"
+                key={order.id}
+                className="block w-full rounded-xl border border-[#e5ded4] bg-white p-5 text-left transition hover:border-[#c9b8a8] hover:shadow-sm"
               >
-                {it.image || imageByName.get(it.name) ? (
-                  <img
-                    src={it.image || imageByName.get(it.name)}
-                    alt={it.name}
-                    className="h-full w-full object-cover"
-                  />
-                ) : null}
-                {it.quantity > 1 && (
-                  <span className="absolute bottom-0 right-0 rounded-tl-md bg-black/60 px-1 text-[10px] font-semibold text-white">
-                    ×{it.quantity}
-                  </span>
-                )}
+                <button onClick={() => onOpen(order)} className="block w-full text-left">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <p className="font-semibold">{order.order_no}</p>
+                      <p className="text-sm text-[#8a7f72]">
+                        {order.created_at ? new Date(order.created_at).toLocaleString('zh-TW') : ''} ·{' '}
+                        {order.items.reduce((n, it) => n + it.quantity, 0)} 件
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="rounded-full bg-[#f3ede4] px-3 py-1 text-sm font-semibold text-[#6b6156]">
+                        {order.status}
+                      </span>
+                      <span className="font-semibold">{formatter.format(order.total)}</span>
+                      <span className="text-[#c9b8a8]">›</span>
+                    </div>
+                  </div>
+
+                  {order.cancel_status && order.cancel_status !== '' ? (
+                    <p className="mt-2 text-xs font-semibold text-[#c0392b]">
+                      {CANCEL_STATUS_LABEL[order.cancel_status] ?? ''}
+                    </p>
+                  ) : null}
+
+                  {/* 所有商品縮圖 */}
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {order.items.map((it, i) => (
+                      <div
+                        key={i}
+                        className="relative h-14 w-14 shrink-0 overflow-hidden rounded-md border border-[#eee5da] bg-[#e9e1d6]"
+                      >
+                        {it.image || imageByName.get(it.name) ? (
+                          <img
+                            src={it.image || imageByName.get(it.name)}
+                            alt={it.name}
+                            className="h-full w-full object-cover"
+                          />
+                        ) : null}
+                        {it.quantity > 1 && (
+                          <span className="absolute bottom-0 right-0 rounded-tl-md bg-black/60 px-1 text-[10px] font-semibold text-white">
+                            ×{it.quantity}
+                          </span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </button>
+
+                {/* 依狀態顯示操作 */}
+                <div className="mt-3 flex flex-wrap gap-2 border-t border-[#f1ebe1] pt-3">
+                  {!order.paid && order.status !== '取消' && order.status !== '退貨' ? (
+                    <a href={`/api/payment/ecpay/checkout?order=${encodeURIComponent(order.order_no)}`} className="rounded-full bg-[#ada265] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#9a9059]">
+                      立即付款
+                    </a>
+                  ) : null}
+                  {shipped ? (
+                    <button onClick={() => onOpen(order)} className={actionBtn}>查看物流</button>
+                  ) : null}
+                  {canRequestCancel(order) ? (
+                    <button onClick={() => requestCancel(order, onUpdated)} className={actionBtn}>申請取消</button>
+                  ) : null}
+                  <button onClick={() => onOpen(order)} className={actionBtn}>訂單詳情</button>
+                </div>
               </div>
-            ))}
-          </div>
-        </button>
-      ))}
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
@@ -660,11 +748,13 @@ function OrderModal({
   imageByName,
   onClose,
   onReorder,
+  onUpdated,
 }: {
   order: Order;
   imageByName: Map<string, string>;
   onClose: () => void;
   onReorder: () => void;
+  onUpdated: (o: Order) => void;
 }) {
   const dateStr = order.created_at ? new Date(order.created_at).toLocaleString('zh-TW') : '';
   return (
@@ -721,18 +811,52 @@ function OrderModal({
             {order.discount > 0 && (
               <Row label={`折扣 ${order.discount_code || ''}`} value={`-${formatter.format(order.discount)}`} />
             )}
+            {order.point_discount && order.point_discount > 0 ? (
+              <Row label="點數折抵" value={`-${formatter.format(order.point_discount)}`} />
+            ) : null}
             <div className="flex justify-between pt-1 text-base font-semibold">
               <span>合計（{order.items.reduce((n, it) => n + it.quantity, 0)} 件）</span>
               <span className="text-[#c84767]">{formatter.format(order.total)}</span>
             </div>
+            {order.refund_amount && order.refund_amount > 0 ? (
+              <Row label="已退款" value={`-${formatter.format(order.refund_amount)}`} />
+            ) : null}
           </div>
 
-          <button
-            onClick={onReorder}
-            className="w-full rounded-full bg-[#ada265] px-5 py-3 font-semibold text-white transition hover:bg-[#9a9059]"
-          >
-            🛒 再次加入購物車
-          </button>
+          {/* 取消申請狀態 */}
+          {order.cancel_status && order.cancel_status !== '' ? (
+            <div className="rounded-xl border border-[#e8d6d0] bg-[#fbf3f0] p-4">
+              <p className="text-sm font-semibold text-[#c0392b]">{CANCEL_STATUS_LABEL[order.cancel_status] ?? ''}</p>
+              {order.cancel_reason ? <p className="mt-1 text-xs text-[#8a7f72]">你的原因：{order.cancel_reason}</p> : null}
+              {order.cancel_response ? <p className="mt-1 text-xs text-[#6b6156]">賣家回覆：{order.cancel_response}</p> : null}
+            </div>
+          ) : null}
+
+          {/* 操作 */}
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={onReorder}
+              className="flex-1 rounded-full bg-[#ada265] px-5 py-3 font-semibold text-white transition hover:bg-[#9a9059]"
+            >
+              🛒 再次加入購物車
+            </button>
+            {!order.paid && order.status !== '取消' && order.status !== '退貨' ? (
+              <a
+                href={`/api/payment/ecpay/checkout?order=${encodeURIComponent(order.order_no)}`}
+                className="rounded-full border border-[#d7c9bd] px-5 py-3 text-center font-semibold text-[#6b6156] hover:bg-[#efe8dd]"
+              >
+                立即付款
+              </a>
+            ) : null}
+            {canRequestCancel(order) ? (
+              <button
+                onClick={() => requestCancel(order, onUpdated)}
+                className="rounded-full border border-[#d7c9bd] px-5 py-3 font-semibold text-[#6b6156] hover:bg-[#efe8dd]"
+              >
+                申請取消
+              </button>
+            ) : null}
+          </div>
 
           {/* 訂單資訊 */}
           <Section title="訂單資訊">

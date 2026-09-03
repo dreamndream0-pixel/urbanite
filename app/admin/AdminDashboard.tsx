@@ -357,6 +357,9 @@ export default function AdminDashboard({
   const [uploadingBanner, setUploadingBanner] = useState(false);
   const [settingsTab, setSettingsTab] = useState<'general' | 'banners' | 'footer' | 'payments' | 'shippings'>('general');
   const [orderFilter, setOrderFilter] = useState<string>('全部');
+  const [orderSearch, setOrderSearch] = useState('');
+  const [orderPaidFilter, setOrderPaidFilter] = useState<'全部' | '已付款' | '未付款'>('全部');
+  const [orderCancelOnly, setOrderCancelOnly] = useState(false);
   const [openOrderId, setOpenOrderId] = useState<string | null>(null);
   const [productsTab, setProductsTab] = useState<'items' | 'categories'>('items');
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
@@ -558,7 +561,7 @@ export default function AdminDashboard({
     router.refresh();
   }
 
-  async function updateOrder(id: string, patch: Partial<Pick<Order, 'status' | 'paid'>>) {
+  async function updateOrder(id: string, patch: Partial<Pick<Order, 'status' | 'paid' | 'admin_note'>>) {
     const res = await fetch(`/api/orders/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -568,6 +571,18 @@ export default function AdminDashboard({
       const updated = (await res.json()) as Order;
       setOrders((list) => list.map((o) => (o.id === id ? updated : o)));
     } else alert('更新失敗');
+  }
+
+  async function reviewCancel(id: string, action: 'approve' | 'reject', response: string) {
+    const res = await fetch(`/api/orders/${id}/cancel`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action, response }),
+    });
+    const data = await res.json();
+    if (res.ok) {
+      setOrders((list) => list.map((o) => (o.id === id ? (data as Order) : o)));
+    } else alert(data.error ?? '審核失敗');
   }
 
   async function saveProduct() {
@@ -1356,6 +1371,38 @@ export default function AdminDashboard({
           {/* ===== 訂單管理 ===== */}
           {section === 'orders' && (
             <Card title={`訂單(${orders.length})`}>
+              {/* 搜尋 + 篩選 */}
+              <div className="mb-3 flex flex-wrap gap-2">
+                <input
+                  value={orderSearch}
+                  onChange={(e) => setOrderSearch(e.target.value)}
+                  placeholder="搜尋:單號 / 姓名 / Email / 手機 / 商品 / SKU"
+                  className="min-w-[200px] flex-1 rounded-lg border border-[#d7c9bd] px-3 py-2 text-sm"
+                />
+                <select
+                  value={orderPaidFilter}
+                  onChange={(e) => setOrderPaidFilter(e.target.value as '全部' | '已付款' | '未付款')}
+                  className="rounded-lg border border-[#d7c9bd] bg-white px-3 py-2 text-sm"
+                >
+                  <option value="全部">付款:全部</option>
+                  <option value="已付款">已付款</option>
+                  <option value="未付款">未付款</option>
+                </select>
+                {(() => {
+                  const pending = orders.filter((o) => o.cancel_status === 'REQUESTED').length;
+                  return (
+                    <button
+                      onClick={() => setOrderCancelOnly((v) => !v)}
+                      className={`rounded-lg border px-3 py-2 text-sm font-semibold transition ${
+                        orderCancelOnly ? 'border-[#c0392b] bg-[#c0392b] text-white' : 'border-[#e0b4b4] text-[#c0392b]'
+                      }`}
+                    >
+                      待審核取消 <span className={orderCancelOnly ? 'text-white/80' : 'text-[#c0392b]'}>{pending}</span>
+                    </button>
+                  );
+                })()}
+              </div>
+
               {/* 狀態分類 */}
               <div className="mb-4 -mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
                 {['全部', ...ORDER_STATUSES].map((s) => {
@@ -1378,8 +1425,22 @@ export default function AdminDashboard({
               </div>
 
               {(() => {
-                const shown = orderFilter === '全部' ? orders : orders.filter((o) => o.status === orderFilter);
-                if (shown.length === 0) return <Empty>此分類目前沒有訂單。</Empty>;
+                const q = orderSearch.trim().toLowerCase();
+                const shown = orders.filter((o) => {
+                  if (orderFilter !== '全部' && o.status !== orderFilter) return false;
+                  if (orderPaidFilter === '已付款' && !o.paid) return false;
+                  if (orderPaidFilter === '未付款' && o.paid) return false;
+                  if (orderCancelOnly && o.cancel_status !== 'REQUESTED') return false;
+                  if (q) {
+                    const hay = [
+                      o.order_no, o.customer_name, o.email, o.phone,
+                      ...o.items.flatMap((it) => [it.name, it.sku ?? '']),
+                    ].join(' ').toLowerCase();
+                    if (!hay.includes(q)) return false;
+                  }
+                  return true;
+                });
+                if (shown.length === 0) return <Empty>沒有符合條件的訂單。</Empty>;
                 return (
                   <div className="space-y-3">
                     {shown.map((order) => {
@@ -1451,6 +1512,11 @@ export default function AdminDashboard({
                             >
                               {order.paid ? '已付款' : '未付款'}
                             </span>
+                            {order.cancel_status === 'REQUESTED' ? (
+                              <span className="rounded-full bg-[#fbe9e7] px-3 py-1 text-xs font-semibold text-[#c0392b]">
+                                取消審核中
+                              </span>
+                            ) : null}
                             <span className="ml-auto text-xs text-[#a99e8f]">點看完整訂單 ›</span>
                           </div>
                         </button>
@@ -2405,6 +2471,7 @@ export default function AdminDashboard({
           imageByName={imageByName}
           onClose={() => setOpenOrderId(null)}
           onUpdate={(patch) => updateOrder(openOrderId, patch)}
+          onReviewCancel={(action, response) => reviewCancel(openOrderId, action, response)}
         />
       )}
     </div>
@@ -3292,13 +3359,17 @@ function AdminOrderModal({
   imageByName,
   onClose,
   onUpdate,
+  onReviewCancel,
 }: {
   order: Order;
   imageByName: Map<string, string>;
   onClose: () => void;
   onUpdate: (patch: Partial<Order>) => void;
+  onReviewCancel: (action: 'approve' | 'reject', response: string) => void;
 }) {
   const dateStr = order.created_at ? new Date(order.created_at).toLocaleString('zh-TW') : '';
+  const [cancelReply, setCancelReply] = useState('');
+  const [adminNote, setAdminNote] = useState(order.admin_note ?? '');
   const row = (label: string, value?: string) =>
     value ? (
       <div className="flex justify-between gap-3">
@@ -3389,6 +3460,41 @@ function AdminOrderModal({
             {badge(`付款：${PAYMENT_STATUS_LABEL[order.payment_status ?? ''] ?? (order.paid ? '已付款' : '未付款')}`, order.paid ? 'green' : 'amber')}
             {badge(`物流：${FULFILLMENT_STATUS_LABEL[order.fulfillment_status ?? ''] ?? '未出貨'}`, order.fulfillment_status && order.fulfillment_status !== 'UNFULFILLED' ? 'green' : 'gray')}
           </div>
+
+          {/* 客人取消申請審核 */}
+          {order.cancel_status === 'REQUESTED' ? (
+            <div className="rounded-xl border border-[#e0b4b4] bg-[#fbf3f0] p-4">
+              <p className="text-sm font-semibold text-[#c0392b]">客人申請取消,待審核</p>
+              {order.cancel_reason ? <p className="mt-1 text-sm text-[#6b6156]">原因:{order.cancel_reason}</p> : null}
+              {order.paid ? <p className="mt-1 text-xs text-[#9a6a1f]">此訂單已付款,核准後需至金流後台退刷。</p> : null}
+              <textarea
+                value={cancelReply}
+                onChange={(e) => setCancelReply(e.target.value)}
+                placeholder="回覆客人(選填)"
+                rows={2}
+                className="mt-2 w-full rounded-lg border border-[#d7c9bd] px-3 py-2 text-sm"
+              />
+              <div className="mt-2 flex flex-wrap gap-2">
+                <button
+                  onClick={() => { if (confirm('核准取消?將取消訂單並回補庫存。')) onReviewCancel('approve', cancelReply.trim()); }}
+                  className="rounded-full bg-[#c0392b] px-4 py-1.5 text-sm font-semibold text-white hover:bg-[#a83226]"
+                >
+                  核准取消
+                </button>
+                <button
+                  onClick={() => onReviewCancel('reject', cancelReply.trim())}
+                  className="rounded-full border border-[#d7c9bd] px-4 py-1.5 text-sm font-semibold text-[#6b6156] hover:bg-[#efe8dd]"
+                >
+                  婉拒
+                </button>
+              </div>
+            </div>
+          ) : order.cancel_status === 'REJECTED' || order.cancel_status === 'APPROVED' ? (
+            <div className="rounded-xl bg-[#faf7f2] p-3 text-sm text-[#6b6156]">
+              取消申請:{order.cancel_status === 'APPROVED' ? '已核准' : '已婉拒'}
+              {order.cancel_response ? `(${order.cancel_response})` : ''}
+            </div>
+          ) : null}
 
           {/* 出貨狀態 / 付款(管理操作) */}
           <div className="rounded-xl bg-[#faf7f2] p-4">
@@ -3516,10 +3622,16 @@ function AdminOrderModal({
             {row('小計', formatter.format(order.subtotal))}
             {row('運費', order.shipping === 0 ? '免運' : formatter.format(order.shipping))}
             {order.discount > 0 ? row(`折扣 ${order.discount_code || ''}`, `-${formatter.format(order.discount)}`) : null}
+            {order.member_discount && order.member_discount > 0 ? row('會員折扣', `-${formatter.format(order.member_discount)}`) : null}
+            {order.point_discount && order.point_discount > 0 ? row('點數折抵', `-${formatter.format(order.point_discount)}`) : null}
+            {order.shipping_discount && order.shipping_discount > 0 ? row('運費優惠', `-${formatter.format(order.shipping_discount)}`) : null}
             <div className="flex justify-between pt-1 text-base font-semibold">
               <span>合計</span>
               <span className="text-[#c84767]">{formatter.format(order.total)}</span>
             </div>
+            {order.paid ? row('實收', formatter.format(order.paid_amount ?? order.total)) : null}
+            {order.refund_amount && order.refund_amount > 0 ? row('已退款', `-${formatter.format(order.refund_amount)}`) : null}
+            {order.refund_amount && order.refund_amount > 0 ? row('淨額', formatter.format(order.net_amount ?? (order.total - order.refund_amount))) : null}
           </div>
 
           <div className="border-t border-[#efe8dd] pt-4">
@@ -3529,8 +3641,27 @@ function AdminOrderModal({
               {row('訂單日期', dateStr)}
               {row('訂單狀態', order.status)}
               {row('付款狀態', order.paid ? '已付款' : '未付款')}
-              {row('備註', order.note)}
+              {row('客人備註', order.note)}
             </div>
+          </div>
+
+          {/* 後台備註(客人看不到) */}
+          <div className="border-t border-[#efe8dd] pt-4">
+            <h3 className="mb-2 font-semibold">後台備註 <span className="text-xs font-normal text-[#a99e8f]">(客人看不到)</span></h3>
+            <textarea
+              value={adminNote}
+              onChange={(e) => setAdminNote(e.target.value)}
+              rows={2}
+              placeholder="內部備註,例:VIP、換過尺寸…"
+              className="w-full rounded-lg border border-[#d7c9bd] px-3 py-2 text-sm"
+            />
+            <button
+              onClick={() => onUpdate({ admin_note: adminNote })}
+              disabled={adminNote === (order.admin_note ?? '')}
+              className="mt-2 rounded-full bg-[#1f1b19] px-4 py-1.5 text-sm font-semibold text-white disabled:opacity-40"
+            >
+              儲存備註
+            </button>
           </div>
 
           <div className="border-t border-[#efe8dd] pt-4">

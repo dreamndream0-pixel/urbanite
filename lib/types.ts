@@ -198,6 +198,24 @@ export type Order = {
   order_status?: string;       // PENDING / CONFIRMED / PROCESSING / COMPLETED / CANCELLED / CLOSED
   payment_status?: string;     // UNPAID / PENDING / PAID / PARTIALLY_REFUNDED / REFUNDED / FAILED / CANCELLED
   fulfillment_status?: string; // UNFULFILLED / PREPARING / READY_TO_SHIP / SHIPPED / IN_TRANSIT / DELIVERED / RETURNING / RETURNED
+  // §4 金額明細
+  member_discount?: number;
+  point_discount?: number;
+  shipping_discount?: number;
+  tax_amount?: number;
+  paid_amount?: number;
+  refund_amount?: number;
+  net_amount?: number;
+  // §22 後台備註
+  admin_note?: string;
+  // §25 庫存旗標
+  stock_committed?: boolean;
+  // 客人取消申請 → 賣家審核
+  cancel_status?: string;        // '' / REQUESTED / APPROVED / REJECTED
+  cancel_reason?: string;
+  cancel_response?: string;
+  cancel_requested_at?: string | null;
+  cancel_reviewed_at?: string | null;
   user_id?: string | null;
   created_at?: string;
 };
