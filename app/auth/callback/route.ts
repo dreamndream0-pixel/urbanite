@@ -7,12 +7,27 @@ import { getServerRedirectOrigin } from '@/lib/site-url';
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get('code');
+  const providerError = searchParams.get('error_description') || searchParams.get('error');
   // 預設導回「前台首頁」;管理員登入會自行帶 next=/admin
   const next = searchParams.get('next') ?? '/';
+  const redirectOrigin = getServerRedirectOrigin(origin);
+
+  if (providerError) {
+    const loginUrl = new URL('/login', redirectOrigin);
+    loginUrl.searchParams.set('next', next);
+    loginUrl.searchParams.set('error', `登入失敗：${providerError}`);
+    return NextResponse.redirect(loginUrl);
+  }
 
   if (code) {
     const supabase = await createServerSupabase();
-    await supabase.auth.exchangeCodeForSession(code);
+    const { error } = await supabase.auth.exchangeCodeForSession(code);
+    if (error) {
+      const loginUrl = new URL('/login', redirectOrigin);
+      loginUrl.searchParams.set('next', next);
+      loginUrl.searchParams.set('error', `登入失敗：${error.message}`);
+      return NextResponse.redirect(loginUrl);
+    }
 
     // 登入即建檔:把登入帳號寫進顧客資料(管理員帳號除外)
     const {
@@ -38,5 +53,5 @@ export async function GET(request: Request) {
     }
   }
 
-  return NextResponse.redirect(`${getServerRedirectOrigin(origin)}${next}`);
+  return NextResponse.redirect(`${redirectOrigin}${next}`);
 }

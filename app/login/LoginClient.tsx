@@ -12,12 +12,14 @@ export default function LoginClient({
   configured,
   nextPath,
   logoUrl = '',
+  initialError = '',
 }: {
   configured: boolean;
   nextPath: string;
   logoUrl?: string;
+  initialError?: string;
 }) {
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(initialError || null);
   const [busy, setBusy] = useState<string | null>(null);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');

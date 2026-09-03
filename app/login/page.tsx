@@ -14,10 +14,11 @@ function normalizeNext(value: string | string[] | undefined) {
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ next?: string | string[] }>;
+  searchParams: Promise<{ next?: string | string[]; error?: string | string[] }>;
 }) {
   const params = await searchParams;
   const nextPath = normalizeNext(params.next);
+  const authError = Array.isArray(params.error) ? params.error[0] : params.error;
   const configured = Boolean(
     process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
   );
@@ -45,5 +46,5 @@ export default async function LoginPage({
     }
   }
 
-  return <LoginClient configured={configured} nextPath={nextPath} logoUrl={logoUrl} />;
+  return <LoginClient configured={configured} nextPath={nextPath} logoUrl={logoUrl} initialError={authError ?? ''} />;
 }
