@@ -385,7 +385,7 @@ export default function AdminDashboard({
   ]);
   const [cropFile, setCropFile] = useState<File | null>(null);
   const [editBannerId, setEditBannerId] = useState<string | null>(null);
-  const [newCat, setNewCat] = useState({ slug: '', name: '', en: '' });
+  const [newCat, setNewCat] = useState({ slug: '', name: '', en: '', parent_id: '' });
   const [newDiscount, setNewDiscount] = useState<DiscountDraft>(blankDiscountDraft());
   const [couponModalOpen, setCouponModalOpen] = useState(false);
   const [discountQuery, setDiscountQuery] = useState('');
@@ -916,12 +916,13 @@ export default function AdminDashboard({
         name: newCat.name.trim(),
         en: newCat.en.trim() || slug.toUpperCase(),
         sort_order: categories.length + 1,
+        parent_id: newCat.parent_id || null,
       }),
     });
     const data = await res.json();
     if (res.ok) {
       setCategories((l) => [...l, data as Category]);
-      setNewCat({ slug: '', name: '', en: '' });
+      setNewCat({ slug: '', name: '', en: '', parent_id: '' });
     } else void uiAlert(data.error ?? '新增失敗(代碼可能重複)');
   }
 
@@ -1696,7 +1697,7 @@ export default function AdminDashboard({
                 <div className="mb-4 rounded-lg border border-[#ffcf54] bg-[#fff8e8] px-4 py-3 text-sm text-[#8a7f72]">
                   新增分類前請先在下方填好分類代碼與名稱；詳情可加入或移出商品。
                 </div>
-                <div className="mb-4 grid gap-2 md:grid-cols-3">
+                <div className="mb-4 grid gap-2 md:grid-cols-2 lg:grid-cols-4">
                   <input
                     value={newCat.slug}
                     onChange={(e) => setNewCat({ ...newCat, slug: e.target.value })}
@@ -1715,6 +1716,19 @@ export default function AdminDashboard({
                     placeholder="英文名稱"
                     className="rounded border border-[#e5ded4] px-3 py-2 text-sm"
                   />
+                  <select
+                    value={newCat.parent_id}
+                    onChange={(e) => setNewCat({ ...newCat, parent_id: e.target.value })}
+                    className="rounded border border-[#e5ded4] px-3 py-2 text-sm"
+                  >
+                    <option value="">上層分類(留空=主分類)</option>
+                    {categories.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.parent_id ? '— ' : ''}
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
                 </div>
                 <div className="overflow-x-auto rounded-lg border border-[#e5ded4]">
                   <table className="w-full min-w-[760px] whitespace-nowrap text-sm">

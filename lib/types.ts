@@ -153,6 +153,7 @@ export type Category = {
   name: string;
   en: string;
   sort_order: number;
+  parent_id?: string | null;
   created_at?: string;
 };
 

@@ -37,6 +37,7 @@ export async function POST(request: Request) {
       name,
       en: body.en ?? '',
       sort_order: body.sort_order ?? 0,
+      parent_id: body.parent_id || null,
     })
     .select()
     .single();

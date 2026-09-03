@@ -18,6 +18,7 @@ export async function PATCH(
   if (typeof body.name === 'string') update.name = body.name;
   if (typeof body.en === 'string') update.en = body.en;
   if (typeof body.sort_order === 'number') update.sort_order = body.sort_order;
+  if ('parent_id' in body) update.parent_id = body.parent_id || null;
   if (Object.keys(update).length === 0) {
     return NextResponse.json({ error: '沒有可更新的欄位' }, { status: 400 });
   }
