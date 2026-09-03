@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createServerSupabase } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { getServerRedirectOrigin } from '@/lib/site-url';
 
 // 社群登入完成後,Supabase 會把使用者導回這裡,換取登入 session。
 export async function GET(request: Request) {
@@ -37,5 +38,5 @@ export async function GET(request: Request) {
     }
   }
 
-  return NextResponse.redirect(`${origin}${next}`);
+  return NextResponse.redirect(`${getServerRedirectOrigin(origin)}${next}`);
 }

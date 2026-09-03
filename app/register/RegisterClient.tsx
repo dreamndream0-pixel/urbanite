@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useState } from 'react';
 import { createBrowserSupabase } from '@/lib/supabase/client';
+import { getBrowserAuthOrigin } from '@/lib/site-url';
 
 const STORE_NAME = process.env.NEXT_PUBLIC_STORE_NAME || 'URBANITE';
 
@@ -49,7 +50,7 @@ export default function RegisterClient({
         password,
         options: {
           data: { name: name || email },
-          emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(nextPath)}`,
+          emailRedirectTo: `${getBrowserAuthOrigin()}/auth/callback?next=${encodeURIComponent(nextPath)}`,
         },
       });
       if (error) throw error;

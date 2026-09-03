@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useState } from 'react';
 import { createBrowserSupabase } from '@/lib/supabase/client';
+import { getBrowserAuthOrigin } from '@/lib/site-url';
 import type { Provider } from '@supabase/supabase-js';
 
 const STORE_NAME = process.env.NEXT_PUBLIC_STORE_NAME || 'URBANITE';
@@ -48,7 +49,7 @@ export default function LoginClient({
       const { error } = await supabase.auth.signInWithOAuth({
         provider: provider as Provider,
         options: {
-          redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(nextPath)}`,
+          redirectTo: `${getBrowserAuthOrigin()}/auth/callback?next=${encodeURIComponent(nextPath)}`,
         },
       });
       if (error) {
