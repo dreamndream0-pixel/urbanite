@@ -67,6 +67,8 @@ export type SiteSettings = {
   shipping_methods?: string[];
   enabled_payment_methods?: string[];
   enabled_shipping_methods?: string[];
+  // 非綠界付款方式的收款帳號資訊(例:銀行轉帳),name 需對應 payment_methods 內的名稱
+  payment_accounts?: { name: string; info: string }[];
   updated_at?: string;
 };
 

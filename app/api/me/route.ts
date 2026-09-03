@@ -30,6 +30,7 @@ export async function GET() {
     name: customer?.name || name,
     phone: customer?.phone || user.phone || '',
     address: customer?.address || '',
+    recipients: Array.isArray(customer?.recipients) ? customer.recipients : [],
     isAdmin,
   });
 }

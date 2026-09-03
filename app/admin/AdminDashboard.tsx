@@ -439,6 +439,9 @@ export default function AdminDashboard({
         : DEFAULT_SHIPPING_METHODS,
   });
   const [savingSettings, setSavingSettings] = useState(false);
+  const [paymentAccounts, setPaymentAccounts] = useState<{ name: string; info: string }[]>(
+    initialSettings?.payment_accounts ?? [],
+  );
   const [uploading, setUploading] = useState(false);
   const [editing, setEditing] = useState<Draft | null>(null);
   const [isNew, setIsNew] = useState(false);
@@ -561,7 +564,7 @@ export default function AdminDashboard({
     router.refresh();
   }
 
-  async function updateOrder(id: string, patch: Partial<Pick<Order, 'status' | 'paid' | 'admin_note'>>) {
+  async function updateOrder(id: string, patch: Partial<Pick<Order, 'status' | 'paid' | 'admin_note' | 'refund_amount'>>) {
     const res = await fetch(`/api/orders/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -1214,12 +1217,14 @@ export default function AdminDashboard({
           .map((line) => line.trim())
           .filter(Boolean);
       const methods = kind === 'payments' ? toLines(footerDraft.payments) : toLines(footerDraft.shippings);
+      // 只保留仍在啟用清單內、且有填帳號資訊的收款資料
+      const accounts = paymentAccounts.filter((a) => methods.includes(a.name) && (a.info ?? '').trim());
       const res = await fetch('/api/settings', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(
           kind === 'payments'
-            ? { payment_methods: methods, enabled_payment_methods: methods }
+            ? { payment_methods: methods, enabled_payment_methods: methods, payment_accounts: accounts }
             : { shipping_methods: methods, enabled_shipping_methods: methods },
         ),
       });
@@ -1231,6 +1236,32 @@ export default function AdminDashboard({
     } finally {
       setSavingSettings(false);
     }
+  }
+
+  async function applyMethodsToProducts(
+    field: 'available_payment_methods' | 'available_shipping_methods',
+    methods: string[],
+    scope: 'all' | 'category',
+    category: string,
+  ) {
+    const targets = scope === 'category' ? products.filter((p) => p.category === category) : products;
+    if (targets.length === 0) { alert('沒有符合的商品。'); return; }
+    const kindLabel = field === 'available_payment_methods' ? '付款' : '物流';
+    const scopeLabel = scope === 'category'
+      ? `分類「${categories.find((c) => c.slug === category)?.name ?? category}」`
+      : '全部商品';
+    const methodLabel = methods.length ? methods.join('、') : '允許全部(清除商品限制)';
+    if (!confirm(`確定將${kindLabel}方式套用到${scopeLabel}(${targets.length} 件)?\n\n${methodLabel}`)) return;
+    const res = await fetch('/api/products/methods', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ field, methods, scope, category: scope === 'category' ? category : undefined }),
+    });
+    const data = await res.json();
+    if (!res.ok) { alert(data.error ?? '套用失敗'); return; }
+    const ids = new Set(targets.map((p) => p.id));
+    setProducts((list) => list.map((p) => (ids.has(p.id) ? { ...p, [field]: methods } : p)));
+    alert(`已套用到 ${data.updated} 件商品。`);
   }
 
   const activeNav = NAV.find((n) => n.key === section) ?? NAV[0];
@@ -2411,6 +2442,17 @@ export default function AdminDashboard({
                   value={footerDraft.payments}
                   onChange={(v) => setFooterDraft({ ...footerDraft, payments: v })}
                 />
+                <PaymentAccountsEditor
+                  methods={footerDraft.payments.split('\n').map((s) => s.trim()).filter(Boolean)}
+                  accounts={paymentAccounts}
+                  onChange={setPaymentAccounts}
+                />
+                <BulkMethodApply
+                  field="available_payment_methods"
+                  methodOptions={footerDraft.payments.split('\n').map((s) => s.trim()).filter(Boolean)}
+                  categories={categories}
+                  onApply={applyMethodsToProducts}
+                />
               </Card>
               )}
 
@@ -2428,10 +2470,16 @@ export default function AdminDashboard({
                 }
               >
                 <MethodToggles
-                  label="物流方式(勾選=啟用,可套用到各商品)"
+                  label="物流方式(勾選=啟用,自動同步到前台結帳)"
                   defaults={DEFAULT_SHIPPING_METHODS}
                   value={footerDraft.shippings}
                   onChange={(v) => setFooterDraft({ ...footerDraft, shippings: v })}
+                />
+                <BulkMethodApply
+                  field="available_shipping_methods"
+                  methodOptions={footerDraft.shippings.split('\n').map((s) => s.trim()).filter(Boolean)}
+                  categories={categories}
+                  onApply={applyMethodsToProducts}
                 />
               </Card>
               )}
@@ -3281,6 +3329,124 @@ function MethodToggles({
   );
 }
 
+// 非綠界收款方式的帳號資訊編輯(例:銀行轉帳填銀行/戶名/帳號)
+function isEcpayName(method: string): boolean {
+  return /綠界|信用卡|line\s?pay|apple\s?pay/i.test(method);
+}
+
+function PaymentAccountsEditor({
+  methods,
+  accounts,
+  onChange,
+}: {
+  methods: string[];
+  accounts: { name: string; info: string }[];
+  onChange: (next: { name: string; info: string }[]) => void;
+}) {
+  const nonEcpay = methods.filter((m) => !isEcpayName(m));
+  function setInfo(name: string, info: string) {
+    const rest = accounts.filter((a) => a.name !== name);
+    onChange(info.trim() ? [...rest, { name, info }] : rest);
+  }
+  return (
+    <Field label="收款帳號資訊(非綠界方式,結帳時顯示給買家)">
+      {nonEcpay.length === 0 ? (
+        <p className="text-sm text-[#a99e8f]">目前沒有非綠界的付款方式。新增「銀行轉帳」等方式後即可在此填寫收款帳號。</p>
+      ) : (
+        <div className="space-y-3">
+          {nonEcpay.map((m) => (
+            <div key={m} className="rounded-lg border border-[#e5ded4] p-3">
+              <p className="mb-1 text-sm font-semibold text-[#1f1b19]">{m}</p>
+              <textarea
+                value={accounts.find((a) => a.name === m)?.info ?? ''}
+                onChange={(e) => setInfo(m, e.target.value)}
+                rows={2}
+                placeholder="例:玉山銀行(808) / 戶名:王小明 / 帳號:1234-567-890123"
+                className="w-full rounded-lg border border-[#e5ded4] px-3 py-2 text-sm"
+              />
+            </div>
+          ))}
+          <p className="text-xs text-[#a99e8f]">留空的方式結帳時不顯示收款資訊。記得按上方「儲存金流」。</p>
+        </div>
+      )}
+    </Field>
+  );
+}
+
+// 批次把「可用付款 / 物流方式」套用到全部或指定分類的商品
+function BulkMethodApply({
+  field,
+  methodOptions,
+  categories,
+  onApply,
+}: {
+  field: 'available_payment_methods' | 'available_shipping_methods';
+  methodOptions: string[];
+  categories: Category[];
+  onApply: (
+    field: 'available_payment_methods' | 'available_shipping_methods',
+    methods: string[],
+    scope: 'all' | 'category',
+    category: string,
+  ) => void;
+}) {
+  const [scope, setScope] = useState<'all' | 'category'>('all');
+  const [category, setCategory] = useState('');
+  const [allowAll, setAllowAll] = useState(true);
+  const [selected, setSelected] = useState<string[]>([]);
+  const kindLabel = field === 'available_payment_methods' ? '付款' : '物流';
+
+  function toggle(m: string, on: boolean) {
+    setSelected((list) => (on ? [...list, m] : list.filter((x) => x !== m)));
+  }
+
+  return (
+    <Field label={`批次套用${kindLabel}方式到商品`}>
+      <div className="space-y-3 rounded-lg border border-[#e5ded4] p-3">
+        <div className="flex flex-wrap items-center gap-2 text-sm">
+          <select value={scope} onChange={(e) => setScope(e.target.value as 'all' | 'category')} className="rounded-lg border border-[#d7c9bd] bg-white px-3 py-2">
+            <option value="all">全部商品</option>
+            <option value="category">指定分類</option>
+          </select>
+          {scope === 'category' ? (
+            <select value={category} onChange={(e) => setCategory(e.target.value)} className="rounded-lg border border-[#d7c9bd] bg-white px-3 py-2">
+              <option value="">選擇分類…</option>
+              {categories.map((c) => (
+                <option key={c.id} value={c.slug}>{c.name}</option>
+              ))}
+            </select>
+          ) : null}
+        </div>
+
+        <label className="flex items-center gap-2 text-sm">
+          <input type="checkbox" checked={allowAll} onChange={(e) => setAllowAll(e.target.checked)} className="h-4 w-4" />
+          允許全部(清除商品限制)
+        </label>
+
+        {!allowAll ? (
+          <div className="flex flex-wrap gap-2">
+            {methodOptions.map((m) => (
+              <label key={m} className={`cursor-pointer rounded-full border px-3 py-1.5 text-sm ${selected.includes(m) ? 'border-[#1f1b19] bg-[#1f1b19] text-white' : 'border-[#d7c9bd] text-[#6b6156]'}`}>
+                <input type="checkbox" className="hidden" checked={selected.includes(m)} onChange={(e) => toggle(m, e.target.checked)} />
+                {m}
+              </label>
+            ))}
+          </div>
+        ) : null}
+
+        <button
+          onClick={() => onApply(field, allowAll ? [] : selected, scope, category)}
+          disabled={scope === 'category' && !category}
+          className="rounded-full bg-[#ada265] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+        >
+          套用到商品
+        </button>
+        <p className="text-xs text-[#a99e8f]">商品未設定限制時 = 開放所有已啟用方式。此操作會直接覆寫所選商品的可用{kindLabel}方式。</p>
+      </div>
+    </Field>
+  );
+}
+
 // 上傳前先在瀏覽器縮圖壓縮 JPEG；透明圖檔保持原檔,避免 PNG/WebP 去背被轉成黑底。
 function prepareProductImage(file: File, index: number, maxDim = 1600, quality = 0.85): Promise<{ blob: Blob; filename: string }> {
   if (file.type !== 'image/jpeg') {
@@ -3351,6 +3517,10 @@ function uploadImageWithProgress(
     xhr.onerror = () => reject(new Error('連線發生問題'));
     xhr.send(fd);
   });
+}
+
+function escapeHtml(s: string): string {
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
 // 後台專用的訂單完整資訊(含出貨狀態 / 付款管理;與客人端的訂單明細分開)
@@ -3428,6 +3598,36 @@ function AdminOrderModal({
     } finally { setBusy(false); }
   }
 
+  function printOrder() {
+    const rows = order.items
+      .map((it) => `<tr><td>${escapeHtml(it.name)}</td><td>${escapeHtml(it.variant)}</td><td style="text-align:center">${it.quantity}</td><td style="text-align:right">${formatter.format(it.price * it.quantity)}</td></tr>`)
+      .join('');
+    const html = `<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><title>${escapeHtml(order.order_no)}</title>
+<style>body{font-family:system-ui,"PingFang TC","Microsoft JhengHei",sans-serif;color:#1f1b19;padding:32px;max-width:640px;margin:0 auto}
+h1{font-size:20px;margin:0 0 4px}table{width:100%;border-collapse:collapse;margin:16px 0}
+th,td{border-bottom:1px solid #e5ded4;padding:8px;font-size:14px;text-align:left}
+.muted{color:#6b6156;font-size:13px}.tot{text-align:right;font-weight:700;font-size:16px;margin-top:8px}
+.sec{margin-top:20px}.sec h2{font-size:14px;margin:0 0 6px}</style></head><body>
+<h1>訂單 ${escapeHtml(order.order_no)}</h1>
+<p class="muted">${dateStr} · ${order.status} · ${order.paid ? '已付款' : '未付款'}</p>
+<table><thead><tr><th>商品</th><th>規格</th><th style="text-align:center">數量</th><th style="text-align:right">小計</th></tr></thead><tbody>${rows}</tbody></table>
+<p class="muted">小計 ${formatter.format(order.subtotal)}｜運費 ${order.shipping === 0 ? '免運' : formatter.format(order.shipping)}${order.discount > 0 ? `｜折扣 -${formatter.format(order.discount)}` : ''}</p>
+<p class="tot">合計 ${formatter.format(order.total)}</p>
+<div class="sec"><h2>收件資訊</h2><p class="muted">${escapeHtml(order.customer_name)}｜${escapeHtml(order.phone ?? '')}<br>${escapeHtml(order.address ?? '')}<br>${escapeHtml(order.shipping_method ?? '')}｜${escapeHtml(order.payment_method ?? '')}</p></div>
+${order.note ? `<div class="sec"><h2>備註</h2><p class="muted">${escapeHtml(order.note)}</p></div>` : ''}
+<script>window.onload=function(){window.print()}</script></body></html>`;
+    const w = window.open('', '_blank', 'width=720,height=800');
+    if (w) { w.document.write(html); w.document.close(); }
+  }
+
+  function markRefund() {
+    const input = window.prompt(`標記退款金額(此訂單合計 ${order.total})。\n注意:這只記錄退款,實際退刷需至金流後台操作。`, String(order.total));
+    if (input === null) return;
+    const amount = Math.floor(Number(input));
+    if (!Number.isFinite(amount) || amount < 0) { alert('金額不正確'); return; }
+    onUpdate({ refund_amount: amount });
+  }
+
   const badge = (text: string, tone: 'gray' | 'green' | 'amber') => (
     <span
       className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
@@ -3459,6 +3659,15 @@ function AdminOrderModal({
             {badge(`訂單：${ORDER_STATUS_LABEL[order.order_status ?? ''] ?? order.status}`, 'gray')}
             {badge(`付款：${PAYMENT_STATUS_LABEL[order.payment_status ?? ''] ?? (order.paid ? '已付款' : '未付款')}`, order.paid ? 'green' : 'amber')}
             {badge(`物流：${FULFILLMENT_STATUS_LABEL[order.fulfillment_status ?? ''] ?? '未出貨'}`, order.fulfillment_status && order.fulfillment_status !== 'UNFULFILLED' ? 'green' : 'gray')}
+          </div>
+
+          {/* 快速操作 */}
+          <div className="flex flex-wrap gap-2">
+            <button onClick={printOrder} className="rounded-full border border-[#d7c9bd] px-3 py-1.5 text-sm font-semibold text-[#6b6156] hover:bg-[#efe8dd]">列印訂單</button>
+            <button onClick={markRefund} className="rounded-full border border-[#d7c9bd] px-3 py-1.5 text-sm font-semibold text-[#6b6156] hover:bg-[#efe8dd]">標記退款</button>
+            {order.status !== '取消' && order.status !== '退貨' ? (
+              <button onClick={() => { if (confirm('直接取消訂單?將回補庫存。')) onUpdate({ status: '取消' }); }} className="rounded-full border border-[#e0b4b4] px-3 py-1.5 text-sm font-semibold text-[#c0392b] hover:bg-[#fbf3f0]">取消訂單</button>
+            ) : null}
           </div>
 
           {/* 客人取消申請審核 */}

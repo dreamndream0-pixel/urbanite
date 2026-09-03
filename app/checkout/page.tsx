@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import type { Product, SiteSettings, UserCoupon } from '@/lib/types';
+import type { Product, Recipient, SiteSettings, UserCoupon } from '@/lib/types';
 
 const STORE_NAME = process.env.NEXT_PUBLIC_STORE_NAME || 'URBANITE';
 const CART_KEY = 'cart';
@@ -71,6 +71,7 @@ export default function CheckoutPage() {
   const [phone, setPhone] = useState('');
   const [address, setAddress] = useState('');
   const [note, setNote] = useState('');
+  const [recipients, setRecipients] = useState<Recipient[]>([]);
   const [shippingMethod, setShippingMethod] = useState(SHIPPING_METHODS[0]);
   const [paymentMethod, setPaymentMethod] = useState(PAYMENT_METHODS[0]);
   const [discountInput, setDiscountInput] = useState('');
@@ -95,6 +96,7 @@ export default function CheckoutPage() {
         if (data?.name) setName(data.name);
         if (data?.phone) setPhone(data.phone);
         if (data?.address) setAddress(data.address);
+        if (Array.isArray(data?.recipients)) setRecipients(data.recipients);
       })
       .catch(() => {});
 
@@ -145,6 +147,11 @@ export default function CheckoutPage() {
   const selectedPaymentMethod = availablePaymentMethods.includes(paymentMethod)
     ? paymentMethod
     : availablePaymentMethods[0] ?? '';
+  // 非綠界付款方式(如銀行轉帳)的收款帳號資訊
+  const paymentAccount = (settings?.payment_accounts ?? []).find(
+    (a) => a.name === selectedPaymentMethod && (a.info ?? '').trim(),
+  );
+  const showAccountInfo = Boolean(paymentAccount) && !isEcpayMethod(selectedPaymentMethod);
 
   useEffect(() => {
     let alive = true;
@@ -187,6 +194,14 @@ export default function CheckoutPage() {
       alive = false;
     };
   }, [cart, loaded, memberCoupons, shipping, subtotal]);
+
+  function fillRecipient(idx: number) {
+    const r = recipients[idx];
+    if (!r) return;
+    setName(r.name || '');
+    setPhone(r.phone || '');
+    setAddress([r.city, r.district, r.address].filter(Boolean).join(''));
+  }
 
   function updateQty(id: string, change: number) {
     setCart((items) => {
@@ -319,6 +334,13 @@ export default function CheckoutPage() {
             <p className="text-lg font-semibold text-[#1f7a44]">訂單成立！</p>
             <p className="mt-2 text-[#6b6156]">單號：{orderNo}</p>
             <p className="mt-1 text-sm text-[#8a7f72]">我們會盡快為你備貨，感謝購買。</p>
+            {showAccountInfo && paymentAccount ? (
+              <div className="mx-auto mt-5 max-w-sm rounded-xl border border-[#d8c7a8] bg-[#faf6ea] p-4 text-left">
+                <p className="text-sm font-semibold text-[#8a6d1b]">{paymentAccount.name} — 收款資訊</p>
+                <p className="mt-1 whitespace-pre-wrap text-sm text-[#6b6156]">{paymentAccount.info}</p>
+                <p className="mt-2 text-xs text-[#a99e8f]">請完成付款後保留交易明細，方便我們對帳。</p>
+              </div>
+            ) : null}
             <Link
               href="/"
               className="mt-6 inline-block rounded-full bg-[#1f1b19] px-6 py-3 font-semibold text-white"
@@ -457,11 +479,37 @@ export default function CheckoutPage() {
                   </select>
                 </label>
               </div>
+
+              {/* 非綠界付款方式:賣家收款帳號資訊 */}
+              {showAccountInfo && paymentAccount ? (
+                <div className="mt-4 rounded-xl border border-[#d8c7a8] bg-[#faf6ea] p-4">
+                  <p className="text-sm font-semibold text-[#8a6d1b]">{paymentAccount.name} — 收款資訊</p>
+                  <p className="mt-1 whitespace-pre-wrap text-sm text-[#6b6156]">{paymentAccount.info}</p>
+                  <p className="mt-2 text-xs text-[#a99e8f]">請於下單後依上述資訊完成付款,並保留交易明細。</p>
+                </div>
+              ) : null}
             </section>
 
             {/* 收件資料 */}
             <section className="rounded-2xl bg-white p-5 shadow-sm">
               <h2 className="mb-4 font-semibold">收件資料</h2>
+              {recipients.length > 0 ? (
+                <label className="mb-3 block">
+                  <span className="mb-1 block text-sm text-[#8a7f72]">常用收件人</span>
+                  <select
+                    defaultValue=""
+                    onChange={(e) => { if (e.target.value !== '') fillRecipient(Number(e.target.value)); }}
+                    className="w-full rounded-lg border border-[#e5ded4] px-3 py-2.5"
+                  >
+                    <option value="">選擇常用收件人自動帶入…</option>
+                    {recipients.map((r, i) => (
+                      <option key={i} value={i}>
+                        {r.name}（{r.phone}）{[r.city, r.district].filter(Boolean).join('')}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ) : null}
               <div className="grid gap-3">
                 <input
                   className="rounded-lg border border-[#e5ded4] px-4 py-3"

@@ -76,6 +76,8 @@ export async function PATCH(
   if (typeof body.status === 'string') update.status = body.status;
   if (typeof body.paid === 'boolean') update.paid = body.paid;
   if (typeof body.admin_note === 'string') update.admin_note = body.admin_note;
+  const hasRefund = typeof body.refund_amount === 'number';
+  if (hasRefund) update.refund_amount = Math.max(0, Math.min(current.total, Math.floor(body.refund_amount)));
   if (Object.keys(update).length === 0) {
     return NextResponse.json({ error: '沒有可更新的欄位' }, { status: 400 });
   }
@@ -84,6 +86,14 @@ export async function PATCH(
   update.order_status = derived.order_status;
   update.payment_status = derived.payment_status;
   update.fulfillment_status = derived.fulfillment_status;
+
+  // 手動標記退款:改寫付款狀態與淨額
+  let refundValue = 0;
+  if (hasRefund) {
+    refundValue = update.refund_amount as number;
+    update.net_amount = current.total - refundValue;
+    update.payment_status = refundValue >= current.total ? 'REFUNDED' : refundValue > 0 ? 'PARTIALLY_REFUNDED' : derived.payment_status;
+  }
 
   const { data, error } = await supabase
     .from('orders')
@@ -100,7 +110,9 @@ export async function PATCH(
   if (derived.order_status !== current.order_status) {
     rows.push({ order_id: id, type: 'order', from_status: current.order_status ?? '', to_status: derived.order_status, note: `狀態改為「${nextStatus}」`, created_by: actor });
   }
-  if (derived.payment_status !== current.payment_status) {
+  if (hasRefund) {
+    rows.push({ order_id: id, type: 'payment', from_status: current.payment_status ?? '', to_status: update.payment_status as string, note: `標記退款 ${refundValue}`, created_by: actor });
+  } else if (derived.payment_status !== current.payment_status) {
     rows.push({ order_id: id, type: 'payment', from_status: current.payment_status ?? '', to_status: derived.payment_status, note: nextPaid ? '標記已付款' : '標記未付款', created_by: actor });
   }
   if (derived.fulfillment_status !== current.fulfillment_status) {
