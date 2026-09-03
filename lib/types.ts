@@ -192,6 +192,13 @@ export type Order = {
   shipping: number;
   shipping_method?: string;
   payment_method?: string;
+  store_id?: string;
+  store_name?: string;
+  store_phone?: string;
+  store_address?: string;
+  store_ship_type?: string;
+  store_lgs_type?: string;
+  store_extra?: Record<string, unknown> | null;
   discount: number;
   discount_code: string;
   coupon_id?: string | null;
@@ -252,6 +259,8 @@ export type ShipmentEvent = {
   status?: string;
   description?: string;
   location?: string;
+  ret_id?: string;
+  raw_response?: Record<string, unknown> | null;
   event_at: string;
   created_at?: string;
 };
@@ -262,6 +271,16 @@ export type Shipment = {
   provider?: string;
   shipping_method?: string;
   tracking_number?: string;
+  lgs_type?: string;
+  ship_type?: string;
+  trade_type?: string;
+  store_id?: string;
+  store_name?: string;
+  store_phone?: string;
+  store_address?: string;
+  store_print_no?: string;
+  trade_no?: string;
+  raw_response?: Record<string, unknown> | null;
   recipient_name?: string;
   recipient_phone?: string;
   status: string; // PREPARING / READY_TO_SHIP / SHIPPED / IN_TRANSIT / DELIVERED

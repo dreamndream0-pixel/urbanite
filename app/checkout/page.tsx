@@ -24,8 +24,29 @@ type CartItem = {
   quantity: number;
 };
 
+type PickupStore = {
+  store_id: string;
+  store_name: string;
+  store_phone: string;
+  store_address: string;
+  store_ship_type: string;
+  store_lgs_type: string;
+};
+
 const SHIPPING_METHODS = ['全家 取貨付款', '7-11 取貨付款', '宅配到府'];
 const PAYMENT_METHODS = ['信用卡 / ATM / 超商(藍新)', '取貨付款(貨到付款)', '轉帳匯款'];
+const PICKUP_STORE_KEY = 'newebpay-pickup-store';
+
+function isStorePickupMethod(method = '') {
+  return /超商|取貨|7-?11|7-ELEVEN|全家|family|萊爾富|hi-?life|ok/i.test(method);
+}
+
+function shipTypeFromCheckout(method = '') {
+  if (/全家|family/i.test(method)) return '2';
+  if (/萊爾富|hi-?life/i.test(method)) return '3';
+  if (/\bok\b|ok mart/i.test(method)) return '4';
+  return '1';
+}
 
 function allowedForCart(
   allMethods: string[],
@@ -78,10 +99,17 @@ export default function CheckoutPage() {
   const [message, setMessage] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
   const [orderNo, setOrderNo] = useState('');
   const [transferOpen, setTransferOpen] = useState(true);
+  const [pickupStore, setPickupStore] = useState<PickupStore | null>(null);
 
   useEffect(() => {
     Promise.resolve().then(() => {
       setCart(readCart());
+      try {
+        const rawStore = localStorage.getItem(PICKUP_STORE_KEY);
+        if (rawStore) setPickupStore(JSON.parse(rawStore) as PickupStore);
+      } catch {
+        /* 略過 */
+      }
       setLoaded(true);
     });
 
@@ -145,6 +173,18 @@ export default function CheckoutPage() {
     (a) => a.name === selectedPaymentMethod && (a.info ?? '').trim(),
   );
   const showAccountInfo = Boolean(paymentAccount) && !isOnlinePayment(selectedPaymentMethod);
+  const needsPickupStore = isStorePickupMethod(selectedShippingMethod);
+
+  useEffect(() => {
+    if (!needsPickupStore && pickupStore) {
+      setPickupStore(null);
+      try {
+        localStorage.removeItem(PICKUP_STORE_KEY);
+      } catch {
+        /* 略過 */
+      }
+    }
+  }, [needsPickupStore, pickupStore]);
 
   useEffect(() => {
     let alive = true;
@@ -251,12 +291,16 @@ export default function CheckoutPage() {
       setMessage({ type: 'err', text: '購物車是空的' });
       return;
     }
-    if (!name || !email || !phone || !address) {
-      setMessage({ type: 'err', text: '請填寫收件人姓名、Email、電話與地址' });
+    if (!name || !email || !phone || (!needsPickupStore && !address)) {
+      setMessage({ type: 'err', text: needsPickupStore ? '請填寫取貨人姓名、Email 與電話' : '請填寫收件人姓名、Email、電話與地址' });
       return;
     }
     if (!selectedShippingMethod || !selectedPaymentMethod) {
       setMessage({ type: 'err', text: '購物車內商品沒有共同可用的付款或送貨方式' });
+      return;
+    }
+    if (needsPickupStore && !pickupStore?.store_id) {
+      setMessage({ type: 'err', text: '請先選擇超商取貨門市' });
       return;
     }
     setSubmitting(true);
@@ -272,6 +316,12 @@ export default function CheckoutPage() {
           note,
           shipping_method: selectedShippingMethod,
           payment_method: selectedPaymentMethod,
+          store_id: needsPickupStore ? pickupStore?.store_id ?? '' : '',
+          store_name: needsPickupStore ? pickupStore?.store_name ?? '' : '',
+          store_phone: needsPickupStore ? pickupStore?.store_phone ?? '' : '',
+          store_address: needsPickupStore ? pickupStore?.store_address ?? '' : '',
+          store_ship_type: needsPickupStore ? pickupStore?.store_ship_type ?? shipTypeFromCheckout(selectedShippingMethod) : '',
+          store_lgs_type: needsPickupStore ? pickupStore?.store_lgs_type ?? 'C2C' : '',
           discount_code: applied?.code ?? '',
           user_coupon_id: applied?.userCouponId ?? '',
           items: cart.map((item) => ({
@@ -288,6 +338,7 @@ export default function CheckoutPage() {
         setCart([]);
         try {
           localStorage.removeItem(CART_KEY);
+          localStorage.removeItem(PICKUP_STORE_KEY);
         } catch {
           /* 略過 */
         }
@@ -447,6 +498,30 @@ export default function CheckoutPage() {
                     ))}
                   </select>
                 </label>
+                {needsPickupStore ? (
+                  <div className="rounded-xl border border-[#e5ded4] bg-[#faf7f2] p-4">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-semibold text-[#1f1b19]">取貨門市</p>
+                        {pickupStore ? (
+                          <div className="mt-1 text-sm leading-6 text-[#6b6156]">
+                            <p>{pickupStore.store_name}（{pickupStore.store_id}）</p>
+                            <p>{pickupStore.store_address}</p>
+                            {pickupStore.store_phone ? <p>{pickupStore.store_phone}</p> : null}
+                          </div>
+                        ) : (
+                          <p className="mt-1 text-sm text-[#c0392b]">尚未選擇門市</p>
+                        )}
+                      </div>
+                      <a
+                        href={`/api/logistics/newebpay/store-map?ship_type=${encodeURIComponent(shipTypeFromCheckout(selectedShippingMethod))}&lgs_type=C2C`}
+                        className="rounded-full bg-[#1f1b19] px-4 py-2 text-sm font-semibold text-white"
+                      >
+                        {pickupStore ? '重新選擇' : '選擇門市'}
+                      </a>
+                    </div>
+                  </div>
+                ) : null}
                 <label className="block">
                   <span className="mb-1 block text-sm text-[#8a7f72]">付款方式</span>
                   <select

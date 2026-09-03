@@ -3721,18 +3721,32 @@ function AdminOrderModal({
     } finally { setBusy(false); }
   }
 
-  async function createShipment() {
+  async function createShipment(useNewebpay = false) {
     if (busy) return;
     setBusy(true);
     try {
       const res = await fetch(`/api/orders/${order.id}/shipment`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(shipForm),
+        body: JSON.stringify(useNewebpay ? { use_newebpay: true } : shipForm),
       });
       if (!res.ok) { void uiAlert((await res.json()).error ?? '建立出貨失敗'); return; }
-      onUpdate({ status: '已出貨' });
+      onUpdate(useNewebpay ? { status: '待出貨', fulfillment_status: 'READY_TO_SHIP' } : { status: '已出貨', fulfillment_status: 'SHIPPED' });
       setShipForm({ provider: '', tracking_number: '' });
+      await loadDetail();
+    } finally { setBusy(false); }
+  }
+
+  async function traceShipment(shipmentId: string) {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/orders/${order.id}/shipment`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ shipment_id: shipmentId, action: 'trace' }),
+      });
+      if (!res.ok) { void uiAlert((await res.json()).error ?? '查詢貨態失敗'); return; }
       await loadDetail();
     } finally { setBusy(false); }
   }
@@ -3888,6 +3902,13 @@ ${order.note ? `<div class="sec"><h2>備註</h2><p class="muted">${escapeHtml(or
           {/* 物流 */}
           <div className="rounded-xl border border-[#efe8dd] p-4">
             <p className="mb-2 text-sm font-semibold text-[#6b6156]">物流</p>
+            {order.store_id ? (
+              <div className="mb-3 rounded-lg bg-[#faf7f2] p-3 text-xs leading-5 text-[#6b6156]">
+                <p className="font-semibold text-[#1f1b19]">取貨門市：{order.store_name || order.store_id}</p>
+                <p>{order.store_address}</p>
+                <p>門市代號：{order.store_id}{order.store_phone ? `｜${order.store_phone}` : ''}</p>
+              </div>
+            ) : null}
             {detailLoading ? (
               <p className="text-xs text-[#a99e8f]">載入中…</p>
             ) : detail && detail.shipments.length > 0 ? (
@@ -3899,6 +3920,8 @@ ${order.note ? `<div class="sec"><h2>備註</h2><p class="muted">${escapeHtml(or
                       <span className="text-[#8a7f72]">{FULFILLMENT_STATUS_LABEL[s.status] ?? s.status}</span>
                     </div>
                     {s.tracking_number ? <p className="mt-1 text-xs text-[#6b6156]">單號：{s.tracking_number}</p> : null}
+                    {s.store_print_no ? <p className="mt-1 text-xs text-[#6b6156]">寄件代碼：{s.store_print_no}</p> : null}
+                    {s.store_name ? <p className="mt-1 text-xs text-[#6b6156]">門市：{s.store_name}（{s.store_id}）</p> : null}
                     {s.events && s.events.length > 0 ? (
                       <ul className="mt-2 space-y-1 border-t border-[#efe8dd] pt-2 text-xs text-[#6b6156]">
                         {s.events.map((ev) => (
@@ -3910,6 +3933,25 @@ ${order.note ? `<div class="sec"><h2>備註</h2><p class="muted">${escapeHtml(or
                       </ul>
                     ) : null}
                     <div className="mt-2 flex flex-wrap items-center gap-2">
+                      {s.lgs_type && s.ship_type ? (
+                        <>
+                          <button
+                            onClick={() => traceShipment(s.id)}
+                            disabled={busy}
+                            className="rounded-full border border-[#d7c9bd] px-3 py-1 text-xs font-semibold text-[#6b6156] disabled:opacity-50"
+                          >
+                            更新藍新貨態
+                          </button>
+                          <a
+                            href={`/api/orders/${order.id}/shipment/label?shipment_id=${s.id}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="rounded-full border border-[#d7c9bd] px-3 py-1 text-xs font-semibold text-[#6b6156]"
+                          >
+                            列印寄件單
+                          </a>
+                        </>
+                      ) : null}
                       <select
                         value={eventForm.status}
                         onChange={(e) => setEventForm({ ...eventForm, status: e.target.value })}
@@ -3938,6 +3980,15 @@ ${order.note ? `<div class="sec"><h2>備註</h2><p class="muted">${escapeHtml(or
               </div>
             ) : (
               <div className="flex flex-wrap items-center gap-2">
+                {order.store_id ? (
+                  <button
+                    onClick={() => createShipment(true)}
+                    disabled={busy}
+                    className="rounded-full bg-[#1f1b19] px-4 py-1.5 text-sm font-semibold text-white disabled:opacity-50"
+                  >
+                    建立藍新物流單
+                  </button>
+                ) : null}
                 <input
                   value={shipForm.provider}
                   onChange={(e) => setShipForm({ ...shipForm, provider: e.target.value })}
@@ -3951,7 +4002,7 @@ ${order.note ? `<div class="sec"><h2>備註</h2><p class="muted">${escapeHtml(or
                   className="min-w-0 flex-1 rounded-lg border border-[#d7c9bd] px-2.5 py-1.5 text-sm"
                 />
                 <button
-                  onClick={createShipment}
+                  onClick={() => createShipment(false)}
                   disabled={busy}
                   className="rounded-full bg-[#ada265] px-4 py-1.5 text-sm font-semibold text-white disabled:opacity-50"
                 >
@@ -4059,6 +4110,8 @@ ${order.note ? `<div class="sec"><h2>備註</h2><p class="muted">${escapeHtml(or
               {row('Email', order.email)}
               {row('地址', order.address)}
               {row('送貨方式', order.shipping_method)}
+              {row('取貨門市', order.store_name ? `${order.store_name}（${order.store_id ?? ''}）` : order.store_id)}
+              {row('門市地址', order.store_address)}
               {row('付款方式', order.payment_method)}
             </div>
           </div>

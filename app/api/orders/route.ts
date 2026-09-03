@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getAdminUser, getSessionUser } from '@/lib/supabase/server';
 import { evaluateCoupon } from '@/lib/discount';
+import { isStorePickup, shipTypeFromMethod } from '@/lib/newebpay-logistics';
 import { deriveStatuses } from '@/lib/order-status';
 import { computeShipping } from '@/lib/shipping';
 import type { Discount, Order, OrderItem, Product } from '@/lib/types';
@@ -32,6 +33,14 @@ export async function POST(request: Request) {
   const phone = String(body?.phone ?? '').trim();
   const address = String(body?.address ?? '').trim();
   const note = String(body?.note ?? '').trim();
+  const pickupStore = {
+    store_id: String(body?.store_id ?? '').trim(),
+    store_name: String(body?.store_name ?? '').trim(),
+    store_phone: String(body?.store_phone ?? '').trim(),
+    store_address: String(body?.store_address ?? '').trim(),
+    store_ship_type: String(body?.store_ship_type ?? '').trim() || shipTypeFromMethod(shippingMethod),
+    store_lgs_type: String(body?.store_lgs_type ?? '').trim() || 'C2C',
+  };
 
   if (!customer_name || !email) {
     return NextResponse.json({ error: '請填寫姓名與 Email' }, { status: 400 });
@@ -41,6 +50,9 @@ export async function POST(request: Request) {
   }
   if (!shippingMethod || !paymentMethod) {
     return NextResponse.json({ error: '請選擇付款與送貨方式' }, { status: 400 });
+  }
+  if (isStorePickup(shippingMethod) && !pickupStore.store_id) {
+    return NextResponse.json({ error: '請先選擇超商取貨門市' }, { status: 400 });
   }
 
   const supabase = createAdminClient();
@@ -218,6 +230,13 @@ export async function POST(request: Request) {
       shipping,
       shipping_method: shippingMethod,
       payment_method: paymentMethod,
+      store_id: pickupStore.store_id,
+      store_name: pickupStore.store_name,
+      store_phone: pickupStore.store_phone,
+      store_address: pickupStore.store_address,
+      store_ship_type: pickupStore.store_ship_type,
+      store_lgs_type: pickupStore.store_lgs_type,
+      store_extra: pickupStore.store_id ? pickupStore : null,
       discount,
       discount_code: discountCode,
       coupon_id: appliedCouponId || null,
