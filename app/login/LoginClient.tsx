@@ -53,6 +53,7 @@ export default function LoginClient({
         provider: authProvider as Provider,
         options: {
           redirectTo: `${getBrowserAuthOrigin()}/auth/callback?next=${encodeURIComponent(nextPath)}`,
+          ...(provider === 'line' ? { scopes: 'openid profile' } : {}),
         },
       });
       if (error) {
