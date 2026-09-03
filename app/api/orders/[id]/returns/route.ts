@@ -91,27 +91,51 @@ export async function POST(
   return NextResponse.json(ret as ReturnRequest, { status: 201 });
 }
 
-// PATCH /api/orders/[id]/returns — 賣家審核 / 推進退貨(限管理員)
-// body: { return_id, action: 'approve'|'reject'|'received'|'refund', response?, restock?:boolean }
+// PATCH /api/orders/[id]/returns — 推進退貨
+// 買家(限本人):action 'shipped'(填物流公司/單號,標記已寄回)
+// 賣家(限管理員):'approve'|'reject'|'received'|'processing'|'refund'|'complete'
 export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const admin = await getAdminUser();
-  if (!admin) return NextResponse.json({ error: '未授權' }, { status: 401 });
-
   const { id } = await params;
   const body = await request.json().catch(() => ({}));
   const returnId = String(body?.return_id ?? '').trim();
   const action = String(body?.action ?? '').trim();
   const response = String(body?.response ?? '').trim();
-  const actor = admin.email || '後台管理員';
 
   const supabase = createAdminClient();
+  const { data: order } = await supabase.from('orders').select('id, user_id, total, refund_amount, paid').eq('id', id).maybeSingle();
+  if (!order) return NextResponse.json({ error: '找不到訂單' }, { status: 404 });
   const { data: ret } = await supabase.from('returns').select('*').eq('id', returnId).eq('order_id', id).maybeSingle();
   if (!ret) return NextResponse.json({ error: '找不到退貨單' }, { status: 404 });
 
   const nowIso = new Date().toISOString();
+
+  // ---- 買家:標記已寄回(限本人) ----
+  if (action === 'shipped') {
+    const user = await getSessionUser();
+    if (!user || order.user_id !== user.id) return NextResponse.json({ error: '未授權' }, { status: 401 });
+    if (ret.status !== 'APPROVED' && ret.status !== 'SHIPPED_BACK') {
+      return NextResponse.json({ error: '此退貨目前無法回報寄件' }, { status: 409 });
+    }
+    const carrier = String(body?.return_carrier ?? '').trim();
+    const tracking = String(body?.return_tracking ?? '').trim();
+    if (!carrier && !tracking) return NextResponse.json({ error: '請填寫物流公司或單號' }, { status: 400 });
+    const { data } = await supabase
+      .from('returns')
+      .update({ status: 'SHIPPED_BACK', return_carrier: carrier, return_tracking: tracking, shipped_back_at: nowIso })
+      .eq('id', returnId)
+      .select()
+      .single();
+    await supabase.from('order_status_history').insert({ order_id: id, type: 'order', from_status: 'RETURN_APPROVED', to_status: 'RETURN_SHIPPED_BACK', note: `買家已寄回退貨${tracking ? `(${carrier} ${tracking})` : ''}`, created_by: '客人' });
+    return NextResponse.json(data as ReturnRequest);
+  }
+
+  // ---- 以下為賣家操作 ----
+  const admin = await getAdminUser();
+  if (!admin) return NextResponse.json({ error: '未授權' }, { status: 401 });
+  const actor = admin.email || '後台管理員';
 
   if (action === 'approve') {
     const { data } = await supabase.from('returns').update({ status: 'APPROVED', response, reviewed_at: nowIso }).eq('id', returnId).select().single();
@@ -121,6 +145,8 @@ export async function PATCH(
 
   if (action === 'reject') {
     const { data } = await supabase.from('returns').update({ status: 'REJECTED', response, reviewed_at: nowIso }).eq('id', returnId).select().single();
+    // 婉拒後訂單回到「已完成」,離開退貨分頁
+    await supabase.from('orders').update({ status: '已完成', fulfillment_status: 'DELIVERED' }).eq('id', id);
     await supabase.from('order_status_history').insert({ order_id: id, type: 'order', from_status: 'RETURN_REQUESTED', to_status: 'RETURN_REJECTED', note: response ? `婉拒退貨:${response}` : '婉拒退貨', created_by: actor });
     return NextResponse.json(data as ReturnRequest);
   }
@@ -133,22 +159,33 @@ export async function PATCH(
       update.restocked = true;
     }
     const { data } = await supabase.from('returns').update(update).eq('id', returnId).select().single();
-    await supabase.from('order_status_history').insert({ order_id: id, type: 'fulfillment', from_status: 'SHIPPED', to_status: 'RETURNED', note: restock ? '已收到退貨並回補庫存' : '已收到退貨', created_by: actor });
+    await supabase.from('order_status_history').insert({ order_id: id, type: 'order', from_status: 'RETURN', to_status: 'RETURN_RECEIVED', note: restock ? '已收到退貨並回補庫存' : '已收到退貨', created_by: actor });
+    return NextResponse.json(data as ReturnRequest);
+  }
+
+  if (action === 'processing') {
+    const { data } = await supabase.from('returns').update({ status: 'PROCESSING' }).eq('id', returnId).select().single();
+    await supabase.from('order_status_history').insert({ order_id: id, type: 'order', from_status: 'RETURN', to_status: 'RETURN_PROCESSING', note: '退款處理中', created_by: actor });
+    return NextResponse.json(data as ReturnRequest);
+  }
+
+  if (action === 'complete') {
+    const { data } = await supabase.from('returns').update({ status: 'COMPLETED', completed_at: nowIso }).eq('id', returnId).select().single();
+    await supabase.from('orders').update({ fulfillment_status: 'RETURNED' }).eq('id', id);
+    await supabase.from('order_status_history').insert({ order_id: id, type: 'order', from_status: 'RETURN', to_status: 'RETURN_COMPLETED', note: '退貨完成', created_by: actor });
     return NextResponse.json(data as ReturnRequest);
   }
 
   if (action === 'refund') {
-    const { data: order } = await supabase.from('orders').select('total, refund_amount, paid').eq('id', id).maybeSingle();
-    if (!order) return NextResponse.json({ error: '找不到訂單' }, { status: 404 });
     const amount = Number(ret.refund_amount) || 0;
     const refundNo = await genNo(supabase, 'refunds', 'RF');
     await supabase.from('refunds').insert({ refund_no: refundNo, order_id: id, return_id: returnId, amount, reason: '退貨退款', status: 'COMPLETED', created_by: actor });
 
     const newRefundTotal = (Number(order.refund_amount) || 0) + amount;
     const payStatus = newRefundTotal >= Number(order.total) ? 'REFUNDED' : 'PARTIALLY_REFUNDED';
-    await supabase.from('orders').update({ refund_amount: newRefundTotal, net_amount: Number(order.total) - newRefundTotal, payment_status: payStatus }).eq('id', id);
+    await supabase.from('orders').update({ refund_amount: newRefundTotal, net_amount: Number(order.total) - newRefundTotal, payment_status: payStatus, fulfillment_status: 'RETURNED' }).eq('id', id);
 
-    const { data } = await supabase.from('returns').update({ status: 'COMPLETED', completed_at: nowIso }).eq('id', returnId).select().single();
+    const { data } = await supabase.from('returns').update({ status: 'REFUNDED', completed_at: nowIso }).eq('id', returnId).select().single();
     await supabase.from('order_status_history').insert({ order_id: id, type: 'payment', from_status: order.paid ? 'PAID' : 'UNPAID', to_status: payStatus, note: `退貨退款 ${refundNo}(${amount})`, created_by: actor });
     return NextResponse.json(data as ReturnRequest);
   }

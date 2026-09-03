@@ -14,6 +14,7 @@ import type {
   OrderDetail,
   OrderStatusHistory,
   Product,
+  ReturnRequest,
   SiteSettings,
   StockMovement,
   UserCoupon,
@@ -386,6 +387,7 @@ export default function AdminDashboard({
   const [editBannerId, setEditBannerId] = useState<string | null>(null);
   const [newCat, setNewCat] = useState({ slug: '', name: '', en: '' });
   const [newDiscount, setNewDiscount] = useState<DiscountDraft>(blankDiscountDraft());
+  const [couponModalOpen, setCouponModalOpen] = useState(false);
   const [discountQuery, setDiscountQuery] = useState('');
   const [discountStatus, setDiscountStatus] = useState('全部');
   const [userCoupons, setUserCoupons] = useState<UserCoupon[]>(initialUserCoupons);
@@ -998,6 +1000,7 @@ export default function AdminDashboard({
     if (res.ok) {
       setDiscounts((l) => [data as Discount, ...l]);
       setNewDiscount(blankDiscountDraft());
+      setCouponModalOpen(false);
     } else void uiAlert(data.error ?? '新增失敗(折扣碼可能重複)');
   }
 
@@ -2084,7 +2087,17 @@ export default function AdminDashboard({
                 <StatCard label="優惠券折抵" value={formatter.format(couponStats.discountTotal)} />
                 <StatCard label="帶來營收" value={formatter.format(couponStats.revenue)} />
               </div>
-              <Card title="優惠券管理">
+              <Card
+                title="優惠券管理"
+                action={
+                  <button
+                    onClick={() => setCouponModalOpen(true)}
+                    className="rounded-full bg-[#1f1b19] px-4 py-2 text-sm font-semibold text-white hover:bg-black"
+                  >
+                    ＋ 新增優惠券
+                  </button>
+                }
+              >
                 <div className="mb-4 flex flex-wrap gap-2">
                   <input
                     value={discountQuery}
@@ -2179,7 +2192,14 @@ export default function AdminDashboard({
                   </div>
                 )}
               </Card>
-              <Card title="新增優惠券">
+              {couponModalOpen && (
+              <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4" onClick={() => setCouponModalOpen(false)}>
+              <div className="flex max-h-[92dvh] w-full max-w-3xl flex-col overflow-hidden rounded-t-2xl bg-white sm:rounded-2xl" onClick={(e) => e.stopPropagation()}>
+                <div className="flex shrink-0 items-center justify-between border-b border-[#e5ded4] px-5 py-4">
+                  <h2 className="text-lg font-semibold">新增優惠券</h2>
+                  <button onClick={() => setCouponModalOpen(false)} aria-label="關閉" className="rounded-md p-1 text-2xl leading-none hover:bg-[#efe8dd]">×</button>
+                </div>
+                <div className="flex-1 overflow-y-auto overscroll-contain p-5">
                 <div className="grid gap-4 md:grid-cols-3">
                   <Labeled label="優惠券名稱"><input value={newDiscount.name} onChange={(e) => setNewDiscount({ ...newDiscount, name: e.target.value })} className="w-full rounded border border-[#e5ded4] px-3 py-2" /></Labeled>
                   <Labeled label="優惠碼"><input value={newDiscount.code} onChange={(e) => setNewDiscount({ ...newDiscount, code: e.target.value })} className="w-full rounded border border-[#e5ded4] px-3 py-2" /></Labeled>
@@ -2200,8 +2220,14 @@ export default function AdminDashboard({
                     <label className="flex items-center gap-2"><input type="checkbox" checked={newDiscount.stackable} onChange={(e) => setNewDiscount({ ...newDiscount, stackable: e.target.checked })} /> 可與其他優惠併用</label>
                   </div>
                 </div>
-                <button onClick={addDiscount} className="mt-5 rounded-full bg-[#1f1b19] px-5 py-2.5 text-sm font-semibold text-white">新增優惠券</button>
-              </Card>
+                </div>
+                <div className="flex shrink-0 justify-end gap-2 border-t border-[#e5ded4] px-5 py-4">
+                  <button onClick={() => setCouponModalOpen(false)} className="rounded-full border border-[#d7c9bd] px-5 py-2.5 text-sm font-semibold text-[#6b6156] hover:bg-[#efe8dd]">取消</button>
+                  <button onClick={() => { addDiscount(); }} className="rounded-full bg-[#1f1b19] px-5 py-2.5 text-sm font-semibold text-white">新增優惠券</button>
+                </div>
+              </div>
+              </div>
+              )}
             </div>
           )}
 
@@ -3554,6 +3580,44 @@ function escapeHtml(s: string): string {
   return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
+// 退貨狀態推進(賣家):已收到退貨 / 處理中 / 已退款 / 已完成
+function ReturnStatusControl({
+  r,
+  busy,
+  onAction,
+}: {
+  r: ReturnRequest;
+  busy: boolean;
+  onAction: (action: 'received' | 'processing' | 'refund' | 'complete') => void;
+}) {
+  const [sel, setSel] = useState<'received' | 'processing' | 'refund' | 'complete'>('received');
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <select
+        value={sel}
+        onChange={(e) => setSel(e.target.value as typeof sel)}
+        className="rounded-lg border border-[#d7c9bd] bg-white px-2 py-1 text-xs"
+      >
+        <option value="received">已收到退貨(回補庫存)</option>
+        <option value="processing">退款處理中</option>
+        <option value="refund">已退款(建立退款單)</option>
+        <option value="complete">已完成</option>
+      </select>
+      <button
+        onClick={async () => {
+          if (sel === 'received' && !(await uiConfirm('標記已收到退貨?將回補庫存。'))) return;
+          if (sel === 'refund' && !(await uiConfirm(`退款 ${formatter.format(r.refund_amount)}?\n(實際退刷仍需至金流後台操作)`))) return;
+          onAction(sel);
+        }}
+        disabled={busy}
+        className="rounded-full bg-[#1f1b19] px-3 py-1 text-xs font-semibold text-white disabled:opacity-50"
+      >
+        更新
+      </button>
+    </div>
+  );
+}
+
 // 後台專用的訂單完整資訊(含出貨狀態 / 付款管理;與客人端的訂單明細分開)
 function AdminOrderModal({
   order,
@@ -3601,7 +3665,7 @@ function AdminOrderModal({
   }, [order.id, onOrderChange]);
   useEffect(() => { loadDetail(); }, [loadDetail]);
 
-  async function reviewReturn(returnId: string, action: 'approve' | 'reject' | 'received' | 'refund', response = '') {
+  async function reviewReturn(returnId: string, action: 'approve' | 'reject' | 'received' | 'processing' | 'refund' | 'complete', response = '') {
     if (busy) return;
     setBusy(true);
     try {
@@ -3971,18 +4035,17 @@ ${order.note ? `<div class="sec"><h2>備註</h2><p class="muted">${escapeHtml(or
                     <p className="mt-1 text-xs text-[#6b6156]">{r.items.map((it) => `${it.name}${it.variant ? `(${it.variant})` : ''}×${it.quantity}`).join('、')}</p>
                     <p className="mt-0.5 text-xs text-[#8a7f72]">原因：{r.reason || '—'}｜退款 {formatter.format(r.refund_amount)}</p>
                     {r.response ? <p className="mt-0.5 text-xs text-[#8a7f72]">回覆：{r.response}</p> : null}
-                    <div className="mt-2 flex flex-wrap gap-2">
+                    {r.return_tracking || r.return_carrier ? (
+                      <p className="mt-0.5 text-xs text-[#1f7a44]">買家已寄回：{r.return_carrier} {r.return_tracking}</p>
+                    ) : null}
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
                       {r.status === 'REQUESTED' ? (
                         <>
                           <button onClick={() => reviewReturn(r.id, 'approve')} disabled={busy} className="rounded-full bg-[#1f7a44] px-3 py-1 text-xs font-semibold text-white disabled:opacity-50">核准退貨</button>
                           <button onClick={async () => { const resp = await uiPrompt('婉拒退貨,回覆客人(選填):'); if (resp !== null) reviewReturn(r.id, 'reject', resp); }} disabled={busy} className="rounded-full border border-[#e0b4b4] px-3 py-1 text-xs font-semibold text-[#c0392b] disabled:opacity-50">婉拒</button>
                         </>
-                      ) : null}
-                      {r.status === 'APPROVED' ? (
-                        <button onClick={async () => { if (await uiConfirm('標記已收到退貨?將回補庫存。')) reviewReturn(r.id, 'received'); }} disabled={busy} className="rounded-full bg-[#1f1b19] px-3 py-1 text-xs font-semibold text-white disabled:opacity-50">已收到退貨(回補庫存)</button>
-                      ) : null}
-                      {r.status === 'RECEIVED' ? (
-                        <button onClick={async () => { if (await uiConfirm(`退款 ${formatter.format(r.refund_amount)} 並完成此退貨?\n(實際退刷仍需至金流後台操作)`)) reviewReturn(r.id, 'refund'); }} disabled={busy} className="rounded-full bg-[#c84767] px-3 py-1 text-xs font-semibold text-white disabled:opacity-50">退款完成</button>
+                      ) : r.status !== 'REJECTED' && r.status !== 'REFUNDED' && r.status !== 'COMPLETED' ? (
+                        <ReturnStatusControl r={r} busy={busy} onAction={(action) => reviewReturn(r.id, action)} />
                       ) : null}
                     </div>
                   </div>

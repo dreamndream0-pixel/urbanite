@@ -298,11 +298,14 @@ export type ReturnRequest = {
   order_id: string;
   user_id?: string | null;
   reason?: string;
-  status: string; // REQUESTED / APPROVED / REJECTED / RECEIVED / COMPLETED
+  status: string; // REQUESTED / APPROVED / REJECTED / SHIPPED_BACK / RECEIVED / PROCESSING / REFUNDED / COMPLETED
   items: ReturnItem[];
   refund_amount: number;
   response?: string;
   restocked?: boolean;
+  return_carrier?: string;
+  return_tracking?: string;
+  shipped_back_at?: string | null;
   requested_at?: string;
   reviewed_at?: string | null;
   received_at?: string | null;

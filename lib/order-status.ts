@@ -86,7 +86,7 @@ export function buildProgress(order: {
 }
 
 // 會員「我的訂單」分頁
-export type OrderTab = 'all' | 'unpaid' | 'to_ship' | 'shipping' | 'done' | 'cancelled';
+export type OrderTab = 'all' | 'unpaid' | 'to_ship' | 'shipping' | 'done' | 'returning' | 'cancelled';
 
 export const ORDER_TABS: { key: OrderTab; label: string }[] = [
   { key: 'all', label: '全部' },
@@ -94,7 +94,8 @@ export const ORDER_TABS: { key: OrderTab; label: string }[] = [
   { key: 'to_ship', label: '待出貨' },
   { key: 'shipping', label: '配送中' },
   { key: 'done', label: '已完成' },
-  { key: 'cancelled', label: '取消/退貨' },
+  { key: 'returning', label: '退貨申請中' },
+  { key: 'cancelled', label: '取消/已退貨' },
 ];
 
 type TabOrder = {
@@ -105,8 +106,9 @@ type TabOrder = {
 };
 
 export function orderTabOf(order: TabOrder): Exclude<OrderTab, 'all'> {
-  if (order.status === '取消' || order.status === '退貨' || order.cancel_status === 'APPROVED') return 'cancelled';
   const f = order.fulfillment_status ?? '';
+  if (f === 'RETURNING') return 'returning';                 // 退貨處理中
+  if (order.status === '取消' || order.status === '退貨' || order.cancel_status === 'APPROVED' || f === 'RETURNED') return 'cancelled';
   if (order.status === '已完成' || f === 'DELIVERED') return 'done';
   if (['SHIPPED', 'IN_TRANSIT'].includes(f) || order.status === '已出貨') return 'shipping';
   if (!order.paid) return 'unpaid';
@@ -133,9 +135,17 @@ export const RETURN_STATUS_LABEL: Record<string, string> = {
   REQUESTED: '退貨申請中',
   APPROVED: '已核准，待寄回',
   REJECTED: '退貨申請被婉拒',
+  SHIPPED_BACK: '買家已寄回',
   RECEIVED: '已收到退貨',
-  COMPLETED: '退款完成',
+  PROCESSING: '退款處理中',
+  REFUNDED: '已退款',
+  COMPLETED: '已完成',
 };
+
+// 退貨是否已進入終結狀態(不可再變更)
+export function isReturnTerminal(status: string): boolean {
+  return status === 'REJECTED' || status === 'REFUNDED' || status === 'COMPLETED';
+}
 
 // 訂單是否可申請退貨:已送達 / 已完成,且未取消。
 export function canRequestReturn(order: { status: string; fulfillment_status?: string }): boolean {

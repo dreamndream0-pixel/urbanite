@@ -251,7 +251,7 @@ export default function AccountClient({
 
       {/* 分頁列 */}
       <div className="border-b border-[#e5ded4] bg-[#faf7f2]">
-        <div className="mx-auto flex max-w-4xl gap-1 overflow-x-auto px-4 sm:px-6">
+        <div className="mx-auto flex max-w-4xl gap-1 overflow-x-auto overflow-y-hidden px-4 sm:px-6">
           {TABS.map((t) => (
             <button
               key={t.key}
@@ -884,6 +884,8 @@ function OrderModal({
   const dateStr = order.created_at ? new Date(order.created_at).toLocaleString('zh-TW') : '';
   const [returns, setReturns] = useState<ReturnRequest[]>([]);
   const [showReturn, setShowReturn] = useState(false);
+  const [shipForm, setShipForm] = useState({ carrier: '', tracking: '' });
+  const [shipBusy, setShipBusy] = useState(false);
   const hasActiveReturn = returns.some((r) => r.status !== 'REJECTED');
 
   const loadReturns = useCallback(() => {
@@ -893,6 +895,22 @@ function OrderModal({
       .catch(() => {});
   }, [order.id]);
   useEffect(() => { loadReturns(); }, [loadReturns]);
+
+  async function markShipped(returnId: string) {
+    if (shipBusy || (!shipForm.carrier.trim() && !shipForm.tracking.trim())) return;
+    setShipBusy(true);
+    try {
+      const res = await fetch(`/api/orders/${order.id}/returns`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ return_id: returnId, action: 'shipped', return_carrier: shipForm.carrier.trim(), return_tracking: shipForm.tracking.trim() }),
+      });
+      if (!res.ok) { void uiAlert((await res.json()).error ?? '回報失敗'); return; }
+      setShipForm({ carrier: '', tracking: '' });
+      loadReturns();
+      void uiAlert('已回報寄件,賣家收到退貨後會為你處理退款。');
+    } finally { setShipBusy(false); }
+  }
 
   return (
     <div
@@ -1027,10 +1045,39 @@ function OrderModal({
                   </p>
                   <p className="mt-0.5 text-xs text-[#6b6156]">退款金額 {formatter.format(r.refund_amount)}</p>
                   {r.response ? <p className="mt-0.5 text-xs text-[#6b6156]">賣家回覆：{r.response}</p> : null}
+                  {r.return_tracking || r.return_carrier ? (
+                    <p className="mt-0.5 text-xs text-[#6b6156]">寄回物流：{r.return_carrier} {r.return_tracking}</p>
+                  ) : null}
                   {r.status === 'APPROVED' && returnInfo ? (
                     <div className="mt-2 rounded-lg bg-[#faf6ea] p-2 text-xs">
                       <p className="font-semibold text-[#8a6d1b]">退貨寄回資訊</p>
                       <p className="mt-0.5 whitespace-pre-wrap text-[#6b6156]">{returnInfo}</p>
+                    </div>
+                  ) : null}
+                  {r.status === 'APPROVED' ? (
+                    <div className="mt-2 rounded-lg border border-[#e5ded4] p-2">
+                      <p className="mb-1 text-xs font-semibold text-[#6b6156]">寄回後請回報物流</p>
+                      <div className="flex flex-wrap gap-2">
+                        <input
+                          value={shipForm.carrier}
+                          onChange={(e) => setShipForm({ ...shipForm, carrier: e.target.value })}
+                          placeholder="物流公司(例:黑貓)"
+                          className="min-w-0 flex-1 rounded-lg border border-[#e5ded4] px-2 py-1.5 text-xs"
+                        />
+                        <input
+                          value={shipForm.tracking}
+                          onChange={(e) => setShipForm({ ...shipForm, tracking: e.target.value })}
+                          placeholder="物流單號"
+                          className="min-w-0 flex-1 rounded-lg border border-[#e5ded4] px-2 py-1.5 text-xs"
+                        />
+                        <button
+                          onClick={() => markShipped(r.id)}
+                          disabled={shipBusy}
+                          className="rounded-full bg-[#1f1b19] px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
+                        >
+                          已寄回退貨商品
+                        </button>
+                      </div>
                     </div>
                   ) : null}
                 </div>
