@@ -45,7 +45,7 @@ function plainText(value = '') {
 }
 
 // 前台分類 tab 用的型別(虛擬的「全部」也用同一形狀)
-type CategoryTab = { slug: string; name: string; en: string };
+type CategoryTab = { slug: string; name: string; en: string; children?: CategoryTab[] };
 const ALL_TAB: CategoryTab = { slug: 'all', name: '全部', en: 'ALL' };
 
 function readCart(): CartItem[] {
@@ -196,11 +196,21 @@ export default function Home() {
     setAccountOpen(false);
   }
 
+  const visibleCats = dbCategories.filter((c) => c.sort_order >= 0);
+  const childrenOf = (pid: string): CategoryTab[] =>
+    visibleCats
+      .filter((c) => c.parent_id === pid)
+      .map((c) => ({ slug: c.slug, name: c.name, en: c.en || c.slug.toUpperCase() }));
   const categoryTabs: CategoryTab[] = [
     ALL_TAB,
-    ...dbCategories
-      .filter((c) => c.sort_order >= 0)
-      .map((c) => ({ slug: c.slug, name: c.name, en: c.en || c.slug.toUpperCase() })),
+    ...visibleCats
+      .filter((c) => !c.parent_id)
+      .map((c) => ({
+        slug: c.slug,
+        name: c.name,
+        en: c.en || c.slug.toUpperCase(),
+        children: childrenOf(c.id),
+      })),
   ];
 
   const liveProducts = products.filter((p) => p.status !== '已下架');
@@ -464,19 +474,43 @@ export default function Home() {
         {/* 分類篩選列 */}
         <div className="-mx-4 mt-5 overflow-x-auto px-4 sm:mx-0 sm:px-0">
           <div className="flex w-max min-w-full items-center gap-3 whitespace-nowrap sm:justify-center">
-            {categoryTabs.map((c) => (
-              <button
-                key={c.slug}
-                onClick={() => setCategory(c.slug)}
-                className={`shrink-0 rounded-full border px-5 py-3 text-sm font-semibold tracking-wide transition sm:px-7 ${
-                  category === c.slug
-                    ? 'border-[#1f1b19] bg-[#1f1b19] text-white shadow-sm'
-                    : 'border-[#e0d7cc] bg-[#faf7f2] text-[#8a7f72] hover:border-[#cfc1b3] hover:text-[#1f1b19]'
-                }`}
-              >
-                {c.slug === 'all' ? '全部商品' : c.name}
-              </button>
-            ))}
+            {categoryTabs.map((c) => {
+              const activeHere =
+                category === c.slug || (c.children?.some((s) => s.slug === category) ?? false);
+              return (
+                <div key={c.slug} className="group relative shrink-0">
+                  <button
+                    onClick={() => setCategory(c.slug)}
+                    className={`shrink-0 rounded-full border px-5 py-3 text-sm font-semibold tracking-wide transition sm:px-7 ${
+                      activeHere
+                        ? 'border-[#1f1b19] bg-[#1f1b19] text-white shadow-sm'
+                        : 'border-[#e0d7cc] bg-[#faf7f2] text-[#8a7f72] hover:border-[#cfc1b3] hover:text-[#1f1b19]'
+                    }`}
+                  >
+                    {c.slug === 'all' ? '全部商品' : c.name}
+                  </button>
+                  {c.children && c.children.length > 0 && (
+                    <div className="absolute left-1/2 top-full z-30 hidden -translate-x-1/2 pt-2 group-hover:block">
+                      <div className="min-w-[9rem] rounded-xl border border-[#e5ded4] bg-white p-1.5 shadow-lg">
+                        {c.children.map((s) => (
+                          <button
+                            key={s.slug}
+                            onClick={() => setCategory(s.slug)}
+                            className={`block w-full whitespace-nowrap rounded-lg px-4 py-2 text-left text-sm transition ${
+                              category === s.slug
+                                ? 'bg-[#1f1b19] text-white'
+                                : 'text-[#3d3935] hover:bg-[#f3ede4]'
+                            }`}
+                          >
+                            {s.name}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
 
@@ -1130,16 +1164,32 @@ function SideMenu({
         </div>
         <nav className="flex-1 overflow-auto px-5 py-6">
           {categories.map((c) => (
-            <button
-              key={c.slug}
-              onClick={() => onSelect(c.slug)}
-              className={`block w-full border-b border-[#efe8dd] py-4 text-left transition ${
-                current === c.slug ? 'text-[#1f1b19]' : 'text-[#6b6156] hover:text-[#1f1b19]'
-              }`}
-            >
-              <span className="block text-[11px] tracking-[0.2em] text-[#a99e8f]">{c.en}</span>
-              <span className="mt-0.5 block text-lg font-medium">{c.name}</span>
-            </button>
+            <div key={c.slug} className="border-b border-[#efe8dd]">
+              <button
+                onClick={() => onSelect(c.slug)}
+                className={`block w-full py-4 text-left transition ${
+                  current === c.slug ? 'text-[#1f1b19]' : 'text-[#6b6156] hover:text-[#1f1b19]'
+                }`}
+              >
+                <span className="block text-[11px] tracking-[0.2em] text-[#a99e8f]">{c.en}</span>
+                <span className="mt-0.5 block text-lg font-medium">{c.name}</span>
+              </button>
+              {c.children && c.children.length > 0 && (
+                <div className="pb-3 pl-4">
+                  {c.children.map((s) => (
+                    <button
+                      key={s.slug}
+                      onClick={() => onSelect(s.slug)}
+                      className={`block w-full py-2 text-left text-sm transition ${
+                        current === s.slug ? 'font-semibold text-[#1f1b19]' : 'text-[#8a7f72] hover:text-[#1f1b19]'
+                      }`}
+                    >
+                      └ {s.name}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           ))}
         </nav>
       </aside>

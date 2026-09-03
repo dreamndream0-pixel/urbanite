@@ -264,6 +264,33 @@ function nextDocumentNo(movements: StockMovement[]) {
   return `${prefix}${String(next).padStart(3, '0')}`;
 }
 
+// 把扁平分類依 parent_id 組成樹狀順序(父後面接子,附深度供縮排)
+function buildCategoryTree(cats: Category[]): { cat: Category; depth: number }[] {
+  const byParent = new Map<string, Category[]>();
+  for (const c of cats) {
+    const key = c.parent_id || '';
+    const list = byParent.get(key) ?? [];
+    list.push(c);
+    byParent.set(key, list);
+  }
+  for (const list of byParent.values())
+    list.sort((a, b) => Math.abs(a.sort_order) - Math.abs(b.sort_order));
+  const result: { cat: Category; depth: number }[] = [];
+  const walk = (parentKey: string, depth: number) => {
+    for (const c of byParent.get(parentKey) ?? []) {
+      result.push({ cat: c, depth });
+      walk(c.id, depth + 1);
+    }
+  };
+  walk('', 0);
+  // 保底:萬一有分類的 parent 不存在(孤兒),補在最後
+  if (result.length < cats.length) {
+    const seen = new Set(result.map((r) => r.cat.id));
+    for (const c of cats) if (!seen.has(c.id)) result.push({ cat: c, depth: 0 });
+  }
+  return result;
+}
+
 function blankDraft(): Draft {
   return {
     id: '',
@@ -1742,14 +1769,15 @@ export default function AdminDashboard({
                       </tr>
                     </thead>
                     <tbody>
-                      {[...categories].sort((a, b) => Math.abs(a.sort_order) - Math.abs(b.sort_order)).map((c) => {
+                      {buildCategoryTree(categories).map(({ cat: c, depth }) => {
                         const count = products.filter((product) => product.category === c.slug).length;
                         const image = products.find((product) => product.category === c.slug && product.image)?.image;
                         const visible = c.sort_order >= 0;
                         return (
                           <tr key={c.id} className="border-b border-[#e5ded4] last:border-0">
                             <td className="px-4 py-4">
-                              <div className="flex items-center gap-4">
+                              <div className="flex items-center gap-4" style={{ paddingLeft: depth * 24 }}>
+                                {depth > 0 && <span className="text-[#c9bdb0]">└</span>}
                                 <div className="flex h-14 w-14 items-center justify-center overflow-hidden rounded bg-[#f1f1f1]">
                                   {image ? <img src={image} alt="" className="h-full w-full object-cover" /> : <span className="text-xs text-[#bbb]">無圖</span>}
                                 </div>
