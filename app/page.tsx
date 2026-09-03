@@ -5,9 +5,22 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createBrowserSupabase } from '@/lib/supabase/client';
 import type { Product, Category, SiteSettings, Banner } from '@/lib/types';
+import { uiAlert } from '@/lib/ui-dialog';
 
 // 購物車存在瀏覽器本機的 key(結帳頁會讀同一份)
 const CART_KEY = 'cart';
+
+// 依商品/規格計算目前可加入的庫存;預購商品不受限。
+function stockOf(product: Product | undefined, variant: string): number {
+  if (!product) return Number.POSITIVE_INFINITY;
+  if ((product.sale_mode || '').includes('預購')) return Number.POSITIVE_INFINITY;
+  const vs = product.variants ?? [];
+  if (vs.length > 0) {
+    const v = vs.find((vv) => vv.options.join(' / ') === variant);
+    return Math.max(0, v?.inventory ?? 0);
+  }
+  return Math.max(0, product.inventory ?? 0);
+}
 
 type CartItem = {
   id: string;
@@ -69,6 +82,39 @@ export default function Home() {
   const [user, setUser] = useState<{ email: string; name: string; isAdmin: boolean } | null>(null);
   const [accountOpen, setAccountOpen] = useState(false);
   const [quickAdd, setQuickAdd] = useState<Product | null>(null);
+  const cartIconRef = useRef<HTMLButtonElement>(null);
+  const [cartToast, setCartToast] = useState(false);
+  const cartToastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  function notifyAdded() {
+    setCartToast(true);
+    if (cartToastTimer.current) clearTimeout(cartToastTimer.current);
+    cartToastTimer.current = setTimeout(() => setCartToast(false), 3000);
+  }
+
+  // 加入購物車特效:一張商品縮圖從來源位置飛向右上角購物車圖示
+  function flyToCart(imgUrl: string, sourceRect: DOMRect | null) {
+    if (typeof document === 'undefined') return;
+    const target = cartIconRef.current?.getBoundingClientRect();
+    if (!imgUrl || !sourceRect || !target) return;
+    const el = document.createElement('img');
+    el.src = imgUrl;
+    el.setAttribute('aria-hidden', 'true');
+    el.style.cssText =
+      `position:fixed;left:${sourceRect.left}px;top:${sourceRect.top}px;` +
+      `width:${sourceRect.width}px;height:${sourceRect.height}px;object-fit:contain;` +
+      `border-radius:14px;z-index:100;pointer-events:none;opacity:.95;` +
+      `transition:left .7s cubic-bezier(.5,-0.2,.7,1),top .7s cubic-bezier(.5,-0.2,.7,1),width .7s ease,height .7s ease,opacity .7s ease;`;
+    document.body.appendChild(el);
+    requestAnimationFrame(() => {
+      el.style.left = `${target.left + target.width / 2 - 11}px`;
+      el.style.top = `${target.top + target.height / 2 - 11}px`;
+      el.style.width = '22px';
+      el.style.height = '22px';
+      el.style.opacity = '0.15';
+    });
+    window.setTimeout(() => el.remove(), 760);
+  }
 
   useEffect(() => {
     fetch('/api/products')
@@ -209,25 +255,49 @@ export default function Home() {
       opts?.variant ??
       ([product.colors[0], product.sizes[0]].filter(Boolean).join(' / ') || '標準款');
     const id = `${product.id}-${variant}`;
+    const stock = stockOf(product, variant);
+    const current = cart.find((item) => item.id === id)?.quantity ?? 0;
+
+    if (stock <= 0) {
+      void uiAlert('此商品目前無庫存,暫時無法加入購物車。');
+      return;
+    }
+    const desired = current + quantity;
+    const capped = Math.min(desired, stock);
+    if (capped <= current) {
+      void uiAlert(`此商品（${variant}）庫存僅剩 ${stock} 件,購物車已達可加入上限。`);
+      if (opts?.openCart !== false) setCartOpen(true);
+      return;
+    }
+    if (capped < desired) {
+      void uiAlert(`此商品（${variant}）庫存僅剩 ${stock} 件,已為你調整為最大可購數量。`);
+    }
     setCart((items) => {
       const existing = items.find((item) => item.id === id);
       if (existing) {
-        return items.map((item) =>
-          item.id === id ? { ...item, quantity: item.quantity + quantity } : item,
-        );
+        return items.map((item) => (item.id === id ? { ...item, quantity: capped } : item));
       }
       return [
         ...items,
-        { id, productId: product.id, name: product.name, variant, price: product.price, quantity },
+        { id, productId: product.id, name: product.name, variant, price: product.price, quantity: capped },
       ];
     });
+    notifyAdded();
     if (opts?.openCart !== false) setCartOpen(true);
   }
 
   function updateCart(id: string, change: number) {
     setCart((items) =>
       items
-        .map((item) => ({ ...item, quantity: Math.max(0, item.quantity + change) }))
+        .map((item) => {
+          if (item.id !== id) return item;
+          let next = item.quantity + change;
+          if (change > 0) {
+            const stock = stockOf(products.find((p) => p.id === item.productId), item.variant);
+            next = Math.min(next, stock);
+          }
+          return { ...item, quantity: Math.max(0, next) };
+        })
         .filter((item) => item.id !== id || item.quantity > 0),
     );
   }
@@ -311,6 +381,7 @@ export default function Home() {
               )}
             </button>
             <button
+              ref={cartIconRef}
               onClick={() => setCartOpen(true)}
               aria-label="購物車"
               className="relative rounded-md p-2 hover:bg-[#efe8dd]"
@@ -474,6 +545,7 @@ export default function Home() {
         onClose={() => setCartOpen(false)}
         onUpdate={updateCart}
         onAdd={(product) => addToCart(product, { openCart: false })}
+        maxOf={(item) => stockOf(products.find((p) => p.id === item.productId), item.variant)}
         onCheckout={() => {
           setCartOpen(false);
           router.push('/checkout');
@@ -499,6 +571,7 @@ export default function Home() {
           favorited={favorites.has(quickAdd.id)}
           onFavorite={() => toggleFavorite(quickAdd.id)}
           onClose={() => setQuickAdd(null)}
+          onFly={flyToCart}
           onAdd={(variant, quantity, buyNow) => {
             addToCart(quickAdd, { variant, quantity, openCart: !buyNow });
             setQuickAdd(null);
@@ -506,6 +579,16 @@ export default function Home() {
           }}
         />
       )}
+
+      {/* 已加入購物車 提示(停約 3 秒後淡出) */}
+      <div
+        className={`pointer-events-none fixed right-4 top-20 z-[70] flex items-center gap-2 rounded-full bg-[#1f1b19] px-4 py-2.5 text-sm font-semibold text-white shadow-lg transition-all duration-500 ${
+          cartToast ? 'translate-y-0 opacity-100' : '-translate-y-2 opacity-0'
+        }`}
+      >
+        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#1f7a44] text-xs">✓</span>
+        已加入購物車
+      </div>
     </main>
   );
 }
@@ -1080,6 +1163,7 @@ function CartDrawer({
   onClose,
   onUpdate,
   onAdd,
+  maxOf,
   onCheckout,
 }: {
   cart: CartItem[];
@@ -1091,6 +1175,7 @@ function CartDrawer({
   onClose: () => void;
   onUpdate: (id: string, change: number) => void;
   onAdd: (product: Product) => void;
+  maxOf: (item: CartItem) => number;
   onCheckout: () => void;
 }) {
   return (
@@ -1135,14 +1220,23 @@ function CartDrawer({
                     </button>
                   </div>
                 </div>
-                <div className="mt-4 inline-flex items-center rounded-full border border-[#e5ded4]">
-                  <button className="px-3 py-1" onClick={() => onUpdate(item.id, -1)}>
-                    -
-                  </button>
-                  <span className="w-8 text-center text-sm">{item.quantity}</span>
-                  <button className="px-3 py-1" onClick={() => onUpdate(item.id, 1)}>
-                    +
-                  </button>
+                <div className="mt-4 flex items-center gap-3">
+                  <div className="inline-flex items-center rounded-full border border-[#e5ded4]">
+                    <button className="px-3 py-1" onClick={() => onUpdate(item.id, -1)}>
+                      -
+                    </button>
+                    <span className="w-8 text-center text-sm">{item.quantity}</span>
+                    <button
+                      className="px-3 py-1 disabled:cursor-not-allowed disabled:opacity-30"
+                      onClick={() => onUpdate(item.id, 1)}
+                      disabled={item.quantity >= maxOf(item)}
+                    >
+                      +
+                    </button>
+                  </div>
+                  {Number.isFinite(maxOf(item)) && item.quantity >= maxOf(item) ? (
+                    <span className="text-xs text-[#c0392b]">已達庫存上限（{maxOf(item)}）</span>
+                  ) : null}
                 </div>
               </div>
             ))
@@ -1365,15 +1459,18 @@ function QuickAddModal({
   onFavorite,
   onClose,
   onAdd,
+  onFly,
 }: {
   product: Product;
   favorited: boolean;
   onFavorite: () => void;
   onClose: () => void;
   onAdd: (variant: string, quantity: number, buyNow: boolean) => void;
+  onFly?: (imgUrl: string, rect: DOMRect | null) => void;
 }) {
   const specs = product.specs ?? [];
   const hasSpecs = specs.length > 0;
+  const imgRef = useRef<HTMLImageElement>(null);
   const [color, setColor] = useState(product.colors[0] ?? '');
   const [size, setSize] = useState(product.sizes[0] ?? '');
   const [specSel, setSpecSel] = useState<string[]>(() => specs.map((d) => d.options[0] ?? ''));
@@ -1388,6 +1485,8 @@ function QuickAddModal({
     : null;
   const inv = hasSpecs ? variant?.inventory ?? 0 : product.inventory;
   const soldOut = hasSpecs && allChosen && inv <= 0;
+  const preorder = (product.sale_mode || '').includes('預購');
+  const maxQty = preorder ? Number.POSITIVE_INFINITY : Math.max(0, hasSpecs ? (allChosen ? inv : 0) : product.inventory ?? 0);
 
   // 某規格選項在「其他維度目前選擇」下有沒有庫存;沒有就反白
   function optionAvailable(dimIndex: number, opt: string) {
@@ -1416,7 +1515,7 @@ function QuickAddModal({
         <div className="flex gap-4">
           <div className="h-40 w-40 shrink-0 overflow-hidden rounded-lg bg-[#e9e1d6]">
             {product.image ? (
-              <img src={product.image} alt={product.name} className="h-full w-full object-contain drop-shadow-[0_12px_14px_rgba(31,27,25,0.2)]" />
+              <img ref={imgRef} src={product.image} alt={product.name} className="h-full w-full object-contain drop-shadow-[0_12px_14px_rgba(31,27,25,0.2)]" />
             ) : (
               <div className="flex h-full w-full items-center justify-center text-sm text-[#a99]">無圖片</div>
             )}
@@ -1528,7 +1627,11 @@ function QuickAddModal({
               -
             </button>
             <div className="flex items-center justify-center border-x border-[#d8d2cc]">{quantity}</div>
-            <button onClick={() => setQuantity((q) => q + 1)} className="text-xl font-bold">
+            <button
+              onClick={() => setQuantity((q) => Math.min(q + 1, Math.max(1, maxQty)))}
+              disabled={quantity >= maxQty}
+              className="text-xl font-bold disabled:cursor-not-allowed disabled:opacity-30"
+            >
               +
             </button>
           </div>
@@ -1536,7 +1639,7 @@ function QuickAddModal({
 
         <div className="mt-6 grid grid-cols-2 gap-3">
           <button
-            onClick={() => onAdd(variantLabel, quantity, false)}
+            onClick={() => { onFly?.(product.image, imgRef.current?.getBoundingClientRect() ?? null); onAdd(variantLabel, quantity, false); }}
             disabled={!allChosen || soldOut}
             className="rounded-full bg-[#c84767] px-4 py-3 font-semibold text-white disabled:opacity-50"
           >

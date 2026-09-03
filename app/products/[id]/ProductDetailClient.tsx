@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Product } from '@/lib/types';
 
 const STORE_NAME = process.env.NEXT_PUBLIC_STORE_NAME || 'URBANITE';
@@ -77,6 +77,44 @@ export default function ProductDetailClient({ product }: { product: Product }) {
   const allSpecsChosen = !hasSpecs || specSel.every(Boolean);
   const variantInventory = hasSpecs ? selectedVariant?.inventory ?? 0 : product.inventory;
   const soldOut = hasSpecs && allSpecsChosen && variantInventory <= 0;
+  const preorder = (product.sale_mode || '').includes('預購');
+  const maxQty = preorder
+    ? Number.POSITIVE_INFINITY
+    : Math.max(0, hasSpecs ? (allSpecsChosen ? variantInventory : 0) : product.inventory ?? 0);
+
+  const cartIconRef = useRef<HTMLAnchorElement>(null);
+  const mainImgRef = useRef<HTMLImageElement>(null);
+  const [added, setAdded] = useState(false);
+  const addedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  function flyToCart() {
+    if (typeof document === 'undefined') return;
+    const src = mainImgRef.current?.getBoundingClientRect();
+    const target = cartIconRef.current?.getBoundingClientRect();
+    if (!src || !target || !activeImage) return;
+    const el = document.createElement('img');
+    el.src = activeImage;
+    el.setAttribute('aria-hidden', 'true');
+    el.style.cssText =
+      `position:fixed;left:${src.left}px;top:${src.top}px;width:${Math.min(src.width, 160)}px;` +
+      `height:${Math.min(src.height, 160)}px;object-fit:contain;border-radius:14px;z-index:100;` +
+      `pointer-events:none;opacity:.95;transition:left .7s cubic-bezier(.5,-0.2,.7,1),top .7s cubic-bezier(.5,-0.2,.7,1),width .7s ease,height .7s ease,opacity .7s ease;`;
+    document.body.appendChild(el);
+    requestAnimationFrame(() => {
+      el.style.left = `${target.left + target.width / 2 - 11}px`;
+      el.style.top = `${target.top + target.height / 2 - 11}px`;
+      el.style.width = '22px';
+      el.style.height = '22px';
+      el.style.opacity = '0.15';
+    });
+    window.setTimeout(() => el.remove(), 760);
+  }
+
+  function showAdded() {
+    setAdded(true);
+    if (addedTimer.current) clearTimeout(addedTimer.current);
+    addedTimer.current = setTimeout(() => setAdded(false), 3000);
+  }
 
   // 某規格選項在「其他維度目前的選擇」下是否有庫存;沒有就反白(不可選)
   function optionAvailable(dimIndex: number, opt: string) {
@@ -101,8 +139,17 @@ export default function ProductDetailClient({ product }: { product: Product }) {
       const raw = localStorage.getItem(CART_KEY);
       const cart: CartItem[] = raw ? JSON.parse(raw) : [];
       const existing = cart.find((it) => it.id === id);
+      const current = existing?.quantity ?? 0;
+      const capped = Math.min(current + quantity, maxQty);
+      if (capped <= current) {
+        setMessage(`此商品（${variantLabel}）庫存僅剩 ${maxQty} 件,已達可加入上限。`);
+        return;
+      }
+      if (capped < current + quantity) {
+        setMessage(`此商品（${variantLabel}）庫存僅剩 ${maxQty} 件,已為你調整數量。`);
+      }
       if (existing) {
-        existing.quantity += quantity;
+        existing.quantity = capped;
       } else {
         cart.push({
           id,
@@ -110,7 +157,7 @@ export default function ProductDetailClient({ product }: { product: Product }) {
           name: product.name,
           variant: variantLabel,
           price: product.price,
-          quantity,
+          quantity: capped,
         });
       }
       localStorage.setItem(CART_KEY, JSON.stringify(cart));
@@ -121,7 +168,8 @@ export default function ProductDetailClient({ product }: { product: Product }) {
     if (action === 'buy') {
       router.push('/checkout');
     } else {
-      setMessage(`已加入購物車：${variantLabel} x ${quantity}`);
+      flyToCart();
+      showAdded();
     }
   }
 
@@ -155,7 +203,7 @@ export default function ProductDetailClient({ product }: { product: Product }) {
             <Link href="/" aria-label="搜尋" className="rounded-md p-2 hover:bg-[#efe8dd]">
               <IconSearch />
             </Link>
-            <Link href="/checkout" aria-label="購物車" className="relative rounded-md p-2 hover:bg-[#efe8dd]">
+            <Link ref={cartIconRef} href="/checkout" aria-label="購物車" className="relative rounded-md p-2 hover:bg-[#efe8dd]">
               <IconBag />
               {cartCount > 0 && (
                 <span className="absolute -right-0.5 -top-0.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-[#c84767] px-1 text-[10px] font-semibold text-white">
@@ -175,7 +223,7 @@ export default function ProductDetailClient({ product }: { product: Product }) {
         <div className="lg:sticky lg:top-24">
         <div className="mx-auto aspect-[3/4] w-full max-w-md overflow-hidden rounded-xl bg-[#eee8e1] sm:max-w-lg lg:max-w-none">
           {activeImage ? (
-            <img src={activeImage} alt={product.name} className="h-full w-full object-contain drop-shadow-[0_18px_22px_rgba(31,27,25,0.22)]" />
+            <img ref={mainImgRef} src={activeImage} alt={product.name} className="h-full w-full object-contain drop-shadow-[0_18px_22px_rgba(31,27,25,0.22)]" />
           ) : (
             <div className="flex h-full items-center justify-center text-[#8a7f72]">無商品圖片</div>
           )}
@@ -326,7 +374,11 @@ export default function ProductDetailClient({ product }: { product: Product }) {
                 -
               </button>
               <div className="flex items-center justify-center border-x border-[#d8d2cc]">{quantity}</div>
-              <button onClick={() => setQuantity((q) => q + 1)} className="text-2xl font-bold">
+              <button
+                onClick={() => setQuantity((q) => Math.min(q + 1, Math.max(1, maxQty)))}
+                disabled={quantity >= maxQty}
+                className="text-2xl font-bold disabled:cursor-not-allowed disabled:opacity-30"
+              >
                 +
               </button>
             </div>
@@ -406,6 +458,16 @@ export default function ProductDetailClient({ product }: { product: Product }) {
           )}
         </section>
       </section>
+
+      {/* 已加入購物車 提示(停約 3 秒後淡出) */}
+      <div
+        className={`pointer-events-none fixed right-4 top-20 z-[70] flex items-center gap-2 rounded-full bg-[#1f1b19] px-4 py-2.5 text-sm font-semibold text-white shadow-lg transition-all duration-500 ${
+          added ? 'translate-y-0 opacity-100' : '-translate-y-2 opacity-0'
+        }`}
+      >
+        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#1f7a44] text-xs">✓</span>
+        已加入購物車
+      </div>
     </main>
   );
 }
