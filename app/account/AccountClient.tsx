@@ -19,6 +19,8 @@ import {
   type OrderTab,
 } from '@/lib/order-status';
 
+const STORE_NAME = process.env.NEXT_PUBLIC_STORE_NAME || 'URBANITE';
+
 const formatter = new Intl.NumberFormat('zh-TW', {
   style: 'currency',
   currency: 'TWD',
@@ -74,12 +76,16 @@ export default function AccountClient({
   const [cancelTarget, setCancelTarget] = useState<Order | null>(null);
   const [payTarget, setPayTarget] = useState<Order | null>(null);
   const [paymentAccounts, setPaymentAccounts] = useState<{ name: string; info: string }[]>([]);
+  const [logoUrl, setLogoUrl] = useState('');
   const [toast, setToast] = useState('');
 
   useEffect(() => {
     fetch('/api/settings')
       .then((res) => (res.ok ? res.json() : null))
-      .then((data: SiteSettings | null) => setPaymentAccounts(data?.payment_accounts ?? []))
+      .then((data: SiteSettings | null) => {
+        setPaymentAccounts(data?.payment_accounts ?? []);
+        if (data?.logo_url) setLogoUrl(data.logo_url);
+      })
       .catch(() => {});
   }, []);
 
@@ -153,19 +159,30 @@ export default function AccountClient({
 
   return (
     <main className="min-h-screen bg-[#f6f2ec] text-[#1f1b19]">
-      <header className="border-b border-[#e5ded4] bg-[#faf7f2]">
-        <div className="mx-auto flex max-w-4xl items-center justify-between px-4 py-4 sm:px-6">
-          <div>
-            <p className="text-xs font-semibold tracking-[0.2em] text-[#8a7f72]">會員中心</p>
-            <p className="mt-0.5 font-medium">{userName}</p>
-          </div>
-          <div className="flex items-center gap-2">
+      <header className="sticky top-0 z-30 border-b border-[#e5ded4] bg-[#faf7f2]/95 backdrop-blur">
+        <nav className="mx-auto grid max-w-6xl grid-cols-[1fr_auto_1fr] items-center px-4 py-4 sm:px-6 sm:py-5">
+          {/* 左:回商店 */}
+          <div className="flex items-center">
             <Link
               href="/"
               className="rounded-full border border-[#e5ded4] bg-white px-4 py-2 text-sm font-medium text-[#6b6156] hover:bg-[#efe8dd]"
             >
               繼續購物
             </Link>
+          </div>
+
+          {/* 中:Logo(與首頁一致) */}
+          <Link href="/" className="justify-self-center px-2 text-center">
+            {logoUrl ? (
+              <img src={logoUrl} alt={STORE_NAME} className="mx-auto h-8 w-auto object-contain sm:h-10" />
+            ) : (
+              <span className="font-serif text-2xl italic tracking-wide sm:text-3xl">{STORE_NAME}</span>
+            )}
+          </Link>
+
+          {/* 右:會員 + 登出 */}
+          <div className="flex items-center justify-end gap-3">
+            <span className="hidden text-sm text-[#6b6156] sm:inline">{userName}</span>
             <button
               onClick={signOut}
               className="rounded-full bg-[#1f1b19] px-4 py-2 text-sm font-semibold text-white"
@@ -173,7 +190,7 @@ export default function AccountClient({
               登出
             </button>
           </div>
-        </div>
+        </nav>
       </header>
 
       {/* 分頁列 */}
