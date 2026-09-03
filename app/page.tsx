@@ -472,7 +472,7 @@ export default function Home() {
         <HeroCarousel banners={banners.filter((b) => b.active)} />
 
         {/* 分類篩選列 */}
-        <div className="-mx-4 mt-5 overflow-x-auto px-4 sm:mx-0 sm:px-0">
+        <div className="-mx-4 mt-5 overflow-x-auto px-4 sm:mx-0 sm:overflow-visible sm:px-0">
           <div className="flex w-max min-w-full items-center gap-3 whitespace-nowrap sm:justify-center">
             {categoryTabs.map((c) => {
               const activeHere =
