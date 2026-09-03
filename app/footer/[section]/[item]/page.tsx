@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { createAdminClient } from '@/lib/supabase/admin';
 import type { Banner, SiteSettings } from '@/lib/types';
-import BackButton from './BackButton';
+import ShopHeader from '@/app/components/ShopHeader';
 
 export const dynamic = 'force-dynamic';
 
@@ -35,11 +35,11 @@ export default async function FooterContentPage({ params }: { params: Promise<{ 
 
   return (
     <main className="min-h-screen bg-[#f8f3ec] text-[#2c2826]">
+      <ShopHeader logoUrl={settings?.logo_url ?? ''} leftLabel="← 回首頁" />
       <section className="relative overflow-hidden border-b border-[#e5ded4]">
         <div className="relative mx-auto max-w-[92rem] px-6 py-8 sm:px-10 lg:min-h-[720px] lg:px-14 lg:py-12">
         <div className="relative z-10 max-w-3xl pb-10 lg:pb-16">
-          <BackButton />
-          <p className="mt-12 text-xs font-bold uppercase tracking-[0.28em] text-[#9a8f84]">
+          <p className="mt-8 text-xs font-bold uppercase tracking-[0.28em] text-[#9a8f84]">
             About Urbanite
           </p>
           <h1 className="mt-4 text-3xl font-bold tracking-wide sm:text-4xl">

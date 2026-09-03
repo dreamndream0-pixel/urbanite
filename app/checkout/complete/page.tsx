@@ -3,8 +3,7 @@
 import { Suspense, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-
-const STORE_NAME = process.env.NEXT_PUBLIC_STORE_NAME || 'URBANITE';
+import ShopHeader from '@/app/components/ShopHeader';
 
 type OrderStatus = {
   order_no: string;
@@ -57,17 +56,7 @@ function CompleteInner() {
 
   return (
     <main className="min-h-screen bg-[#f6f2ec] text-[#1f1b19]">
-      <header className="border-b border-[#e5ded4] bg-[#faf7f2]/95">
-        <div className="mx-auto flex max-w-3xl items-center justify-between px-4 py-4 sm:px-6">
-          <Link href="/" className="text-sm text-[#6b6156] hover:text-[#1f1b19]">
-            ← 回商店
-          </Link>
-          <Link href="/" className="font-serif text-xl italic tracking-wide">
-            {STORE_NAME}
-          </Link>
-          <span className="w-14" />
-        </div>
-      </header>
+      <ShopHeader leftLabel="← 回商店" />
 
       <div className="mx-auto max-w-lg px-4 py-14 sm:px-6">
         <div className="rounded-2xl bg-white p-8 text-center shadow-sm">

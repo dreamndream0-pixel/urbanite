@@ -609,13 +609,13 @@ function FavoritesDrawer({
   return (
     <>
       <div
-        className={`fixed inset-0 z-40 bg-black/30 transition-opacity duration-300 ${
+        className={`fixed inset-x-0 bottom-0 top-[72px] z-40 bg-black/30 transition-opacity duration-300 sm:top-[80px] ${
           open ? 'opacity-100' : 'pointer-events-none opacity-0'
         }`}
         onClick={onClose}
       />
       <aside
-        className={`fixed inset-y-0 right-0 z-50 flex w-full max-w-md flex-col bg-white shadow-2xl transition-transform duration-300 ${
+        className={`fixed bottom-0 right-0 top-[72px] z-50 flex w-full max-w-md flex-col bg-white shadow-2xl transition-transform duration-300 sm:top-[80px] ${
           open ? 'translate-x-0' : 'translate-x-full'
         }`}
       >
@@ -1181,13 +1181,13 @@ function CartDrawer({
   return (
     <>
       <div
-        className={`fixed inset-0 z-40 bg-black/30 transition-opacity duration-300 ${
+        className={`fixed inset-x-0 bottom-0 top-[72px] z-40 bg-black/30 transition-opacity duration-300 sm:top-[80px] ${
           open ? 'opacity-100' : 'pointer-events-none opacity-0'
         }`}
         onClick={onClose}
       />
       <aside
-        className={`fixed inset-y-0 right-0 z-50 flex w-full max-w-md flex-col bg-white shadow-2xl transition-transform duration-300 ${
+        className={`fixed bottom-0 right-0 top-[72px] z-50 flex w-full max-w-md flex-col bg-white shadow-2xl transition-transform duration-300 sm:top-[80px] ${
           open ? 'translate-x-0' : 'translate-x-full'
         }`}
       >

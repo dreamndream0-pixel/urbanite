@@ -4,8 +4,8 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import type { Product, Recipient, SiteSettings, UserCoupon } from '@/lib/types';
 import { isEcpayMethod } from '@/lib/payment';
+import ShopHeader from '@/app/components/ShopHeader';
 
-const STORE_NAME = process.env.NEXT_PUBLIC_STORE_NAME || 'URBANITE';
 const CART_KEY = 'cart';
 const FREE_SHIPPING_THRESHOLD = 2000;
 const SHIPPING_FEE = 120;
@@ -114,6 +114,7 @@ export default function CheckoutPage() {
   }, []);
 
   const subtotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const cartCount = cart.reduce((sum, item) => sum + item.quantity, 0);
   const freeShippingItems = cart.some((item) => {
     const product = products.find((entry) => entry.id === item.productId);
     return product?.available_shipping_methods?.includes('免運');
@@ -311,17 +312,7 @@ export default function CheckoutPage() {
 
   return (
     <main className="min-h-screen bg-[#f6f2ec] text-[#1f1b19]">
-      <header className="sticky top-0 z-30 border-b border-[#e5ded4] bg-[#faf7f2]/95 backdrop-blur">
-        <div className="mx-auto flex max-w-3xl items-center justify-between px-4 py-4 sm:px-6">
-          <Link href="/" className="text-sm text-[#6b6156] hover:text-[#1f1b19]">
-            ← 回商店
-          </Link>
-          <Link href="/" className="font-serif text-xl italic tracking-wide">
-            {STORE_NAME}
-          </Link>
-          <span className="w-14" />
-        </div>
-      </header>
+      <ShopHeader logoUrl={settings?.logo_url ?? ''} leftLabel="← 回商店" cartCount={cartCount} />
 
       <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6">
         <h1 className="mb-6 text-2xl font-semibold tracking-wide">訂單結帳</h1>

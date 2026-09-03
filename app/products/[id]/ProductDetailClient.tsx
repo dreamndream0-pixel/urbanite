@@ -203,6 +203,14 @@ export default function ProductDetailClient({ product }: { product: Product }) {
             <Link href="/" aria-label="搜尋" className="rounded-md p-2 hover:bg-[#efe8dd]">
               <IconSearch />
             </Link>
+            <button
+              type="button"
+              onClick={() => setFavorite((value) => !value)}
+              aria-label="收藏商品"
+              className="rounded-md p-2 hover:bg-[#efe8dd]"
+            >
+              <IconStar filled={favorite} />
+            </button>
             <Link ref={cartIconRef} href="/checkout" aria-label="購物車" className="relative rounded-md p-2 hover:bg-[#efe8dd]">
               <IconBag />
               {cartCount > 0 && (
@@ -367,6 +375,12 @@ export default function ProductDetailClient({ product }: { product: Product }) {
             </>
           )}
 
+          {message && (
+            <p className="mt-5 rounded-lg bg-[#f6f2ec] px-4 py-3 text-sm font-semibold text-[#5d5652]">
+              {message}
+            </p>
+          )}
+
           <section className="mt-6">
             <p className="mb-2 text-sm text-[#8a8480]">數量</p>
             <div className="grid h-12 grid-cols-[48px_1fr_48px] border border-[#d8d2cc]">
@@ -407,12 +421,6 @@ export default function ProductDetailClient({ product }: { product: Product }) {
           >
             <IconStar filled={favorite} /> 收藏
           </button>
-
-          {message && (
-            <p className="mt-5 rounded-lg bg-[#f6f2ec] px-4 py-3 text-center text-sm font-semibold text-[#5d5652]">
-              {message}
-            </p>
-          )}
         </div>
         </div>
 
