@@ -4,11 +4,10 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import type { Product, Recipient, SiteSettings, UserCoupon } from '@/lib/types';
 import { isOnlinePayment } from '@/lib/payment';
+import { computeShipping } from '@/lib/shipping';
 import ShopHeader from '@/app/components/ShopHeader';
 
 const CART_KEY = 'cart';
-const FREE_SHIPPING_THRESHOLD = 2000;
-const SHIPPING_FEE = 120;
 
 const formatter = new Intl.NumberFormat('zh-TW', {
   style: 'currency',
@@ -115,11 +114,7 @@ export default function CheckoutPage() {
 
   const subtotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
   const cartCount = cart.reduce((sum, item) => sum + item.quantity, 0);
-  const freeShippingItems = cart.some((item) => {
-    const product = products.find((entry) => entry.id === item.productId);
-    return product?.available_shipping_methods?.includes('免運');
-  });
-  const shipping = subtotal >= FREE_SHIPPING_THRESHOLD || freeShippingItems ? 0 : subtotal > 0 ? SHIPPING_FEE : 0;
+  const shipping = computeShipping(subtotal, cart, products);
   const total = Math.max(0, subtotal + shipping - (applied?.amount ?? 0));
   const siteShippingMethods = settings?.enabled_shipping_methods?.length
     ? settings.enabled_shipping_methods

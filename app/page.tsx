@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { createBrowserSupabase } from '@/lib/supabase/client';
 import type { Product, Category, SiteSettings, Banner } from '@/lib/types';
 import { uiAlert } from '@/lib/ui-dialog';
+import { computeShipping } from '@/lib/shipping';
 
 // 購物車存在瀏覽器本機的 key(結帳頁會讀同一份)
 const CART_KEY = 'cart';
@@ -249,7 +250,7 @@ export default function Home() {
 
   const cartCount = cart.reduce((sum, item) => sum + item.quantity, 0);
   const subtotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
-  const shipping = subtotal >= 2000 ? 0 : 120;
+  const shipping = computeShipping(subtotal, cart, products);
   const total = subtotal + shipping;
 
   const activeCategory = categoryTabs.find((c) => c.slug === category) ?? ALL_TAB;

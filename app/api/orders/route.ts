@@ -3,10 +3,8 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { getAdminUser, getSessionUser } from '@/lib/supabase/server';
 import { evaluateCoupon } from '@/lib/discount';
 import { deriveStatuses } from '@/lib/order-status';
+import { computeShipping } from '@/lib/shipping';
 import type { Discount, Order, OrderItem, Product } from '@/lib/types';
-
-const FREE_SHIPPING_THRESHOLD = 2000;
-const SHIPPING_FEE = 120;
 
 // GET /api/orders — 取得所有訂單(限管理員)
 export async function GET() {
@@ -94,7 +92,7 @@ export async function POST(request: Request) {
     });
   }
 
-  const shipping = subtotal >= FREE_SHIPPING_THRESHOLD ? 0 : SHIPPING_FEE;
+  const shipping = computeShipping(subtotal, items, products ?? []);
 
   // 折扣碼(可選):由後端重新驗證計算,避免竄改
   let discount = 0;

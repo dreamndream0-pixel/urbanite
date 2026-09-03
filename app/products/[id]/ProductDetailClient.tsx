@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Product } from '@/lib/types';
+import { FREE_SHIPPING_THRESHOLD } from '@/lib/shipping';
 
 const STORE_NAME = process.env.NEXT_PUBLIC_STORE_NAME || 'URBANITE';
 const CART_KEY = 'cart';
@@ -262,8 +263,11 @@ export default function ProductDetailClient({ product }: { product: Product }) {
           )}
 
           <div className="mt-8 border-l-4 border-[#c84767] pl-4 text-sm leading-7 text-[#3d3935]">
-            <p>全店,超商滿1500免運費</p>
-            <p>全店,宅配滿3000免運費</p>
+            {product.available_shipping_methods?.includes('免運') ? (
+              <p>此商品免運費</p>
+            ) : (
+              <p>全店消費滿 {formatter.format(FREE_SHIPPING_THRESHOLD)} 免運費</p>
+            )}
           </div>
 
           <div className="mt-8 flex items-baseline gap-4">
