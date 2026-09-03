@@ -50,6 +50,12 @@ export async function POST(
   if (!order || order.user_id !== user.id) return NextResponse.json({ error: '找不到訂單' }, { status: 404 });
   if (!canRequestReturn(order as Order)) return NextResponse.json({ error: '此訂單目前無法申請退貨' }, { status: 409 });
 
+  // 每張訂單只能提出一次退貨申請(除非先前被婉拒)
+  const { data: existing } = await supabase.from('returns').select('status').eq('order_id', id);
+  if ((existing ?? []).some((r) => r.status !== 'REJECTED')) {
+    return NextResponse.json({ error: '此訂單已提出退貨申請,無法重複申請' }, { status: 409 });
+  }
+
   const orderItems = (order.items ?? []) as OrderItem[];
   const items: ReturnItem[] = [];
   let refundAmount = 0;
@@ -73,6 +79,9 @@ export async function POST(
     .select()
     .single();
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+
+  // 有退貨申請就把訂單歸到「退貨」欄位
+  await supabase.from('orders').update({ status: '退貨', fulfillment_status: 'RETURNING' }).eq('id', id);
 
   await supabase.from('order_status_history').insert({
     order_id: id, type: 'order', from_status: '', to_status: 'RETURN_REQUESTED',

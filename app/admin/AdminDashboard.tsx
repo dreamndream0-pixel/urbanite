@@ -350,6 +350,7 @@ export default function AdminDashboard({
   const router = useRouter();
   const [section, setSection] = useState<SectionKey>('overview');
   const [menuOpen, setMenuOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(true); // 桌機側邊選單預設常開
   const [products, setProducts] = useState<Product[]>(initialProducts);
   const [orders, setOrders] = useState<Order[]>(initialOrders);
   const [categories, setCategories] = useState<Category[]>(initialCategories);
@@ -444,6 +445,7 @@ export default function AdminDashboard({
   const [paymentAccounts, setPaymentAccounts] = useState<{ name: string; info: string }[]>(
     initialSettings?.payment_accounts ?? [],
   );
+  const [returnInfo, setReturnInfo] = useState(initialSettings?.return_info ?? '');
   const [uploading, setUploading] = useState(false);
   const [editing, setEditing] = useState<Draft | null>(null);
   const [isNew, setIsNew] = useState(false);
@@ -1227,7 +1229,7 @@ export default function AdminDashboard({
         body: JSON.stringify(
           kind === 'payments'
             ? { payment_methods: methods, enabled_payment_methods: methods, payment_accounts: accounts }
-            : { shipping_methods: methods, enabled_shipping_methods: methods },
+            : { shipping_methods: methods, enabled_shipping_methods: methods, return_info: returnInfo },
         ),
       });
       const data = await res.json();
@@ -1276,7 +1278,7 @@ export default function AdminDashboard({
             <button
               onClick={() => setMenuOpen(true)}
               aria-label="開啟後台選單"
-              className="rounded-md p-1 text-[#1f1b19] hover:bg-[#efe8dd]"
+              className="rounded-md p-1 text-[#1f1b19] hover:bg-[#efe8dd] lg:hidden"
             >
               <IconMenu />
             </button>
@@ -1302,59 +1304,74 @@ export default function AdminDashboard({
         </nav>
       </header>
 
+      {/* 手機:遮罩(桌機不顯示) */}
       <div
-        className={`fixed inset-0 z-40 bg-black/30 transition-opacity duration-300 ${
+        className={`fixed inset-0 z-40 bg-black/30 transition-opacity duration-300 lg:hidden ${
           menuOpen ? 'opacity-100' : 'pointer-events-none opacity-0'
         }`}
         onClick={() => setMenuOpen(false)}
       />
-      <aside
-        className={`fixed inset-y-0 left-0 z-50 flex w-full max-w-xs flex-col bg-[#faf7f2] shadow-2xl transition-transform duration-300 ${
-          menuOpen ? 'translate-x-0' : '-translate-x-full'
-        }`}
-      >
-        <div className="flex items-center justify-between border-b border-[#e5ded4] px-5 py-4">
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-semibold tracking-[0.2em] text-[#8a7f72]">ADMIN</span>
-            <span className="rounded bg-[#f3ede4] px-1.5 py-0.5 text-[10px] font-semibold text-[#8a7f72]">
-              {activeNav.label}
-            </span>
-          </div>
-          <button onClick={() => setMenuOpen(false)} aria-label="關閉選單" className="rounded-md p-1 hover:bg-[#efe8dd]">
-            <IconClose />
-          </button>
-        </div>
-        <nav className="flex flex-col gap-1 p-3">
-          {NAV.map((n) => (
-            <button
-              key={n.key}
-              onClick={() => {
-                setSection(n.key);
-                setMenuOpen(false);
-              }}
-              className={`flex items-center gap-3 rounded-lg px-3 py-3 text-left text-sm font-medium transition ${
-                section === n.key
-                  ? 'bg-[#1f1b19] text-white'
-                  : 'text-[#6b6156] hover:bg-[#f3ede4]'
-              }`}
-            >
-              <n.Icon />
-              <span>{n.label}</span>
-            </button>
-          ))}
-        </nav>
-        <div className="mt-auto border-t border-[#e5ded4] p-3">
-          <button
-            onClick={signOut}
-            className="block w-full rounded-lg px-3 py-3 text-left text-sm font-semibold text-[#c84767] hover:bg-[#f3ede4]"
-          >
-            登出
-          </button>
-        </div>
-      </aside>
 
-      {/* 主內容 */}
-      <div>
+      <div className="lg:flex lg:items-stretch">
+        <aside
+          className={`fixed inset-y-0 left-0 z-50 flex w-full max-w-xs flex-col bg-[#faf7f2] shadow-2xl transition-transform duration-300 lg:relative lg:z-auto lg:max-w-none lg:shadow-none lg:transition-[width] ${
+            menuOpen ? 'translate-x-0' : '-translate-x-full'
+          } lg:translate-x-0 lg:shrink-0 lg:border-r lg:border-[#e5ded4] ${
+            sidebarOpen ? 'lg:w-60' : 'lg:w-0 lg:overflow-hidden lg:border-r-0'
+          }`}
+        >
+          <div className="flex items-center justify-between border-b border-[#e5ded4] px-5 py-4">
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-semibold tracking-[0.2em] text-[#8a7f72]">ADMIN</span>
+              <span className="rounded bg-[#f3ede4] px-1.5 py-0.5 text-[10px] font-semibold text-[#8a7f72]">
+                {activeNav.label}
+              </span>
+            </div>
+            <button onClick={() => setMenuOpen(false)} aria-label="關閉選單" className="rounded-md p-1 hover:bg-[#efe8dd] lg:hidden">
+              <IconClose />
+            </button>
+          </div>
+          <nav className="flex flex-col gap-1 p-3">
+            {NAV.map((n) => (
+              <button
+                key={n.key}
+                onClick={() => {
+                  setSection(n.key);
+                  setMenuOpen(false);
+                }}
+                className={`flex items-center gap-3 rounded-lg px-3 py-3 text-left text-sm font-medium transition ${
+                  section === n.key
+                    ? 'bg-[#1f1b19] text-white'
+                    : 'text-[#6b6156] hover:bg-[#f3ede4]'
+                }`}
+              >
+                <n.Icon />
+                <span>{n.label}</span>
+              </button>
+            ))}
+          </nav>
+          <div className="mt-auto border-t border-[#e5ded4] p-3">
+            <button
+              onClick={signOut}
+              className="block w-full rounded-lg px-3 py-3 text-left text-sm font-semibold text-[#c84767] hover:bg-[#f3ede4]"
+            >
+              登出
+            </button>
+          </div>
+        </aside>
+
+        {/* 桌機:側邊選單開合小箭頭(貼在側欄右緣中間) */}
+        <button
+          onClick={() => setSidebarOpen((v) => !v)}
+          aria-label={sidebarOpen ? '收起選單' : '展開選單'}
+          className="fixed top-1/2 z-[45] hidden h-12 -translate-y-1/2 items-center rounded-r-lg border border-l-0 border-[#e5ded4] bg-[#faf7f2] px-0.5 text-[#6b6156] shadow-sm transition-[left] hover:bg-[#efe8dd] lg:flex"
+          style={{ left: sidebarOpen ? '15rem' : '0px' }}
+        >
+          {sidebarOpen ? <IconChevronLeft /> : <IconChevronRight />}
+        </button>
+
+        {/* 主內容 */}
+        <div className="lg:min-w-0 lg:flex-1">
         <div className="border-b border-[#e5ded4] bg-[#faf7f2] px-4 py-4 sm:px-6">
           <div className="mx-auto flex max-w-5xl items-center justify-between gap-3">
             <h1 className="text-lg font-semibold">{activeNav.label}</h1>
@@ -2483,11 +2500,22 @@ export default function AdminDashboard({
                   categories={categories}
                   onApply={applyMethodsToProducts}
                 />
+                <Field label="退貨收件資訊(顯示給申請退貨的買家)">
+                  <textarea
+                    value={returnInfo}
+                    onChange={(e) => setReturnInfo(e.target.value)}
+                    rows={3}
+                    placeholder="例:退貨請寄至 100 台北市中正區 XX 路 1 號,收件人:Urbanite 退貨組,電話 02-1234-5678。請務必附上訂單編號。"
+                    className="w-full rounded-lg border border-[#e5ded4] px-3 py-2 text-sm"
+                  />
+                  <p className="mt-1 text-xs text-[#a99e8f]">按上方「儲存物流」一併儲存。</p>
+                </Field>
               </Card>
               )}
             </div>
           )}
         </main>
+        </div>
       </div>
 
       {editing && (
@@ -5992,6 +6020,21 @@ function IconClose() {
   return (
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
       <path d="M6 6l12 12M18 6 6 18" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function IconChevronLeft() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M15 6l-6 6 6 6" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+function IconChevronRight() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M9 6l6 6-6 6" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }

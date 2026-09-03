@@ -77,6 +77,7 @@ export default function AccountClient({
   const [payTarget, setPayTarget] = useState<Order | null>(null);
   const [paymentAccounts, setPaymentAccounts] = useState<{ name: string; info: string }[]>([]);
   const [logoUrl, setLogoUrl] = useState('');
+  const [returnInfo, setReturnInfo] = useState('');
   const [toast, setToast] = useState('');
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const [cartCount, setCartCount] = useState(0);
@@ -94,6 +95,7 @@ export default function AccountClient({
       .then((res) => (res.ok ? res.json() : null))
       .then((data: SiteSettings | null) => {
         setPaymentAccounts(data?.payment_accounts ?? []);
+        setReturnInfo(data?.return_info ?? '');
         if (data?.logo_url) setLogoUrl(data.logo_url);
       })
       .catch(() => {});
@@ -171,13 +173,13 @@ export default function AccountClient({
     <main className="min-h-screen bg-[#f6f2ec] text-[#1f1b19]">
       <header className="sticky top-0 z-30 bg-[#faf7f2]/95 backdrop-blur">
         <nav className="mx-auto grid max-w-6xl grid-cols-[1fr_auto_1fr] items-center px-4 py-4 sm:px-6 sm:py-5">
-          {/* 左:選單 + 搜尋(回商店) */}
-          <div className="flex items-center gap-1 sm:gap-2">
-            <Link href="/" aria-label="商店選單" className="rounded-md p-1 text-[#1f1b19] hover:bg-[#efe8dd]">
-              <IconMenu />
-            </Link>
-            <Link href="/" aria-label="搜尋商品" className="rounded-md p-2 hover:bg-[#efe8dd]">
-              <IconSearch />
+          {/* 左:回首頁 */}
+          <div className="flex items-center">
+            <Link
+              href="/"
+              className="rounded-full border border-[#e5ded4] bg-white px-4 py-2 text-sm font-medium text-[#6b6156] hover:bg-[#efe8dd]"
+            >
+              ← 回首頁
             </Link>
           </div>
 
@@ -233,13 +235,6 @@ export default function AccountClient({
                       <p className="truncate text-sm font-medium">{userName}</p>
                       <p className="truncate text-xs text-[#8a7f72]">{userEmail}</p>
                     </div>
-                    <Link
-                      href="/"
-                      onClick={() => setAccountMenuOpen(false)}
-                      className="block rounded px-3 py-2 text-sm hover:bg-[#f6f2ec]"
-                    >
-                      繼續購物
-                    </Link>
                     <button
                       onClick={() => { setAccountMenuOpen(false); signOut(); }}
                       className="block w-full rounded px-3 py-2 text-left text-sm hover:bg-[#f6f2ec]"
@@ -305,10 +300,12 @@ export default function AccountClient({
         <OrderModal
           order={openOrder}
           imageByName={imageByName}
+          returnInfo={returnInfo}
           onClose={() => setOpenOrder(null)}
           onReorder={() => reorder(openOrder)}
           onCancel={setCancelTarget}
           onPay={setPayTarget}
+          onOrderChange={applyOrderUpdate}
         />
       )}
 
@@ -868,21 +865,26 @@ const PAYMENT_NOTE =
 function OrderModal({
   order,
   imageByName,
+  returnInfo,
   onClose,
   onReorder,
   onCancel,
   onPay,
+  onOrderChange,
 }: {
   order: Order;
   imageByName: Map<string, string>;
+  returnInfo: string;
   onClose: () => void;
   onReorder: () => void;
   onCancel: (o: Order) => void;
   onPay: (o: Order) => void;
+  onOrderChange: (o: Order) => void;
 }) {
   const dateStr = order.created_at ? new Date(order.created_at).toLocaleString('zh-TW') : '';
   const [returns, setReturns] = useState<ReturnRequest[]>([]);
   const [showReturn, setShowReturn] = useState(false);
+  const hasActiveReturn = returns.some((r) => r.status !== 'REJECTED');
 
   const loadReturns = useCallback(() => {
     fetch(`/api/orders/${order.id}/returns`)
@@ -1000,7 +1002,7 @@ function OrderModal({
                 申請取消
               </button>
             ) : null}
-            {canRequestReturn(order) ? (
+            {canRequestReturn(order) && !hasActiveReturn ? (
               <button
                 onClick={() => setShowReturn(true)}
                 className="rounded-full border border-[#d7c9bd] px-5 py-3 font-semibold text-[#6b6156] hover:bg-[#efe8dd]"
@@ -1025,6 +1027,12 @@ function OrderModal({
                   </p>
                   <p className="mt-0.5 text-xs text-[#6b6156]">退款金額 {formatter.format(r.refund_amount)}</p>
                   {r.response ? <p className="mt-0.5 text-xs text-[#6b6156]">賣家回覆：{r.response}</p> : null}
+                  {r.status === 'APPROVED' && returnInfo ? (
+                    <div className="mt-2 rounded-lg bg-[#faf6ea] p-2 text-xs">
+                      <p className="font-semibold text-[#8a6d1b]">退貨寄回資訊</p>
+                      <p className="mt-0.5 whitespace-pre-wrap text-[#6b6156]">{returnInfo}</p>
+                    </div>
+                  ) : null}
                 </div>
               ))}
             </div>
@@ -1067,8 +1075,14 @@ function OrderModal({
       {showReturn ? (
         <ReturnRequestModal
           order={order}
+          returnInfo={returnInfo}
           onClose={() => setShowReturn(false)}
-          onDone={() => { setShowReturn(false); loadReturns(); void uiAlert('已送出退貨申請，賣家將盡快為你處理。'); }}
+          onDone={() => {
+            setShowReturn(false);
+            loadReturns();
+            onOrderChange({ ...order, status: '退貨', fulfillment_status: 'RETURNING' });
+            void uiAlert('已送出退貨申請，賣家將盡快為你處理。');
+          }}
         />
       ) : null}
     </div>
@@ -1078,7 +1092,7 @@ function OrderModal({
 const CANCEL_REASONS = ['購買錯商品，需重新下單', '不想買了', '想修改訂單', '其他'];
 const RETURN_REASONS = ['尺寸不合', '商品瑕疵', '與描述不符', '不想要了', '其他'];
 
-function ReturnRequestModal({ order, onClose, onDone }: { order: Order; onClose: () => void; onDone: () => void }) {
+function ReturnRequestModal({ order, returnInfo, onClose, onDone }: { order: Order; returnInfo: string; onClose: () => void; onDone: () => void }) {
   const [picked, setPicked] = useState<Record<number, number>>({});
   const [reason, setReason] = useState('');
   const [other, setOther] = useState('');
@@ -1166,6 +1180,15 @@ function ReturnRequestModal({ order, onClose, onDone }: { order: Order; onClose:
         <span className="text-[#8a7f72]">預估退款金額</span>
         <span className="font-semibold text-[#c84767]">{formatter.format(refundAmount)}</span>
       </div>
+
+      {returnInfo ? (
+        <div className="mt-3 rounded-lg border border-[#d8c7a8] bg-[#faf6ea] p-3">
+          <p className="text-sm font-semibold text-[#8a6d1b]">退貨寄回資訊</p>
+          <p className="mt-1 whitespace-pre-wrap text-xs text-[#6b6156]">{returnInfo}</p>
+          <p className="mt-1 text-xs text-[#a99e8f]">賣家核准後請依此資訊將商品寄回。</p>
+        </div>
+      ) : null}
+
       {err ? <p className="mt-2 text-sm text-[#c0392b]">{err}</p> : null}
       <div className="mt-4 flex gap-2">
         <button onClick={onClose} className="flex-1 rounded-full border border-[#d7c9bd] px-4 py-3 font-semibold text-[#6b6156] hover:bg-[#efe8dd]">先不要</button>
@@ -1420,21 +1443,6 @@ function FavoritesTab({ products }: { products: Product[] }) {
 }
 
 /* ---------- 表頭圖示(與首頁一致) ---------- */
-function IconMenu() {
-  return (
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
-      <path d="M3 6h18M3 12h18M3 18h18" strokeLinecap="round" />
-    </svg>
-  );
-}
-function IconSearch() {
-  return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
-      <circle cx="11" cy="11" r="7" />
-      <path d="M21 21l-4-4" strokeLinecap="round" />
-    </svg>
-  );
-}
 function IconStar({ filled = false }: { filled?: boolean }) {
   return (
     <svg width="20" height="20" viewBox="0 0 24 24" fill={filled ? '#f5c542' : 'none'} stroke={filled ? '#d89a00' : 'currentColor'} strokeWidth="1.8" strokeLinejoin="round">

@@ -155,9 +155,6 @@ export default function ProductDetailClient({ product }: { product: Product }) {
             <Link href="/" aria-label="搜尋" className="rounded-md p-2 hover:bg-[#efe8dd]">
               <IconSearch />
             </Link>
-            <Link href="/account" aria-label="我的帳號" className="rounded-md p-2 hover:bg-[#efe8dd]">
-              <IconUser />
-            </Link>
             <Link href="/checkout" aria-label="購物車" className="relative rounded-md p-2 hover:bg-[#efe8dd]">
               <IconBag />
               {cartCount > 0 && (
@@ -165,6 +162,9 @@ export default function ProductDetailClient({ product }: { product: Product }) {
                   {cartCount}
                 </span>
               )}
+            </Link>
+            <Link href="/account" aria-label="我的帳號" className="rounded-md p-2 hover:bg-[#efe8dd]">
+              <IconUser />
             </Link>
           </div>
         </nav>

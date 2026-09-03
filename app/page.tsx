@@ -310,6 +310,18 @@ export default function Home() {
                 </span>
               )}
             </button>
+            <button
+              onClick={() => setCartOpen(true)}
+              aria-label="購物車"
+              className="relative rounded-md p-2 hover:bg-[#efe8dd]"
+            >
+              <IconBag />
+              {cartCount > 0 && (
+                <span className="absolute -right-0.5 -top-0.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-[#c84767] px-1 text-[10px] font-semibold text-white">
+                  {cartCount}
+                </span>
+              )}
+            </button>
             <div className="relative">
               <button
                 onClick={() => {
@@ -361,18 +373,6 @@ export default function Home() {
                 </div>
               )}
             </div>
-            <button
-              onClick={() => setCartOpen(true)}
-              aria-label="購物車"
-              className="relative rounded-md p-2 hover:bg-[#efe8dd]"
-            >
-              <IconBag />
-              {cartCount > 0 && (
-                <span className="absolute -right-0.5 -top-0.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-[#c84767] px-1 text-[10px] font-semibold text-white">
-                  {cartCount}
-                </span>
-              )}
-            </button>
           </div>
         </nav>
 
