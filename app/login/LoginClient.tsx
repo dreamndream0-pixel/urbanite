@@ -46,8 +46,9 @@ export default function LoginClient({
     setBusy(provider);
     try {
       const supabase = createBrowserSupabase();
+      const authProvider = provider === 'line' ? 'custom:line' : provider;
       const { error } = await supabase.auth.signInWithOAuth({
-        provider: provider as Provider,
+        provider: authProvider as Provider,
         options: {
           redirectTo: `${getBrowserAuthOrigin()}/auth/callback?next=${encodeURIComponent(nextPath)}`,
         },
