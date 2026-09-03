@@ -1,7 +1,6 @@
-import crypto from 'crypto';
 import { NextResponse } from 'next/server';
 import { getConfiguredSiteUrl, getServerRedirectOrigin } from '@/lib/site-url';
-import { getLineLoginConfig, getLineRedirectUri } from '@/lib/line-login';
+import { createLineState, getLineLoginConfig, getLineRedirectUri } from '@/lib/line-login';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,7 +26,7 @@ export async function GET(request: Request) {
     return NextResponse.redirect(loginUrl);
   }
 
-  const state = crypto.randomBytes(24).toString('hex');
+  const state = createLineState(next, channelSecret);
   const lineUrl = new URL('https://access.line.me/oauth2/v2.1/authorize');
   lineUrl.searchParams.set('response_type', 'code');
   lineUrl.searchParams.set('client_id', channelId);
@@ -36,13 +35,6 @@ export async function GET(request: Request) {
   lineUrl.searchParams.set('scope', 'profile');
 
   const response = NextResponse.redirect(lineUrl);
-  response.cookies.set('line_oauth_state', state, {
-    httpOnly: true,
-    secure: redirectOrigin.startsWith('https://'),
-    sameSite: 'lax',
-    path: '/',
-    maxAge: 10 * 60,
-  });
   response.cookies.set('line_oauth_next', next, {
     httpOnly: true,
     secure: redirectOrigin.startsWith('https://'),

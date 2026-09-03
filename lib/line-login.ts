@@ -9,6 +9,24 @@ export type LineProfile = {
   statusMessage?: string;
 };
 
+type LineStatePayload = {
+  next: string;
+  nonce: string;
+  issuedAt: number;
+};
+
+function toBase64Url(input: string) {
+  return Buffer.from(input).toString('base64url');
+}
+
+function fromBase64Url(input: string) {
+  return Buffer.from(input, 'base64url').toString('utf8');
+}
+
+function signLineState(payload: string, channelSecret: string) {
+  return crypto.createHmac('sha256', channelSecret).update(payload).digest('base64url');
+}
+
 export function getLineLoginConfig() {
   return {
     channelId: process.env.LINE_LOGIN_CHANNEL_ID?.trim() ?? '',
@@ -31,6 +49,37 @@ export function getLineSyntheticPassword(lineUserId: string, channelSecret: stri
     .update(`urbanite-line-login:${channelSecret}:${lineUserId}`)
     .digest('hex');
   return `${digest}Aa1!`;
+}
+
+export function createLineState(next: string, channelSecret: string) {
+  const payload = toBase64Url(JSON.stringify({
+    next,
+    nonce: crypto.randomBytes(16).toString('hex'),
+    issuedAt: Date.now(),
+  } satisfies LineStatePayload));
+  const signature = signLineState(payload, channelSecret);
+  return `${payload}.${signature}`;
+}
+
+export function verifyLineState(state: string, channelSecret: string) {
+  const [payload, signature] = state.split('.');
+  if (!payload || !signature) throw new Error('登入驗證資料不完整，請重新登入');
+
+  const expected = signLineState(payload, channelSecret);
+  const receivedBuffer = Buffer.from(signature);
+  const expectedBuffer = Buffer.from(expected);
+  if (
+    receivedBuffer.length !== expectedBuffer.length ||
+    !crypto.timingSafeEqual(receivedBuffer, expectedBuffer)
+  ) {
+    throw new Error('登入驗證失敗，請重新登入');
+  }
+
+  const data = JSON.parse(fromBase64Url(payload)) as Partial<LineStatePayload>;
+  if (!data.next || !data.issuedAt || Date.now() - data.issuedAt > 10 * 60 * 1000) {
+    throw new Error('登入驗證逾時，請重新登入');
+  }
+  return data as LineStatePayload;
 }
 
 export async function exchangeLineCode({

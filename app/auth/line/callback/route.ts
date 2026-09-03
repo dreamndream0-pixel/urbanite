@@ -8,6 +8,7 @@ import {
   getLineRedirectUri,
   upsertLineAuthUser,
   upsertLineCustomer,
+  verifyLineState,
 } from '@/lib/line-login';
 
 export const dynamic = 'force-dynamic';
@@ -31,15 +32,11 @@ export async function GET(request: Request) {
   const state = url.searchParams.get('state');
   const providerError = url.searchParams.get('error_description') || url.searchParams.get('error');
   const cookieHeader = request.headers.get('cookie') ?? '';
-  const stateMatch = cookieHeader.match(/(?:^|;\s*)line_oauth_state=([^;]+)/);
   const nextMatch = cookieHeader.match(/(?:^|;\s*)line_oauth_next=([^;]+)/);
-  const storedState = stateMatch ? decodeURIComponent(stateMatch[1]) : '';
-  const next = normalizeNext(nextMatch ? decodeURIComponent(nextMatch[1]) : undefined);
+  let next = normalizeNext(nextMatch ? decodeURIComponent(nextMatch[1]) : undefined);
 
   if (providerError) return loginError(redirectOrigin, next, providerError);
-  if (!code || !state || !storedState || state !== storedState) {
-    return loginError(redirectOrigin, next, '登入驗證逾時，請重新登入');
-  }
+  if (!code || !state) return loginError(redirectOrigin, next, '登入驗證資料不完整，請重新登入');
 
   const { channelId, channelSecret } = getLineLoginConfig();
   if (!channelId || !channelSecret) {
@@ -47,6 +44,7 @@ export async function GET(request: Request) {
   }
 
   try {
+    next = normalizeNext(verifyLineState(state, channelSecret).next);
     const accessToken = await exchangeLineCode({
       code,
       redirectUri: getLineRedirectUri(redirectOrigin),
@@ -62,7 +60,6 @@ export async function GET(request: Request) {
     if (error) return loginError(redirectOrigin, next, error.message);
 
     const response = NextResponse.redirect(`${redirectOrigin}${next}`);
-    response.cookies.delete('line_oauth_state');
     response.cookies.delete('line_oauth_next');
     return response;
   } catch (error) {
