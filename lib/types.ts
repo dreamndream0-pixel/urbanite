@@ -218,6 +218,10 @@ export type Order = {
   cancel_response?: string;
   cancel_requested_at?: string | null;
   cancel_reviewed_at?: string | null;
+  // 非綠界付款(如銀行轉帳)的買家付款證明
+  payment_ref?: string;
+  payment_proof_url?: string;
+  payment_proof_note?: string;
   user_id?: string | null;
   created_at?: string;
 };

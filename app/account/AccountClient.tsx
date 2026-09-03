@@ -4,8 +4,9 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createBrowserSupabase } from '@/lib/supabase/client';
-import type { Customer, Discount, Order, Product, Recipient, UserCoupon } from '@/lib/types';
+import type { Customer, Discount, Order, Product, Recipient, SiteSettings, UserCoupon } from '@/lib/types';
 import { TW_CITIES, TW_REGIONS } from '@/lib/tw-regions';
+import { isEcpayMethod } from '@/lib/payment';
 import {
   buildProgress,
   orderTabOf,
@@ -67,10 +68,30 @@ export default function AccountClient({
   const [tab, setTab] = useState<TabKey>('profile');
   const [orderList, setOrderList] = useState<Order[]>(orders);
   const [openOrder, setOpenOrder] = useState<Order | null>(null);
+  const [cancelTarget, setCancelTarget] = useState<Order | null>(null);
+  const [payTarget, setPayTarget] = useState<Order | null>(null);
+  const [paymentAccounts, setPaymentAccounts] = useState<{ name: string; info: string }[]>([]);
+  const [toast, setToast] = useState('');
+
+  useEffect(() => {
+    fetch('/api/settings')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: SiteSettings | null) => setPaymentAccounts(data?.payment_accounts ?? []))
+      .catch(() => {});
+  }, []);
+
+  function showToast(msg: string) {
+    setToast(msg);
+    window.setTimeout(() => setToast(''), 3200);
+  }
 
   function applyOrderUpdate(updated: Order) {
     setOrderList((list) => list.map((o) => (o.id === updated.id ? updated : o)));
     setOpenOrder((o) => (o && o.id === updated.id ? updated : o));
+  }
+
+  function accountFor(order: Order) {
+    return paymentAccounts.find((a) => a.name === order.payment_method && (a.info ?? '').trim()) ?? null;
   }
 
   // 用商品名稱對應到商品圖(訂單品項沒有存圖片,靠名稱對照)
@@ -187,7 +208,13 @@ export default function AccountClient({
         {tab === 'coupons' && <CouponsTab coupons={coupons} />}
 
         {tab === 'orders' && (
-          <OrdersTab orders={orderList} imageByName={imageByName} onOpen={setOpenOrder} onUpdated={applyOrderUpdate} />
+          <OrdersTab
+            orders={orderList}
+            imageByName={imageByName}
+            onOpen={setOpenOrder}
+            onCancel={setCancelTarget}
+            onPay={setPayTarget}
+          />
         )}
 
         {tab === 'favorites' && <FavoritesTab products={favoriteProducts} />}
@@ -199,8 +226,32 @@ export default function AccountClient({
           imageByName={imageByName}
           onClose={() => setOpenOrder(null)}
           onReorder={() => reorder(openOrder)}
-          onUpdated={applyOrderUpdate}
+          onCancel={setCancelTarget}
+          onPay={setPayTarget}
         />
+      )}
+
+      {cancelTarget && (
+        <CancelRequestModal
+          order={cancelTarget}
+          onClose={() => setCancelTarget(null)}
+          onDone={(updated) => { applyOrderUpdate(updated); setCancelTarget(null); showToast('已送出取消申請,請等候賣家審核。'); }}
+        />
+      )}
+
+      {payTarget && (
+        <PayTransferModal
+          order={payTarget}
+          account={accountFor(payTarget)}
+          onClose={() => setPayTarget(null)}
+          onDone={(updated) => { applyOrderUpdate(updated); setPayTarget(null); showToast('已收到你的付款回報,賣家會盡快對帳。'); }}
+        />
+      )}
+
+      {toast && (
+        <div className="fixed inset-x-0 bottom-6 z-[60] flex justify-center px-4">
+          <div className="rounded-full bg-[#1f1b19] px-5 py-3 text-sm font-semibold text-white shadow-lg">{toast}</div>
+        </div>
       )}
     </main>
   );
@@ -591,34 +642,18 @@ function CouponsTab({ coupons }: { coupons: Discount[] }) {
 }
 
 /* ---------- 訂單紀錄(列表) ---------- */
-async function requestCancel(order: Order, onUpdated: (o: Order) => void) {
-  const reason = window.prompt(`要對訂單 ${order.order_no} 提出「取消申請」嗎?\n請簡述取消原因(選填),送出後由賣家審核:`, '');
-  if (reason === null) return; // 按取消
-  try {
-    const res = await fetch(`/api/orders/${order.id}/cancel`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ reason: reason.trim() }),
-    });
-    const data = await res.json();
-    if (!res.ok) { alert(data.error ?? '申請失敗'); return; }
-    onUpdated(data as Order);
-    alert('已送出取消申請,請等候賣家審核。');
-  } catch {
-    alert('申請失敗,請稍後再試。');
-  }
-}
-
 function OrdersTab({
   orders,
   imageByName,
   onOpen,
-  onUpdated,
+  onCancel,
+  onPay,
 }: {
   orders: Order[];
   imageByName: Map<string, string>;
   onOpen: (o: Order) => void;
-  onUpdated: (o: Order) => void;
+  onCancel: (o: Order) => void;
+  onPay: (o: Order) => void;
 }) {
   const [tab, setTab] = useState<OrderTab>('all');
   if (orders.length === 0) {
@@ -716,15 +751,21 @@ function OrdersTab({
                 {/* 依狀態顯示操作 */}
                 <div className="mt-3 flex flex-wrap gap-2 border-t border-[#f1ebe1] pt-3">
                   {!order.paid && order.status !== '取消' && order.status !== '退貨' ? (
-                    <a href={`/api/payment/ecpay/checkout?order=${encodeURIComponent(order.order_no)}`} className="rounded-full bg-[#ada265] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#9a9059]">
-                      立即付款
-                    </a>
+                    isEcpayMethod(order.payment_method ?? '') ? (
+                      <a href={`/api/payment/ecpay/checkout?order=${encodeURIComponent(order.order_no)}`} className="rounded-full bg-[#ada265] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#9a9059]">
+                        立即付款
+                      </a>
+                    ) : (
+                      <button onClick={() => onPay(order)} className="rounded-full bg-[#ada265] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#9a9059]">
+                        立即付款
+                      </button>
+                    )
                   ) : null}
                   {shipped ? (
                     <button onClick={() => onOpen(order)} className={actionBtn}>查看物流</button>
                   ) : null}
                   {canRequestCancel(order) ? (
-                    <button onClick={() => requestCancel(order, onUpdated)} className={actionBtn}>申請取消</button>
+                    <button onClick={() => onCancel(order)} className={actionBtn}>申請取消</button>
                   ) : null}
                   <button onClick={() => onOpen(order)} className={actionBtn}>訂單詳情</button>
                 </div>
@@ -748,13 +789,15 @@ function OrderModal({
   imageByName,
   onClose,
   onReorder,
-  onUpdated,
+  onCancel,
+  onPay,
 }: {
   order: Order;
   imageByName: Map<string, string>;
   onClose: () => void;
   onReorder: () => void;
-  onUpdated: (o: Order) => void;
+  onCancel: (o: Order) => void;
+  onPay: (o: Order) => void;
 }) {
   const dateStr = order.created_at ? new Date(order.created_at).toLocaleString('zh-TW') : '';
   return (
@@ -841,16 +884,25 @@ function OrderModal({
               🛒 再次加入購物車
             </button>
             {!order.paid && order.status !== '取消' && order.status !== '退貨' ? (
-              <a
-                href={`/api/payment/ecpay/checkout?order=${encodeURIComponent(order.order_no)}`}
-                className="rounded-full border border-[#d7c9bd] px-5 py-3 text-center font-semibold text-[#6b6156] hover:bg-[#efe8dd]"
-              >
-                立即付款
-              </a>
+              isEcpayMethod(order.payment_method ?? '') ? (
+                <a
+                  href={`/api/payment/ecpay/checkout?order=${encodeURIComponent(order.order_no)}`}
+                  className="rounded-full border border-[#d7c9bd] px-5 py-3 text-center font-semibold text-[#6b6156] hover:bg-[#efe8dd]"
+                >
+                  立即付款
+                </a>
+              ) : (
+                <button
+                  onClick={() => onPay(order)}
+                  className="rounded-full border border-[#d7c9bd] px-5 py-3 font-semibold text-[#6b6156] hover:bg-[#efe8dd]"
+                >
+                  立即付款 / 回報匯款
+                </button>
+              )
             ) : null}
             {canRequestCancel(order) ? (
               <button
-                onClick={() => requestCancel(order, onUpdated)}
+                onClick={() => onCancel(order)}
                 className="rounded-full border border-[#d7c9bd] px-5 py-3 font-semibold text-[#6b6156] hover:bg-[#efe8dd]"
               >
                 申請取消
@@ -880,11 +932,178 @@ function OrderModal({
           <Section title="付款資訊">
             {order.payment_method ? <Row label="付款方式" value={order.payment_method} /> : null}
             <Row label="付款狀態" value={order.paid ? '已付款' : '未付款'} />
+            {order.payment_ref ? <Row label="回報後五碼" value={order.payment_ref} /> : null}
+            {order.payment_proof_url ? (
+              <div className="flex justify-between gap-3">
+                <span className="shrink-0 text-[#8a7f72]">付款截圖</span>
+                <a href={order.payment_proof_url} target="_blank" rel="noreferrer" className="font-semibold text-[#c84767] underline">已上傳</a>
+              </div>
+            ) : null}
             <p className="pt-1 text-xs leading-5 text-[#8a7f72]">付款指示：{PAYMENT_NOTE}</p>
           </Section>
         </div>
       </div>
     </div>
+  );
+}
+
+const CANCEL_REASONS = ['購買錯商品，需重新下單', '不想買了', '想修改訂單', '其他'];
+
+function ModalShell({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
+  return (
+    <div className="fixed inset-0 z-[55] flex items-end justify-center bg-black/40 sm:items-center sm:p-4" onClick={onClose}>
+      <div className="flex max-h-[90dvh] w-full max-w-md flex-col overflow-hidden rounded-t-2xl bg-white sm:rounded-2xl" onClick={(e) => e.stopPropagation()}>
+        <div className="flex shrink-0 items-center justify-between border-b border-[#e5ded4] px-5 py-4">
+          <h2 className="text-lg font-semibold">{title}</h2>
+          <button onClick={onClose} aria-label="關閉" className="rounded-md p-1 text-2xl leading-none hover:bg-[#efe8dd]">×</button>
+        </div>
+        <div className="flex-1 overflow-y-auto overscroll-contain p-5">{children}</div>
+      </div>
+    </div>
+  );
+}
+
+function CancelRequestModal({ order, onClose, onDone }: { order: Order; onClose: () => void; onDone: (o: Order) => void }) {
+  const [reason, setReason] = useState('');
+  const [other, setOther] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+
+  async function submit() {
+    setErr('');
+    if (!reason) { setErr('請選擇取消原因'); return; }
+    const finalReason = reason === '其他' ? other.trim() : reason;
+    if (reason === '其他' && !finalReason) { setErr('請輸入取消原因'); return; }
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/orders/${order.id}/cancel`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason: finalReason }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setErr(data.error ?? '申請失敗'); return; }
+      onDone(data as Order);
+    } catch {
+      setErr('申請失敗，請稍後再試');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <ModalShell title="申請取消訂單" onClose={onClose}>
+      <p className="mb-3 text-sm text-[#8a7f72]">訂單 {order.order_no}，送出後由賣家審核。</p>
+      <label className="mb-3 block">
+        <span className="mb-1 block text-sm text-[#8a7f72]">取消原因</span>
+        <select
+          value={reason}
+          onChange={(e) => { setReason(e.target.value); setErr(''); }}
+          className="w-full rounded-lg border border-[#e5ded4] px-3 py-2.5"
+        >
+          <option value="">請選擇取消原因…</option>
+          {CANCEL_REASONS.map((r) => <option key={r} value={r}>{r}</option>)}
+        </select>
+      </label>
+      {reason === '其他' ? (
+        <textarea
+          value={other}
+          onChange={(e) => setOther(e.target.value)}
+          rows={3}
+          placeholder="請輸入取消原因"
+          className="mb-3 w-full rounded-lg border border-[#e5ded4] px-3 py-2.5 text-sm"
+        />
+      ) : null}
+      {err ? <p className="mb-3 text-sm text-[#c0392b]">{err}</p> : null}
+      <div className="flex gap-2">
+        <button onClick={onClose} className="flex-1 rounded-full border border-[#d7c9bd] px-4 py-3 font-semibold text-[#6b6156] hover:bg-[#efe8dd]">先不要</button>
+        <button onClick={submit} disabled={busy} className="flex-1 rounded-full bg-[#c84767] px-4 py-3 font-semibold text-white disabled:opacity-60">送出申請</button>
+      </div>
+    </ModalShell>
+  );
+}
+
+function PayTransferModal({ order, account, onClose, onDone }: { order: Order; account: { name: string; info: string } | null; onClose: () => void; onDone: (o: Order) => void }) {
+  const [last5, setLast5] = useState(order.payment_ref ?? '');
+  const [note, setNote] = useState(order.payment_proof_note ?? '');
+  const [file, setFile] = useState<File | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+
+  async function submit() {
+    setErr('');
+    if (!last5.trim() && !file) { setErr('請輸入帳號後五碼，或選擇上傳截圖'); return; }
+    setBusy(true);
+    try {
+      const fd = new FormData();
+      fd.append('last5', last5.trim());
+      fd.append('note', note.trim());
+      if (file) fd.append('file', file);
+      const res = await fetch(`/api/orders/${order.id}/payment-proof`, { method: 'POST', body: fd });
+      const data = await res.json();
+      if (!res.ok) { setErr(data.error ?? '送出失敗'); return; }
+      onDone(data as Order);
+    } catch {
+      setErr('送出失敗，請稍後再試');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <ModalShell title="匯款資訊與回報" onClose={onClose}>
+      <div className="space-y-4">
+        <div className="rounded-xl bg-[#faf7f2] p-4 text-sm">
+          <div className="flex justify-between"><span className="text-[#8a7f72]">訂單號碼</span><span className="font-medium">{order.order_no}</span></div>
+          <div className="mt-1 flex justify-between"><span className="text-[#8a7f72]">應付金額</span><span className="font-semibold text-[#c84767]">{formatter.format(order.total)}</span></div>
+          <div className="mt-1 flex justify-between"><span className="text-[#8a7f72]">付款方式</span><span>{order.payment_method}</span></div>
+        </div>
+
+        {account ? (
+          <div className="rounded-xl border border-[#d8c7a8] bg-[#faf6ea] p-4">
+            <p className="text-sm font-semibold text-[#8a6d1b]">{account.name} — 收款帳號</p>
+            <p className="mt-1 whitespace-pre-wrap text-sm text-[#6b6156]">{account.info}</p>
+          </div>
+        ) : (
+          <p className="text-sm text-[#8a7f72]">請聯繫賣家取得匯款帳號。</p>
+        )}
+
+        <div className="space-y-2">
+          <p className="text-sm font-semibold">完成匯款後回報,方便賣家對帳</p>
+          <input
+            value={last5}
+            onChange={(e) => setLast5(e.target.value)}
+            inputMode="numeric"
+            maxLength={20}
+            placeholder="轉出帳號後五碼"
+            className="w-full rounded-lg border border-[#e5ded4] px-3 py-2.5 text-sm"
+          />
+          <input
+            type="file"
+            accept="image/*"
+            onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+            className="w-full text-sm text-[#6b6156] file:mr-3 file:rounded-full file:border-0 file:bg-[#efe8dd] file:px-4 file:py-2 file:text-sm file:font-semibold"
+          />
+          <textarea
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            rows={2}
+            placeholder="補充說明(選填,例:匯款時間)"
+            className="w-full rounded-lg border border-[#e5ded4] px-3 py-2.5 text-sm"
+          />
+        </div>
+
+        {order.payment_proof_url ? (
+          <p className="text-xs text-[#1f7a44]">已上傳截圖，可再上傳覆蓋。</p>
+        ) : null}
+        {err ? <p className="text-sm text-[#c0392b]">{err}</p> : null}
+
+        <div className="flex gap-2">
+          <button onClick={onClose} className="flex-1 rounded-full border border-[#d7c9bd] px-4 py-3 font-semibold text-[#6b6156] hover:bg-[#efe8dd]">關閉</button>
+          <button onClick={submit} disabled={busy} className="flex-1 rounded-full bg-[#c84767] px-4 py-3 font-semibold text-white disabled:opacity-60">送出回報</button>
+        </div>
+      </div>
+    </ModalShell>
   );
 }
 

@@ -3854,6 +3854,30 @@ ${order.note ? `<div class="sec"><h2>備註</h2><p class="muted">${escapeHtml(or
             </div>
           </div>
 
+          {/* 買家付款回報(非綠界) */}
+          {order.payment_ref || order.payment_proof_url || order.payment_proof_note ? (
+            <div className="rounded-xl border border-[#d8c7a8] bg-[#faf6ea] p-4">
+              <p className="mb-2 text-sm font-semibold text-[#8a6d1b]">買家付款回報</p>
+              <div className="space-y-1.5 text-sm text-[#6b6156]">
+                {row('帳號後五碼', order.payment_ref)}
+                {row('買家備註', order.payment_proof_note)}
+                {order.payment_proof_url ? (
+                  <a href={order.payment_proof_url} target="_blank" rel="noreferrer" className="inline-block text-sm font-semibold text-[#c84767] underline">
+                    查看付款截圖
+                  </a>
+                ) : null}
+              </div>
+              {!order.paid ? (
+                <button
+                  onClick={() => onUpdate({ paid: true })}
+                  className="mt-3 rounded-full bg-[#1f7a44] px-4 py-1.5 text-sm font-semibold text-white"
+                >
+                  對帳完成,標記已付款
+                </button>
+              ) : null}
+            </div>
+          ) : null}
+
           {/* 後台備註(客人看不到) */}
           <div className="border-t border-[#efe8dd] pt-4">
             <h3 className="mb-2 font-semibold">後台備註 <span className="text-xs font-normal text-[#a99e8f]">(客人看不到)</span></h3>

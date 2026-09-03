@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import type { Product, Recipient, SiteSettings, UserCoupon } from '@/lib/types';
+import { isEcpayMethod } from '@/lib/payment';
 
 const STORE_NAME = process.env.NEXT_PUBLIC_STORE_NAME || 'URBANITE';
 const CART_KEY = 'cart';
@@ -26,11 +27,6 @@ type CartItem = {
 
 const SHIPPING_METHODS = ['全家 取貨付款', '7-11 取貨付款', '宅配到府'];
 const PAYMENT_METHODS = ['信用卡 / ATM / 超商(綠界)', '取貨付款(貨到付款)', '轉帳匯款'];
-
-// 判斷此付款方式是否走綠界線上金流(建單後導向綠界付款頁)
-function isEcpayMethod(method: string): boolean {
-  return /綠界|信用卡|line\s?pay|apple\s?pay/i.test(method);
-}
 
 function allowedForCart(
   allMethods: string[],
@@ -82,6 +78,7 @@ export default function CheckoutPage() {
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
   const [orderNo, setOrderNo] = useState('');
+  const [transferOpen, setTransferOpen] = useState(true);
 
   useEffect(() => {
     Promise.resolve().then(() => {
@@ -479,15 +476,6 @@ export default function CheckoutPage() {
                   </select>
                 </label>
               </div>
-
-              {/* 非綠界付款方式:賣家收款帳號資訊 */}
-              {showAccountInfo && paymentAccount ? (
-                <div className="mt-4 rounded-xl border border-[#d8c7a8] bg-[#faf6ea] p-4">
-                  <p className="text-sm font-semibold text-[#8a6d1b]">{paymentAccount.name} — 收款資訊</p>
-                  <p className="mt-1 whitespace-pre-wrap text-sm text-[#6b6156]">{paymentAccount.info}</p>
-                  <p className="mt-2 text-xs text-[#a99e8f]">請於下單後依上述資訊完成付款,並保留交易明細。</p>
-                </div>
-              ) : null}
             </section>
 
             {/* 收件資料 */}
@@ -570,6 +558,42 @@ export default function CheckoutPage() {
                   <span className="text-[#c84767]">{formatter.format(total)}</span>
                 </div>
               </div>
+
+              {/* 轉帳匯款:開合式面板,展開訂單明細 + 收件資訊 + 賣家匯款帳號 */}
+              {showAccountInfo && paymentAccount ? (
+                <div className="mt-4 overflow-hidden rounded-xl border border-[#d8c7a8] bg-[#faf6ea]">
+                  <button
+                    type="button"
+                    onClick={() => setTransferOpen((v) => !v)}
+                    className="flex w-full items-center justify-between px-4 py-3 text-left"
+                  >
+                    <span className="text-sm font-semibold text-[#8a6d1b]">匯款資訊與訂單明細</span>
+                    <span className="text-[#8a6d1b]">{transferOpen ? '▲' : '▼'}</span>
+                  </button>
+                  {transferOpen ? (
+                    <div className="space-y-3 border-t border-[#e8d9b6] px-4 py-3 text-sm">
+                      <div>
+                        <p className="mb-1 font-semibold text-[#8a6d1b]">賣家收款帳號</p>
+                        <p className="whitespace-pre-wrap text-[#6b6156]">{paymentAccount.info}</p>
+                      </div>
+                      <div className="border-t border-[#e8d9b6] pt-2">
+                        <p className="mb-1 font-semibold text-[#8a6d1b]">訂單金額</p>
+                        <div className="flex justify-between text-[#6b6156]"><span>小計</span><span>{formatter.format(subtotal)}</span></div>
+                        <div className="flex justify-between text-[#6b6156]"><span>運費</span><span>{shipping === 0 ? '免運' : formatter.format(shipping)}</span></div>
+                        {applied ? <div className="flex justify-between text-[#1f7a44]"><span>折扣 {applied.code}</span><span>-{formatter.format(applied.amount)}</span></div> : null}
+                        <div className="flex justify-between pt-1 font-semibold"><span>應付總額</span><span className="text-[#c84767]">{formatter.format(total)}</span></div>
+                      </div>
+                      <div className="border-t border-[#e8d9b6] pt-2">
+                        <p className="mb-1 font-semibold text-[#8a6d1b]">收件資訊</p>
+                        <p className="text-[#6b6156]">{name || '(未填姓名)'}｜{phone || '(未填電話)'}</p>
+                        <p className="text-[#6b6156]">{address || '(未填地址)'}</p>
+                        <p className="text-[#6b6156]">{selectedShippingMethod}</p>
+                      </div>
+                      <p className="text-xs text-[#a99e8f]">請依上方帳號完成匯款,並保留交易明細;送出訂單後也可於「我的訂單 → 立即付款」回報帳號後五碼或上傳截圖。</p>
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
 
               {message && (
                 <p
