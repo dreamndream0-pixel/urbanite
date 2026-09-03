@@ -78,6 +78,16 @@ export default function AccountClient({
   const [paymentAccounts, setPaymentAccounts] = useState<{ name: string; info: string }[]>([]);
   const [logoUrl, setLogoUrl] = useState('');
   const [toast, setToast] = useState('');
+  const [accountMenuOpen, setAccountMenuOpen] = useState(false);
+  const [cartCount, setCartCount] = useState(0);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('cart');
+      const items = raw ? (JSON.parse(raw) as { quantity: number }[]) : [];
+      setCartCount(items.reduce((n, i) => n + (i.quantity || 0), 0));
+    } catch { /* 略過 */ }
+  }, []);
 
   useEffect(() => {
     fetch('/api/settings')
@@ -159,15 +169,15 @@ export default function AccountClient({
 
   return (
     <main className="min-h-screen bg-[#f6f2ec] text-[#1f1b19]">
-      <header className="sticky top-0 z-30 border-b border-[#e5ded4] bg-[#faf7f2]/95 backdrop-blur">
+      <header className="sticky top-0 z-30 bg-[#faf7f2]/95 backdrop-blur">
         <nav className="mx-auto grid max-w-6xl grid-cols-[1fr_auto_1fr] items-center px-4 py-4 sm:px-6 sm:py-5">
-          {/* 左:回商店 */}
-          <div className="flex items-center">
-            <Link
-              href="/"
-              className="rounded-full border border-[#e5ded4] bg-white px-4 py-2 text-sm font-medium text-[#6b6156] hover:bg-[#efe8dd]"
-            >
-              繼續購物
+          {/* 左:選單 + 搜尋(回商店) */}
+          <div className="flex items-center gap-1 sm:gap-2">
+            <Link href="/" aria-label="商店選單" className="rounded-md p-1 text-[#1f1b19] hover:bg-[#efe8dd]">
+              <IconMenu />
+            </Link>
+            <Link href="/" aria-label="搜尋商品" className="rounded-md p-2 hover:bg-[#efe8dd]">
+              <IconSearch />
             </Link>
           </div>
 
@@ -180,15 +190,66 @@ export default function AccountClient({
             )}
           </Link>
 
-          {/* 右:會員 + 登出 */}
-          <div className="flex items-center justify-end gap-3">
-            <span className="hidden text-sm text-[#6b6156] sm:inline">{userName}</span>
+          {/* 右:追蹤清單、購物車(中)、我的帳號(最右) */}
+          <div className="flex items-center justify-end gap-1 sm:gap-2">
             <button
-              onClick={signOut}
-              className="rounded-full bg-[#1f1b19] px-4 py-2 text-sm font-semibold text-white"
+              onClick={() => setTab('favorites')}
+              aria-label="追蹤清單"
+              className="relative rounded-md p-2 hover:bg-[#efe8dd]"
             >
-              登出
+              <IconStar filled={favoriteIds.length > 0} />
+              {favoriteIds.length > 0 && (
+                <span className="absolute -right-0.5 -top-0.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-[#c84767] px-1 text-[10px] font-semibold text-white">
+                  {favoriteIds.length}
+                </span>
+              )}
             </button>
+            <Link href="/checkout" aria-label="購物車" className="relative rounded-md p-2 hover:bg-[#efe8dd]">
+              <IconBag />
+              {cartCount > 0 && (
+                <span className="absolute -right-0.5 -top-0.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-[#c84767] px-1 text-[10px] font-semibold text-white">
+                  {cartCount}
+                </span>
+              )}
+            </Link>
+            <div className="relative">
+              <button
+                onClick={() => setAccountMenuOpen((v) => !v)}
+                aria-label="我的帳號"
+                className="rounded-md p-2 hover:bg-[#efe8dd]"
+              >
+                <IconUser />
+              </button>
+              {accountMenuOpen && (
+                <>
+                  <button
+                    aria-hidden
+                    tabIndex={-1}
+                    onClick={() => setAccountMenuOpen(false)}
+                    className="fixed inset-0 z-40 cursor-default"
+                  />
+                  <div className="absolute right-0 top-full z-50 mt-2 w-52 rounded-lg border border-[#e5ded4] bg-white p-2 shadow-lg">
+                    <div className="px-3 py-2">
+                      <p className="truncate text-sm font-medium">{userName}</p>
+                      <p className="truncate text-xs text-[#8a7f72]">{userEmail}</p>
+                    </div>
+                    <Link
+                      href="/"
+                      onClick={() => setAccountMenuOpen(false)}
+                      className="block rounded px-3 py-2 text-sm hover:bg-[#f6f2ec]"
+                    >
+                      繼續購物
+                    </Link>
+                    <button
+                      onClick={() => { setAccountMenuOpen(false); signOut(); }}
+                      className="block w-full rounded px-3 py-2 text-left text-sm hover:bg-[#f6f2ec]"
+                    >
+                      登出
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
           </div>
         </nav>
       </header>
@@ -1355,5 +1416,45 @@ function FavoritesTab({ products }: { products: Product[] }) {
         </Link>
       ))}
     </div>
+  );
+}
+
+/* ---------- 表頭圖示(與首頁一致) ---------- */
+function IconMenu() {
+  return (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
+      <path d="M3 6h18M3 12h18M3 18h18" strokeLinecap="round" />
+    </svg>
+  );
+}
+function IconSearch() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
+      <circle cx="11" cy="11" r="7" />
+      <path d="M21 21l-4-4" strokeLinecap="round" />
+    </svg>
+  );
+}
+function IconStar({ filled = false }: { filled?: boolean }) {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill={filled ? '#f5c542' : 'none'} stroke={filled ? '#d89a00' : 'currentColor'} strokeWidth="1.8" strokeLinejoin="round">
+      <path d="m12 2 3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21 7 14.2l-5-4.9 6.9-1L12 2Z" />
+    </svg>
+  );
+}
+function IconUser() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
+      <circle cx="12" cy="8" r="4" />
+      <path d="M4 21c0-4 3.5-6 8-6s8 2 8 6" strokeLinecap="round" />
+    </svg>
+  );
+}
+function IconBag() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
+      <path d="M6 8h12l-1 12H7L6 8z" strokeLinejoin="round" />
+      <path d="M9 8V6a3 3 0 016 0v2" strokeLinecap="round" />
+    </svg>
   );
 }
