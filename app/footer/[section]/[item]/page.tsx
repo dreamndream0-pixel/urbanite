@@ -92,7 +92,11 @@ export default async function FooterContentPage({ params }: { params: Promise<{ 
       <footer className="border-t border-[#e5ded4] px-6 py-6 sm:px-8">
         <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-4 text-xs text-[#6f675f] sm:flex-row">
           <Link href="/" className="font-bold tracking-wide text-[#1f1b19]">
-            {settings?.logo_url ? <img src={settings.logo_url} alt="URBANITE" className="h-8 w-auto object-contain" /> : 'URBANITE'}
+            {settings?.logo_url ? (
+              <img src={settings.logo_url} alt="URBANITE" className="h-8 w-auto object-contain" />
+            ) : (
+              <span className="inline-block h-8 w-28" aria-hidden />
+            )}
           </Link>
           <p>Copyright © {copyrightStartYear}-{copyrightEndYear} URBANITE-TW. All rights reserved.</p>
         </div>

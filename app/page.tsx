@@ -64,7 +64,6 @@ export default function Home() {
   const [banners, setBanners] = useState<Banner[]>([]);
   const [dbCategories, setDbCategories] = useState<Category[]>([]);
   const [logoUrl, setLogoUrl] = useState('');
-  const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [settings, setSettings] = useState<SiteSettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [category, setCategory] = useState('spring'); // 開啟頁面預設停在「精選商品」
@@ -134,8 +133,7 @@ export default function Home() {
         if (s?.logo_url) setLogoUrl(s.logo_url);
         if (s) setSettings(s);
       })
-      .catch(() => {})
-      .finally(() => setSettingsLoaded(true));
+      .catch(() => {});
 
     fetch('/api/banners')
       .then((res) => (res.ok ? res.json() : []))
@@ -357,12 +355,8 @@ export default function Home() {
                 alt={STORE_NAME}
                 className="mx-auto h-8 w-auto object-contain sm:h-10"
               />
-            ) : settingsLoaded ? (
-              <span className="font-serif text-2xl italic tracking-wide sm:text-3xl">
-                {STORE_NAME}
-              </span>
             ) : (
-              <span className="inline-block h-8 sm:h-10" />
+              <span className="inline-block h-8 w-28 sm:h-10 sm:w-36" aria-hidden />
             )}
           </Link>
 
@@ -740,7 +734,7 @@ function Footer({ settings, logoUrl }: { settings: SiteSettings | null; logoUrl:
             {logoUrl ? (
               <img src={logoUrl} alt={STORE_NAME} className="h-10 w-auto object-contain" />
             ) : (
-              <span className="text-2xl font-black tracking-tight">urbanite</span>
+              <span className="inline-block h-10 w-32" aria-hidden />
             )}
           </Link>
           <p className="mt-5 text-sm leading-7 text-[#5f5852]">
@@ -819,7 +813,7 @@ function Footer({ settings, logoUrl }: { settings: SiteSettings | null; logoUrl:
             {logoUrl ? (
               <img src={logoUrl} alt={STORE_NAME} className="h-11 w-auto object-contain" />
             ) : (
-              <span className="text-3xl font-black tracking-tight">urbanite</span>
+              <span className="inline-block h-11 w-32" aria-hidden />
             )}
           </Link>
           <p className="mt-5 text-sm leading-7 text-[#5f5852]">

@@ -84,7 +84,7 @@ export default function LoginClient({
             {logoUrl ? (
               <img src={logoUrl} alt={STORE_NAME} className="mx-auto h-8 w-auto object-contain sm:h-10" />
             ) : (
-              <span className="font-serif text-2xl italic tracking-wide sm:text-3xl">{STORE_NAME}</span>
+              <span className="inline-block h-8 w-28 sm:h-10 sm:w-36" aria-hidden />
             )}
           </Link>
           <div className="flex items-center justify-end gap-5 text-[#717171]">

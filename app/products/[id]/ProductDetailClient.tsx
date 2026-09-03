@@ -36,7 +36,6 @@ export default function ProductDetailClient({ product }: { product: Product }) {
   const [message, setMessage] = useState('');
   const [favorite, setFavorite] = useState(false);
   const [logoUrl, setLogoUrl] = useState('');
-  const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [cartCount, setCartCount] = useState(0);
   const router = useRouter();
 
@@ -58,8 +57,7 @@ export default function ProductDetailClient({ product }: { product: Product }) {
       .then((settings) => {
         if (settings?.logo_url) setLogoUrl(settings.logo_url);
       })
-      .catch(() => {})
-      .finally(() => setSettingsLoaded(true));
+      .catch(() => {});
   }, []);
 
   const variantLabel = useMemo(() => {
@@ -190,12 +188,8 @@ export default function ProductDetailClient({ product }: { product: Product }) {
                 alt={STORE_NAME}
                 className="mx-auto h-8 w-auto object-contain sm:h-10"
               />
-            ) : settingsLoaded ? (
-              <span className="font-serif text-2xl italic tracking-wide sm:text-3xl">
-                {STORE_NAME}
-              </span>
             ) : (
-              <span className="inline-block h-8 sm:h-10" />
+              <span className="inline-block h-8 w-28 sm:h-10 sm:w-36" aria-hidden />
             )}
           </Link>
 
