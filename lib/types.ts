@@ -280,10 +280,53 @@ export type OrderStatusHistory = {
   created_at: string;
 };
 
+export type ReturnItem = {
+  index: number;
+  name: string;
+  variant: string;
+  sku?: string;
+  price: number;
+  quantity: number;
+  reason?: string;
+};
+
+export type ReturnRequest = {
+  id: string;
+  return_no: string;
+  order_id: string;
+  user_id?: string | null;
+  reason?: string;
+  status: string; // REQUESTED / APPROVED / REJECTED / RECEIVED / COMPLETED
+  items: ReturnItem[];
+  refund_amount: number;
+  response?: string;
+  restocked?: boolean;
+  requested_at?: string;
+  reviewed_at?: string | null;
+  received_at?: string | null;
+  completed_at?: string | null;
+  created_at?: string;
+};
+
+export type Refund = {
+  id: string;
+  refund_no: string;
+  order_id: string;
+  return_id?: string | null;
+  amount: number;
+  reason?: string;
+  status: string; // PENDING / PROCESSING / COMPLETED
+  provider_refund_id?: string;
+  created_by?: string;
+  created_at?: string;
+};
+
 // 後台訂單詳情:主檔 + 關聯資料
 export type OrderDetail = {
   order: Order;
   payments: Payment[];
   shipments: Shipment[];
   history: OrderStatusHistory[];
+  returns: ReturnRequest[];
+  refunds: Refund[];
 };

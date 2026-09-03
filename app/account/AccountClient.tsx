@@ -1,18 +1,21 @@
 'use client';
 
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createBrowserSupabase } from '@/lib/supabase/client';
-import type { Customer, Discount, Order, Product, Recipient, SiteSettings, UserCoupon } from '@/lib/types';
+import type { Customer, Discount, Order, Product, Recipient, ReturnRequest, SiteSettings, UserCoupon } from '@/lib/types';
 import { TW_CITIES, TW_REGIONS } from '@/lib/tw-regions';
 import { isEcpayMethod } from '@/lib/payment';
+import { uiAlert } from '@/lib/ui-dialog';
 import {
   buildProgress,
   orderTabOf,
   canRequestCancel,
+  canRequestReturn,
   ORDER_TABS,
   CANCEL_STATUS_LABEL,
+  RETURN_STATUS_LABEL,
   type OrderTab,
 } from '@/lib/order-status';
 
@@ -129,7 +132,7 @@ export default function AccountClient({
       })
       .filter((x): x is NonNullable<typeof x> => x !== null);
     if (toAdd.length === 0) {
-      alert('這筆訂單的商品目前已無法加入購物車。');
+      void uiAlert('這筆訂單的商品目前已無法加入購物車。');
       return;
     }
     try {
@@ -537,7 +540,7 @@ function CouponsTab({ coupons }: { coupons: Discount[] }) {
       body: JSON.stringify({ coupon_id: couponId }),
     });
     const data = await res.json().catch(() => null);
-    if (!res.ok) return alert(data?.error ?? '領取失敗');
+    if (!res.ok) return void uiAlert(data?.error ?? '領取失敗');
     refreshCoupons();
   }
 
@@ -800,6 +803,17 @@ function OrderModal({
   onPay: (o: Order) => void;
 }) {
   const dateStr = order.created_at ? new Date(order.created_at).toLocaleString('zh-TW') : '';
+  const [returns, setReturns] = useState<ReturnRequest[]>([]);
+  const [showReturn, setShowReturn] = useState(false);
+
+  const loadReturns = useCallback(() => {
+    fetch(`/api/orders/${order.id}/returns`)
+      .then((res) => (res.ok ? res.json() : []))
+      .then((data: ReturnRequest[]) => setReturns(Array.isArray(data) ? data : []))
+      .catch(() => {});
+  }, [order.id]);
+  useEffect(() => { loadReturns(); }, [loadReturns]);
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center sm:p-4"
@@ -908,7 +922,35 @@ function OrderModal({
                 申請取消
               </button>
             ) : null}
+            {canRequestReturn(order) ? (
+              <button
+                onClick={() => setShowReturn(true)}
+                className="rounded-full border border-[#d7c9bd] px-5 py-3 font-semibold text-[#6b6156] hover:bg-[#efe8dd]"
+              >
+                申請退貨
+              </button>
+            ) : null}
           </div>
+
+          {/* 退貨紀錄 */}
+          {returns.length > 0 ? (
+            <div className="space-y-2 rounded-xl border border-[#e5ded4] bg-[#faf7f2] p-4">
+              <p className="text-sm font-semibold">退貨紀錄</p>
+              {returns.map((r) => (
+                <div key={r.id} className="rounded-lg bg-white p-3 text-sm">
+                  <div className="flex items-center justify-between">
+                    <span className="font-medium">{r.return_no}</span>
+                    <span className="font-semibold text-[#c0392b]">{RETURN_STATUS_LABEL[r.status] ?? r.status}</span>
+                  </div>
+                  <p className="mt-1 text-xs text-[#8a7f72]">
+                    {r.items.map((it) => `${it.name}${it.variant ? `(${it.variant})` : ''}×${it.quantity}`).join('、')}
+                  </p>
+                  <p className="mt-0.5 text-xs text-[#6b6156]">退款金額 {formatter.format(r.refund_amount)}</p>
+                  {r.response ? <p className="mt-0.5 text-xs text-[#6b6156]">賣家回覆：{r.response}</p> : null}
+                </div>
+              ))}
+            </div>
+          ) : null}
 
           {/* 訂單資訊 */}
           <Section title="訂單資訊">
@@ -943,11 +985,117 @@ function OrderModal({
           </Section>
         </div>
       </div>
+
+      {showReturn ? (
+        <ReturnRequestModal
+          order={order}
+          onClose={() => setShowReturn(false)}
+          onDone={() => { setShowReturn(false); loadReturns(); void uiAlert('已送出退貨申請，賣家將盡快為你處理。'); }}
+        />
+      ) : null}
     </div>
   );
 }
 
 const CANCEL_REASONS = ['購買錯商品，需重新下單', '不想買了', '想修改訂單', '其他'];
+const RETURN_REASONS = ['尺寸不合', '商品瑕疵', '與描述不符', '不想要了', '其他'];
+
+function ReturnRequestModal({ order, onClose, onDone }: { order: Order; onClose: () => void; onDone: () => void }) {
+  const [picked, setPicked] = useState<Record<number, number>>({});
+  const [reason, setReason] = useState('');
+  const [other, setOther] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+
+  function toggle(idx: number, max: number, on: boolean) {
+    setPicked((p) => {
+      const next = { ...p };
+      if (on) next[idx] = Math.min(max, p[idx] || 1);
+      else delete next[idx];
+      return next;
+    });
+  }
+  function setQty(idx: number, qty: number, max: number) {
+    setPicked((p) => ({ ...p, [idx]: Math.max(1, Math.min(max, qty)) }));
+  }
+
+  const refundAmount = order.items.reduce((sum, it, i) => (picked[i] ? sum + it.price * picked[i] : sum), 0);
+
+  async function submit() {
+    setErr('');
+    const items = Object.entries(picked).map(([i, q]) => ({ index: Number(i), quantity: q }));
+    if (items.length === 0) { setErr('請至少選擇一項要退貨的商品'); return; }
+    const finalReason = reason === '其他' ? other.trim() : reason;
+    if (!finalReason) { setErr('請選擇或填寫退貨原因'); return; }
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/orders/${order.id}/returns`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason: finalReason, items: items.map((it) => ({ ...it, reason: finalReason })) }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setErr(data.error ?? '申請失敗'); return; }
+      onDone();
+    } catch {
+      setErr('申請失敗，請稍後再試');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <ModalShell title="申請退貨" onClose={onClose}>
+      <p className="mb-3 text-sm text-[#8a7f72]">訂單 {order.order_no}，勾選要退貨的商品與數量。</p>
+      <div className="space-y-2">
+        {order.items.map((it, i) => {
+          const on = picked[i] != null;
+          return (
+            <div key={i} className={`rounded-lg border p-3 ${on ? 'border-[#1f1b19] bg-[#faf7f2]' : 'border-[#e5ded4]'}`}>
+              <label className="flex items-center gap-2">
+                <input type="checkbox" checked={on} onChange={(e) => toggle(i, it.quantity, e.target.checked)} className="h-4 w-4" />
+                <span className="flex-1 text-sm font-medium">{it.name}<span className="ml-1 text-xs text-[#8a7f72]">{it.variant}</span></span>
+                <span className="text-sm">{formatter.format(it.price)}</span>
+              </label>
+              {on ? (
+                <div className="mt-2 flex items-center gap-2 pl-6 text-sm">
+                  <span className="text-[#8a7f72]">退貨數量</span>
+                  <div className="inline-flex items-center rounded-full border border-[#e5ded4]">
+                    <button type="button" className="px-2.5 py-0.5" onClick={() => setQty(i, (picked[i] || 1) - 1, it.quantity)}>-</button>
+                    <span className="w-8 text-center">{picked[i]}</span>
+                    <button type="button" className="px-2.5 py-0.5" onClick={() => setQty(i, (picked[i] || 1) + 1, it.quantity)}>+</button>
+                  </div>
+                  <span className="text-xs text-[#a99e8f]">/ {it.quantity}</span>
+                </div>
+              ) : null}
+            </div>
+          );
+        })}
+      </div>
+
+      <label className="mt-4 block">
+        <span className="mb-1 block text-sm text-[#8a7f72]">退貨原因</span>
+        <select value={reason} onChange={(e) => { setReason(e.target.value); setErr(''); }} className="w-full rounded-lg border border-[#e5ded4] px-3 py-2.5">
+          <option value="">請選擇退貨原因…</option>
+          {RETURN_REASONS.map((r) => <option key={r} value={r}>{r}</option>)}
+        </select>
+      </label>
+      {reason === '其他' ? (
+        <textarea value={other} onChange={(e) => setOther(e.target.value)} rows={2} placeholder="請輸入退貨原因" className="mt-2 w-full rounded-lg border border-[#e5ded4] px-3 py-2.5 text-sm" />
+      ) : null}
+
+      <div className="mt-3 flex justify-between text-sm">
+        <span className="text-[#8a7f72]">預估退款金額</span>
+        <span className="font-semibold text-[#c84767]">{formatter.format(refundAmount)}</span>
+      </div>
+      {err ? <p className="mt-2 text-sm text-[#c0392b]">{err}</p> : null}
+      <div className="mt-4 flex gap-2">
+        <button onClick={onClose} className="flex-1 rounded-full border border-[#d7c9bd] px-4 py-3 font-semibold text-[#6b6156] hover:bg-[#efe8dd]">先不要</button>
+        <button onClick={submit} disabled={busy} className="flex-1 rounded-full bg-[#c84767] px-4 py-3 font-semibold text-white disabled:opacity-60">送出退貨申請</button>
+      </div>
+    </ModalShell>
+  );
+}
 
 function ModalShell({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
   return (

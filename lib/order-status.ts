@@ -127,3 +127,18 @@ export const CANCEL_STATUS_LABEL: Record<string, string> = {
   APPROVED: '已核准取消',
   REJECTED: '取消申請被婉拒',
 };
+
+// 退貨狀態(§16)
+export const RETURN_STATUS_LABEL: Record<string, string> = {
+  REQUESTED: '退貨申請中',
+  APPROVED: '已核准，待寄回',
+  REJECTED: '退貨申請被婉拒',
+  RECEIVED: '已收到退貨',
+  COMPLETED: '退款完成',
+};
+
+// 訂單是否可申請退貨:已送達 / 已完成,且未取消。
+export function canRequestReturn(order: { status: string; fulfillment_status?: string }): boolean {
+  if (order.status === '取消') return false;
+  return order.status === '已完成' || order.fulfillment_status === 'DELIVERED';
+}

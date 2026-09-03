@@ -23,7 +23,9 @@ import {
   ORDER_STATUS_LABEL,
   PAYMENT_STATUS_LABEL,
   FULFILLMENT_STATUS_LABEL,
+  RETURN_STATUS_LABEL,
 } from '@/lib/order-status';
+import { uiAlert, uiConfirm, uiPrompt } from '@/lib/ui-dialog';
 
 const formatter = new Intl.NumberFormat('zh-TW', {
   style: 'currency',
@@ -573,7 +575,7 @@ export default function AdminDashboard({
     if (res.ok) {
       const updated = (await res.json()) as Order;
       setOrders((list) => list.map((o) => (o.id === id ? updated : o)));
-    } else alert('更新失敗');
+    } else void uiAlert('更新失敗');
   }
 
   async function reviewCancel(id: string, action: 'approve' | 'reject', response: string) {
@@ -585,7 +587,7 @@ export default function AdminDashboard({
     const data = await res.json();
     if (res.ok) {
       setOrders((list) => list.map((o) => (o.id === id ? (data as Order) : o)));
-    } else alert(data.error ?? '審核失敗');
+    } else void uiAlert(data.error ?? '審核失敗');
   }
 
   async function saveProduct() {
@@ -626,7 +628,7 @@ export default function AdminDashboard({
         : editing.sizes.split(',').map((s) => s.trim()).filter(Boolean),
     };
     if (isNew) {
-      if (!payload.id || !payload.name) return alert('請填寫商品代碼與名稱');
+      if (!payload.id || !payload.name) return void uiAlert('請填寫商品代碼與名稱');
       const res = await fetch('/api/products', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -636,7 +638,7 @@ export default function AdminDashboard({
       if (res.ok) {
         setProducts((l) => [...l, data as Product]);
         setEditing(null);
-      } else alert(data.error ?? '新增失敗');
+      } else void uiAlert(data.error ?? '新增失敗');
     } else {
       const res = await fetch(`/api/products/${editing.id}`, {
         method: 'PATCH',
@@ -647,7 +649,7 @@ export default function AdminDashboard({
       if (res.ok) {
         setProducts((l) => l.map((p) => (p.id === editing.id ? (data as Product) : p)));
         setEditing(null);
-      } else alert(data.error ?? '更新失敗');
+      } else void uiAlert(data.error ?? '更新失敗');
     }
   }
 
@@ -655,19 +657,19 @@ export default function AdminDashboard({
     const product = products.find((p) => p.id === id);
     const relatedMovements = movements.filter((m) => m.product_id === id).length;
     const variantCount = product?.variants.length ?? 0;
-    if (!confirm(
+    if (!await uiConfirm(
       `確定刪除商品「${product?.name ?? id}」嗎?\n\n會一併刪除/影響:\n- 商品管理中的商品資料\n- ${variantCount} 筆規格資料與庫存列\n- 前台商品頁與購物車可選商品\n\n既有進出庫紀錄 ${relatedMovements} 筆會保留作為歷史紀錄。`,
     )) return;
     const res = await fetch(`/api/products/${id}`, { method: 'DELETE' });
     if (res.ok) setProducts((l) => l.filter((p) => p.id !== id));
-    else alert('刪除失敗');
+    else void uiAlert('刪除失敗');
   }
 
   async function deleteStockRow(productId: string, variantKey: string) {
     const product = products.find((p) => p.id === productId);
     if (!product) return;
     if (variantKey) {
-      if (!confirm(
+      if (!await uiConfirm(
         `確定刪除庫存列「${product.name} / ${variantKey}」嗎?\n\n會一併刪除/影響:\n- 此商品的這一筆顏色/尺寸規格\n- 商品管理的規格組合\n- 入庫單可選規格\n\n商品本身與進出庫歷史紀錄會保留。`,
       )) return;
       const variants = product.variants.filter((v) => v.options.join(' / ') !== variantKey);
@@ -677,12 +679,12 @@ export default function AdminDashboard({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ variants, inventory }),
       });
-      if (!res.ok) return alert('刪除庫存列失敗');
+      if (!res.ok) return void uiAlert('刪除庫存列失敗');
       setProducts((list) => list.map((p) => (p.id === productId ? { ...p, variants, inventory } : p)));
       return;
     }
 
-    if (!confirm(
+    if (!await uiConfirm(
       `確定刪除庫存列「${product.name}」嗎?\n\n此商品沒有規格,刪除庫存列會將目前庫存歸零。\n商品資料與進出庫歷史紀錄會保留。`,
     )) return;
     const res = await fetch(`/api/products/${productId}`, {
@@ -690,18 +692,18 @@ export default function AdminDashboard({
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ inventory: 0 }),
     });
-    if (!res.ok) return alert('刪除庫存列失敗');
+    if (!res.ok) return void uiAlert('刪除庫存列失敗');
     setProducts((list) => list.map((p) => (p.id === productId ? { ...p, inventory: 0 } : p)));
   }
 
   async function deleteMovement(movement: StockMovement) {
     const doc = parseMovementNote(movement.note);
-    if (!confirm(
+    if (!await uiConfirm(
       `確定刪除進出庫紀錄「${doc.document_no || movement.id}」嗎?\n\n會一併刪除/影響:\n- 這筆進出庫紀錄\n- 商品 ${movement.product_id} 的庫存會反向調整\n- ${movement.variant_key || '無規格'} 數量會${movement.type === 'in' ? '扣回' : '加回'} ${movement.quantity}\n\n商品資料本身會保留。`,
     )) return;
     const res = await fetch(`/api/stock-movements?id=${encodeURIComponent(movement.id)}`, { method: 'DELETE' });
     const data = await res.json().catch(() => null);
-    if (!res.ok) return alert(data?.error ?? '刪除進出庫紀錄失敗');
+    if (!res.ok) return void uiAlert(data?.error ?? '刪除進出庫紀錄失敗');
     const delta = movement.type === 'in' ? -movement.quantity : movement.quantity;
     setMovements((list) => list.filter((m) => m.id !== movement.id));
     setProducts((list) =>
@@ -747,19 +749,19 @@ export default function AdminDashboard({
 
   // 進出庫:新增一筆入庫/出庫,後端會自動更新庫存
   async function addMovement() {
-    if (!mvForm.document_no.trim()) return alert('請填寫單號');
-    if (!mvForm.document_date.trim()) return alert('請填寫日期');
-    if (!mvForm.status.trim()) return alert('請填寫狀態');
-    if (!mvForm.handler.trim()) return alert(`請填寫${mvForm.type === 'in' ? '入庫人' : '出庫人'}`);
+    if (!mvForm.document_no.trim()) return void uiAlert('請填寫單號');
+    if (!mvForm.document_date.trim()) return void uiAlert('請填寫日期');
+    if (!mvForm.status.trim()) return void uiAlert('請填寫狀態');
+    if (!mvForm.handler.trim()) return void uiAlert(`請填寫${mvForm.type === 'in' ? '入庫人' : '出庫人'}`);
     const validLines = movementLines.filter((line) => line.product_id && line.quantity > 0);
-    if (validLines.length === 0) return alert('請至少新增一筆商品明細');
+    if (validLines.length === 0) return void uiAlert('請至少新增一筆商品明細');
 
     for (const line of validLines) {
       const product = products.find((p) => p.id === line.product_id);
       if (product?.variants.length) {
-        if (!line.color) return alert(`請選擇 ${product.name} 的顏色`);
-        if (!line.size) return alert(`請選擇 ${product.name} 的尺寸`);
-        if (!getLineVariantKey(product, line)) return alert(`${product.name} 找不到符合的顏色 / 尺寸`);
+        if (!line.color) return void uiAlert(`請選擇 ${product.name} 的顏色`);
+        if (!line.size) return void uiAlert(`請選擇 ${product.name} 的尺寸`);
+        if (!getLineVariantKey(product, line)) return void uiAlert(`${product.name} 找不到符合的顏色 / 尺寸`);
       }
     }
 
@@ -789,7 +791,7 @@ export default function AdminDashboard({
         }),
       });
       const data = await res.json();
-      if (!res.ok) return alert(data.error ?? '新增失敗');
+      if (!res.ok) return void uiAlert(data.error ?? '新增失敗');
       createdMovements.push(data as StockMovement);
     }
 
@@ -838,8 +840,8 @@ export default function AdminDashboard({
   }
 
   async function importInventoryRows(rows: InventoryImportRow[]) {
-    if (rows.length === 0) return alert('匯入檔沒有資料');
-    if (!confirm(`確定匯入 ${rows.length} 筆庫存資料嗎?\n\n會直接更新資料庫中的目前庫存、安全庫存、單位成本與儲位。`)) return;
+    if (rows.length === 0) return void uiAlert('匯入檔沒有資料');
+    if (!await uiConfirm(`確定匯入 ${rows.length} 筆庫存資料嗎?\n\n會直接更新資料庫中的目前庫存、安全庫存、單位成本與儲位。`)) return;
 
     const productMap = new Map(products.map((product) => [product.id, product]));
     const nextById = new Map<string, Product>();
@@ -892,16 +894,16 @@ export default function AdminDashboard({
         }),
       });
       const data = await res.json().catch(() => null);
-      if (!res.ok) return alert(data?.error ?? `匯入 ${product.id} 失敗`);
+      if (!res.ok) return void uiAlert(data?.error ?? `匯入 ${product.id} 失敗`);
     }
 
     setProducts((list) => list.map((product) => nextById.get(product.id) ?? product));
-    alert(`匯入完成: 更新 ${changed} 筆庫存${missing.length ? `,略過 ${missing.length} 筆找不到的資料` : ''}`);
+    void uiAlert(`匯入完成: 更新 ${changed} 筆庫存${missing.length ? `,略過 ${missing.length} 筆找不到的資料` : ''}`);
   }
 
   async function saveNewCategory() {
     const slug = newCat.slug.trim().toLowerCase();
-    if (!slug || !newCat.name.trim()) return alert('請填寫代碼(英文)與名稱');
+    if (!slug || !newCat.name.trim()) return void uiAlert('請填寫代碼(英文)與名稱');
     const res = await fetch('/api/categories', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -916,7 +918,7 @@ export default function AdminDashboard({
     if (res.ok) {
       setCategories((l) => [...l, data as Category]);
       setNewCat({ slug: '', name: '', en: '' });
-    } else alert(data.error ?? '新增失敗(代碼可能重複)');
+    } else void uiAlert(data.error ?? '新增失敗(代碼可能重複)');
   }
 
   async function patchCategory(id: string, patch: Partial<Pick<Category, 'name' | 'en' | 'sort_order'>>) {
@@ -953,14 +955,14 @@ export default function AdminDashboard({
       body: JSON.stringify({ category: slug }),
     });
     const data = await res.json().catch(() => null);
-    if (!res.ok) return alert(data?.error ?? '更新商品分類失敗');
+    if (!res.ok) return void uiAlert(data?.error ?? '更新商品分類失敗');
     setProducts((list) => list.map((item) => (item.id === product.id ? (data as Product) : item)));
   }
 
   async function deleteCategory(id: string) {
     const category = categories.find((c) => c.id === id);
     const count = products.filter((product) => product.category === category?.slug).length;
-    if (!confirm(`確定刪除分類「${category?.name ?? id}」嗎?\n\n會一併影響:\n- 此分類會從分類管理消失\n- ${count} 個商品會失去這個分類標籤\n- 首頁分類選單不再顯示此分類\n\n商品本身不會被刪除。`)) return;
+    if (!await uiConfirm(`確定刪除分類「${category?.name ?? id}」嗎?\n\n會一併影響:\n- 此分類會從分類管理消失\n- ${count} 個商品會失去這個分類標籤\n- 首頁分類選單不再顯示此分類\n\n商品本身不會被刪除。`)) return;
     if (category) {
       await Promise.all(products
         .filter((product) => product.category === category.slug)
@@ -973,12 +975,12 @@ export default function AdminDashboard({
     }
     const res = await fetch(`/api/categories/${id}`, { method: 'DELETE' });
     if (res.ok) setCategories((l) => l.filter((c) => c.id !== id));
-    else alert('刪除失敗');
+    else void uiAlert('刪除失敗');
   }
 
   async function addDiscount() {
     const code = newDiscount.code.trim().toUpperCase();
-    if (!code) return alert('請填寫折扣碼');
+    if (!code) return void uiAlert('請填寫折扣碼');
     const res = await fetch('/api/discounts', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -994,7 +996,7 @@ export default function AdminDashboard({
     if (res.ok) {
       setDiscounts((l) => [data as Discount, ...l]);
       setNewDiscount(blankDiscountDraft());
-    } else alert(data.error ?? '新增失敗(折扣碼可能重複)');
+    } else void uiAlert(data.error ?? '新增失敗(折扣碼可能重複)');
   }
 
   async function toggleDiscount(id: string, active: boolean) {
@@ -1011,10 +1013,10 @@ export default function AdminDashboard({
     const d = discounts.find((item) => item.id === id);
     const claimed = userCoupons.filter((item) => item.coupon_id === id).length;
     const used = couponUsages.filter((item) => item.coupon_id === id).length;
-    if (!confirm(`確定刪除優惠券「${d?.code ?? id}」嗎?\n\n會一併刪除/影響:\n- 優惠券主檔\n- ${claimed} 筆會員持券資料\n- ${used} 筆優惠券使用紀錄\n- 後續結帳無法再套用此券\n\n舊訂單仍保留當時的折抵快照。`)) return;
+    if (!await uiConfirm(`確定刪除優惠券「${d?.code ?? id}」嗎?\n\n會一併刪除/影響:\n- 優惠券主檔\n- ${claimed} 筆會員持券資料\n- ${used} 筆優惠券使用紀錄\n- 後續結帳無法再套用此券\n\n舊訂單仍保留當時的折抵快照。`)) return;
     const res = await fetch(`/api/discounts/${id}`, { method: 'DELETE' });
     if (res.ok) setDiscounts((l) => l.filter((d) => d.id !== id));
-    else alert('刪除失敗');
+    else void uiAlert('刪除失敗');
   }
 
   async function copyDiscount(d: Discount) {
@@ -1032,7 +1034,7 @@ export default function AdminDashboard({
       }),
     });
     const data = await res.json().catch(() => null);
-    if (!res.ok) return alert(data?.error ?? '複製失敗');
+    if (!res.ok) return void uiAlert(data?.error ?? '複製失敗');
     setDiscounts((list) => [data as Discount, ...list]);
   }
 
@@ -1070,26 +1072,26 @@ export default function AdminDashboard({
 
   async function issueCouponToUser(userId: string) {
     const couponId = manualCouponByUser[userId];
-    if (!couponId) return alert('請選擇要補發的優惠券');
+    if (!couponId) return void uiAlert('請選擇要補發的優惠券');
     const res = await fetch('/api/admin/user-coupons', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ user_id: userId, coupon_id: couponId }),
     });
     const data = await res.json().catch(() => null);
-    if (!res.ok) return alert(data?.error ?? '補發失敗');
+    if (!res.ok) return void uiAlert(data?.error ?? '補發失敗');
     setUserCoupons((list) => [data as UserCoupon, ...list.filter((item) => !(item.user_id === userId && item.coupon_id === couponId))]);
   }
 
   async function revokeUserCoupon(id: string) {
-    if (!confirm('確定撤回這張尚未使用的會員優惠券嗎?')) return;
+    if (!await uiConfirm('確定撤回這張尚未使用的會員優惠券嗎?')) return;
     const res = await fetch('/api/admin/user-coupons', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id }),
     });
     const data = await res.json().catch(() => null);
-    if (!res.ok) return alert(data?.error ?? '撤回失敗');
+    if (!res.ok) return void uiAlert(data?.error ?? '撤回失敗');
     setUserCoupons((list) => list.map((item) => (item.id === id ? (data as UserCoupon) : item)));
   }
 
@@ -1101,9 +1103,9 @@ export default function AdminDashboard({
       const res = await fetch('/api/settings/logo', { method: 'POST', body: fd });
       const data = await res.json();
       if (res.ok) setLogoUrl(data.logo_url);
-      else alert(data.error ?? '上傳失敗');
+      else void uiAlert(data.error ?? '上傳失敗');
     } catch {
-      alert('上傳發生問題');
+      void uiAlert('上傳發生問題');
     } finally {
       setUploading(false);
     }
@@ -1143,7 +1145,7 @@ export default function AdminDashboard({
       setCropFile(null);
       setEditBannerId(null);
     } catch (error) {
-      alert(error instanceof Error ? error.message : '上傳失敗');
+      void uiAlert(error instanceof Error ? error.message : '上傳失敗');
     } finally {
       setUploadingBanner(false);
     }
@@ -1157,14 +1159,14 @@ export default function AdminDashboard({
     });
     const data = await res.json();
     if (res.ok) setBanners((l) => l.map((b) => (b.id === id ? (data as Banner) : b)));
-    else alert(data.error ?? '更新失敗');
+    else void uiAlert(data.error ?? '更新失敗');
   }
 
   async function deleteBanner(id: string) {
-    if (!confirm('確定要刪除這張輪播圖嗎?')) return;
+    if (!await uiConfirm('確定要刪除這張輪播圖嗎?')) return;
     const res = await fetch(`/api/banners/${id}`, { method: 'DELETE' });
     if (res.ok) setBanners((l) => l.filter((b) => b.id !== id));
-    else alert('刪除失敗');
+    else void uiAlert('刪除失敗');
   }
 
   async function saveFooterSettings() {
@@ -1200,9 +1202,9 @@ export default function AdminDashboard({
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? '儲存失敗');
-      alert('頁尾資訊已更新');
+      void uiAlert('頁尾資訊已更新');
     } catch (error) {
-      alert(error instanceof Error ? error.message : '儲存失敗');
+      void uiAlert(error instanceof Error ? error.message : '儲存失敗');
     } finally {
       setSavingSettings(false);
     }
@@ -1230,9 +1232,9 @@ export default function AdminDashboard({
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? '儲存失敗');
-      alert(kind === 'payments' ? '金流設定已更新' : '物流設定已更新');
+      void uiAlert(kind === 'payments' ? '金流設定已更新' : '物流設定已更新');
     } catch (error) {
-      alert(error instanceof Error ? error.message : '儲存失敗');
+      void uiAlert(error instanceof Error ? error.message : '儲存失敗');
     } finally {
       setSavingSettings(false);
     }
@@ -1245,23 +1247,23 @@ export default function AdminDashboard({
     category: string,
   ) {
     const targets = scope === 'category' ? products.filter((p) => p.category === category) : products;
-    if (targets.length === 0) { alert('沒有符合的商品。'); return; }
+    if (targets.length === 0) { void uiAlert('沒有符合的商品。'); return; }
     const kindLabel = field === 'available_payment_methods' ? '付款' : '物流';
     const scopeLabel = scope === 'category'
       ? `分類「${categories.find((c) => c.slug === category)?.name ?? category}」`
       : '全部商品';
     const methodLabel = methods.length ? methods.join('、') : '允許全部(清除商品限制)';
-    if (!confirm(`確定將${kindLabel}方式套用到${scopeLabel}(${targets.length} 件)?\n\n${methodLabel}`)) return;
+    if (!await uiConfirm(`確定將${kindLabel}方式套用到${scopeLabel}(${targets.length} 件)?\n\n${methodLabel}`)) return;
     const res = await fetch('/api/products/methods', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ field, methods, scope, category: scope === 'category' ? category : undefined }),
     });
     const data = await res.json();
-    if (!res.ok) { alert(data.error ?? '套用失敗'); return; }
+    if (!res.ok) { void uiAlert(data.error ?? '套用失敗'); return; }
     const ids = new Set(targets.map((p) => p.id));
     setProducts((list) => list.map((p) => (ids.has(p.id) ? { ...p, [field]: methods } : p)));
-    alert(`已套用到 ${data.updated} 件商品。`);
+    void uiAlert(`已套用到 ${data.updated} 件商品。`);
   }
 
   const activeNav = NAV.find((n) => n.key === section) ?? NAV[0];
@@ -2520,6 +2522,7 @@ export default function AdminDashboard({
           onClose={() => setOpenOrderId(null)}
           onUpdate={(patch) => updateOrder(openOrderId, patch)}
           onReviewCancel={(action, response) => reviewCancel(openOrderId, action, response)}
+          onOrderChange={(o) => setOrders((list) => list.map((x) => (x.id === o.id ? o : x)))}
         />
       )}
     </div>
@@ -3134,7 +3137,7 @@ function FooterSocialLinksEditor({ value, onChange }: { value: string; onChange:
       if (!res.ok || !data.image_url) throw new Error(data.error ?? '上傳失敗');
       updateItem(index, { image: data.image_url });
     } catch (error) {
-      alert(error instanceof Error ? error.message : '上傳發生問題');
+      void uiAlert(error instanceof Error ? error.message : '上傳發生問題');
     } finally {
       setUploadingIndex(null);
     }
@@ -3530,12 +3533,14 @@ function AdminOrderModal({
   onClose,
   onUpdate,
   onReviewCancel,
+  onOrderChange,
 }: {
   order: Order;
   imageByName: Map<string, string>;
   onClose: () => void;
   onUpdate: (patch: Partial<Order>) => void;
   onReviewCancel: (action: 'approve' | 'reject', response: string) => void;
+  onOrderChange?: (o: Order) => void;
 }) {
   const dateStr = order.created_at ? new Date(order.created_at).toLocaleString('zh-TW') : '';
   const [cancelReply, setCancelReply] = useState('');
@@ -3548,7 +3553,7 @@ function AdminOrderModal({
       </div>
     ) : null;
 
-  const [detail, setDetail] = useState<Pick<OrderDetail, 'payments' | 'shipments' | 'history'> | null>(null);
+  const [detail, setDetail] = useState<Pick<OrderDetail, 'payments' | 'shipments' | 'history' | 'returns' | 'refunds'> | null>(null);
   const [detailLoading, setDetailLoading] = useState(true);
   const [shipForm, setShipForm] = useState({ provider: '', tracking_number: '' });
   const [eventForm, setEventForm] = useState({ status: '', description: '', location: '' });
@@ -3559,13 +3564,28 @@ function AdminOrderModal({
       const res = await fetch(`/api/orders/${order.id}`);
       if (res.ok) {
         const d = (await res.json()) as OrderDetail;
-        setDetail({ payments: d.payments, shipments: d.shipments, history: d.history });
+        setDetail({ payments: d.payments, shipments: d.shipments, history: d.history, returns: d.returns, refunds: d.refunds });
+        onOrderChange?.(d.order);
       }
     } finally {
       setDetailLoading(false);
     }
-  }, [order.id]);
+  }, [order.id, onOrderChange]);
   useEffect(() => { loadDetail(); }, [loadDetail]);
+
+  async function reviewReturn(returnId: string, action: 'approve' | 'reject' | 'received' | 'refund', response = '') {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/orders/${order.id}/returns`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ return_id: returnId, action, response }),
+      });
+      if (!res.ok) { void uiAlert((await res.json()).error ?? '操作失敗'); return; }
+      await loadDetail();
+    } finally { setBusy(false); }
+  }
 
   async function createShipment() {
     if (busy) return;
@@ -3576,7 +3596,7 @@ function AdminOrderModal({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(shipForm),
       });
-      if (!res.ok) { alert((await res.json()).error ?? '建立出貨失敗'); return; }
+      if (!res.ok) { void uiAlert((await res.json()).error ?? '建立出貨失敗'); return; }
       onUpdate({ status: '已出貨' });
       setShipForm({ provider: '', tracking_number: '' });
       await loadDetail();
@@ -3592,7 +3612,7 @@ function AdminOrderModal({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ shipment_id: shipmentId, ...eventForm }),
       });
-      if (!res.ok) { alert((await res.json()).error ?? '新增失敗'); return; }
+      if (!res.ok) { void uiAlert((await res.json()).error ?? '新增失敗'); return; }
       setEventForm({ status: '', description: '', location: '' });
       await loadDetail();
     } finally { setBusy(false); }
@@ -3620,11 +3640,11 @@ ${order.note ? `<div class="sec"><h2>備註</h2><p class="muted">${escapeHtml(or
     if (w) { w.document.write(html); w.document.close(); }
   }
 
-  function markRefund() {
-    const input = window.prompt(`標記退款金額(此訂單合計 ${order.total})。\n注意:這只記錄退款,實際退刷需至金流後台操作。`, String(order.total));
+  async function markRefund() {
+    const input = await uiPrompt(`標記退款金額(此訂單合計 ${order.total})。\n注意:這只記錄退款,實際退刷需至金流後台操作。`, { defaultValue: String(order.total) });
     if (input === null) return;
     const amount = Math.floor(Number(input));
-    if (!Number.isFinite(amount) || amount < 0) { alert('金額不正確'); return; }
+    if (!Number.isFinite(amount) || amount < 0) { void uiAlert('金額不正確'); return; }
     onUpdate({ refund_amount: amount });
   }
 
@@ -3666,7 +3686,7 @@ ${order.note ? `<div class="sec"><h2>備註</h2><p class="muted">${escapeHtml(or
             <button onClick={printOrder} className="rounded-full border border-[#d7c9bd] px-3 py-1.5 text-sm font-semibold text-[#6b6156] hover:bg-[#efe8dd]">列印訂單</button>
             <button onClick={markRefund} className="rounded-full border border-[#d7c9bd] px-3 py-1.5 text-sm font-semibold text-[#6b6156] hover:bg-[#efe8dd]">標記退款</button>
             {order.status !== '取消' && order.status !== '退貨' ? (
-              <button onClick={() => { if (confirm('直接取消訂單?將回補庫存。')) onUpdate({ status: '取消' }); }} className="rounded-full border border-[#e0b4b4] px-3 py-1.5 text-sm font-semibold text-[#c0392b] hover:bg-[#fbf3f0]">取消訂單</button>
+              <button onClick={async () => { if (await uiConfirm('直接取消訂單?將回補庫存。', { danger: true })) onUpdate({ status: '取消' }); }} className="rounded-full border border-[#e0b4b4] px-3 py-1.5 text-sm font-semibold text-[#c0392b] hover:bg-[#fbf3f0]">取消訂單</button>
             ) : null}
           </div>
 
@@ -3685,7 +3705,7 @@ ${order.note ? `<div class="sec"><h2>備註</h2><p class="muted">${escapeHtml(or
               />
               <div className="mt-2 flex flex-wrap gap-2">
                 <button
-                  onClick={() => { if (confirm('核准取消?將取消訂單並回補庫存。')) onReviewCancel('approve', cancelReply.trim()); }}
+                  onClick={async () => { if (await uiConfirm('核准取消?將取消訂單並回補庫存。')) onReviewCancel('approve', cancelReply.trim()); }}
                   className="rounded-full bg-[#c0392b] px-4 py-1.5 text-sm font-semibold text-white hover:bg-[#a83226]"
                 >
                   核准取消
@@ -3908,6 +3928,45 @@ ${order.note ? `<div class="sec"><h2>備註</h2><p class="muted">${escapeHtml(or
               {row('付款方式', order.payment_method)}
             </div>
           </div>
+
+          {/* 退貨 / 退款 */}
+          {detail && (detail.returns.length > 0 || detail.refunds.length > 0) ? (
+            <div className="border-t border-[#efe8dd] pt-4">
+              <h3 className="mb-3 font-semibold">退貨 / 退款</h3>
+              <div className="space-y-3">
+                {detail.returns.map((r) => (
+                  <div key={r.id} className="rounded-xl border border-[#e5ded4] p-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium">{r.return_no}</span>
+                      <span className="rounded-full bg-[#fbe9e7] px-2.5 py-1 text-xs font-semibold text-[#c0392b]">{RETURN_STATUS_LABEL[r.status] ?? r.status}</span>
+                    </div>
+                    <p className="mt-1 text-xs text-[#6b6156]">{r.items.map((it) => `${it.name}${it.variant ? `(${it.variant})` : ''}×${it.quantity}`).join('、')}</p>
+                    <p className="mt-0.5 text-xs text-[#8a7f72]">原因：{r.reason || '—'}｜退款 {formatter.format(r.refund_amount)}</p>
+                    {r.response ? <p className="mt-0.5 text-xs text-[#8a7f72]">回覆：{r.response}</p> : null}
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {r.status === 'REQUESTED' ? (
+                        <>
+                          <button onClick={() => reviewReturn(r.id, 'approve')} disabled={busy} className="rounded-full bg-[#1f7a44] px-3 py-1 text-xs font-semibold text-white disabled:opacity-50">核准退貨</button>
+                          <button onClick={async () => { const resp = await uiPrompt('婉拒退貨,回覆客人(選填):'); if (resp !== null) reviewReturn(r.id, 'reject', resp); }} disabled={busy} className="rounded-full border border-[#e0b4b4] px-3 py-1 text-xs font-semibold text-[#c0392b] disabled:opacity-50">婉拒</button>
+                        </>
+                      ) : null}
+                      {r.status === 'APPROVED' ? (
+                        <button onClick={async () => { if (await uiConfirm('標記已收到退貨?將回補庫存。')) reviewReturn(r.id, 'received'); }} disabled={busy} className="rounded-full bg-[#1f1b19] px-3 py-1 text-xs font-semibold text-white disabled:opacity-50">已收到退貨(回補庫存)</button>
+                      ) : null}
+                      {r.status === 'RECEIVED' ? (
+                        <button onClick={async () => { if (await uiConfirm(`退款 ${formatter.format(r.refund_amount)} 並完成此退貨?\n(實際退刷仍需至金流後台操作)`)) reviewReturn(r.id, 'refund'); }} disabled={busy} className="rounded-full bg-[#c84767] px-3 py-1 text-xs font-semibold text-white disabled:opacity-50">退款完成</button>
+                      ) : null}
+                    </div>
+                  </div>
+                ))}
+                {detail.refunds.map((rf) => (
+                  <div key={rf.id} className="rounded-lg bg-[#faf7f2] p-3 text-xs text-[#6b6156]">
+                    退款單 {rf.refund_no}｜{formatter.format(rf.amount)}｜{new Date(rf.created_at ?? '').toLocaleString('zh-TW')}
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
 
           {detail && detail.history.length > 0 ? (
             <div className="border-t border-[#efe8dd] pt-4">
@@ -4321,8 +4380,8 @@ function InventorySection({
   const removeMovementLine = (id: string) => {
     setMovementLines(movementLines.length <= 1 ? movementLines : movementLines.filter((line) => line.id !== id));
   };
-  const clearMovementDocument = () => {
-    if (!confirm(
+  const clearMovementDocument = async () => {
+    if (!await uiConfirm(
       `確定刪除此${mvForm.type === 'in' ? '入庫單' : '出庫單'}嗎?\n\n會一併清除:\n- 單號、日期、狀態、人員等單頭資料\n- 目前尚未送出的所有商品明細列\n\n已送出的進出庫紀錄不會被刪除。`,
     )) return;
     setMvForm({
@@ -4454,7 +4513,7 @@ function InventorySection({
   const importInventoryCsv = async (file: File) => {
     const text = await file.text();
     const lines = text.replace(/^\uFEFF/, '').split(/\r?\n/).filter((line) => line.trim());
-    if (lines.length < 2) return alert('匯入檔沒有資料');
+    if (lines.length < 2) return void uiAlert('匯入檔沒有資料');
     const headers = splitCsvLine(lines[0]).map((header) => header.trim());
     const indexOf = (names: string[]) => names.map((name) => headers.indexOf(name)).find((index) => index >= 0) ?? -1;
     const productIdIndex = indexOf(['品項編號', '商品編號', 'product_id']);
@@ -4463,7 +4522,7 @@ function InventorySection({
     const safetyIndex = indexOf(['安全庫存', 'safety']);
     const costIndex = indexOf(['單位成本', 'cost']);
     const locationIndex = indexOf(['儲位', 'location']);
-    if (productIdIndex < 0 || inventoryIndex < 0) return alert('CSV 需要包含「品項編號」與「目前庫存」欄位');
+    if (productIdIndex < 0 || inventoryIndex < 0) return void uiAlert('CSV 需要包含「品項編號」與「目前庫存」欄位');
 
     const rows = lines.slice(1).map((line) => {
       const cells = splitCsvLine(line);
@@ -5355,7 +5414,7 @@ function ProductModal({
     const res = await fetch('/api/products/image', { method: 'POST', body: fd });
     const data = await res.json();
     if (res.ok) set('colorImages', { ...draft.colorImages, [color]: data.image_url });
-    else alert(data.error ?? '圖片上傳失敗');
+    else void uiAlert(data.error ?? '圖片上傳失敗');
   }
   const colorDim = modalSpecs.find((s) => s.name.includes('色'));
   function toggleMethod(
@@ -5405,7 +5464,7 @@ function ProductModal({
   async function uploadProductImages(files: File[]) {
     const room = MAX_PRODUCT_IMAGES - draft.images.length;
     if (room <= 0) {
-      alert(`最多只能放 ${MAX_PRODUCT_IMAGES} 張圖片`);
+      void uiAlert(`最多只能放 ${MAX_PRODUCT_IMAGES} 張圖片`);
       return;
     }
     const picked = files.slice(0, room);
@@ -5437,9 +5496,9 @@ function ProductModal({
         setUploadProgress({ done: i + 1, total: picked.length, percent: 100 });
       }
       onChange({ ...draft, images: [...draft.images, ...uploaded].slice(0, MAX_PRODUCT_IMAGES) });
-      if (files.length > room) alert(`最多只能放 ${MAX_PRODUCT_IMAGES} 張,已略過多餘的圖片`);
+      if (files.length > room) void uiAlert(`最多只能放 ${MAX_PRODUCT_IMAGES} 張,已略過多餘的圖片`);
     } catch (error) {
-      alert(error instanceof Error ? error.message : '上傳失敗');
+      void uiAlert(error instanceof Error ? error.message : '上傳失敗');
     } finally {
       setUploadingImage(false);
       setUploadProgress(null);
@@ -5462,7 +5521,7 @@ function ProductModal({
     const url = prompt('貼上圖片網址')?.trim();
     if (!url) return;
     if (draft.images.length >= MAX_PRODUCT_IMAGES) {
-      alert(`最多只能放 ${MAX_PRODUCT_IMAGES} 張圖片`);
+      void uiAlert(`最多只能放 ${MAX_PRODUCT_IMAGES} 張圖片`);
       return;
     }
     onChange({ ...draft, images: [...draft.images, url] });

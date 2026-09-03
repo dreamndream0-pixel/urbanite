@@ -3,7 +3,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { getAdminUser } from '@/lib/supabase/server';
 import { deriveStatuses } from '@/lib/order-status';
 import { restoreOrderStock } from '@/lib/inventory';
-import type { Order, Payment, Shipment, ShipmentEvent, OrderStatusHistory } from '@/lib/types';
+import type { Order, Payment, Shipment, ShipmentEvent, OrderStatusHistory, ReturnRequest, Refund } from '@/lib/types';
 
 // GET /api/orders/[id] — 取得訂單完整資訊(主檔 + 付款 + 物流 + 歷程),限管理員
 export async function GET(
@@ -16,11 +16,13 @@ export async function GET(
   const { id } = await params;
   const supabase = createAdminClient();
 
-  const [orderRes, payRes, shipRes, histRes] = await Promise.all([
+  const [orderRes, payRes, shipRes, histRes, retRes, refRes] = await Promise.all([
     supabase.from('orders').select('*').eq('id', id).maybeSingle(),
     supabase.from('payments').select('*').eq('order_id', id).order('created_at', { ascending: true }),
     supabase.from('shipments').select('*').eq('order_id', id).order('created_at', { ascending: true }),
     supabase.from('order_status_history').select('*').eq('order_id', id).order('created_at', { ascending: true }),
+    supabase.from('returns').select('*').eq('order_id', id).order('created_at', { ascending: true }),
+    supabase.from('refunds').select('*').eq('order_id', id).order('created_at', { ascending: true }),
   ]);
 
   if (!orderRes.data) return NextResponse.json({ error: '找不到訂單' }, { status: 404 });
@@ -46,6 +48,8 @@ export async function GET(
     payments: (payRes.data ?? []) as Payment[],
     shipments,
     history: (histRes.data ?? []) as OrderStatusHistory[],
+    returns: (retRes.data ?? []) as ReturnRequest[],
+    refunds: (refRes.data ?? []) as Refund[],
   });
 }
 

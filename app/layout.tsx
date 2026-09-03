@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import './globals.css';
+import DialogHost from './components/DialogHost';
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://urbanite-tw.vercel.app'),
@@ -30,7 +31,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="zh-Hant">
-      <body>{children}</body>
+      <body>
+        {children}
+        <DialogHost />
+      </body>
     </html>
   );
 }
