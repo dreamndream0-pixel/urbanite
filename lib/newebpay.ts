@@ -77,9 +77,8 @@ export function buildMPGParams(order: {
     NotifyURL: `${cfg.siteUrl}/api/payment/newebpay/notify`,
     ReturnURL: `${cfg.siteUrl}/api/payment/newebpay/return`,
     ClientBackURL: `${cfg.siteUrl}/checkout/complete?order_no=${encodeURIComponent(order.order_no)}`,
-    // 啟用的支付工具(需先在藍新後台開通):信用卡一次付清 + Apple Pay
-    CREDIT: '1',
-    APPLEPAY: '1',
+    // 不在 API 指定支付方式 → 依藍新後台【商店設定】已開通的方式顯示
+    // (信用卡 / WebATM / ATM 轉帳 / 超商代碼 / 超商條碼 / LINE Pay 等)
   };
   const query = new URLSearchParams(trade).toString();
   const tradeInfo = aesEncrypt(query, cfg.hashKey, cfg.hashIv);
