@@ -46,14 +46,16 @@ export default function LoginClient({
   async function signIn(provider: 'line' | 'facebook' | 'google') {
     setError(null);
     setBusy(provider);
+    if (provider === 'line') {
+      window.location.href = `/auth/line/start?next=${encodeURIComponent(nextPath)}`;
+      return;
+    }
     try {
       const supabase = createBrowserSupabase();
-      const authProvider = provider === 'line' ? 'custom:line' : provider;
       const { error } = await supabase.auth.signInWithOAuth({
-        provider: authProvider as Provider,
+        provider: provider as Provider,
         options: {
           redirectTo: `${getBrowserAuthOrigin()}/auth/callback?next=${encodeURIComponent(nextPath)}`,
-          ...(provider === 'line' ? { scopes: 'openid profile' } : {}),
         },
       });
       if (error) {
