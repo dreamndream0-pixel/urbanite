@@ -36,8 +36,8 @@ const formatter = new Intl.NumberFormat('zh-TW', {
 
 const ORDER_STATUSES = ['尚未付款', '待出貨', '已出貨', '已完成', '取消', '退貨'];
 const PRODUCT_STATUSES = ['上架中', '加購品', '已下架'];
-const DEFAULT_PAYMENT_METHODS = ['綠界金流', 'Line Pay', 'Apple Pay', '取貨付款', '轉帳匯款'];
-const DEFAULT_SHIPPING_METHODS = ['綠界物流-超商取貨', '綠界物流-宅配', '7-11 取貨付款', '全家 取貨付款'];
+const DEFAULT_PAYMENT_METHODS = ['藍新金流', 'Line Pay', 'Apple Pay', '取貨付款', '轉帳匯款'];
+const DEFAULT_SHIPPING_METHODS = ['超商取貨', '宅配', '7-11 取貨付款', '全家 取貨付款'];
 const DEFAULT_FOOTER_SOCIAL_LINKS = [
   { label: 'Instagram', image: '', url: '' },
   { label: 'LINE', image: '', url: '' },
@@ -3428,9 +3428,9 @@ function MethodToggles({
   );
 }
 
-// 非綠界收款方式的帳號資訊編輯(例:銀行轉帳填銀行/戶名/帳號)
+// 非藍新收款方式的帳號資訊編輯(例:銀行轉帳填銀行/戶名/帳號)
 function isEcpayName(method: string): boolean {
-  return /綠界|信用卡|line\s?pay|apple\s?pay/i.test(method);
+  return /藍新|信用卡|line\s?pay|apple\s?pay/i.test(method);
 }
 
 function PaymentAccountsEditor({
@@ -3448,9 +3448,9 @@ function PaymentAccountsEditor({
     onChange(info.trim() ? [...rest, { name, info }] : rest);
   }
   return (
-    <Field label="收款帳號資訊(非綠界方式,結帳時顯示給買家)">
+    <Field label="收款帳號資訊(非藍新方式,結帳時顯示給買家)">
       {nonEcpay.length === 0 ? (
-        <p className="text-sm text-[#a99e8f]">目前沒有非綠界的付款方式。新增「銀行轉帳」等方式後即可在此填寫收款帳號。</p>
+        <p className="text-sm text-[#a99e8f]">目前沒有非藍新的付款方式。新增「銀行轉帳」等方式後即可在此填寫收款帳號。</p>
       ) : (
         <div className="space-y-3">
           {nonEcpay.map((m) => (
@@ -4008,7 +4008,7 @@ ${order.note ? `<div class="sec"><h2>備註</h2><p class="muted">${escapeHtml(or
             </div>
           </div>
 
-          {/* 買家付款回報(非綠界) */}
+          {/* 買家付款回報(非藍新) */}
           {order.payment_ref || order.payment_proof_url || order.payment_proof_note ? (
             <div className="rounded-xl border border-[#d8c7a8] bg-[#faf6ea] p-4">
               <p className="mb-2 text-sm font-semibold text-[#8a6d1b]">買家付款回報</p>

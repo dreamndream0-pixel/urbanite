@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { createBrowserSupabase } from '@/lib/supabase/client';
 import type { Customer, Discount, Order, Product, Recipient, ReturnRequest, SiteSettings, UserCoupon } from '@/lib/types';
 import { TW_CITIES, TW_REGIONS } from '@/lib/tw-regions';
-import { isEcpayMethod } from '@/lib/payment';
+import { isOnlinePayment } from '@/lib/payment';
 import { uiAlert } from '@/lib/ui-dialog';
 import {
   buildProgress,
@@ -829,8 +829,8 @@ function OrdersTab({
                 {/* 依狀態顯示操作 */}
                 <div className="mt-3 flex flex-wrap gap-2 border-t border-[#f1ebe1] pt-3">
                   {!order.paid && order.status !== '取消' && order.status !== '退貨' ? (
-                    isEcpayMethod(order.payment_method ?? '') ? (
-                      <a href={`/api/payment/ecpay/checkout?order=${encodeURIComponent(order.order_no)}`} className="rounded-full bg-[#ada265] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#9a9059]">
+                    isOnlinePayment(order.payment_method ?? '') ? (
+                      <a href={`/api/payment/newebpay/checkout?order=${encodeURIComponent(order.order_no)}`} className="rounded-full bg-[#ada265] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#9a9059]">
                         立即付款
                       </a>
                     ) : (
@@ -996,9 +996,9 @@ function OrderModal({
               🛒 再次加入購物車
             </button>
             {!order.paid && order.status !== '取消' && order.status !== '退貨' ? (
-              isEcpayMethod(order.payment_method ?? '') ? (
+              isOnlinePayment(order.payment_method ?? '') ? (
                 <a
-                  href={`/api/payment/ecpay/checkout?order=${encodeURIComponent(order.order_no)}`}
+                  href={`/api/payment/newebpay/checkout?order=${encodeURIComponent(order.order_no)}`}
                   className="rounded-full border border-[#d7c9bd] px-5 py-3 text-center font-semibold text-[#6b6156] hover:bg-[#efe8dd]"
                 >
                   立即付款

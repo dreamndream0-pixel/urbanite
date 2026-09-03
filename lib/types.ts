@@ -67,7 +67,7 @@ export type SiteSettings = {
   shipping_methods?: string[];
   enabled_payment_methods?: string[];
   enabled_shipping_methods?: string[];
-  // 非綠界付款方式的收款帳號資訊(例:銀行轉帳),name 需對應 payment_methods 內的名稱
+  // 非線上金流付款方式的收款帳號資訊(例:銀行轉帳),name 需對應 payment_methods 內的名稱
   payment_accounts?: { name: string; info: string }[];
   // 退貨收件資訊(賣家退貨寄回地址/聯絡方式,顯示給買家)
   return_info?: string;
@@ -221,7 +221,7 @@ export type Order = {
   cancel_response?: string;
   cancel_requested_at?: string | null;
   cancel_reviewed_at?: string | null;
-  // 非綠界付款(如銀行轉帳)的買家付款證明
+  // 非線上金流付款(如銀行轉帳)的買家付款證明
   payment_ref?: string;
   payment_proof_url?: string;
   payment_proof_note?: string;

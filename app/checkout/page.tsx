@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import type { Product, Recipient, SiteSettings, UserCoupon } from '@/lib/types';
-import { isEcpayMethod } from '@/lib/payment';
+import { isOnlinePayment } from '@/lib/payment';
 import ShopHeader from '@/app/components/ShopHeader';
 
 const CART_KEY = 'cart';
@@ -26,7 +26,7 @@ type CartItem = {
 };
 
 const SHIPPING_METHODS = ['全家 取貨付款', '7-11 取貨付款', '宅配到府'];
-const PAYMENT_METHODS = ['信用卡 / ATM / 超商(綠界)', '取貨付款(貨到付款)', '轉帳匯款'];
+const PAYMENT_METHODS = ['信用卡 / ATM / 超商(藍新)', '取貨付款(貨到付款)', '轉帳匯款'];
 
 function allowedForCart(
   allMethods: string[],
@@ -145,11 +145,11 @@ export default function CheckoutPage() {
   const selectedPaymentMethod = availablePaymentMethods.includes(paymentMethod)
     ? paymentMethod
     : availablePaymentMethods[0] ?? '';
-  // 非綠界付款方式(如銀行轉帳)的收款帳號資訊
+  // 非藍新付款方式(如銀行轉帳)的收款帳號資訊
   const paymentAccount = (settings?.payment_accounts ?? []).find(
     (a) => a.name === selectedPaymentMethod && (a.info ?? '').trim(),
   );
-  const showAccountInfo = Boolean(paymentAccount) && !isEcpayMethod(selectedPaymentMethod);
+  const showAccountInfo = Boolean(paymentAccount) && !isOnlinePayment(selectedPaymentMethod);
 
   useEffect(() => {
     let alive = true;
@@ -296,9 +296,9 @@ export default function CheckoutPage() {
         } catch {
           /* 略過 */
         }
-        // 綠界線上金流:建單後導向綠界付款頁(不在此顯示訂單成立)
-        if (isEcpayMethod(selectedPaymentMethod)) {
-          window.location.href = `/api/payment/ecpay/checkout?order=${encodeURIComponent(data.order_no)}`;
+        // 藍新線上金流:建單後導向藍新付款頁(不在此顯示訂單成立)
+        if (isOnlinePayment(selectedPaymentMethod)) {
+          window.location.href = `/api/payment/newebpay/checkout?order=${encodeURIComponent(data.order_no)}`;
           return;
         }
         setOrderNo(data.order_no);
@@ -603,8 +603,8 @@ export default function CheckoutPage() {
               >
                 {submitting
                   ? '送出中…'
-                  : isEcpayMethod(selectedPaymentMethod)
-                    ? '前往綠界付款'
+                  : isOnlinePayment(selectedPaymentMethod)
+                    ? '前往藍新付款'
                     : '送出訂單'}
               </button>
             </section>

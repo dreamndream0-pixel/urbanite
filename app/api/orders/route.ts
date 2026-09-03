@@ -244,7 +244,7 @@ export async function POST(request: Request) {
   // 建立初始付款紀錄 + 訂單成立歷程(失敗不影響下單)
   try {
     const providerMap: Record<string, string> = {
-      credit_card: 'ECPay', atm: 'ECPay', line_pay: 'LINE Pay', cod: '貨到付款',
+      credit_card: 'NewebPay', atm: 'NewebPay', line_pay: 'LINE Pay', cod: '貨到付款',
     };
     await supabase.from('payments').insert({
       order_id: order.id,

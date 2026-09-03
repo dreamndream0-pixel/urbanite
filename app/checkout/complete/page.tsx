@@ -16,7 +16,7 @@ type OrderStatus = {
 function CompleteInner() {
   const sp = useSearchParams();
   const orderNo = sp.get('order_no') || '';
-  const hintStatus = sp.get('status') || ''; // paid / fail(來自綠界導回)
+  const hintStatus = sp.get('status') || ''; // paid / fail(來自藍新導回)
   const [order, setOrder] = useState<OrderStatus | null>(null);
   const [loading, setLoading] = useState(() => Boolean(orderNo));
 
@@ -84,7 +84,7 @@ function CompleteInner() {
               <p className="mt-1 text-sm text-[#8a7f72]">訂單已保留,你可以重新付款或改用其他方式。</p>
               {orderNo && (
                 <a
-                  href={`/api/payment/ecpay/checkout?order=${encodeURIComponent(orderNo)}`}
+                  href={`/api/payment/newebpay/checkout?order=${encodeURIComponent(orderNo)}`}
                   className="mt-5 inline-block rounded-full bg-[#c84767] px-6 py-3 font-semibold text-white"
                 >
                   重新付款
