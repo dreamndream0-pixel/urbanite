@@ -104,7 +104,7 @@ export default function Home() {
       `position:fixed;left:${sourceRect.left}px;top:${sourceRect.top}px;` +
       `width:${sourceRect.width}px;height:${sourceRect.height}px;object-fit:contain;` +
       `border-radius:14px;z-index:100;pointer-events:none;opacity:.95;` +
-      `transition:left .7s cubic-bezier(.5,-0.2,.7,1),top .7s cubic-bezier(.5,-0.2,.7,1),width .7s ease,height .7s ease,opacity .7s ease;`;
+      `transition:left 1.1s cubic-bezier(.45,-0.15,.6,1),top 1.1s cubic-bezier(.45,-0.15,.6,1),width 1.1s ease,height 1.1s ease,opacity 1.1s ease;`;
     document.body.appendChild(el);
     requestAnimationFrame(() => {
       el.style.left = `${target.left + target.width / 2 - 11}px`;
@@ -113,7 +113,7 @@ export default function Home() {
       el.style.height = '22px';
       el.style.opacity = '0.15';
     });
-    window.setTimeout(() => el.remove(), 760);
+    window.setTimeout(() => el.remove(), 1160);
   }
 
   useEffect(() => {
