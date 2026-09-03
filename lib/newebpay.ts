@@ -1,6 +1,7 @@
 // 藍新金流(NewebPay)MPG 幕前支付 — AES-256-CBC 加解密、TradeSha、參數組裝
 // 依官方技術串接手冊 NDNF-1.2.5。
 import crypto from 'crypto';
+import { getConfiguredSiteUrl } from '@/lib/site-url';
 
 export function getNewebpayConfig() {
   const env = (process.env.NEWEBPAY_ENV || 'stage').toLowerCase();
@@ -13,7 +14,7 @@ export function getNewebpayConfig() {
     mpgUrl: isProd
       ? 'https://core.newebpay.com/MPG/mpg_gateway'
       : 'https://ccore.newebpay.com/MPG/mpg_gateway',
-    siteUrl: (process.env.NEXT_PUBLIC_SITE_URL || 'https://urbanite-tw.vercel.app').replace(/\/$/, ''),
+    siteUrl: getConfiguredSiteUrl(), // 一律使用正式網域(www.urbanite.com.tw),確保藍新 Notify/Return 打得到
   };
 }
 
