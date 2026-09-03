@@ -65,7 +65,7 @@ export function getEcpayConfig() {
     // 付款方式:ALL=全部(需商店已開通所有方式);Credit=只信用卡;ATM / CVS 等亦可
     // 若正式環境只開通了信用卡,設 ECPAY_CHOOSE_PAYMENT=Credit 可先上線收信用卡
     choosePayment: process.env.ECPAY_CHOOSE_PAYMENT || 'ALL',
-    siteUrl: (process.env.NEXT_PUBLIC_SITE_URL || 'https://urbanite-tw.vercel.app').replace(/\/$/, ''),
+    siteUrl: (process.env.NEXT_PUBLIC_SITE_URL || 'https://www.urbanite.com.tw').replace(/\/$/, ''),
   };
 }
 

@@ -3,7 +3,7 @@ import './globals.css';
 import DialogHost from './components/DialogHost';
 
 export const metadata: Metadata = {
-  metadataBase: new URL('https://urbanite-tw.vercel.app'),
+  metadataBase: new URL('https://www.urbanite.com.tw'),
   title: {
     default: 'Urbanite',
     template: '%s | Urbanite',
@@ -12,7 +12,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: 'Urbanite',
     description: 'Urbanite 線上選品商店,提供流行服飾、配件與會員訂單查詢服務。',
-    url: 'https://urbanite-tw.vercel.app',
+    url: 'https://www.urbanite.com.tw',
     siteName: 'Urbanite',
     locale: 'zh_TW',
     type: 'website',
