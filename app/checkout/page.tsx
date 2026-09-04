@@ -5,7 +5,7 @@ import Link from 'next/link';
 import type { Product, Recipient, SiteSettings, UserCoupon } from '@/lib/types';
 import { isOnlinePayment } from '@/lib/payment';
 import { TW_CITIES, TW_REGIONS } from '@/lib/tw-regions';
-import { computeShipping } from '@/lib/shipping';
+import { computeShipping, resolveMethodFee } from '@/lib/shipping';
 import ShopHeader from '@/app/components/ShopHeader';
 
 const CART_KEY = 'cart';
@@ -154,8 +154,6 @@ export default function CheckoutPage() {
 
   const subtotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
   const cartCount = cart.reduce((sum, item) => sum + item.quantity, 0);
-  const shipping = computeShipping(subtotal, cart, products);
-  const total = Math.max(0, subtotal + shipping - (applied?.amount ?? 0));
   const siteShippingMethods = settings?.enabled_shipping_methods?.length
     ? settings.enabled_shipping_methods
     : settings?.shipping_methods?.length
@@ -177,6 +175,8 @@ export default function CheckoutPage() {
   const selectedShippingMethod = availableShippingMethods.includes(shippingMethod)
     ? shippingMethod
     : availableShippingMethods[0] ?? '';
+  const shipping = computeShipping(subtotal, cart, products, selectedShippingMethod, resolveMethodFee(settings, selectedShippingMethod));
+  const total = Math.max(0, subtotal + shipping - (applied?.amount ?? 0));
   const needsPickupStore = isStorePickupMethod(selectedShippingMethod);
   // 超商取貨:收件地址=門市;宅配:縣市+行政區+詳細地址
   const finalAddress = needsPickupStore
@@ -196,15 +196,16 @@ export default function CheckoutPage() {
   const showAccountInfo = Boolean(paymentAccount) && !isOnlinePayment(selectedPaymentMethod);
 
   useEffect(() => {
-    if (!needsPickupStore && pickupStore) {
+    if (!pickupStore) return;
+    const clearStore = () => {
       setPickupStore(null);
-      try {
-        localStorage.removeItem(PICKUP_STORE_KEY);
-      } catch {
-        /* 略過 */
-      }
-    }
-  }, [needsPickupStore, pickupStore]);
+      try { localStorage.removeItem(PICKUP_STORE_KEY); } catch { /* 略過 */ }
+    };
+    // 改成非超商取貨,或改選不同超商(ship_type 不同)→ 已選門市失效,需重新選擇
+    if (!needsPickupStore) { clearStore(); return; }
+    const wantShipType = shipTypeFromCheckout(selectedShippingMethod);
+    if (pickupStore.store_ship_type && pickupStore.store_ship_type !== wantShipType) clearStore();
+  }, [needsPickupStore, pickupStore, selectedShippingMethod]);
 
   useEffect(() => {
     let alive = true;

@@ -38,6 +38,7 @@ export type Product = {
   images: string[];
   available_payment_methods?: string[];
   available_shipping_methods?: string[];
+  shipping_fee_overrides?: Record<string, number>; // 各物流方式的商品自訂運費(未設用後台預設)
   colors: string[];
   sizes: string[];
   specs: SpecDim[];
@@ -69,6 +70,8 @@ export type SiteSettings = {
   enabled_shipping_methods?: string[];
   // 非線上金流付款方式的收款帳號資訊(例:銀行轉帳),name 需對應 payment_methods 內的名稱
   payment_accounts?: { name: string; info: string }[];
+  // 各物流方式的運費(name 對應 shipping_methods 內的名稱)
+  shipping_fees?: { name: string; fee: number }[];
   // 退貨收件資訊(賣家退貨寄回地址/聯絡方式,顯示給買家)
   return_info?: string;
   updated_at?: string;

@@ -4,7 +4,7 @@ import { getAdminUser, getSessionUser } from '@/lib/supabase/server';
 import { evaluateCoupon } from '@/lib/discount';
 import { isStorePickup, shipTypeFromMethod } from '@/lib/newebpay-logistics';
 import { deriveStatuses } from '@/lib/order-status';
-import { computeShipping } from '@/lib/shipping';
+import { computeShipping, resolveMethodFee } from '@/lib/shipping';
 import type { Discount, Order, OrderItem, Product } from '@/lib/types';
 
 // GET /api/orders — 取得所有訂單(限管理員)
@@ -104,7 +104,8 @@ export async function POST(request: Request) {
     });
   }
 
-  const shipping = computeShipping(subtotal, items, products ?? []);
+  const { data: shipSettings } = await supabase.from('site_settings').select('shipping_fees').eq('id', 1).maybeSingle();
+  const shipping = computeShipping(subtotal, items, products ?? [], shippingMethod, resolveMethodFee(shipSettings, shippingMethod));
 
   // 折扣碼(可選):由後端重新驗證計算,避免竄改
   let discount = 0;

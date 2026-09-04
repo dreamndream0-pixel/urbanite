@@ -48,6 +48,9 @@ export async function POST(request: Request) {
       available_shipping_methods: Array.isArray(body.available_shipping_methods)
         ? body.available_shipping_methods
         : [],
+      shipping_fee_overrides: body.shipping_fee_overrides && typeof body.shipping_fee_overrides === 'object'
+        ? body.shipping_fee_overrides
+        : {},
       colors: body.colors ?? [],
       sizes: body.sizes ?? [],
       specs: Array.isArray(body.specs) ? body.specs : [],

@@ -27,6 +27,7 @@ const DEFAULT_SETTINGS: SiteSettings = {
   enabled_payment_methods: ['信用卡付款', '轉帳匯款'],
   enabled_shipping_methods: ['全家取貨付款', '全家取貨不付款', '7-11取貨付款', '7-11取貨不付款', '宅配到府'],
   payment_accounts: [],
+  shipping_fees: [],
   return_info: '',
 };
 
@@ -70,6 +71,7 @@ export async function PATCH(request: Request) {
     'enabled_payment_methods',
     'enabled_shipping_methods',
     'payment_accounts',
+    'shipping_fees',
     'return_info',
   ] as const;
 

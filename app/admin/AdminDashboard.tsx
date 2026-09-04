@@ -71,6 +71,7 @@ type Draft = {
   images: string[];
   available_payment_methods: string[];
   available_shipping_methods: string[];
+  shipping_fee_overrides: Record<string, number>;
   colors: string;
   sizes: string;
   unit: string;
@@ -305,6 +306,7 @@ function blankDraft(): Draft {
     images: [],
     available_payment_methods: [],
     available_shipping_methods: [],
+    shipping_fee_overrides: {},
     colors: '',
     sizes: '',
     unit: '',
@@ -336,6 +338,7 @@ function toDraft(p: Product): Draft {
     images,
     available_payment_methods: p.available_payment_methods ?? [],
     available_shipping_methods: p.available_shipping_methods ?? [],
+    shipping_fee_overrides: p.shipping_fee_overrides ?? {},
     colors: p.colors.join(', '),
     sizes: p.sizes.join(', '),
     unit: p.unit ?? '',
@@ -475,6 +478,9 @@ export default function AdminDashboard({
     initialSettings?.payment_accounts ?? [],
   );
   const [returnInfo, setReturnInfo] = useState(initialSettings?.return_info ?? '');
+  const [shippingFees, setShippingFees] = useState<{ name: string; fee: number }[]>(
+    initialSettings?.shipping_fees ?? [],
+  );
   const [uploading, setUploading] = useState(false);
   const [editing, setEditing] = useState<Draft | null>(null);
   const [isNew, setIsNew] = useState(false);
@@ -1260,7 +1266,7 @@ export default function AdminDashboard({
         body: JSON.stringify(
           kind === 'payments'
             ? { payment_methods: methods, enabled_payment_methods: methods, payment_accounts: accounts }
-            : { shipping_methods: methods, enabled_shipping_methods: methods, return_info: returnInfo },
+            : { shipping_methods: methods, enabled_shipping_methods: methods, return_info: returnInfo, shipping_fees: shippingFees.filter((f) => methods.includes(f.name)) },
         ),
       });
       const data = await res.json();
@@ -2562,6 +2568,11 @@ export default function AdminDashboard({
                   value={footerDraft.shippings}
                   onChange={(v) => setFooterDraft({ ...footerDraft, shippings: v })}
                 />
+                <ShippingFeesEditor
+                  methods={footerDraft.shippings.split('\n').map((s) => s.trim()).filter(Boolean)}
+                  fees={shippingFees}
+                  onChange={setShippingFees}
+                />
                 <BulkMethodApply
                   field="available_shipping_methods"
                   methodOptions={footerDraft.shippings.split('\n').map((s) => s.trim()).filter(Boolean)}
@@ -2593,6 +2604,7 @@ export default function AdminDashboard({
           categories={categories}
           paymentMethods={enabledPaymentMethods}
           shippingMethods={enabledShippingMethods}
+          shippingFees={shippingFees}
           onChange={setEditing}
           onClose={() => setEditing(null)}
           onSave={saveProduct}
@@ -3466,6 +3478,48 @@ function PaymentAccountsEditor({
             </div>
           ))}
           <p className="text-xs text-[#a99e8f]">留空的方式結帳時不顯示收款資訊。記得按上方「儲存金流」。</p>
+        </div>
+      )}
+    </Field>
+  );
+}
+
+// 各物流方式的運費設定
+function ShippingFeesEditor({
+  methods,
+  fees,
+  onChange,
+}: {
+  methods: string[];
+  fees: { name: string; fee: number }[];
+  onChange: (next: { name: string; fee: number }[]) => void;
+}) {
+  function setFee(name: string, fee: number) {
+    const rest = fees.filter((f) => f.name !== name);
+    onChange([...rest, { name, fee: Math.max(0, Math.floor(fee) || 0) }]);
+  }
+  return (
+    <Field label="運費設定(各物流方式的預設運費,商品可於編輯頁個別覆寫)">
+      {methods.length === 0 ? (
+        <p className="text-sm text-[#a99e8f]">尚未新增物流方式。</p>
+      ) : (
+        <div className="space-y-2">
+          {methods.map((m) => (
+            <div key={m} className="flex items-center justify-between rounded-lg border border-[#e5ded4] px-3 py-2">
+              <span className="text-sm text-[#1f1b19]">{m}</span>
+              <div className="flex items-center gap-1 text-sm">
+                <span className="text-[#8a7f72]">NT$</span>
+                <input
+                  type="number"
+                  min={0}
+                  value={fees.find((f) => f.name === m)?.fee ?? 0}
+                  onChange={(e) => setFee(m, Number(e.target.value))}
+                  className="w-24 rounded-lg border border-[#d7c9bd] px-2 py-1 text-right"
+                />
+              </div>
+            </div>
+          ))}
+          <p className="text-xs text-[#a99e8f]">滿額免運門檻與「商品免運」設定仍優先;記得按上方「儲存物流」。</p>
         </div>
       )}
     </Field>
@@ -5579,6 +5633,7 @@ function ProductModal({
   categories,
   paymentMethods,
   shippingMethods,
+  shippingFees,
   onChange,
   onClose,
   onSave,
@@ -5588,6 +5643,7 @@ function ProductModal({
   categories: Category[];
   paymentMethods: string[];
   shippingMethods: string[];
+  shippingFees: { name: string; fee: number }[];
   onChange: (d: Draft) => void;
   onClose: () => void;
   onSave: () => void;
@@ -6015,21 +6071,43 @@ function ProductModal({
                 )}
               </div>
             </Field>
-            <Field label="可用物流(未勾選=全部)">
+            <Field label="可用物流與運費(未勾選=全部;運費留空=用後台預設)">
               <div className="space-y-2 rounded-lg border border-[#e5ded4] p-3">
                 {shippingMethods.length === 0 ? (
                   <p className="text-sm text-[#8a7f72]">請先到系統設定新增物流方式。</p>
                 ) : (
-                  shippingMethods.map((method) => (
-                    <label key={method} className="flex items-center gap-2 text-sm">
-                      <input
-                        type="checkbox"
-                        checked={draft.available_shipping_methods.includes(method)}
-                        onChange={(e) => toggleMethod('available_shipping_methods', method, e.target.checked)}
-                      />
-                      <span>{method}</span>
-                    </label>
-                  ))
+                  shippingMethods.map((method) => {
+                    const baseFee = shippingFees.find((f) => f.name === method)?.fee;
+                    const override = draft.shipping_fee_overrides[method];
+                    return (
+                      <div key={method} className="flex items-center justify-between gap-2 text-sm">
+                        <label className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            checked={draft.available_shipping_methods.includes(method)}
+                            onChange={(e) => toggleMethod('available_shipping_methods', method, e.target.checked)}
+                          />
+                          <span>{method}</span>
+                        </label>
+                        <div className="flex items-center gap-1 text-[#8a7f72]">
+                          <span>運費 NT$</span>
+                          <input
+                            type="number"
+                            min={0}
+                            value={override ?? ''}
+                            placeholder={String(baseFee ?? 120)}
+                            onChange={(e) => {
+                              const next = { ...draft.shipping_fee_overrides };
+                              if (e.target.value.trim() === '') delete next[method];
+                              else next[method] = Math.max(0, Math.floor(Number(e.target.value)) || 0);
+                              onChange({ ...draft, shipping_fee_overrides: next });
+                            }}
+                            className="w-20 rounded-lg border border-[#d7c9bd] px-2 py-1 text-right text-[#1f1b19]"
+                          />
+                        </div>
+                      </div>
+                    );
+                  })
                 )}
               </div>
 	            </Field>
