@@ -99,6 +99,7 @@ export default function CheckoutPage() {
   const [recipients, setRecipients] = useState<Recipient[]>([]);
   const [isMember, setIsMember] = useState(false);
   const [savingRecipient, setSavingRecipient] = useState(false);
+  const [toast, setToast] = useState('');
   const [shippingMethod, setShippingMethod] = useState(SHIPPING_METHODS[0]);
   const [paymentMethod, setPaymentMethod] = useState(PAYMENT_METHODS[0]);
   const [discountInput, setDiscountInput] = useState('');
@@ -271,7 +272,8 @@ export default function CheckoutPage() {
       });
       if (!res.ok) { setMessage({ type: 'err', text: '加入常用收件人失敗' }); return; }
       setRecipients(list);
-      setMessage({ type: 'ok', text: '已加入常用收件人' });
+      setToast(needsPickupStore ? '已加入常用取貨人' : '已加入常用收件人');
+      window.setTimeout(() => setToast(''), 3000);
     } catch {
       setMessage({ type: 'err', text: '加入常用收件人失敗，請稍後再試' });
     } finally {
@@ -681,7 +683,7 @@ export default function CheckoutPage() {
                     disabled={savingRecipient}
                     className="justify-self-start rounded-full border border-[#1f1b19] px-4 py-2 text-sm font-semibold text-[#1f1b19] hover:bg-[#1f1b19] hover:text-white disabled:opacity-50"
                   >
-                    ＋ 加入常用收件人
+                    ＋ {needsPickupStore ? '加入常用取貨人' : '加入常用收件人'}
                   </button>
                 ) : null}
 
@@ -779,6 +781,18 @@ export default function CheckoutPage() {
             </section>
           </div>
         )}
+      </div>
+
+      {/* 加入常用收件人 提示(停約 3 秒後淡出) */}
+      <div
+        className={`pointer-events-none fixed inset-x-0 bottom-6 z-[70] flex justify-center px-4 transition-all duration-500 ${
+          toast ? 'translate-y-0 opacity-100' : 'translate-y-2 opacity-0'
+        }`}
+      >
+        <div className="flex items-center gap-2 rounded-full bg-[#1f1b19] px-5 py-3 text-sm font-semibold text-white shadow-lg">
+          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#1f7a44] text-xs">✓</span>
+          {toast}
+        </div>
       </div>
     </main>
   );
