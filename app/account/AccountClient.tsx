@@ -389,6 +389,97 @@ function ProfileTab({
   const field = 'w-full rounded-lg border border-[#e5ded4] px-3 py-2.5';
   const labelText = 'mb-1 block text-sm text-[#8a7f72]';
 
+  const homeRecipients = recipients.map((r, i) => ({ r, i })).filter(({ r }) => r.type !== 'store');
+  const storeRecipients = recipients.map((r, i) => ({ r, i })).filter(({ r }) => r.type === 'store');
+
+  const renderRecipientCard = (r: Recipient, i: number) => (
+    <div key={i} className="rounded-xl border border-[#e5ded4] p-4">
+      {expandedRecipient === i ? (
+        <>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="block">
+              <span className={labelText}>收件人姓名</span>
+              <input value={r.name} onChange={(e) => updateRecipient(i, { name: e.target.value })} className={field} />
+            </label>
+            <label className="block">
+              <span className={labelText}>收件人電話</span>
+              <input value={r.phone} onChange={(e) => updateRecipient(i, { phone: e.target.value })} className={field} />
+            </label>
+            {r.type !== 'store' ? (
+              <>
+                <label className="block">
+                  <span className={labelText}>縣市</span>
+                  <select value={r.city} onChange={(e) => updateRecipient(i, { city: e.target.value, district: '' })} className={field}>
+                    <option value="">請選擇縣市</option>
+                    {TW_CITIES.map((city) => (
+                      <option key={city} value={city}>{city}</option>
+                    ))}
+                  </select>
+                </label>
+                <label className="block">
+                  <span className={labelText}>行政區</span>
+                  <select
+                    value={r.district}
+                    onChange={(e) => updateRecipient(i, { district: e.target.value })}
+                    disabled={!r.city}
+                    className={field + ' disabled:bg-[#f6f2ec]'}
+                  >
+                    <option value="">{r.city ? '請選擇行政區' : '請先選縣市'}</option>
+                    {(TW_REGIONS[r.city] ?? []).map((d) => (
+                      <option key={d} value={d}>{d}</option>
+                    ))}
+                  </select>
+                </label>
+              </>
+            ) : null}
+          </div>
+          {r.type === 'store' ? (
+            <div className="mt-3 rounded-lg bg-[#faf7f2] px-3 py-2 text-sm text-[#6b6156]">
+              常用取貨門市：{r.store_name || '(未設)'}{r.store_id ? `（${r.store_id}）` : ''}
+              {r.store_address ? <span className="block text-xs">{r.store_address}</span> : null}
+              <span className="mt-1 block text-xs text-[#a99e8f]">門市請於結帳時重新選擇後「加入常用取貨人」更新。</span>
+            </div>
+          ) : (
+            <label className="mt-3 block">
+              <span className={labelText}>詳細地址</span>
+              <input value={r.address} onChange={(e) => updateRecipient(i, { address: e.target.value })} placeholder="路 / 街 / 巷弄 / 號 / 樓" className={field} />
+            </label>
+          )}
+          <div className="mt-4 flex items-center gap-4">
+            <button type="button" onClick={() => setExpandedRecipient(null)} className="rounded-full bg-[#1f1b19] px-5 py-1.5 text-sm font-semibold text-white">
+              完成
+            </button>
+            <button type="button" onClick={() => removeRecipient(i)} className="text-sm font-semibold text-[#c0392b]">
+              刪除此收件人
+            </button>
+          </div>
+        </>
+      ) : (
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="font-semibold">
+              {r.name || '(未填姓名)'}
+              {r.phone ? <span className="ml-2 text-sm font-normal text-[#8a7f72]">{r.phone}</span> : null}
+            </p>
+            <p className="mt-1 truncate text-sm text-[#8a7f72]">
+              {r.type === 'store'
+                ? `超商取貨 · ${r.store_name || r.store_id || '(未設門市)'}`
+                : [r.city, r.district, r.address].filter(Boolean).join(' ') || '(未填地址)'}
+            </p>
+          </div>
+          <div className="flex shrink-0 gap-2">
+            <button type="button" onClick={() => setExpandedRecipient(i)} className="rounded-full border border-[#d7c9bd] px-3 py-1.5 text-sm font-semibold">
+              編輯
+            </button>
+            <button type="button" onClick={() => removeRecipient(i)} className="rounded-full border border-[#e0b4b4] px-3 py-1.5 text-sm font-semibold text-[#c0392b]">
+              刪除
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+
   return (
     <div className="space-y-6">
       <div className="rounded-2xl border border-[#e5ded4] bg-white p-6">
@@ -434,99 +525,24 @@ function ProfileTab({
             新增收件人
           </button>
         </div>
-        {recipients.length === 0 ? (
-          <p className="mt-4 text-sm text-[#8a7f72]">尚未設定,點「新增收件人」加入常用地址。</p>
-        ) : (
-          <div className="mt-4 space-y-4">
-            {recipients.map((r, i) => (
-              <div key={i} className="rounded-xl border border-[#e5ded4] p-4">
-                {expandedRecipient === i ? (
-                  <>
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      <label className="block">
-                        <span className={labelText}>收件人姓名</span>
-                        <input value={r.name} onChange={(e) => updateRecipient(i, { name: e.target.value })} className={field} />
-                      </label>
-                      <label className="block">
-                        <span className={labelText}>收件人電話</span>
-                        <input value={r.phone} onChange={(e) => updateRecipient(i, { phone: e.target.value })} className={field} />
-                      </label>
-                      {r.type !== 'store' ? (
-                        <>
-                          <label className="block">
-                            <span className={labelText}>縣市</span>
-                            <select value={r.city} onChange={(e) => updateRecipient(i, { city: e.target.value, district: '' })} className={field}>
-                              <option value="">請選擇縣市</option>
-                              {TW_CITIES.map((city) => (
-                                <option key={city} value={city}>{city}</option>
-                              ))}
-                            </select>
-                          </label>
-                          <label className="block">
-                            <span className={labelText}>行政區</span>
-                            <select
-                              value={r.district}
-                              onChange={(e) => updateRecipient(i, { district: e.target.value })}
-                              disabled={!r.city}
-                              className={field + ' disabled:bg-[#f6f2ec]'}
-                            >
-                              <option value="">{r.city ? '請選擇行政區' : '請先選縣市'}</option>
-                              {(TW_REGIONS[r.city] ?? []).map((d) => (
-                                <option key={d} value={d}>{d}</option>
-                              ))}
-                            </select>
-                          </label>
-                        </>
-                      ) : null}
-                    </div>
-                    {r.type === 'store' ? (
-                      <div className="mt-3 rounded-lg bg-[#faf7f2] px-3 py-2 text-sm text-[#6b6156]">
-                        常用取貨門市：{r.store_name || '(未設)'}{r.store_id ? `（${r.store_id}）` : ''}
-                        {r.store_address ? <span className="block text-xs">{r.store_address}</span> : null}
-                        <span className="mt-1 block text-xs text-[#a99e8f]">門市請於結帳時重新選擇後「加入常用取貨人」更新。</span>
-                      </div>
-                    ) : (
-                      <label className="mt-3 block">
-                        <span className={labelText}>詳細地址</span>
-                        <input value={r.address} onChange={(e) => updateRecipient(i, { address: e.target.value })} placeholder="路 / 街 / 巷弄 / 號 / 樓" className={field} />
-                      </label>
-                    )}
-                    <div className="mt-4 flex items-center gap-4">
-                      <button type="button" onClick={() => setExpandedRecipient(null)} className="rounded-full bg-[#1f1b19] px-5 py-1.5 text-sm font-semibold text-white">
-                        完成
-                      </button>
-                      <button type="button" onClick={() => removeRecipient(i)} className="text-sm font-semibold text-[#c0392b]">
-                        刪除此收件人
-                      </button>
-                    </div>
-                  </>
-                ) : (
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="font-semibold">
-                        {r.name || '(未填姓名)'}
-                        {r.phone ? <span className="ml-2 text-sm font-normal text-[#8a7f72]">{r.phone}</span> : null}
-                      </p>
-                      <p className="mt-1 truncate text-sm text-[#8a7f72]">
-                        {r.type === 'store'
-                          ? `超商取貨 · ${r.store_name || r.store_id || '(未設門市)'}`
-                          : [r.city, r.district, r.address].filter(Boolean).join(' ') || '(未填地址)'}
-                      </p>
-                    </div>
-                    <div className="flex shrink-0 gap-2">
-                      <button type="button" onClick={() => setExpandedRecipient(i)} className="rounded-full border border-[#d7c9bd] px-3 py-1.5 text-sm font-semibold">
-                        編輯
-                      </button>
-                      <button type="button" onClick={() => removeRecipient(i)} className="rounded-full border border-[#e0b4b4] px-3 py-1.5 text-sm font-semibold text-[#c0392b]">
-                        刪除
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            ))}
+        <div className="mt-4 grid gap-6 md:grid-cols-2">
+          <div>
+            <h3 className="mb-2 text-sm font-semibold text-[#6b6156]">宅配到府</h3>
+            {homeRecipients.length === 0 ? (
+              <p className="text-sm text-[#a99e8f]">尚未設定,點「新增收件人」加入宅配地址。</p>
+            ) : (
+              <div className="space-y-3">{homeRecipients.map(({ r, i }) => renderRecipientCard(r, i))}</div>
+            )}
           </div>
-        )}
+          <div>
+            <h3 className="mb-2 text-sm font-semibold text-[#6b6156]">超商取貨</h3>
+            {storeRecipients.length === 0 ? (
+              <p className="text-sm text-[#a99e8f]">結帳選門市後按「加入常用取貨人」即可存到這裡。</p>
+            ) : (
+              <div className="space-y-3">{storeRecipients.map(({ r, i }) => renderRecipientCard(r, i))}</div>
+            )}
+          </div>
+        </div>
       </div>
 
       <div className="rounded-2xl border border-[#e5ded4] bg-white p-6">
