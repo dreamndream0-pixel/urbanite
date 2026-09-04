@@ -3836,6 +3836,22 @@ function AdminOrderModal({
     } finally { setBusy(false); }
   }
 
+  async function reGetShipmentNo(shipmentId: string) {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/orders/${order.id}/shipment`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ shipment_id: shipmentId, action: 'getno' }),
+      });
+      const data = await res.json();
+      if (!res.ok) { void uiAlert(data.error ?? '取號失敗'); return; }
+      void uiAlert(data.lgs_no ? `取號成功:${data.lgs_no}` : '已重新取號');
+      await loadDetail();
+    } finally { setBusy(false); }
+  }
+
   async function queryShipment(shipmentId: string) {
     if (busy) return;
     setBusy(true);
@@ -4071,6 +4087,13 @@ ${order.note ? `<div class="sec"><h2>備註</h2><p class="muted">${escapeHtml(or
                           >
                             列印寄件單
                           </a>
+                          <button
+                            onClick={() => reGetShipmentNo(s.id)}
+                            disabled={busy}
+                            className="rounded-full border border-[#d7c9bd] px-3 py-1 text-xs font-semibold text-[#6b6156] disabled:opacity-50"
+                          >
+                            重新取號
+                          </button>
                           <button
                             onClick={() => queryShipment(s.id)}
                             disabled={busy}

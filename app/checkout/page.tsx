@@ -385,8 +385,16 @@ export default function CheckoutPage() {
       setMessage({ type: 'err', text: '購物車是空的' });
       return;
     }
-    if (!name || !email || !phone) {
+    if (!name.trim() || !email.trim() || !phone.trim()) {
       setMessage({ type: 'err', text: '請填寫收件人姓名、電話與 Email' });
+      return;
+    }
+    if (!/^0\d{8,9}$/.test(phone.replace(/\D/g, ''))) {
+      setMessage({ type: 'err', text: '電話格式不正確,請輸入正確的手機或市話(例:0912345678)' });
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      setMessage({ type: 'err', text: 'Email 格式不正確' });
       return;
     }
     if (!needsPickupStore && (!city || !district || !address.trim())) {

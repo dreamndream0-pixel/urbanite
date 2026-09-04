@@ -191,7 +191,7 @@ export async function PATCH(
   const description = String(body?.description ?? '').trim();
   const location = String(body?.location ?? '').trim();
   const action = String(body?.action ?? '').trim();
-  const apiActions = ['trace', 'query', 'modify'];
+  const apiActions = ['trace', 'query', 'modify', 'getno'];
   if (!shipmentId || (!status && !description && !apiActions.includes(action))) {
     return NextResponse.json({ error: '請填寫物流狀態或說明' }, { status: 400 });
   }
@@ -248,6 +248,33 @@ export async function PATCH(
       created_by: admin.email || '後台管理員',
     });
     return NextResponse.json(event, { status: 201 });
+  }
+
+  // 重新取號(NPA-B53):對已建單但未取得寄件代碼的物流單重試 getShipmentNo
+  if (action === 'getno') {
+    const { data: order } = await supabase.from('orders').select('order_no').eq('id', id).maybeSingle();
+    if (!order?.order_no) return NextResponse.json({ error: '找不到訂單單號' }, { status: 404 });
+    if (!shipment.lgs_type || !shipment.ship_type) return NextResponse.json({ error: '此物流單不是藍新物流單' }, { status: 400 });
+    const r = await requestNewebpayLogistics('getShipmentNo', { MerchantOrderNo: [order.order_no] });
+    if (!r.ok) return NextResponse.json({ error: r.message || '取號失敗', detail: r.raw }, { status: 400 });
+    const row = firstSuccessRow(r.data);
+    const lgsNo = String(row.LgsNo ?? '');
+    const storePrintNo = String(row.StorePrintNo ?? '');
+    const nowIso = new Date().toISOString();
+    await supabase.from('shipments').update({
+      tracking_number: lgsNo || storePrintNo || shipment.tracking_number || '',
+      store_print_no: storePrintNo || shipment.store_print_no || '',
+      updated_at: nowIso,
+      raw_response: r.data,
+    }).eq('id', shipmentId);
+    await supabase.from('shipment_events').insert({
+      shipment_id: shipmentId,
+      status: shipment.status,
+      description: lgsNo || storePrintNo ? `重新取號成功,寄件代碼 ${lgsNo || storePrintNo}` : '重新取號',
+      event_at: nowIso,
+      raw_response: r.data,
+    });
+    return NextResponse.json({ ok: true, lgs_no: lgsNo || storePrintNo, data: r.data }, { status: 200 });
   }
 
   // 查詢配送單(NPA-B55):取回目前配送單明細/狀態
