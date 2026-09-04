@@ -260,7 +260,16 @@ export default function CheckoutPage() {
   // 用彈出視窗開藍新電子地圖:選完由回傳頁 postMessage 帶回門市,結帳頁不換頁
   function openStoreMap(shipType: string) {
     const url = `/api/logistics/newebpay/store-map?ship_type=${encodeURIComponent(shipType)}&lgs_type=C2C`;
-    const w = window.open(url, 'newebpay-storemap', 'width=460,height=720');
+    // 超商電子地圖頁面較寬,彈窗需夠大並可捲動,否則按不到確認鈕
+    const width = Math.min(1040, window.screen.availWidth || 1040);
+    const height = Math.min(820, window.screen.availHeight || 820);
+    const left = Math.max(0, ((window.screen.availWidth || width) - width) / 2);
+    const top = Math.max(0, ((window.screen.availHeight || height) - height) / 2);
+    const w = window.open(
+      url,
+      'newebpay-storemap',
+      `width=${width},height=${height},left=${left},top=${top},scrollbars=yes,resizable=yes`,
+    );
     if (!w) { window.location.href = url; } // 彈窗被擋 → 退回同頁流程
   }
 
