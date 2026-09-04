@@ -58,12 +58,16 @@ export function buildNewebpayLogisticsForm(
   data: Record<string, string | number | undefined | null>,
 ) {
   const cfg = requireLogisticsConfig();
-  const payload = new URLSearchParams();
+  // 藍新物流規格:EncryptData 明文為「JSON 字串」(非金流的 query string),
+  // 再 AES-256-CBC → hex,雜湊 = SHA256(HashKey=..&<enc>&HashIV=..) 轉大寫。
+  const payload: Record<string, string> = {};
   for (const [key, value] of Object.entries(data)) {
-    if (value !== undefined && value !== null) payload.set(key, String(value));
+    if (value !== undefined && value !== null) payload[key] = String(value);
   }
-  if (!payload.get('TimeStamp')) payload.set('TimeStamp', String(Math.floor(Date.now() / 1000)));
-  const encryptData = aesEncrypt(payload.toString(), cfg.hashKey, cfg.hashIv);
+  if (!payload.TimeStamp) payload.TimeStamp = String(Math.floor(Date.now() / 1000));
+  payload.Version = '1.0';
+  payload.RespondType = 'JSON';
+  const encryptData = aesEncrypt(JSON.stringify(payload), cfg.hashKey, cfg.hashIv);
   return {
     actionUrl: `${cfg.apiBase}/${LOGISTIC_PATHS[action]}`,
     fields: {
