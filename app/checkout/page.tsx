@@ -257,6 +257,29 @@ export default function CheckoutPage() {
     };
   }, [cart, loaded, memberCoupons, shipping, subtotal]);
 
+  // 用彈出視窗開藍新電子地圖:選完由回傳頁 postMessage 帶回門市,結帳頁不換頁
+  function openStoreMap(shipType: string) {
+    const url = `/api/logistics/newebpay/store-map?ship_type=${encodeURIComponent(shipType)}&lgs_type=C2C`;
+    const w = window.open(url, 'newebpay-storemap', 'width=460,height=720');
+    if (!w) { window.location.href = url; } // 彈窗被擋 → 退回同頁流程
+  }
+
+  useEffect(() => {
+    function onMessage(e: MessageEvent) {
+      if (e.origin !== window.location.origin) return;
+      if (!e.data || e.data.type !== 'newebpay-pickup-store') return;
+      try {
+        const store = JSON.parse(e.data.store) as PickupStore;
+        if (store?.store_id) {
+          setPickupStore(store);
+          try { localStorage.setItem(PICKUP_STORE_KEY, JSON.stringify(store)); } catch { /* 略過 */ }
+        }
+      } catch { /* 略過 */ }
+    }
+    window.addEventListener('message', onMessage);
+    return () => window.removeEventListener('message', onMessage);
+  }, []);
+
   function fillRecipient(idx: number) {
     const r = recipients[idx];
     if (!r) return;
@@ -588,12 +611,13 @@ export default function CheckoutPage() {
                           <p className="mt-1 text-sm text-[#c0392b]">尚未選擇門市</p>
                         )}
                       </div>
-                      <a
-                        href={`/api/logistics/newebpay/store-map?ship_type=${encodeURIComponent(shipTypeFromCheckout(selectedShippingMethod))}&lgs_type=C2C`}
+                      <button
+                        type="button"
+                        onClick={() => openStoreMap(shipTypeFromCheckout(selectedShippingMethod))}
                         className="rounded-full bg-[#1f1b19] px-4 py-2 text-sm font-semibold text-white"
                       >
                         {pickupStore ? '重新選擇' : '選擇門市'}
-                      </a>
+                      </button>
                     </div>
                   </div>
                 ) : null}

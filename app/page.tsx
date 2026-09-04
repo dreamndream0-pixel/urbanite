@@ -1331,8 +1331,11 @@ function CartDrawer({
         <div className="border-t border-[#e5ded4] p-5">
           <div className="space-y-2 text-sm">
             <Row label="小計" value={formatter.format(subtotal)} />
-            <Row label="運費" value={shipping === 0 ? '免運' : formatter.format(shipping)} />
-            <Row label="總計" value={formatter.format(total)} strong />
+            <div className="flex justify-between text-[#8a7f72]">
+              <span>運費</span>
+              <span className="text-sm">結帳時依配送方式計算</span>
+            </div>
+            <Row label="總計" value={formatter.format(subtotal)} strong />
           </div>
           <button
             className="mt-4 w-full rounded-full bg-[#c84767] px-5 py-3 font-semibold text-white disabled:opacity-50"

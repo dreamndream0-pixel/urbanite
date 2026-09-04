@@ -19,7 +19,19 @@ export async function POST(request: Request) {
     };
     if (!store.store_id) throw new Error('未取得門市資料');
     const json = JSON.stringify(store).replace(/</g, '\\u003c');
-    return new NextResponse(`<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><title>門市已選擇</title></head><body><p>已選擇 ${esc(store.store_name)}，正在返回結帳頁...</p><script>localStorage.setItem('newebpay-pickup-store', ${JSON.stringify(json)});location.replace('/checkout');</script></body></html>`, {
+    // 若是彈出視窗:把門市回傳給結帳頁並自動關閉(結帳頁不換頁);否則(同頁)存 localStorage 後導回。
+    return new NextResponse(`<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><title>門市已選擇</title></head><body><script>
+(function(){
+  var store = ${JSON.stringify(json)};
+  try { localStorage.setItem('newebpay-pickup-store', store); } catch(e){}
+  if (window.opener && !window.opener.closed) {
+    try { window.opener.postMessage({ type: 'newebpay-pickup-store', store: store }, window.location.origin); } catch(e){}
+    window.close();
+  } else {
+    location.replace('/checkout');
+  }
+})();
+</script><p>已選擇 ${esc(store.store_name)}，可關閉此視窗。</p></body></html>`, {
       headers: { 'Content-Type': 'text/html; charset=utf-8' },
     });
   } catch (error) {
