@@ -78,7 +78,7 @@ export async function POST(
     let shipmentNoResult: Awaited<ReturnType<typeof requestNewebpayLogistics>> | null = null;
     try {
       shipmentNoResult = await requestNewebpayLogistics('getShipmentNo', {
-        MerchantOrderNo: JSON.stringify([order.order_no]),
+        MerchantOrderNo: [order.order_no],
       });
     } catch {
       shipmentNoResult = null;

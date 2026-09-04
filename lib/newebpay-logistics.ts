@@ -70,14 +70,16 @@ export function decodeNewebpayLogisticsResponse(form: Record<string, FormDataEnt
 
 export function buildNewebpayLogisticsForm(
   action: NewebpayLogisticsAction,
-  data: Record<string, string | number | undefined | null>,
+  data: Record<string, string | number | string[] | undefined | null>,
 ) {
   const cfg = requireLogisticsConfig();
   // 藍新物流規格:EncryptData 明文為「JSON 字串」(非金流的 query string),
   // 再 AES-256-CBC → hex,雜湊 = SHA256(HashKey=..&<enc>&HashIV=..) 轉大寫。
-  const payload: Record<string, string> = {};
+  // 陣列值(如 getShipmentNo / printLabel 的 MerchantOrderNo)需保留為 JSON 陣列。
+  const payload: Record<string, string | string[]> = {};
   for (const [key, value] of Object.entries(data)) {
-    if (value !== undefined && value !== null) payload[key] = String(value);
+    if (value === undefined || value === null) continue;
+    payload[key] = Array.isArray(value) ? value : String(value);
   }
   if (!payload.TimeStamp) payload.TimeStamp = String(Math.floor(Date.now() / 1000));
   payload.Version = '1.0';
@@ -97,7 +99,7 @@ export function buildNewebpayLogisticsForm(
 
 export async function requestNewebpayLogistics(
   action: NewebpayLogisticsAction,
-  data: Record<string, string | number | undefined | null>,
+  data: Record<string, string | number | string[] | undefined | null>,
 ) {
   const form = buildNewebpayLogisticsForm(action, data);
   const res = await fetch(form.actionUrl, {

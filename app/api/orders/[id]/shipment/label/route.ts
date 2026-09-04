@@ -23,7 +23,7 @@ export async function GET(
   const { actionUrl, fields } = buildNewebpayLogisticsForm('printLabel', {
     LgsType: shipment.lgs_type,
     ShipType: shipment.ship_type,
-    MerchantOrderNo: JSON.stringify([order.order_no]),
+    MerchantOrderNo: [order.order_no],
   });
   const inputs = Object.entries(fields)
     .map(([key, value]) => `<input type="hidden" name="${key}" value="${String(value).replace(/"/g, '&quot;')}">`)
