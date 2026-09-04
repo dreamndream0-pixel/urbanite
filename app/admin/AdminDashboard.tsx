@@ -37,7 +37,7 @@ const formatter = new Intl.NumberFormat('zh-TW', {
 const ORDER_STATUSES = ['尚未付款', '待出貨', '已出貨', '已完成', '取消', '退貨'];
 const PRODUCT_STATUSES = ['上架中', '加購品', '已下架'];
 const DEFAULT_PAYMENT_METHODS = ['藍新金流', 'Line Pay', 'Apple Pay', '取貨付款', '轉帳匯款'];
-const DEFAULT_SHIPPING_METHODS = ['超商取貨', '宅配', '7-11 取貨付款', '全家 取貨付款'];
+const DEFAULT_SHIPPING_METHODS = ['全家取貨付款', '全家取貨不付款', '7-11取貨付款', '7-11取貨不付款', '宅配到府'];
 const DEFAULT_FOOTER_SOCIAL_LINKS = [
   { label: 'Instagram', image: '', url: '' },
   { label: 'LINE', image: '', url: '' },

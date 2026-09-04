@@ -40,6 +40,15 @@ function couponLabel(d: Discount) {
   return d.min_spend > 0 ? `${base}(滿 ${formatter.format(d.min_spend)})` : base;
 }
 
+// 是否顯示「立即付款」:未付款、未取消/退貨、無取消申請中或已核准、非退貨處理中。
+function canPayNow(order: Order): boolean {
+  if (order.paid) return false;
+  if (order.status === '取消' || order.status === '退貨') return false;
+  if (order.cancel_status === 'REQUESTED' || order.cancel_status === 'APPROVED') return false;
+  if (['RETURNING', 'RETURNED'].includes(order.fulfillment_status ?? '')) return false;
+  return true;
+}
+
 function couponScope(d: Discount) {
   const products = d.applicable_products?.length ? `指定商品 ${d.applicable_products.join(', ')}` : '';
   const categories = d.applicable_categories?.length ? `指定分類 ${d.applicable_categories.join(', ')}` : '';
@@ -793,7 +802,7 @@ function OrdersTab({
 
                 {/* 依狀態顯示操作 */}
                 <div className="mt-3 flex flex-wrap gap-2 border-t border-[#f1ebe1] pt-3">
-                  {!order.paid && order.status !== '取消' && order.status !== '退貨' ? (
+                  {canPayNow(order) ? (
                     isOnlinePayment(order.payment_method ?? '') ? (
                       <a href={`/api/payment/newebpay/checkout?order=${encodeURIComponent(order.order_no)}`} className="rounded-full bg-[#ada265] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#9a9059]">
                         立即付款
@@ -960,7 +969,7 @@ function OrderModal({
             >
               🛒 再次加入購物車
             </button>
-            {!order.paid && order.status !== '取消' && order.status !== '退貨' ? (
+            {canPayNow(order) ? (
               isOnlinePayment(order.payment_method ?? '') ? (
                 <a
                   href={`/api/payment/newebpay/checkout?order=${encodeURIComponent(order.order_no)}`}

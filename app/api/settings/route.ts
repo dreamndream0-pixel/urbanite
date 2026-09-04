@@ -23,9 +23,9 @@ const DEFAULT_SETTINGS: SiteSettings = {
   footer_instagram_url: '',
   footer_line_url: '',
   payment_methods: ['藍新金流', 'Line Pay', 'Apple Pay', '取貨付款', '轉帳匯款'],
-  shipping_methods: ['超商取貨', '宅配', '7-11 取貨付款', '全家 取貨付款'],
+  shipping_methods: ['全家取貨付款', '全家取貨不付款', '7-11取貨付款', '7-11取貨不付款', '宅配到府'],
   enabled_payment_methods: ['藍新金流', 'Line Pay', 'Apple Pay', '取貨付款', '轉帳匯款'],
-  enabled_shipping_methods: ['超商取貨', '宅配', '7-11 取貨付款', '全家 取貨付款'],
+  enabled_shipping_methods: ['全家取貨付款', '全家取貨不付款', '7-11取貨付款', '7-11取貨不付款', '宅配到府'],
   payment_accounts: [],
   return_info: '',
 };

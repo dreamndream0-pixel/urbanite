@@ -33,12 +33,18 @@ type PickupStore = {
   store_lgs_type: string;
 };
 
-const SHIPPING_METHODS = ['全家 取貨付款', '7-11 取貨付款', '宅配到府'];
+const SHIPPING_METHODS = ['全家取貨付款', '全家取貨不付款', '7-11取貨付款', '7-11取貨不付款', '宅配到府'];
 const PAYMENT_METHODS = ['信用卡 / ATM / 超商(藍新)', '取貨付款(貨到付款)', '轉帳匯款'];
 const PICKUP_STORE_KEY = 'newebpay-pickup-store';
 
 function isStorePickupMethod(method = '') {
   return /超商|取貨|7-?11|7-ELEVEN|全家|family|萊爾富|hi-?life|ok/i.test(method);
+}
+
+// 「取貨付款」= 到店由藍新代收,結帳不需再選付款方式;「取貨不付款」「宅配」才需線上付款。
+const COD_PAYMENT_LABEL = '取貨付款(門市付款)';
+function isCodPickupMethod(method = '') {
+  return /取貨付款/.test(method) && !/不付款/.test(method);
 }
 
 function shipTypeFromCheckout(method = '') {
@@ -165,15 +171,19 @@ export default function CheckoutPage() {
   const selectedShippingMethod = availableShippingMethods.includes(shippingMethod)
     ? shippingMethod
     : availableShippingMethods[0] ?? '';
-  const selectedPaymentMethod = availablePaymentMethods.includes(paymentMethod)
-    ? paymentMethod
-    : availablePaymentMethods[0] ?? '';
+  const needsPickupStore = isStorePickupMethod(selectedShippingMethod);
+  // 取貨付款(門市代收):不需線上付款、鎖定付款方式;其餘(宅配 / 取貨不付款)才選付款方式
+  const codPickup = isCodPickupMethod(selectedShippingMethod);
+  const selectedPaymentMethod = codPickup
+    ? COD_PAYMENT_LABEL
+    : availablePaymentMethods.includes(paymentMethod)
+      ? paymentMethod
+      : availablePaymentMethods[0] ?? '';
   // 非藍新付款方式(如銀行轉帳)的收款帳號資訊
   const paymentAccount = (settings?.payment_accounts ?? []).find(
     (a) => a.name === selectedPaymentMethod && (a.info ?? '').trim(),
   );
   const showAccountInfo = Boolean(paymentAccount) && !isOnlinePayment(selectedPaymentMethod);
-  const needsPickupStore = isStorePickupMethod(selectedShippingMethod);
 
   useEffect(() => {
     if (!needsPickupStore && pickupStore) {
@@ -522,20 +532,27 @@ export default function CheckoutPage() {
                     </div>
                   </div>
                 ) : null}
-                <label className="block">
-                  <span className="mb-1 block text-sm text-[#8a7f72]">付款方式</span>
-                  <select
-                    value={selectedPaymentMethod}
-                    onChange={(e) => setPaymentMethod(e.target.value)}
-                    className="w-full rounded-lg border border-[#e5ded4] px-3 py-2.5"
-                  >
-                    {availablePaymentMethods.map((m) => (
-                      <option key={m} value={m}>
-                        {m}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+                {codPickup ? (
+                  <div className="rounded-xl border border-[#e5ded4] bg-[#faf7f2] p-4 text-sm">
+                    <p className="font-semibold text-[#1f1b19]">付款方式：門市取貨付款</p>
+                    <p className="mt-1 text-[#6b6156]">此方式為到門市取貨時付款（藍新代收），下單後不需線上付款。</p>
+                  </div>
+                ) : (
+                  <label className="block">
+                    <span className="mb-1 block text-sm text-[#8a7f72]">付款方式</span>
+                    <select
+                      value={selectedPaymentMethod}
+                      onChange={(e) => setPaymentMethod(e.target.value)}
+                      className="w-full rounded-lg border border-[#e5ded4] px-3 py-2.5"
+                    >
+                      {availablePaymentMethods.map((m) => (
+                        <option key={m} value={m}>
+                          {m}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                )}
               </div>
             </section>
 
