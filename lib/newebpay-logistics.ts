@@ -1,5 +1,20 @@
-import { aesDecrypt, aesEncrypt, tradeSha, verifyTradeSha } from '@/lib/newebpay';
+import crypto from 'crypto';
+import { aesEncrypt, tradeSha, verifyTradeSha } from '@/lib/newebpay';
 import { getConfiguredSiteUrl } from '@/lib/site-url';
+
+// 解密藍新物流回傳:比照官方範例(OPENSSL_ZERO_PADDING + 自行去 padding),
+// 不用 Node 預設 PKCS7 自動去 padding,避免回傳非標準 padding 時 bad decrypt。
+function logisticsAesDecrypt(hex: string, key: string, iv: string): string {
+  const decipher = crypto.createDecipheriv('aes-256-cbc', Buffer.from(key), Buffer.from(iv));
+  decipher.setAutoPadding(false);
+  const out = Buffer.concat([decipher.update(Buffer.from(hex, 'hex')), decipher.final()]);
+  let end = out.length;
+  const last = out[end - 1];
+  if (last > 0 && last <= 16 && end - last >= 0) end -= last; // 去 PKCS7 padding
+  // 再保險:去掉尾端 NUL / 控制字元(zero padding)
+  while (end > 0 && out[end - 1] < 0x20) end -= 1;
+  return out.subarray(0, end).toString('utf8');
+}
 
 const LOGISTIC_PATHS = {
   storeMap: 'storeMap',
@@ -50,7 +65,7 @@ export function decodeNewebpayLogisticsResponse(form: Record<string, FormDataEnt
   if (receivedHash && !verifyTradeSha(encrypted, receivedHash, cfg.hashKey, cfg.hashIv)) {
     throw new Error('藍新物流回傳驗證失敗');
   }
-  return parsePayload(aesDecrypt(encrypted, cfg.hashKey, cfg.hashIv));
+  return parsePayload(logisticsAesDecrypt(encrypted, cfg.hashKey, cfg.hashIv));
 }
 
 export function buildNewebpayLogisticsForm(
