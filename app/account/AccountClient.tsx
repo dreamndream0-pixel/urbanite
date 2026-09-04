@@ -356,7 +356,7 @@ function ProfileTab({
   }
   function addRecipient() {
     setRecipients((list) => {
-      const next = [...list, { name: '', phone: '', city: '', district: '', address: '' }];
+      const next: Recipient[] = [...list, { name: '', phone: '', city: '', district: '', address: '', type: 'home' }];
       setExpandedRecipient(next.length - 1);
       return next;
     });
@@ -451,34 +451,46 @@ function ProfileTab({
                         <span className={labelText}>收件人電話</span>
                         <input value={r.phone} onChange={(e) => updateRecipient(i, { phone: e.target.value })} className={field} />
                       </label>
-                      <label className="block">
-                        <span className={labelText}>縣市</span>
-                        <select value={r.city} onChange={(e) => updateRecipient(i, { city: e.target.value, district: '' })} className={field}>
-                          <option value="">請選擇縣市</option>
-                          {TW_CITIES.map((city) => (
-                            <option key={city} value={city}>{city}</option>
-                          ))}
-                        </select>
-                      </label>
-                      <label className="block">
-                        <span className={labelText}>行政區</span>
-                        <select
-                          value={r.district}
-                          onChange={(e) => updateRecipient(i, { district: e.target.value })}
-                          disabled={!r.city}
-                          className={field + ' disabled:bg-[#f6f2ec]'}
-                        >
-                          <option value="">{r.city ? '請選擇行政區' : '請先選縣市'}</option>
-                          {(TW_REGIONS[r.city] ?? []).map((d) => (
-                            <option key={d} value={d}>{d}</option>
-                          ))}
-                        </select>
-                      </label>
+                      {r.type !== 'store' ? (
+                        <>
+                          <label className="block">
+                            <span className={labelText}>縣市</span>
+                            <select value={r.city} onChange={(e) => updateRecipient(i, { city: e.target.value, district: '' })} className={field}>
+                              <option value="">請選擇縣市</option>
+                              {TW_CITIES.map((city) => (
+                                <option key={city} value={city}>{city}</option>
+                              ))}
+                            </select>
+                          </label>
+                          <label className="block">
+                            <span className={labelText}>行政區</span>
+                            <select
+                              value={r.district}
+                              onChange={(e) => updateRecipient(i, { district: e.target.value })}
+                              disabled={!r.city}
+                              className={field + ' disabled:bg-[#f6f2ec]'}
+                            >
+                              <option value="">{r.city ? '請選擇行政區' : '請先選縣市'}</option>
+                              {(TW_REGIONS[r.city] ?? []).map((d) => (
+                                <option key={d} value={d}>{d}</option>
+                              ))}
+                            </select>
+                          </label>
+                        </>
+                      ) : null}
                     </div>
-                    <label className="mt-3 block">
-                      <span className={labelText}>詳細地址</span>
-                      <input value={r.address} onChange={(e) => updateRecipient(i, { address: e.target.value })} placeholder="路 / 街 / 巷弄 / 號 / 樓" className={field} />
-                    </label>
+                    {r.type === 'store' ? (
+                      <div className="mt-3 rounded-lg bg-[#faf7f2] px-3 py-2 text-sm text-[#6b6156]">
+                        常用取貨門市：{r.store_name || '(未設)'}{r.store_id ? `（${r.store_id}）` : ''}
+                        {r.store_address ? <span className="block text-xs">{r.store_address}</span> : null}
+                        <span className="mt-1 block text-xs text-[#a99e8f]">門市請於結帳時重新選擇後「加入常用取貨人」更新。</span>
+                      </div>
+                    ) : (
+                      <label className="mt-3 block">
+                        <span className={labelText}>詳細地址</span>
+                        <input value={r.address} onChange={(e) => updateRecipient(i, { address: e.target.value })} placeholder="路 / 街 / 巷弄 / 號 / 樓" className={field} />
+                      </label>
+                    )}
                     <div className="mt-4 flex items-center gap-4">
                       <button type="button" onClick={() => setExpandedRecipient(null)} className="rounded-full bg-[#1f1b19] px-5 py-1.5 text-sm font-semibold text-white">
                         完成
@@ -496,7 +508,9 @@ function ProfileTab({
                         {r.phone ? <span className="ml-2 text-sm font-normal text-[#8a7f72]">{r.phone}</span> : null}
                       </p>
                       <p className="mt-1 truncate text-sm text-[#8a7f72]">
-                        {[r.city, r.district, r.address].filter(Boolean).join(' ') || '(未填地址)'}
+                        {r.type === 'store'
+                          ? `超商取貨 · ${r.store_name || r.store_id || '(未設門市)'}`
+                          : [r.city, r.district, r.address].filter(Boolean).join(' ') || '(未填地址)'}
                       </p>
                     </div>
                     <div className="flex shrink-0 gap-2">

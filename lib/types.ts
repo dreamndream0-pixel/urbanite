@@ -106,6 +106,12 @@ export type Recipient = {
   city: string;
   district: string;
   address: string;
+  type?: 'home' | 'store'; // home=宅配(地址) / store=超商(常用門市);未設視為 home
+  store_id?: string;
+  store_name?: string;
+  store_address?: string;
+  store_phone?: string;
+  store_ship_type?: string;
 };
 
 export type Customer = {

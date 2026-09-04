@@ -178,6 +178,14 @@ export default function CheckoutPage() {
   const shipping = computeShipping(subtotal, cart, products, selectedShippingMethod, resolveMethodFee(settings, selectedShippingMethod));
   const total = Math.max(0, subtotal + shipping - (applied?.amount ?? 0));
   const needsPickupStore = isStorePickupMethod(selectedShippingMethod);
+  // 常用收件人依模式篩選:超商模式只顯示「常用取貨門市」且同一超商;宅配模式只顯示「宅配收件人」
+  const visibleRecipients = recipients
+    .map((r, i) => ({ r, i }))
+    .filter(({ r }) =>
+      needsPickupStore
+        ? r.type === 'store' && (!r.store_ship_type || r.store_ship_type === shipTypeFromCheckout(selectedShippingMethod))
+        : r.type !== 'store',
+    );
   // 超商取貨:收件地址=門市;宅配:縣市+行政區+詳細地址
   const finalAddress = needsPickupStore
     ? (pickupStore ? `${pickupStore.store_name} ${pickupStore.store_address}`.trim() : '')
@@ -254,17 +262,34 @@ export default function CheckoutPage() {
     if (!r) return;
     setName(r.name || '');
     setPhone(r.phone || '');
-    setCity(r.city || '');
-    setDistrict(r.district || '');
-    setAddress(r.address || '');
+    if (r.type === 'store' && r.store_id) {
+      const store: PickupStore = {
+        store_id: r.store_id, store_name: r.store_name ?? '', store_phone: r.store_phone ?? '',
+        store_address: r.store_address ?? '', store_ship_type: r.store_ship_type ?? '', store_lgs_type: 'C2C',
+      };
+      setPickupStore(store);
+      try { localStorage.setItem(PICKUP_STORE_KEY, JSON.stringify(store)); } catch { /* 略過 */ }
+    } else {
+      setCity(r.city || '');
+      setDistrict(r.district || '');
+      setAddress(r.address || '');
+    }
   }
 
   async function saveRecipient() {
     if (savingRecipient) return;
     if (!name.trim() || !phone.trim()) { setMessage({ type: 'err', text: '請先填寫收件人姓名與電話' }); return; }
+    if (needsPickupStore && !pickupStore?.store_id) { setMessage({ type: 'err', text: '請先選擇取貨門市再加入常用取貨人' }); return; }
     setSavingRecipient(true);
     try {
-      const next: Recipient = { name: name.trim(), phone: phone.trim(), city, district, address: address.trim() };
+      const next: Recipient = needsPickupStore
+        ? {
+            name: name.trim(), phone: phone.trim(), city: '', district: '', address: '', type: 'store',
+            store_id: pickupStore?.store_id ?? '', store_name: pickupStore?.store_name ?? '',
+            store_address: pickupStore?.store_address ?? '', store_phone: pickupStore?.store_phone ?? '',
+            store_ship_type: pickupStore?.store_ship_type ?? '',
+          }
+        : { name: name.trim(), phone: phone.trim(), city, district, address: address.trim(), type: 'home' };
       const list = [...recipients, next];
       const res = await fetch('/api/customers', {
         method: 'PATCH',
@@ -599,18 +624,20 @@ export default function CheckoutPage() {
             {/* 收件資料 */}
             <section className="rounded-2xl bg-white p-5 shadow-sm">
               <h2 className="mb-4 font-semibold">收件資料</h2>
-              {recipients.length > 0 ? (
+              {visibleRecipients.length > 0 ? (
                 <label className="mb-3 block">
-                  <span className="mb-1 block text-sm text-[#8a7f72]">常用收件人</span>
+                  <span className="mb-1 block text-sm text-[#8a7f72]">{needsPickupStore ? '常用取貨門市' : '常用收件人'}</span>
                   <select
-                    defaultValue=""
+                    value=""
                     onChange={(e) => { if (e.target.value !== '') fillRecipient(Number(e.target.value)); }}
                     className="w-full rounded-lg border border-[#e5ded4] px-3 py-2.5"
                   >
-                    <option value="">選擇常用收件人自動帶入…</option>
-                    {recipients.map((r, i) => (
+                    <option value="">{needsPickupStore ? '選擇常用取貨門市自動帶入…' : '選擇常用收件人自動帶入…'}</option>
+                    {visibleRecipients.map(({ r, i }) => (
                       <option key={i} value={i}>
-                        {r.name}（{r.phone}）{[r.city, r.district].filter(Boolean).join('')}
+                        {r.type === 'store'
+                          ? `${r.name}（${r.phone}）${r.store_name ?? ''}`
+                          : `${r.name}（${r.phone}）${[r.city, r.district].filter(Boolean).join('')}`}
                       </option>
                     ))}
                   </select>
