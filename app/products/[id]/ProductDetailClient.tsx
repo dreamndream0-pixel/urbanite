@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Product } from '@/lib/types';
 import { FREE_SHIPPING_THRESHOLD } from '@/lib/shipping';
+import AccountMenu from '@/app/components/AccountMenu';
 
 const STORE_NAME = process.env.NEXT_PUBLIC_STORE_NAME || 'URBANITE';
 const CART_KEY = 'cart';
@@ -214,9 +215,7 @@ export default function ProductDetailClient({ product }: { product: Product }) {
                 </span>
               )}
             </Link>
-            <Link href="/account" aria-label="我的帳號" className="rounded-md p-2 hover:bg-[#efe8dd]">
-              <IconUser />
-            </Link>
+            <AccountMenu nextPath={`/products/${encodeURIComponent(product.id)}`} />
           </div>
         </nav>
       </header>
@@ -491,15 +490,6 @@ function IconSearch() {
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
       <circle cx="11" cy="11" r="7" />
       <path d="M21 21l-4-4" strokeLinecap="round" />
-    </svg>
-  );
-}
-
-function IconUser() {
-  return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
-      <circle cx="12" cy="8" r="4" />
-      <path d="M4 21c0-4 3.5-6 8-6s8 2 8 6" strokeLinecap="round" />
     </svg>
   );
 }

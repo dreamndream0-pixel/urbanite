@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
+import AccountMenu from './AccountMenu';
 
 const STORE_NAME = process.env.NEXT_PUBLIC_STORE_NAME || 'URBANITE';
 const CART_KEY = 'cart';
@@ -103,9 +104,6 @@ export default function ShopHeader({
 
         <div className="flex items-center justify-end gap-1 sm:gap-2">
           {favoriteButton}
-          <Link href="/account" aria-label="我的帳號" className="rounded-md p-2 hover:bg-[#efe8dd]">
-            <IconUser />
-          </Link>
           <Link href="/checkout" aria-label="購物車" className="relative rounded-md p-2 hover:bg-[#efe8dd]">
             <IconBag />
             {shownCartCount > 0 && (
@@ -114,18 +112,10 @@ export default function ShopHeader({
               </span>
             )}
           </Link>
+          <AccountMenu />
         </div>
       </nav>
     </header>
-  );
-}
-
-function IconUser() {
-  return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
-      <circle cx="12" cy="8" r="4" />
-      <path d="M4 21c0-4 3.5-6 8-6s8 2 8 6" strokeLinecap="round" />
-    </svg>
   );
 }
 
