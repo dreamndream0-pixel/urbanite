@@ -6,7 +6,7 @@ import {
   retToFulfillmentStatus,
   shipTypeFromMethod,
   shipTypeName,
-  tradeTypeFromPayment,
+  tradeTypeFromMethod,
 } from '@/lib/newebpay-logistics';
 import { getConfiguredSiteUrl } from '@/lib/site-url';
 import { createAdminClient } from '@/lib/supabase/admin';
@@ -56,7 +56,7 @@ export async function POST(
     }
     const shipType = order.store_ship_type || shipTypeFromMethod(order.shipping_method || '');
     const lgsType = order.store_lgs_type || 'C2C';
-    const tradeType = tradeTypeFromPayment(order.payment_method || '');
+    const tradeType = tradeTypeFromMethod(order.shipping_method || '', order.payment_method || '');
     const notifyUrl = `${getConfiguredSiteUrl()}/api/logistics/newebpay/notify`;
     const itemDesc = buildItemDesc(Array.isArray(order.items) ? order.items as Parameters<typeof buildItemDesc>[0] : []);
     const createResult = await requestNewebpayLogistics('createShipment', {

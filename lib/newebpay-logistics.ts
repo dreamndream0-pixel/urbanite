@@ -131,6 +131,14 @@ export function tradeTypeFromPayment(paymentMethod = ''): string {
   return /取貨付款|貨到付款|cod/i.test(paymentMethod) ? '1' : '3';
 }
 
+// TradeType:1=取貨付款(藍新代收貨款)、3=取貨不付款(客人已線上付款,到店純取貨)。
+// 這 4 種超商方式的「付款/不付款」寫在物流方式名稱裡,故以物流名稱為主,付款方式為後備。
+export function tradeTypeFromMethod(shippingMethod = '', paymentMethod = ''): string {
+  if (/不付款|不代收/.test(shippingMethod)) return '3';
+  if (/取貨付款|貨到付款|cod/i.test(shippingMethod)) return '1';
+  return tradeTypeFromPayment(paymentMethod);
+}
+
 export function normalizeLogisticsPhone(phone = ''): string {
   const digits = phone.replace(/\D/g, '');
   if (digits.startsWith('886')) return `0${digits.slice(3)}`.slice(0, 10);
