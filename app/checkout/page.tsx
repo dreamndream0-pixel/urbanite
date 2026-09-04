@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import type { Product, Recipient, SiteSettings, UserCoupon } from '@/lib/types';
 import { isOnlinePayment } from '@/lib/payment';
+import { TW_CITIES, TW_REGIONS } from '@/lib/tw-regions';
 import { computeShipping } from '@/lib/shipping';
 import ShopHeader from '@/app/components/ShopHeader';
 
@@ -92,8 +93,12 @@ export default function CheckoutPage() {
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [address, setAddress] = useState('');
+  const [city, setCity] = useState('');
+  const [district, setDistrict] = useState('');
   const [note, setNote] = useState('');
   const [recipients, setRecipients] = useState<Recipient[]>([]);
+  const [isMember, setIsMember] = useState(false);
+  const [savingRecipient, setSavingRecipient] = useState(false);
   const [shippingMethod, setShippingMethod] = useState(SHIPPING_METHODS[0]);
   const [paymentMethod, setPaymentMethod] = useState(PAYMENT_METHODS[0]);
   const [discountInput, setDiscountInput] = useState('');
@@ -122,7 +127,7 @@ export default function CheckoutPage() {
     fetch('/api/me')
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
-        if (data?.email) setEmail(data.email);
+        if (data?.email) { setEmail(data.email); setIsMember(true); }
         if (data?.name) setName(data.name);
         if (data?.phone) setPhone(data.phone);
         if (data?.address) setAddress(data.address);
@@ -172,6 +177,10 @@ export default function CheckoutPage() {
     ? shippingMethod
     : availableShippingMethods[0] ?? '';
   const needsPickupStore = isStorePickupMethod(selectedShippingMethod);
+  // 超商取貨:收件地址=門市;宅配:縣市+行政區+詳細地址
+  const finalAddress = needsPickupStore
+    ? (pickupStore ? `${pickupStore.store_name} ${pickupStore.store_address}`.trim() : '')
+    : [city, district, address].filter(Boolean).join('');
   // 取貨付款(門市代收):不需線上付款、鎖定付款方式;其餘(宅配 / 取貨不付款)才選付款方式
   const codPickup = isCodPickupMethod(selectedShippingMethod);
   const selectedPaymentMethod = codPickup
@@ -243,7 +252,31 @@ export default function CheckoutPage() {
     if (!r) return;
     setName(r.name || '');
     setPhone(r.phone || '');
-    setAddress([r.city, r.district, r.address].filter(Boolean).join(''));
+    setCity(r.city || '');
+    setDistrict(r.district || '');
+    setAddress(r.address || '');
+  }
+
+  async function saveRecipient() {
+    if (savingRecipient) return;
+    if (!name.trim() || !phone.trim()) { setMessage({ type: 'err', text: '請先填寫收件人姓名與電話' }); return; }
+    setSavingRecipient(true);
+    try {
+      const next: Recipient = { name: name.trim(), phone: phone.trim(), city, district, address: address.trim() };
+      const list = [...recipients, next];
+      const res = await fetch('/api/customers', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ recipients: list }),
+      });
+      if (!res.ok) { setMessage({ type: 'err', text: '加入常用收件人失敗' }); return; }
+      setRecipients(list);
+      setMessage({ type: 'ok', text: '已加入常用收件人' });
+    } catch {
+      setMessage({ type: 'err', text: '加入常用收件人失敗，請稍後再試' });
+    } finally {
+      setSavingRecipient(false);
+    }
   }
 
   function updateQty(id: string, change: number) {
@@ -301,8 +334,12 @@ export default function CheckoutPage() {
       setMessage({ type: 'err', text: '購物車是空的' });
       return;
     }
-    if (!name || !email || !phone || (!needsPickupStore && !address)) {
-      setMessage({ type: 'err', text: needsPickupStore ? '請填寫取貨人姓名、Email 與電話' : '請填寫收件人姓名、Email、電話與地址' });
+    if (!name || !email || !phone) {
+      setMessage({ type: 'err', text: '請填寫收件人姓名、電話與 Email' });
+      return;
+    }
+    if (!needsPickupStore && (!city || !district || !address.trim())) {
+      setMessage({ type: 'err', text: '請選擇縣市、行政區並填寫詳細地址' });
       return;
     }
     if (!selectedShippingMethod || !selectedPaymentMethod) {
@@ -322,7 +359,7 @@ export default function CheckoutPage() {
           customer_name: name,
           email,
           phone,
-          address,
+          address: finalAddress,
           note,
           shipping_method: selectedShippingMethod,
           payment_method: selectedPaymentMethod,
@@ -577,32 +614,77 @@ export default function CheckoutPage() {
                 </label>
               ) : null}
               <div className="grid gap-3">
-                <input
-                  className="rounded-lg border border-[#e5ded4] px-4 py-3"
-                  placeholder="收件人姓名"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                />
-                <input
-                  className="rounded-lg border border-[#e5ded4] px-4 py-3"
-                  placeholder="收件人電話"
-                  inputMode="tel"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                />
+                <div className="grid grid-cols-2 gap-3">
+                  <input
+                    className="rounded-lg border border-[#e5ded4] px-4 py-3"
+                    placeholder="收件人姓名(本名)"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                  />
+                  <input
+                    className="rounded-lg border border-[#e5ded4] px-4 py-3"
+                    placeholder="收件人電話"
+                    inputMode="tel"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                  />
+                </div>
                 <input
                   className="rounded-lg border border-[#e5ded4] px-4 py-3"
                   placeholder="Email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                 />
-                <textarea
-                  className="rounded-lg border border-[#e5ded4] px-4 py-3"
-                  placeholder="收件地址(或超商取貨門市)"
-                  rows={2}
-                  value={address}
-                  onChange={(e) => setAddress(e.target.value)}
-                />
+
+                {needsPickupStore ? (
+                  <p className="rounded-lg bg-[#faf7f2] px-4 py-3 text-sm text-[#8a7f72]">
+                    超商取貨免填地址，取貨門市請於上方「選擇門市」設定。
+                  </p>
+                ) : (
+                  <>
+                    <div className="grid grid-cols-2 gap-3">
+                      <select
+                        className="rounded-lg border border-[#e5ded4] px-3 py-3"
+                        value={city}
+                        onChange={(e) => { setCity(e.target.value); setDistrict(''); }}
+                      >
+                        <option value="">選擇縣市</option>
+                        {TW_CITIES.map((c) => (
+                          <option key={c} value={c}>{c}</option>
+                        ))}
+                      </select>
+                      <select
+                        className="rounded-lg border border-[#e5ded4] px-3 py-3 disabled:bg-[#f6f2ec]"
+                        value={district}
+                        onChange={(e) => setDistrict(e.target.value)}
+                        disabled={!city}
+                      >
+                        <option value="">選擇行政區</option>
+                        {(TW_REGIONS[city] ?? []).map((d) => (
+                          <option key={d} value={d}>{d}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <input
+                      className="rounded-lg border border-[#e5ded4] px-4 py-3"
+                      placeholder="詳細地址(路/街、門牌號)"
+                      value={address}
+                      onChange={(e) => setAddress(e.target.value)}
+                    />
+                  </>
+                )}
+
+                {isMember ? (
+                  <button
+                    type="button"
+                    onClick={saveRecipient}
+                    disabled={savingRecipient}
+                    className="justify-self-start rounded-full border border-[#1f1b19] px-4 py-2 text-sm font-semibold text-[#1f1b19] hover:bg-[#1f1b19] hover:text-white disabled:opacity-50"
+                  >
+                    ＋ 加入常用收件人
+                  </button>
+                ) : null}
+
                 <textarea
                   className="rounded-lg border border-[#e5ded4] px-4 py-3"
                   placeholder="訂單備註(選填)"
@@ -664,7 +746,7 @@ export default function CheckoutPage() {
                       <div className="border-t border-[#e8d9b6] pt-2">
                         <p className="mb-1 font-semibold text-[#8a6d1b]">收件資訊</p>
                         <p className="text-[#6b6156]">{name || '(未填姓名)'}｜{phone || '(未填電話)'}</p>
-                        <p className="text-[#6b6156]">{address || '(未填地址)'}</p>
+                        <p className="text-[#6b6156]">{finalAddress || '(未填地址)'}</p>
                         <p className="text-[#6b6156]">{selectedShippingMethod}</p>
                       </div>
                       <p className="text-xs text-[#a99e8f]">請依上方帳號完成匯款,並保留交易明細;送出訂單後也可於「我的訂單 → 立即付款」回報帳號後五碼或上傳截圖。</p>
