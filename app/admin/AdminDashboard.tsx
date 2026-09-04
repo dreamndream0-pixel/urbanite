@@ -3751,6 +3751,42 @@ function AdminOrderModal({
     } finally { setBusy(false); }
   }
 
+  async function queryShipment(shipmentId: string) {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/orders/${order.id}/shipment`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ shipment_id: shipmentId, action: 'query' }),
+      });
+      const data = await res.json();
+      if (!res.ok) { void uiAlert(data.error ?? '查詢配送單失敗'); return; }
+      void uiAlert('已查詢配送單並更新資料。');
+      await loadDetail();
+    } finally { setBusy(false); }
+  }
+
+  async function modifyShipment(shipmentId: string) {
+    if (busy) return;
+    const name = await uiPrompt('修改收件人姓名(留空不改):');
+    if (name === null) return;
+    const phone = await uiPrompt('修改收件人電話(留空不改):');
+    if (phone === null) return;
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/orders/${order.id}/shipment`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ shipment_id: shipmentId, action: 'modify', recipient_name: name.trim(), recipient_phone: phone.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) { void uiAlert(data.error ?? '修改配送單失敗'); return; }
+      void uiAlert('已送出修改配送單。');
+      await loadDetail();
+    } finally { setBusy(false); }
+  }
+
   async function addEvent(shipmentId: string) {
     if (busy || (!eventForm.status && !eventForm.description)) return;
     setBusy(true);
@@ -3950,6 +3986,20 @@ ${order.note ? `<div class="sec"><h2>備註</h2><p class="muted">${escapeHtml(or
                           >
                             列印寄件單
                           </a>
+                          <button
+                            onClick={() => queryShipment(s.id)}
+                            disabled={busy}
+                            className="rounded-full border border-[#d7c9bd] px-3 py-1 text-xs font-semibold text-[#6b6156] disabled:opacity-50"
+                          >
+                            查詢配送單
+                          </button>
+                          <button
+                            onClick={() => modifyShipment(s.id)}
+                            disabled={busy}
+                            className="rounded-full border border-[#d7c9bd] px-3 py-1 text-xs font-semibold text-[#6b6156] disabled:opacity-50"
+                          >
+                            修改配送單
+                          </button>
                         </>
                       ) : null}
                       <select

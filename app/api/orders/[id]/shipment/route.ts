@@ -191,7 +191,8 @@ export async function PATCH(
   const description = String(body?.description ?? '').trim();
   const location = String(body?.location ?? '').trim();
   const action = String(body?.action ?? '').trim();
-  if (!shipmentId || (!status && !description && action !== 'trace')) {
+  const apiActions = ['trace', 'query', 'modify'];
+  if (!shipmentId || (!status && !description && !apiActions.includes(action))) {
     return NextResponse.json({ error: '請填寫物流狀態或說明' }, { status: 400 });
   }
 
@@ -247,6 +248,65 @@ export async function PATCH(
       created_by: admin.email || '後台管理員',
     });
     return NextResponse.json(event, { status: 201 });
+  }
+
+  // 查詢配送單(NPA-B55):取回目前配送單明細/狀態
+  if (action === 'query') {
+    const { data: order } = await supabase.from('orders').select('order_no').eq('id', id).maybeSingle();
+    if (!order?.order_no) return NextResponse.json({ error: '找不到訂單單號' }, { status: 404 });
+    const q = await requestNewebpayLogistics('queryShipment', { MerchantOrderNo: order.order_no });
+    if (!q.ok) return NextResponse.json({ error: q.message || '查詢配送單失敗', detail: q.raw }, { status: 400 });
+    const row = firstSuccessRow(q.data);
+    const lgsNo = String(row.LgsNo ?? '');
+    const nowIso = new Date().toISOString();
+    await supabase.from('shipments').update({
+      tracking_number: lgsNo || shipment.tracking_number || '',
+      updated_at: nowIso,
+      raw_response: q.data,
+    }).eq('id', shipmentId);
+    await supabase.from('shipment_events').insert({
+      shipment_id: shipmentId,
+      status: shipment.status,
+      description: `查詢配送單:${q.message || '成功'}${lgsNo ? `,寄件代碼 ${lgsNo}` : ''}`,
+      event_at: nowIso,
+      raw_response: q.data,
+    });
+    return NextResponse.json({ ok: true, data: q.data }, { status: 200 });
+  }
+
+  // 修改配送單(NPA-B56):改收件人資訊 / 重選門市(限未取號、逾期、重選門市)
+  if (action === 'modify') {
+    const { data: order } = await supabase.from('orders').select('order_no').eq('id', id).maybeSingle();
+    if (!order?.order_no) return NextResponse.json({ error: '找不到訂單單號' }, { status: 404 });
+    if (!shipment.lgs_type || !shipment.ship_type) return NextResponse.json({ error: '此物流單不是藍新物流單' }, { status: 400 });
+    const userName = String(body?.recipient_name ?? '').trim();
+    const userTel = String(body?.recipient_phone ?? '').trim();
+    const userEmail = String(body?.recipient_email ?? '').trim();
+    const storeId = String(body?.store_id ?? '').trim();
+    const m = await requestNewebpayLogistics('modifyShipment', {
+      MerchantOrderNo: order.order_no,
+      LgsType: shipment.lgs_type,
+      ShipType: shipment.ship_type,
+      UserName: userName || undefined,
+      UserTel: userTel ? normalizeLogisticsPhone(userTel) : undefined,
+      UserEmail: userEmail || undefined,
+      StoreID: storeId || undefined,
+    });
+    if (!m.ok) return NextResponse.json({ error: m.message || '修改配送單失敗', detail: m.raw }, { status: 400 });
+    const nowIso = new Date().toISOString();
+    const upd: Record<string, unknown> = { updated_at: nowIso, raw_response: m.data };
+    if (userName) upd.recipient_name = userName;
+    if (userTel) upd.recipient_phone = userTel;
+    if (storeId) upd.store_id = storeId;
+    await supabase.from('shipments').update(upd).eq('id', shipmentId);
+    await supabase.from('shipment_events').insert({
+      shipment_id: shipmentId,
+      status: shipment.status,
+      description: `修改配送單:${m.message || '成功'}`,
+      event_at: nowIso,
+      raw_response: m.data,
+    });
+    return NextResponse.json({ ok: true, data: m.data }, { status: 200 });
   }
 
   const nowIso = new Date().toISOString();
