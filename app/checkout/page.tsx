@@ -34,7 +34,7 @@ type PickupStore = {
 };
 
 const SHIPPING_METHODS = ['全家取貨付款', '全家取貨不付款', '7-11取貨付款', '7-11取貨不付款', '宅配到府'];
-const PAYMENT_METHODS = ['信用卡 / ATM / 超商(藍新)', '取貨付款(貨到付款)', '轉帳匯款'];
+const PAYMENT_METHODS = ['信用卡付款', 'Apple Pay', '轉帳匯款'];
 const PICKUP_STORE_KEY = 'newebpay-pickup-store';
 
 function isStorePickupMethod(method = '') {
