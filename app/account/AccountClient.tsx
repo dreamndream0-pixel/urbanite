@@ -41,11 +41,13 @@ function couponLabel(d: Discount) {
 }
 
 // 是否顯示「立即付款」:未付款、未取消/退貨、無取消申請中或已核准、非退貨處理中。
+// 取貨付款/貨到付款(到店付款)不需線上付款,不顯示。
 function canPayNow(order: Order): boolean {
   if (order.paid) return false;
   if (order.status === '取消' || order.status === '退貨') return false;
   if (order.cancel_status === 'REQUESTED' || order.cancel_status === 'APPROVED') return false;
   if (['RETURNING', 'RETURNED'].includes(order.fulfillment_status ?? '')) return false;
+  if (/取貨付款|貨到付款|cod/i.test(order.payment_method ?? '')) return false;
   return true;
 }
 
