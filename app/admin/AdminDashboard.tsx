@@ -27,6 +27,7 @@ import {
   RETURN_STATUS_LABEL,
 } from '@/lib/order-status';
 import { uiAlert, uiConfirm, uiPrompt } from '@/lib/ui-dialog';
+import { OrderStatusBadge, orderNeedsAttention, AttentionDot, isPaymentReported } from '@/app/components/OrderStatusBadge';
 
 const formatter = new Intl.NumberFormat('zh-TW', {
   style: 'currency',
@@ -36,12 +37,6 @@ const formatter = new Intl.NumberFormat('zh-TW', {
 
 const ORDER_STATUSES = ['尚未付款', '待出貨', '已出貨', '已完成', '取消', '退貨'];
 const PAYMENT_REPORTED_TAB = '通知已付款';
-// 買家已回報匯款(有後五碼/截圖/備註)但賣家尚未確認收款
-function isPaymentReported(o: Order): boolean {
-  return !o.paid
-    && o.status !== '取消' && o.status !== '退貨'
-    && Boolean(o.payment_ref || o.payment_proof_url || o.payment_proof_note);
-}
 const PRODUCT_STATUSES = ['上架中', '加購品', '已下架'];
 const DEFAULT_PAYMENT_METHODS = ['信用卡付款', 'Apple Pay', '轉帳匯款'];
 const DEFAULT_SHIPPING_METHODS = ['全家取貨付款', '全家取貨不付款', '7-11取貨付款', '7-11取貨不付款', '宅配到府'];
@@ -1500,21 +1495,24 @@ export default function AdminDashboard({
               {/* 狀態分類 */}
               <div className="mb-4 -mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
                 {['全部', '尚未付款', PAYMENT_REPORTED_TAB, '待出貨', '已出貨', '已完成', '取消', '退貨'].map((s) => {
-                  const n = s === '全部'
-                    ? orders.length
+                  const tabOrders = s === '全部'
+                    ? orders
                     : s === PAYMENT_REPORTED_TAB
-                      ? orders.filter(isPaymentReported).length
-                      : orders.filter((o) => o.status === s).length;
+                      ? orders.filter(isPaymentReported)
+                      : orders.filter((o) => o.status === s);
+                  const n = tabOrders.length;
+                  const attention = tabOrders.some((o) => orderNeedsAttention(o, 'admin'));
                   return (
                     <button
                       key={s}
                       onClick={() => setOrderFilter(s)}
-                      className={`shrink-0 rounded-full border px-3 py-1.5 text-sm font-semibold transition ${
+                      className={`relative shrink-0 rounded-full border px-3 py-1.5 text-sm font-semibold transition ${
                         orderFilter === s
                           ? 'border-[#1f1b19] bg-[#1f1b19] text-white'
                           : 'border-[#d7c9bd] text-[#6b6156]'
                       }`}
                     >
+                      {attention ? <AttentionDot className="absolute -right-0.5 -top-0.5" /> : null}
                       {s}
                       <span className={`ml-1 ${orderFilter === s ? 'text-white/70' : 'text-[#a99e8f]'}`}>{n}</span>
                     </button>
@@ -1554,7 +1552,10 @@ export default function AdminDashboard({
                         >
                           <div className="flex items-start justify-between gap-3">
                             <div className="min-w-0">
-                              <p className="font-semibold">{order.order_no}</p>
+                              <p className="flex items-center gap-1.5 font-semibold">
+                                {orderNeedsAttention(order, 'admin') ? <AttentionDot /> : null}
+                                {order.order_no}
+                              </p>
                               <p className="text-sm text-[#8a7f72]">
                                 {name}
                                 {order.user_id && customerByUser.has(order.user_id) ? (
@@ -1602,9 +1603,7 @@ export default function AdminDashboard({
                           ) : null}
 
                           <div className="mt-3 flex flex-wrap items-center gap-2">
-                            <span className="rounded-full bg-[#f3ede4] px-3 py-1 text-xs font-semibold text-[#6b6156]">
-                              {order.status}
-                            </span>
+                            <OrderStatusBadge order={order} className="!text-xs" />
                             <span
                               className={`rounded-full px-3 py-1 text-xs font-semibold ${
                                 order.paid ? 'bg-[#e9f7ee] text-[#1f7a44]' : 'bg-[#fdf3e7] text-[#9a6a1f]'

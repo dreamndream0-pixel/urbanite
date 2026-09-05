@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import type { Customer, Discount, Order, Product, Recipient, ReturnRequest, SiteSettings, UserCoupon } from '@/lib/types';
 import { TW_CITIES, TW_REGIONS } from '@/lib/tw-regions';
 import { isOnlinePayment, paymentDeadline } from '@/lib/payment';
+import { OrderStatusBadge, orderNeedsAttention, AttentionDot } from '@/app/components/OrderStatusBadge';
 import { uiAlert } from '@/lib/ui-dialog';
 import AccountMenu from '@/app/components/AccountMenu';
 import {
@@ -757,15 +758,18 @@ function OrdersTab({
       {/* 分頁 */}
       <div className="flex flex-wrap gap-2">
         {ORDER_TABS.map((t) => {
-          const n = t.key === 'all' ? orders.length : orders.filter((o) => orderTabOf(o) === t.key).length;
+          const inTab = t.key === 'all' ? orders : orders.filter((o) => orderTabOf(o) === t.key);
+          const n = inTab.length;
+          const attention = inTab.some((o) => orderNeedsAttention(o, 'customer'));
           return (
             <button
               key={t.key}
               onClick={() => setTab(t.key)}
-              className={`rounded-full px-3 py-1.5 text-sm font-semibold transition ${
+              className={`relative rounded-full px-3 py-1.5 text-sm font-semibold transition ${
                 tab === t.key ? 'bg-[#1f1b19] text-white' : 'border border-[#e5ded4] bg-white text-[#6b6156] hover:bg-[#efe8dd]'
               }`}
             >
+              {attention ? <AttentionDot className="absolute -right-0.5 -top-0.5" /> : null}
               {t.label}
               <span className={`ml-1 ${tab === t.key ? 'text-white/70' : 'text-[#a99e8f]'}`}>{n}</span>
             </button>
@@ -787,16 +791,17 @@ function OrdersTab({
                 <button onClick={() => onOpen(order)} className="block w-full text-left">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div>
-                      <p className="font-semibold">{order.order_no}</p>
+                      <p className="flex items-center gap-1.5 font-semibold">
+                        {orderNeedsAttention(order, 'customer') ? <AttentionDot /> : null}
+                        {order.order_no}
+                      </p>
                       <p className="text-sm text-[#8a7f72]">
                         {order.created_at ? new Date(order.created_at).toLocaleString('zh-TW') : ''} ·{' '}
                         {order.items.reduce((n, it) => n + it.quantity, 0)} 件
                       </p>
                     </div>
                     <div className="flex items-center gap-3">
-                      <span className="rounded-full bg-[#f3ede4] px-3 py-1 text-sm font-semibold text-[#6b6156]">
-                        {order.status}
-                      </span>
+                      <OrderStatusBadge order={order} />
                       <span className="font-semibold">{formatter.format(order.total)}</span>
                       <span className="text-[#c9b8a8]">›</span>
                     </div>
