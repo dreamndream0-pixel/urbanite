@@ -763,7 +763,7 @@ function OrdersTab({
   return (
     <div className="space-y-4">
       {/* 分頁(底線式,可左右滑動) */}
-      <div className="-mx-4 overflow-x-auto border-b border-[#e5ded4] px-4 sm:mx-0 sm:px-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div className="-mx-4 overflow-x-auto overflow-y-hidden border-b border-[#e5ded4] px-4 sm:mx-0 sm:px-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         <div className="flex min-w-max gap-6">
           {ORDER_TABS.map((t) => {
             const inTab = t.key === 'all' ? orders : orders.filter((o) => orderTabOf(o) === t.key);
