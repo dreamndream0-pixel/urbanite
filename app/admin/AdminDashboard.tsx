@@ -35,6 +35,13 @@ const formatter = new Intl.NumberFormat('zh-TW', {
 });
 
 const ORDER_STATUSES = ['尚未付款', '待出貨', '已出貨', '已完成', '取消', '退貨'];
+const PAYMENT_REPORTED_TAB = '通知已付款';
+// 買家已回報匯款(有後五碼/截圖/備註)但賣家尚未確認收款
+function isPaymentReported(o: Order): boolean {
+  return !o.paid
+    && o.status !== '取消' && o.status !== '退貨'
+    && Boolean(o.payment_ref || o.payment_proof_url || o.payment_proof_note);
+}
 const PRODUCT_STATUSES = ['上架中', '加購品', '已下架'];
 const DEFAULT_PAYMENT_METHODS = ['信用卡付款', 'Apple Pay', '轉帳匯款'];
 const DEFAULT_SHIPPING_METHODS = ['全家取貨付款', '全家取貨不付款', '7-11取貨付款', '7-11取貨不付款', '宅配到府'];
@@ -1492,8 +1499,12 @@ export default function AdminDashboard({
 
               {/* 狀態分類 */}
               <div className="mb-4 -mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
-                {['全部', ...ORDER_STATUSES].map((s) => {
-                  const n = s === '全部' ? orders.length : orders.filter((o) => o.status === s).length;
+                {['全部', '尚未付款', PAYMENT_REPORTED_TAB, '待出貨', '已出貨', '已完成', '取消', '退貨'].map((s) => {
+                  const n = s === '全部'
+                    ? orders.length
+                    : s === PAYMENT_REPORTED_TAB
+                      ? orders.filter(isPaymentReported).length
+                      : orders.filter((o) => o.status === s).length;
                   return (
                     <button
                       key={s}
@@ -1514,7 +1525,9 @@ export default function AdminDashboard({
               {(() => {
                 const q = orderSearch.trim().toLowerCase();
                 const shown = orders.filter((o) => {
-                  if (orderFilter !== '全部' && o.status !== orderFilter) return false;
+                  if (orderFilter === PAYMENT_REPORTED_TAB) {
+                    if (!isPaymentReported(o)) return false;
+                  } else if (orderFilter !== '全部' && o.status !== orderFilter) return false;
                   if (orderPaidFilter === '已付款' && !o.paid) return false;
                   if (orderPaidFilter === '未付款' && o.paid) return false;
                   if (orderCancelOnly && o.cancel_status !== 'REQUESTED') return false;
@@ -1599,6 +1612,12 @@ export default function AdminDashboard({
                             >
                               {order.paid ? '已付款' : '未付款'}
                             </span>
+                            {isPaymentReported(order) ? (
+                              <span className="inline-flex items-center gap-1 rounded-full bg-[#eaf1fb] px-3 py-1 text-xs font-semibold text-[#2b5fa5]">
+                                <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.7 21a2 2 0 0 1-3.4 0" /></svg>
+                                通知已付款
+                              </span>
+                            ) : null}
                             {order.cancel_status === 'REQUESTED' ? (
                               <span className="rounded-full bg-[#fbe9e7] px-3 py-1 text-xs font-semibold text-[#c0392b]">
                                 取消審核中
