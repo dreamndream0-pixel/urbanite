@@ -15,7 +15,7 @@ export async function POST(request: Request) {
 
     const { data: shipment } = await supabase
       .from('shipments')
-      .select('id, status')
+      .select('id, status, store_id, ship_type')
       .eq('order_id', order.id)
       .order('created_at', { ascending: false })
       .limit(1)
@@ -23,7 +23,11 @@ export async function POST(request: Request) {
     if (!shipment) return new NextResponse('0|Shipment not found', { status: 404 });
 
     const retId = String(payload.Retld ?? payload.RetID ?? '');
-    const nextStatus = retToFulfillmentStatus(retId);
+    const retString = String(payload.RetString ?? payload.Message ?? '');
+    const isPickup = Boolean(shipment.store_id) || Boolean(shipment.ship_type);
+    const nextStatus = retToFulfillmentStatus(retId, { description: retString, isPickup });
+    // 不倒退:買家已取貨(收款完成)後,後續貨態不再覆蓋
+    if (shipment.status === 'PICKED_UP') return new NextResponse('1|OK');
     const eventAt = String(payload.EventTime ?? '') || new Date().toISOString();
     const description = String(payload.RetString ?? payload.Message ?? '藍新物流狀態更新');
 

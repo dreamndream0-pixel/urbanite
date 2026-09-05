@@ -195,8 +195,20 @@ export function normalizeLogisticsPhone(phone = ''): string {
   return digits.slice(0, 10);
 }
 
-export function retToFulfillmentStatus(retId: unknown): string {
+export function retToFulfillmentStatus(
+  retId: unknown,
+  opts: { description?: string; isPickup?: boolean } = {},
+): string {
   const id = String(retId ?? '');
+  const text = String(opts.description ?? '');
+  // 藍新各超商的數字貨態代碼不一致,超商取貨優先用「貨態描述」判斷到店/退回(較穩定)。
+  const returnedText = /退回|退貨|逾期(未取|退)|未取.*退|退件/.test(text);
+  const arrivedAtStore = !returnedText && (
+    /到店|到門市|貨到門市|可取(件|貨)|待取貨?|取件通知/.test(text)
+    || (/門市/.test(text) && /(到達|送達|配達|抵達|到店|可取|取件|待取)/.test(text))
+  );
+  if (opts.isPickup && arrivedAtStore) return 'AT_STORE';
+  if (returnedText) return 'RETURNING';
   if (id === '6') return 'DELIVERED';
   if (['2', '3', '4', '5'].includes(id)) return 'IN_TRANSIT';
   if (id.startsWith('-') || ['10', '12', '13', '14', '15', '16'].includes(id)) return 'RETURNING';

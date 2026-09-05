@@ -225,9 +225,14 @@ export async function PATCH(
     if (!trace.ok) return NextResponse.json({ error: trace.message || '查詢藍新貨態失敗', detail: trace.raw }, { status: 400 });
     const rows = historyRows(trace.data);
     const newest = rows[rows.length - 1] ?? trace.data ?? {};
-    const nextStatus = retToFulfillmentStatus(newest.Retld ?? newest.RetID);
     const eventAt = String(newest.EventTime ?? '') || new Date().toISOString();
     const eventDescription = String(newest.RetString ?? trace.message ?? '藍新物流貨態更新');
+    const isPickup = Boolean(shipment.store_id) || Boolean(shipment.ship_type);
+    const nextStatus = retToFulfillmentStatus(newest.Retld ?? newest.RetID, { description: eventDescription, isPickup });
+    // 不倒退:已取貨(收款完成)後,後續貨態不再覆蓋
+    if (shipment.status === 'PICKED_UP') {
+      return NextResponse.json({ ok: true, skipped: '已取貨,不再更新貨態' }, { status: 200 });
+    }
     const { data: event, error } = await supabase
       .from('shipment_events')
       .insert({
