@@ -17,3 +17,14 @@ export function isCollectOnDelivery(shippingMethod = '', paymentMethod = ''): bo
 export function initialOrderStatus(shippingMethod = '', paymentMethod = ''): '待出貨' | '尚未付款' {
   return isCollectOnDelivery(shippingMethod, paymentMethod) ? '待出貨' : '尚未付款';
 }
+
+// 線上付款的付款期限天數(下單後 N 天內未付款自動取消)。可用環境變數覆寫,預設 3 天。
+export function paymentDeadlineDays(): number {
+  const n = Number(process.env.PAYMENT_DEADLINE_DAYS);
+  return Number.isFinite(n) && n > 0 ? n : 3;
+}
+
+// 由建立時間推導付款期限(不需資料庫欄位)。
+export function paymentDeadline(createdAt: string | number | Date, days = paymentDeadlineDays()): Date {
+  return new Date(new Date(createdAt).getTime() + days * 24 * 3600 * 1000);
+}

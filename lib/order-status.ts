@@ -84,7 +84,7 @@ export function buildProgress(order: {
       ]
     : [
         { key: 'created', label: '訂單成立' },
-        { key: 'paid', label: '付款完成' },
+        { key: 'paid', label: order.paid ? '已付款' : '尚未付款' },
         { key: 'shipped', label: '商品出貨' },
         { key: 'transit', label: isPickup ? '待取貨' : '配送中' },
         { key: 'done', label: isPickup ? '已取貨完成' : '訂單完成' },

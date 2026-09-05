@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import type { Customer, Discount, Order, Product, Recipient, ReturnRequest, SiteSettings, UserCoupon } from '@/lib/types';
 import { TW_CITIES, TW_REGIONS } from '@/lib/tw-regions';
-import { isOnlinePayment } from '@/lib/payment';
+import { isOnlinePayment, paymentDeadline } from '@/lib/payment';
 import { uiAlert } from '@/lib/ui-dialog';
 import AccountMenu from '@/app/components/AccountMenu';
 import {
@@ -994,6 +994,11 @@ function OrderModal({
           ) : null}
 
           {/* 操作 */}
+          {canPayNow(order) && !order.paid && order.created_at ? (
+            <p className="mb-2 text-sm text-[#c0392b]">
+              請於 {paymentDeadline(order.created_at).toLocaleString('zh-TW', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })} 前完成付款,逾期將自動取消訂單。
+            </p>
+          ) : null}
           <div className="flex flex-wrap gap-2">
             <button
               onClick={onReorder}
