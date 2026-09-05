@@ -758,7 +758,8 @@ function OrdersTab({
     );
   }
   const shown = tab === 'all' ? orders : orders.filter((o) => orderTabOf(o) === tab);
-  const actionBtn = 'rounded-full border border-[#d7c9bd] px-3 py-1.5 text-xs font-semibold text-[#6b6156] hover:bg-[#efe8dd]';
+  const actionBtn = 'inline-flex h-8 items-center rounded-full border border-[#d7c9bd] px-4 text-xs font-semibold text-[#6b6156] hover:bg-[#efe8dd]';
+  const payBtn = 'inline-flex h-8 items-center rounded-full bg-[#ada265] px-4 text-xs font-semibold text-white hover:bg-[#9a9059]';
   return (
     <div className="space-y-4">
       {/* 分頁 */}
@@ -847,11 +848,11 @@ function OrdersTab({
                 <div className="mt-3 flex flex-wrap gap-2 border-t border-[#f1ebe1] pt-3">
                   {canPayNow(order) ? (
                     isOnlinePayment(order.payment_method ?? '') ? (
-                      <a href={`/api/payment/newebpay/checkout?order=${encodeURIComponent(order.order_no)}`} className="rounded-full bg-[#ada265] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#9a9059]">
+                      <a href={`/api/payment/newebpay/checkout?order=${encodeURIComponent(order.order_no)}`} className={payBtn}>
                         立即付款
                       </a>
                     ) : (
-                      <button onClick={() => onPay(order)} className="rounded-full bg-[#ada265] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#9a9059]">
+                      <button onClick={() => onPay(order)} className={payBtn}>
                         立即付款
                       </button>
                     )
