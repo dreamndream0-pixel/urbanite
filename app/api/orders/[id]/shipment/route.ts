@@ -75,7 +75,17 @@ export async function POST(
       ShipType: shipType,
     });
     if (!createResult.ok) {
-      return NextResponse.json({ error: createResult.message || '藍新物流建單失敗', detail: createResult.raw }, { status: 400 });
+      const msg = createResult.message || '';
+      // 帳號未開通該物流商服務(如全家 C2C):藍新回「無啟用對應物流商服務」。
+      // 這是藍新帳號層級設定,非參數錯誤,需到藍新物流後台申請開通對應超商/宅配服務。
+      const noService = /無啟用|未啟用|對應物流商|物流商服務|尚未開通/.test(msg);
+      const error = noService
+        ? `藍新回報「${msg || '無啟用對應物流商服務'}」:此藍新物流帳號尚未開通${shipTypeName(shipType)}（${lgsType}）服務。請至藍新物流後台申請開通該超商/宅配服務後再建單，或改用已開通的物流方式。`
+        : (msg || '藍新物流建單失敗');
+      return NextResponse.json(
+        { error, detail: createResult.raw, sent: { shipType, shipTypeName: shipTypeName(shipType), lgsType, tradeType } },
+        { status: 400 },
+      );
     }
     let shipmentNoResult: Awaited<ReturnType<typeof requestNewebpayLogistics>> | null = null;
     try {
