@@ -80,6 +80,9 @@ export function buildMPGParams(order: {
     ClientBackURL: `${cfg.siteUrl}/checkout/complete?order_no=${encodeURIComponent(order.order_no)}`,
     // 不在 API 指定支付方式 → 依藍新後台【商店設定】已開通的方式顯示
     // (信用卡 / WebATM / ATM 轉帳 / 超商代碼 / 超商條碼 / LINE Pay 等)
+    // 超商取貨物流由本站自行串接(自家選門市),關閉藍新金流頁的「超商取貨」區塊,
+    // 避免客人在付款頁重複選一次門市。
+    CVSCOM: '0',
   };
   const query = new URLSearchParams(trade).toString();
   const tradeInfo = aesEncrypt(query, cfg.hashKey, cfg.hashIv);
