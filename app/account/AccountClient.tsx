@@ -762,26 +762,29 @@ function OrdersTab({
   const payBtn = 'inline-flex h-8 items-center rounded-full bg-[#ada265] px-4 text-xs font-semibold text-white hover:bg-[#9a9059]';
   return (
     <div className="space-y-4">
-      {/* 分頁 */}
-      <div className="flex flex-wrap gap-2">
-        {ORDER_TABS.map((t) => {
-          const inTab = t.key === 'all' ? orders : orders.filter((o) => orderTabOf(o) === t.key);
-          const n = inTab.length;
-          const attention = inTab.some((o) => orderNeedsAttention(o, 'customer'));
-          return (
-            <button
-              key={t.key}
-              onClick={() => setTab(t.key)}
-              className={`relative rounded-full px-3 py-1.5 text-sm font-semibold transition ${
-                tab === t.key ? 'bg-[#1f1b19] text-white' : 'border border-[#e5ded4] bg-white text-[#6b6156] hover:bg-[#efe8dd]'
-              }`}
-            >
-              {attention ? <AttentionDot className="absolute -right-0.5 -top-0.5" /> : null}
-              {t.label}
-              <span className={`ml-1 ${tab === t.key ? 'text-white/70' : 'text-[#a99e8f]'}`}>{n}</span>
-            </button>
-          );
-        })}
+      {/* 分頁(底線式,可左右滑動) */}
+      <div className="-mx-4 overflow-x-auto border-b border-[#e5ded4] px-4 sm:mx-0 sm:px-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div className="flex min-w-max gap-6">
+          {ORDER_TABS.map((t) => {
+            const inTab = t.key === 'all' ? orders : orders.filter((o) => orderTabOf(o) === t.key);
+            const n = inTab.length;
+            const attention = inTab.some((o) => orderNeedsAttention(o, 'customer'));
+            const active = tab === t.key;
+            return (
+              <button
+                key={t.key}
+                onClick={() => setTab(t.key)}
+                className={`relative -mb-px shrink-0 border-b-2 pb-2 pt-1 text-center transition ${
+                  active ? 'border-[#1f1b19]' : 'border-transparent'
+                }`}
+              >
+                {attention ? <AttentionDot className="absolute right-0 top-0" /> : null}
+                <span className={`block text-sm font-semibold ${active ? 'text-[#1f1b19]' : 'text-[#8a7f72]'}`}>{t.label}</span>
+                <span className={`block text-sm ${active ? 'font-semibold text-[#1f1b19]' : 'text-[#a99e8f]'}`}>{n}</span>
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {shown.length === 0 ? (
@@ -1522,7 +1525,7 @@ function OrderProgress({ order, onShowHistory }: { order: Order; onShowHistory?:
             onClick={onShowHistory}
             className="inline-flex items-center gap-0.5 text-[11px] text-[#a99e8f] underline-offset-2 hover:text-[#6b6156] hover:underline"
           >
-            狀態更新紀錄
+            展開
             <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6" /></svg>
           </button>
         </div>

@@ -25,6 +25,7 @@ import {
   PAYMENT_STATUS_LABEL,
   FULFILLMENT_STATUS_LABEL,
   RETURN_STATUS_LABEL,
+  buildProgress,
 } from '@/lib/order-status';
 import { uiAlert, uiConfirm, uiPrompt } from '@/lib/ui-dialog';
 import { OrderStatusBadge, orderNeedsAttention, AttentionDot, isPaymentReported } from '@/app/components/OrderStatusBadge';
@@ -3763,6 +3764,44 @@ function ReturnStatusControl({
   );
 }
 
+// 後台訂單進度條(圖示 + 時間戳)
+function AdminOrderProgress({ order, createdAt, paidAt }: { order: Order; createdAt?: string; paidAt?: string }) {
+  const steps = buildProgress(order);
+  const cancelled = order.status === '取消';
+  const fmt = (s?: string) => (s ? new Date(s).toLocaleString('zh-TW', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : '');
+  const stepIcon = (key: string) => {
+    const p = { width: 16, height: 16, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 1.8, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const };
+    if (key === 'created') return (<svg {...p}><path d="M7 3h7l4 4v14H7z" /><path d="M14 3v4h4M9 12h7M9 16h7" /></svg>);
+    if (key === 'paid') return (<svg {...p}><rect x="3" y="6" width="18" height="12" rx="2" /><path d="M3 10h18" /></svg>);
+    if (key === 'shipped' || key === 'transit') return (<svg {...p}><path d="M3 7h11v9H3zM14 10h4l3 3v3h-7z" /><circle cx="7" cy="18" r="1.5" /><circle cx="17.5" cy="18" r="1.5" /></svg>);
+    if (key === 'done') return (<svg {...p}><path d="M5 13l4 4L19 7" strokeWidth={2.2} /></svg>);
+    return (<svg {...p}><path d="M3 7l9-4 9 4-9 4-9-4zM3 7v10l9 4 9-4V7" /></svg>);
+  };
+  const timeFor = (key: string) => (key === 'created' ? fmt(createdAt) : key === 'paid' ? fmt(paidAt) : '');
+  return (
+    <div className="flex items-start">
+      {steps.map((s, i) => {
+        const active = s.done || s.current;
+        const bg = cancelled ? '#c0392b' : active ? '#1f1b19' : '#efe8dd';
+        const fg = active || cancelled ? '#fff' : '#b3a897';
+        return (
+          <div key={s.key} className="flex flex-1 flex-col items-center">
+            <div className="flex w-full items-center">
+              <div className={`h-0.5 flex-1 ${i === 0 ? 'opacity-0' : ''}`} style={{ background: active ? '#1f1b19' : '#e5ded4' }} />
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full" style={{ background: bg, color: fg }}>
+                {stepIcon(s.key)}
+              </div>
+              <div className={`h-0.5 flex-1 ${i === steps.length - 1 ? 'opacity-0' : ''}`} style={{ background: (steps[i + 1]?.done || steps[i + 1]?.current) ? '#1f1b19' : '#e5ded4' }} />
+            </div>
+            <span className={`mt-1.5 text-center text-[11px] leading-tight ${active ? 'font-semibold text-[#2c2826]' : 'text-[#a99e8f]'}`}>{s.label}</span>
+            {timeFor(s.key) ? <span className="mt-0.5 text-center text-[10px] text-[#a99e8f]">{timeFor(s.key)}</span> : null}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 // 後台專用的訂單完整資訊(含出貨狀態 / 付款管理;與客人端的訂單明細分開)
 function AdminOrderModal({
   order,
@@ -3792,6 +3831,10 @@ function AdminOrderModal({
 
   const [detail, setDetail] = useState<Pick<OrderDetail, 'payments' | 'shipments' | 'history' | 'returns' | 'refunds'> | null>(null);
   const [detailLoading, setDetailLoading] = useState(true);
+  const paidAt = detail?.history?.find((h) => h.type === 'payment' && h.to_status === 'PAID')?.created_at
+    ?? detail?.payments?.find((p) => p.status === 'PAID')?.paid_at
+    ?? undefined;
+  const hasShipment = (detail?.shipments?.length ?? 0) > 0;
   const [shipForm, setShipForm] = useState({ provider: '', tracking_number: '' });
   const [eventForm, setEventForm] = useState({ status: '', description: '', location: '' });
   const [busy, setBusy] = useState(false);
@@ -3968,45 +4011,58 @@ ${order.note ? `<div class="sec"><h2>備註</h2><p class="muted">${escapeHtml(or
     onUpdate({ refund_amount: amount });
   }
 
-  const badge = (text: string, tone: 'gray' | 'green' | 'amber') => (
-    <span
-      className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
-        tone === 'green' ? 'bg-[#e9f7ee] text-[#1f7a44]'
-        : tone === 'amber' ? 'bg-[#fbf1dd] text-[#8a6d1b]'
-        : 'bg-[#f3ede4] text-[#6b6156]'
-      }`}
-    >
-      {text}
-    </span>
-  );
-
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center sm:p-4" onClick={onClose}>
       <div
         className="flex max-h-[90dvh] w-full max-w-lg flex-col overflow-hidden rounded-t-2xl bg-white sm:rounded-2xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex shrink-0 items-center justify-between border-b border-[#e5ded4] bg-white px-5 py-4">
-          <h2 className="text-lg font-semibold">合計：{formatter.format(order.total)}</h2>
-          <button onClick={onClose} aria-label="關閉" className="rounded-md p-1 text-2xl leading-none hover:bg-[#efe8dd]">
-            ×
-          </button>
+        <div className="flex shrink-0 items-start justify-between gap-3 border-b border-[#e5ded4] bg-white px-5 pb-4 pt-5">
+          <div className="min-w-0">
+            <p className="text-[11px] font-semibold tracking-[0.28em] text-[#b3a897]">ORDER DETAIL</p>
+            <h2 className="mt-1 text-2xl font-bold leading-tight">訂單詳情</h2>
+            <p className="mt-0.5 text-sm text-[#8a7f72]">{order.order_no}</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="hidden rounded-xl bg-[#f3ede4] px-3 py-1.5 text-right sm:block">
+              <p className="text-[10px] text-[#a99e8f]">訂單日期</p>
+              <p className="text-xs font-semibold text-[#6b6156]">{dateStr}</p>
+            </div>
+            <button onClick={onClose} aria-label="關閉" className="rounded-md p-1 hover:bg-[#efe8dd]">
+              <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
+            </button>
+          </div>
         </div>
 
         <div className="flex-1 space-y-5 overflow-y-auto overscroll-contain p-5">
-          {/* 狀態總覽 */}
-          <div className="flex flex-wrap gap-2">
-            {badge(`訂單：${ORDER_STATUS_LABEL[order.order_status ?? ''] ?? order.status}`, 'gray')}
-            {badge(`付款：${PAYMENT_STATUS_LABEL[order.payment_status ?? ''] ?? (order.paid ? '已付款' : '未付款')}`, order.paid ? 'green' : 'amber')}
-            {badge(`物流：${FULFILLMENT_STATUS_LABEL[order.fulfillment_status ?? ''] ?? '未出貨'}`, order.fulfillment_status && order.fulfillment_status !== 'UNFULFILLED' ? 'green' : 'gray')}
+          {/* 進度(含圖示) */}
+          <AdminOrderProgress order={order} createdAt={order.created_at} paidAt={paidAt} />
+
+          {/* 三套狀態卡 */}
+          <div className="grid grid-cols-3 gap-2">
+            <div className="rounded-xl border border-[#eee5da] bg-[#faf7f2] p-3">
+              <p className="text-xs text-[#a99e8f]">訂單狀態</p>
+              <p className="mt-1 text-sm font-bold">{ORDER_STATUS_LABEL[order.order_status ?? ''] ?? order.status}</p>
+              <p className="mt-1 flex items-center gap-1 text-[11px] text-[#8a7f72]"><span className="h-1.5 w-1.5 rounded-full bg-[#c9b8a8]" />{order.status === '取消' ? '已取消' : order.status === '已完成' ? '已完成' : '處理中'}</p>
+            </div>
+            <div className="rounded-xl border border-[#eee5da] bg-[#faf7f2] p-3">
+              <p className="text-xs text-[#a99e8f]">付款狀態</p>
+              <p className={`mt-1 inline-block rounded-md px-2 py-0.5 text-sm font-bold ${order.paid ? 'bg-[#e9f7ee] text-[#1f7a44]' : 'bg-[#fdf3e7] text-[#9a6a1f]'}`}>{order.paid ? '已付款' : '未付款'}</p>
+              <p className="mt-1 text-[11px] text-[#8a7f72]">{order.paid ? (paidAt ? new Date(paidAt).toLocaleString('zh-TW') : '已收款') : '尚未付款'}</p>
+            </div>
+            <div className="rounded-xl border border-[#eee5da] bg-[#faf7f2] p-3">
+              <p className="text-xs text-[#a99e8f]">物流狀態</p>
+              <p className="mt-1 text-sm font-bold">{FULFILLMENT_STATUS_LABEL[order.fulfillment_status ?? ''] ?? '未出貨'}</p>
+              <p className="mt-1 flex items-center gap-1 text-[11px] text-[#8a7f72]"><span className="h-1.5 w-1.5 rounded-full bg-[#c9b8a8]" />{hasShipment ? '已建立物流單' : '尚未建立物流單'}</p>
+            </div>
           </div>
 
-          {/* 快速操作 */}
+          {/* 操作 */}
           <div className="flex flex-wrap gap-2">
-            <button onClick={printOrder} className="rounded-full border border-[#d7c9bd] px-3 py-1.5 text-sm font-semibold text-[#6b6156] hover:bg-[#efe8dd]">列印訂單</button>
-            <button onClick={markRefund} className="rounded-full border border-[#d7c9bd] px-3 py-1.5 text-sm font-semibold text-[#6b6156] hover:bg-[#efe8dd]">標記退款</button>
+            <button onClick={printOrder} className="inline-flex h-10 items-center rounded-full bg-[#1f1b19] px-6 text-sm font-semibold text-white hover:bg-black">列印訂單</button>
+            <button onClick={markRefund} className="inline-flex h-10 items-center rounded-full border border-[#d7c9bd] px-6 text-sm font-semibold text-[#6b6156] hover:bg-[#efe8dd]">標記退款</button>
             {order.status !== '取消' && order.status !== '退貨' ? (
-              <button onClick={async () => { if (await uiConfirm('直接取消訂單?將回補庫存。', { danger: true })) onUpdate({ status: '取消' }); }} className="rounded-full border border-[#e0b4b4] px-3 py-1.5 text-sm font-semibold text-[#c0392b] hover:bg-[#fbf3f0]">取消訂單</button>
+              <button onClick={async () => { if (await uiConfirm('直接取消訂單?將回補庫存。', { danger: true })) onUpdate({ status: '取消' }); }} className="inline-flex h-10 items-center rounded-full border border-[#e0b4b4] px-6 text-sm font-semibold text-[#c0392b] hover:bg-[#fbf3f0]">取消訂單</button>
             ) : null}
           </div>
 
@@ -4073,7 +4129,15 @@ ${order.note ? `<div class="sec"><h2>備註</h2><p class="muted">${escapeHtml(or
 
           {/* 物流 */}
           <div className="rounded-xl border border-[#efe8dd] p-4">
-            <p className="mb-2 text-sm font-semibold text-[#6b6156]">物流</p>
+            <div className="mb-3 flex items-center gap-2.5">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#f3ede4] text-[#6b6156]">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 7h11v9H3zM14 10h4l3 3v3h-7z" /><circle cx="7" cy="18" r="1.5" /><circle cx="17.5" cy="18" r="1.5" /></svg>
+              </span>
+              <div>
+                <p className="text-sm font-semibold text-[#2c2826]">物流資訊</p>
+                <p className="text-xs text-[#8a7f72]">建立物流單號後,系統將自動更新物流進度</p>
+              </div>
+            </div>
             {order.store_id ? (
               <div className="mb-3 rounded-lg bg-[#faf7f2] p-3 text-xs leading-5 text-[#6b6156]">
                 <p className="font-semibold text-[#1f1b19]">取貨門市：{order.store_name || order.store_id}</p>
