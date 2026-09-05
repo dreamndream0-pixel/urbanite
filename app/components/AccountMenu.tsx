@@ -58,7 +58,10 @@ export default function AccountMenu({ nextPath = '/account' }: { nextPath?: stri
                 進入管理後台
               </Link>
             )}
-            <Link href="/account" onClick={() => setOpen(false)} className="block rounded px-3 py-2 text-sm hover:bg-[#f6f2ec]">
+            <Link href="/account?tab=profile" onClick={() => setOpen(false)} className="block rounded px-3 py-2 text-sm hover:bg-[#f6f2ec]">
+              我的帳戶
+            </Link>
+            <Link href="/account?tab=orders" onClick={() => setOpen(false)} className="block rounded px-3 py-2 text-sm hover:bg-[#f6f2ec]">
               我的訂單
             </Link>
             <button

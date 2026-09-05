@@ -83,6 +83,12 @@ export default function AccountClient({
 }) {
   const router = useRouter();
   const [tab, setTab] = useState<TabKey>('profile');
+
+  // 由網址帶入初始分頁(例:/account?tab=orders 直接開啟訂單紀錄)
+  useEffect(() => {
+    const t = new URLSearchParams(window.location.search).get('tab');
+    if (t === 'profile' || t === 'coupons' || t === 'orders' || t === 'favorites') setTab(t);
+  }, []);
   const [orderList, setOrderList] = useState<Order[]>(orders);
   const [openOrder, setOpenOrder] = useState<Order | null>(null);
   const [cancelTarget, setCancelTarget] = useState<Order | null>(null);

@@ -433,7 +433,14 @@ export default function Home() {
                       </Link>
                     )}
                     <Link
-                      href="/account"
+                      href="/account?tab=profile"
+                      onClick={() => setAccountOpen(false)}
+                      className="block rounded px-3 py-2 text-sm hover:bg-[#f6f2ec]"
+                    >
+                      我的帳戶
+                    </Link>
+                    <Link
+                      href="/account?tab=orders"
                       onClick={() => setAccountOpen(false)}
                       className="block rounded px-3 py-2 text-sm hover:bg-[#f6f2ec]"
                     >
