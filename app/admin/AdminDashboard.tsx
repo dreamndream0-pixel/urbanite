@@ -3888,6 +3888,23 @@ function AdminOrderModal({
     } finally { setBusy(false); }
   }
 
+  async function markPickup(shipmentId: string, action: 'at_store' | 'picked_up') {
+    if (busy) return;
+    if (action === 'picked_up' && !(await uiConfirm('標記為「已取貨」?\n若為門市取貨付款,將同時完成收款。'))) return;
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/orders/${order.id}/shipment`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ shipment_id: shipmentId, action }),
+      });
+      const data = await res.json();
+      if (!res.ok) { void uiAlert(data.error ?? '更新失敗'); return; }
+      onUpdate({ fulfillment_status: data.fulfillment_status, ...(data.paid ? { paid: true } : {}), ...(data.status ? { status: data.status } : {}) });
+      await loadDetail();
+    } finally { setBusy(false); }
+  }
+
   async function addEvent(shipmentId: string) {
     if (busy || (!eventForm.status && !eventForm.description)) return;
     setBusy(true);
@@ -4107,6 +4124,24 @@ ${order.note ? `<div class="sec"><h2>備註</h2><p class="muted">${escapeHtml(or
                             className="rounded-full border border-[#d7c9bd] px-3 py-1 text-xs font-semibold text-[#6b6156] disabled:opacity-50"
                           >
                             修改配送單
+                          </button>
+                        </>
+                      ) : null}
+                      {order.store_id ? (
+                        <>
+                          <button
+                            onClick={() => markPickup(s.id, 'at_store')}
+                            disabled={busy || ['AT_STORE', 'PICKED_UP'].includes(s.status)}
+                            className="rounded-full border border-[#c6b8e0] px-3 py-1 text-xs font-semibold text-[#6f5b9c] disabled:opacity-40"
+                          >
+                            標記到店(待取貨)
+                          </button>
+                          <button
+                            onClick={() => markPickup(s.id, 'picked_up')}
+                            disabled={busy || s.status === 'PICKED_UP'}
+                            className="rounded-full border border-[#a9cbb4] px-3 py-1 text-xs font-semibold text-[#2f8f5b] disabled:opacity-40"
+                          >
+                            標記已取貨
                           </button>
                         </>
                       ) : null}

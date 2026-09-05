@@ -11,6 +11,7 @@ import {
   tradeTypeFromMethod,
 } from '@/lib/newebpay-logistics';
 import { getConfiguredSiteUrl } from '@/lib/site-url';
+import { isCollectOnDelivery } from '@/lib/payment';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getAdminUser } from '@/lib/supabase/server';
 import type { Shipment } from '@/lib/types';
@@ -201,7 +202,7 @@ export async function PATCH(
   const description = String(body?.description ?? '').trim();
   const location = String(body?.location ?? '').trim();
   const action = String(body?.action ?? '').trim();
-  const apiActions = ['trace', 'query', 'modify', 'getno'];
+  const apiActions = ['trace', 'query', 'modify', 'getno', 'at_store', 'picked_up'];
   if (!shipmentId || (!status && !description && !apiActions.includes(action))) {
     return NextResponse.json({ error: '請填寫物流狀態或說明' }, { status: 400 });
   }
@@ -288,6 +289,81 @@ export async function PATCH(
       raw_response: r.data,
     });
     return NextResponse.json({ ok: true, lgs_no: lgsNo || storePrintNo, data: r.data }, { status: 200 });
+  }
+
+  // 標記到店(待取貨)/ 已取貨:超商取貨流程的到店與取件節點。
+  // 已取貨若為門市代收(取貨付款),同時完成收款(paid → PAID)。
+  if (action === 'at_store' || action === 'picked_up') {
+    const { data: order } = await supabase
+      .from('orders')
+      .select('id, total, paid, payment_status, fulfillment_status, shipping_method, payment_method')
+      .eq('id', id)
+      .maybeSingle();
+    if (!order) return NextResponse.json({ error: '找不到訂單' }, { status: 404 });
+    const nowIso = new Date().toISOString();
+    const nextFulfillment = action === 'at_store' ? 'AT_STORE' : 'PICKED_UP';
+    const desc = action === 'at_store' ? '商品已送達門市,待取貨' : '買家已取貨';
+
+    await supabase.from('shipments').update({
+      status: nextFulfillment,
+      updated_at: nowIso,
+      delivered_at: action === 'picked_up' ? nowIso : shipment.delivered_at,
+    }).eq('id', shipmentId);
+    await supabase.from('shipment_events').insert({
+      shipment_id: shipmentId,
+      status: nextFulfillment,
+      description: desc,
+      event_at: nowIso,
+    });
+
+    const orderPatch: Record<string, unknown> = { fulfillment_status: nextFulfillment };
+    // 已取貨且為門市代收 → 同時完成收款
+    const codCollected = action === 'picked_up' && isCollectOnDelivery(order.shipping_method || '', order.payment_method || '') && !order.paid;
+    if (codCollected) {
+      orderPatch.paid = true;
+      orderPatch.payment_status = 'PAID';
+      orderPatch.paid_amount = Number(order.total) || 0;
+    }
+    // 已取貨 = 超商取貨流程結束 → 訂單完成
+    if (action === 'picked_up') {
+      orderPatch.status = '已完成';
+      orderPatch.order_status = 'COMPLETED';
+    }
+    await supabase.from('orders').update(orderPatch).eq('id', id);
+    await supabase.from('order_status_history').insert({
+      order_id: id,
+      type: 'fulfillment',
+      from_status: order.fulfillment_status ?? '',
+      to_status: nextFulfillment,
+      note: desc,
+      created_by: admin.email || '後台管理員',
+    });
+    if (action === 'picked_up') {
+      await supabase.from('order_status_history').insert({
+        order_id: id,
+        type: 'order',
+        from_status: order.fulfillment_status ? 'PROCESSING' : '',
+        to_status: 'COMPLETED',
+        note: '訂單完成(已取貨)',
+        created_by: admin.email || '後台管理員',
+      });
+    }
+    if (codCollected) {
+      await supabase.from('order_status_history').insert({
+        order_id: id,
+        type: 'payment',
+        from_status: order.payment_status ?? 'UNPAID',
+        to_status: 'PAID',
+        note: '門市取貨付款,已收款',
+        created_by: admin.email || '後台管理員',
+      });
+    }
+    return NextResponse.json({
+      ok: true,
+      fulfillment_status: nextFulfillment,
+      paid: codCollected || order.paid,
+      status: action === 'picked_up' ? '已完成' : undefined,
+    }, { status: 200 });
   }
 
   // 查詢配送單(NPA-B55):取回目前配送單明細/狀態
