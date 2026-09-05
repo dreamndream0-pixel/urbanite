@@ -1,7 +1,9 @@
 import { NextResponse } from 'next/server';
 import { buildItemDesc } from '@/lib/newebpay';
 import {
+  getShipmentNoWithRetry,
   normalizeLogisticsPhone,
+  parseShipmentNo,
   requestNewebpayLogistics,
   retToFulfillmentStatus,
   shipTypeFromMethod,
@@ -77,16 +79,14 @@ export async function POST(
     }
     let shipmentNoResult: Awaited<ReturnType<typeof requestNewebpayLogistics>> | null = null;
     try {
-      shipmentNoResult = await requestNewebpayLogistics('getShipmentNo', {
-        MerchantOrderNo: [order.order_no],
-      });
+      shipmentNoResult = await getShipmentNoWithRetry(order.order_no);
     } catch {
       shipmentNoResult = null;
     }
-    const noRow = firstSuccessRow(shipmentNoResult?.data ?? null);
+    const parsed = parseShipmentNo(shipmentNoResult?.data ?? null);
     const created = createResult.data ?? {};
-    const lgsNo = String(noRow.LgsNo ?? '');
-    const storePrintNo = String(noRow.StorePrintNo ?? '');
+    const lgsNo = parsed.lgsNo;
+    const storePrintNo = parsed.storePrintNo;
     const tradeNo = String(created.TradeNo ?? '');
     const { data: shipment, error } = await supabase
       .from('shipments')
@@ -255,11 +255,14 @@ export async function PATCH(
     const { data: order } = await supabase.from('orders').select('order_no').eq('id', id).maybeSingle();
     if (!order?.order_no) return NextResponse.json({ error: '找不到訂單單號' }, { status: 404 });
     if (!shipment.lgs_type || !shipment.ship_type) return NextResponse.json({ error: '此物流單不是藍新物流單' }, { status: 400 });
-    const r = await requestNewebpayLogistics('getShipmentNo', { MerchantOrderNo: [order.order_no] });
-    if (!r.ok) return NextResponse.json({ error: r.message || '取號失敗', detail: r.raw }, { status: 400 });
-    const row = firstSuccessRow(r.data);
-    const lgsNo = String(row.LgsNo ?? '');
-    const storePrintNo = String(row.StorePrintNo ?? '');
+    const r = await getShipmentNoWithRetry(order.order_no);
+    if (!r || !r.ok) return NextResponse.json({ error: r?.status === '1109' ? '藍新查無此物流單,請改用「建立藍新物流單」重新建立' : (r?.message || '取號失敗'), detail: r?.raw }, { status: 400 });
+    const parsed = parseShipmentNo(r.data);
+    if (parsed.error && !parsed.lgsNo && !parsed.storePrintNo) {
+      return NextResponse.json({ error: `取號失敗:${parsed.error}` }, { status: 400 });
+    }
+    const lgsNo = parsed.lgsNo;
+    const storePrintNo = parsed.storePrintNo;
     const nowIso = new Date().toISOString();
     await supabase.from('shipments').update({
       tracking_number: lgsNo || storePrintNo || shipment.tracking_number || '',

@@ -117,13 +117,46 @@ export async function requestNewebpayLogistics(
   const encrypted = String(raw.EncryptData ?? raw.EncryptData_ ?? '');
   const hash = String(raw.HashData ?? raw.HashData_ ?? '');
   const dataPayload = encrypted ? decodeNewebpayLogisticsResponse({ EncryptData: encrypted, HashData: hash }) : null;
+  // 藍新物流成功外層 Status 固定為 SUCCESS;其餘(1102/1109/2100…)皆為失敗。
   return {
-    ok: res.ok && String(raw.Status ?? '').toUpperCase() !== 'ERROR',
+    ok: res.ok && String(raw.Status ?? '').toUpperCase() === 'SUCCESS',
     status: String(raw.Status ?? ''),
     message: String(raw.Message ?? ''),
     raw,
     data: dataPayload,
   };
+}
+
+// 從 getShipmentNo 回應取出寄件代碼:優先 SUCCESS[] 內的 LgsNo/StorePrintNo,
+// 若落在 ERROR[] 則回傳錯誤訊息。
+export function parseShipmentNo(payload: Record<string, unknown> | null): {
+  lgsNo: string;
+  storePrintNo: string;
+  error: string;
+} {
+  const success = payload?.SUCCESS;
+  const rows = Array.isArray(success) ? success : success && typeof success === 'object' ? [success] : [];
+  const row = (rows[0] ?? {}) as Record<string, unknown>;
+  const lgsNo = String(row.LgsNo ?? '');
+  const storePrintNo = String(row.StorePrintNo ?? '');
+  if (lgsNo || storePrintNo) return { lgsNo, storePrintNo, error: '' };
+  const errArr = payload?.ERROR;
+  const errRows = Array.isArray(errArr) ? errArr : errArr && typeof errArr === 'object' ? [errArr] : [];
+  const errRow = (errRows[0] ?? {}) as Record<string, unknown>;
+  const error = String(errRow.ErrorCode ?? errRow.Message ?? '') || (errRows.length ? '取號失敗' : '');
+  return { lgsNo, storePrintNo, error };
+}
+
+// 建單後藍新資料可能尚未同步,取號 1109 時短暫重試
+export async function getShipmentNoWithRetry(orderNo: string, tries = 3, delayMs = 1500) {
+  let last: Awaited<ReturnType<typeof requestNewebpayLogistics>> | null = null;
+  for (let i = 0; i < tries; i += 1) {
+    last = await requestNewebpayLogistics('getShipmentNo', { MerchantOrderNo: [orderNo] });
+    if (last.ok) return last;
+    if (last.status !== '1109') return last; // 非「查無物流訂單」就不重試
+    if (i < tries - 1) await new Promise((r) => setTimeout(r, delayMs));
+  }
+  return last;
 }
 
 export function isStorePickup(method = ''): boolean {
