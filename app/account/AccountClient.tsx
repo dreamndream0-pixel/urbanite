@@ -955,21 +955,8 @@ function OrderModal({
         </div>
 
         <div className="flex-1 space-y-6 overflow-y-auto overscroll-contain p-5">
-          {/* 訂單進度 */}
-          <OrderProgress order={order} />
-
-          {/* 訂單狀態更新紀錄(浮層,不推擠頁面) */}
-          <button
-            onClick={() => setHistoryOpen(true)}
-            className="flex w-full items-center justify-between rounded-xl border border-[#e5ded4] bg-white px-4 py-3 text-left text-sm font-semibold text-[#6b6156] transition hover:bg-[#faf7f2]"
-          >
-            <span className="flex items-center gap-2">
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>
-              訂單狀態更新紀錄
-              {history.length > 0 ? <span className="text-xs font-normal text-[#a99e8f]">（{history.length}）</span> : null}
-            </span>
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6" /></svg>
-          </button>
+          {/* 訂單進度(下方中央小字可展開狀態更新紀錄) */}
+          <OrderProgress order={order} onShowHistory={history.length > 0 ? () => setHistoryOpen(true) : undefined} />
 
           {/* 品項(含縮圖、原價劃線) */}
           <div className="space-y-3">
@@ -1498,11 +1485,11 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
   );
 }
 
-function OrderProgress({ order }: { order: Order }) {
+function OrderProgress({ order, onShowHistory }: { order: Order; onShowHistory?: () => void }) {
   const steps = buildProgress(order);
   const cancelled = order.status === '取消';
   return (
-    <div className="rounded-xl bg-[#faf7f2] p-4">
+    <div className="rounded-xl bg-[#faf7f2] p-4 pb-2">
       <div className="flex items-start">
         {steps.map((s, i) => {
           const active = s.done || s.current;
@@ -1528,6 +1515,17 @@ function OrderProgress({ order }: { order: Order }) {
           );
         })}
       </div>
+      {onShowHistory ? (
+        <div className="mt-2 text-center">
+          <button
+            onClick={onShowHistory}
+            className="inline-flex items-center gap-0.5 text-[11px] text-[#a99e8f] underline-offset-2 hover:text-[#6b6156] hover:underline"
+          >
+            狀態更新紀錄
+            <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6" /></svg>
+          </button>
+        </div>
+      ) : null}
     </div>
   );
 }
