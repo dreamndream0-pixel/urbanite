@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import type { Customer, Discount, Order, Product, Recipient, ReturnRequest, SiteSettings, UserCoupon } from '@/lib/types';
+import type { Customer, Discount, Order, OrderStatusHistory, Product, Recipient, ReturnRequest, SiteSettings, UserCoupon } from '@/lib/types';
 import { TW_CITIES, TW_REGIONS } from '@/lib/tw-regions';
 import { isOnlinePayment, paymentDeadline } from '@/lib/payment';
 import { OrderStatusBadge, orderNeedsAttention, AttentionDot } from '@/app/components/OrderStatusBadge';
@@ -903,7 +903,16 @@ function OrderModal({
   const [showReturn, setShowReturn] = useState(false);
   const [shipForm, setShipForm] = useState({ carrier: '', tracking: '' });
   const [shipBusy, setShipBusy] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [history, setHistory] = useState<OrderStatusHistory[]>([]);
   const hasActiveReturn = returns.some((r) => r.status !== 'REJECTED');
+
+  useEffect(() => {
+    fetch(`/api/orders/${order.id}/history`)
+      .then((res) => (res.ok ? res.json() : []))
+      .then((data: OrderStatusHistory[]) => setHistory(Array.isArray(data) ? data : []))
+      .catch(() => {});
+  }, [order.id]);
 
   const loadReturns = useCallback(() => {
     fetch(`/api/orders/${order.id}/returns`)
@@ -948,6 +957,19 @@ function OrderModal({
         <div className="flex-1 space-y-6 overflow-y-auto overscroll-contain p-5">
           {/* 訂單進度 */}
           <OrderProgress order={order} />
+
+          {/* 訂單狀態更新紀錄(浮層,不推擠頁面) */}
+          <button
+            onClick={() => setHistoryOpen(true)}
+            className="flex w-full items-center justify-between rounded-xl border border-[#e5ded4] bg-white px-4 py-3 text-left text-sm font-semibold text-[#6b6156] transition hover:bg-[#faf7f2]"
+          >
+            <span className="flex items-center gap-2">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>
+              訂單狀態更新紀錄
+              {history.length > 0 ? <span className="text-xs font-normal text-[#a99e8f]">（{history.length}）</span> : null}
+            </span>
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6" /></svg>
+          </button>
 
           {/* 品項(含縮圖、原價劃線) */}
           <div className="space-y-3">
@@ -1011,33 +1033,33 @@ function OrderModal({
             </p>
           ) : null}
           <div className="flex flex-wrap gap-2">
-            <button
-              onClick={onReorder}
-              className="inline-flex items-center gap-1.5 rounded-full bg-[#ada265] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#9a9059]"
-            >
-              <IconCart /> 再次加入購物車
-            </button>
             {canPayNow(order) ? (
               isOnlinePayment(order.payment_method ?? '') ? (
                 <a
                   href={`/api/payment/newebpay/checkout?order=${encodeURIComponent(order.order_no)}`}
-                  className="inline-flex items-center rounded-full border border-[#d7c9bd] px-4 py-2 text-sm font-semibold text-[#6b6156] hover:bg-[#efe8dd]"
+                  className="inline-flex h-9 items-center rounded-full bg-[#ada265] px-4 text-sm font-semibold text-white transition hover:bg-[#9a9059]"
                 >
                   立即付款
                 </a>
               ) : (
                 <button
                   onClick={() => onPay(order)}
-                  className="inline-flex items-center rounded-full border border-[#d7c9bd] px-4 py-2 text-sm font-semibold text-[#6b6156] hover:bg-[#efe8dd]"
+                  className="inline-flex h-9 items-center rounded-full bg-[#ada265] px-4 text-sm font-semibold text-white transition hover:bg-[#9a9059]"
                 >
                   立即付款 / 回報匯款
                 </button>
               )
             ) : null}
+            <button
+              onClick={onReorder}
+              className="inline-flex h-9 items-center gap-1.5 rounded-full border border-[#d7c9bd] px-4 text-sm font-semibold text-[#6b6156] transition hover:bg-[#efe8dd]"
+            >
+              <IconCart /> 再次加入購物車
+            </button>
             {canRequestCancel(order) ? (
               <button
                 onClick={() => onCancel(order)}
-                className="inline-flex items-center rounded-full border border-[#d7c9bd] px-4 py-2 text-sm font-semibold text-[#6b6156] hover:bg-[#efe8dd]"
+                className="inline-flex h-9 items-center rounded-full border border-[#d7c9bd] px-4 text-sm font-semibold text-[#6b6156] transition hover:bg-[#efe8dd]"
               >
                 申請取消
               </button>
@@ -1045,7 +1067,7 @@ function OrderModal({
             {canRequestReturn(order) && !hasActiveReturn ? (
               <button
                 onClick={() => setShowReturn(true)}
-                className="inline-flex items-center rounded-full border border-[#d7c9bd] px-4 py-2 text-sm font-semibold text-[#6b6156] hover:bg-[#efe8dd]"
+                className="inline-flex h-9 items-center rounded-full border border-[#d7c9bd] px-4 text-sm font-semibold text-[#6b6156] transition hover:bg-[#efe8dd]"
               >
                 申請退貨
               </button>
@@ -1153,6 +1175,48 @@ function OrderModal({
             void uiAlert('已送出退貨申請，賣家將盡快為你處理。');
           }}
         />
+      ) : null}
+
+      {/* 訂單狀態更新紀錄(浮層,最上層,不推擠頁面) */}
+      {historyOpen ? (
+        <div
+          className="fixed inset-0 z-[70] flex items-end justify-center bg-black/40 sm:items-center sm:p-4"
+          onClick={() => setHistoryOpen(false)}
+        >
+          <div
+            className="flex max-h-[80dvh] w-full max-w-md flex-col overflow-hidden rounded-t-2xl bg-white sm:rounded-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex shrink-0 items-center justify-between border-b border-[#e5ded4] px-5 py-4">
+              <h3 className="text-base font-semibold">訂單狀態更新紀錄</h3>
+              <button onClick={() => setHistoryOpen(false)} aria-label="關閉" className="rounded-md p-1 hover:bg-[#efe8dd]">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto overscroll-contain p-5">
+              {history.length === 0 ? (
+                <p className="py-8 text-center text-sm text-[#8a7f72]">目前沒有狀態更新紀錄。</p>
+              ) : (
+                <ol className="relative space-y-4 border-l border-[#e5ded4] pl-5">
+                  {history.map((h) => {
+                    const tone = h.type === 'payment' ? '#2b5fa5' : h.type === 'fulfillment' ? '#1f7a44' : '#ada265';
+                    const typeLabel = h.type === 'payment' ? '付款' : h.type === 'fulfillment' ? '物流' : '訂單';
+                    return (
+                      <li key={h.id} className="relative">
+                        <span className="absolute -left-[26px] top-1 h-3 w-3 rounded-full ring-2 ring-white" style={{ background: tone }} />
+                        <div className="flex items-center gap-2">
+                          <span className="rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ background: `${tone}1a`, color: tone }}>{typeLabel}</span>
+                          <span className="text-sm font-medium text-[#2c2826]">{h.note || h.to_status || '狀態更新'}</span>
+                        </div>
+                        <p className="mt-0.5 text-xs text-[#8a7f72]">{new Date(h.created_at).toLocaleString('zh-TW')}</p>
+                      </li>
+                    );
+                  })}
+                </ol>
+              )}
+            </div>
+          </div>
+        </div>
       ) : null}
     </div>
   );
