@@ -67,8 +67,8 @@ function CompleteInner() {
             </>
           ) : paid ? (
             <>
-              <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-[#e9f7ee] text-2xl">
-                ✓
+              <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-[#e9f7ee] text-[#1f7a44]">
+                <svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M5 13l4 4L19 7" /></svg>
               </div>
               <p className="text-lg font-semibold text-[#1f7a44]">付款成功,訂單成立!</p>
               {orderNo && <p className="mt-2 text-[#6b6156]">單號:{orderNo}</p>}
@@ -76,8 +76,8 @@ function CompleteInner() {
             </>
           ) : failed ? (
             <>
-              <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-[#fdecec] text-2xl">
-                ✕
+              <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-[#fdecec] text-[#c0392b]">
+                <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
               </div>
               <p className="text-lg font-semibold text-[#c0392b]">付款未完成</p>
               {orderNo && <p className="mt-2 text-[#6b6156]">單號:{orderNo}</p>}

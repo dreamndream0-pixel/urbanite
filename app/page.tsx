@@ -615,7 +615,7 @@ export default function Home() {
           cartToast ? 'translate-y-0 opacity-100' : '-translate-y-2 opacity-0'
         }`}
       >
-        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#1f7a44] text-xs">✓</span>
+        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#1f7a44] text-white"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M5 13l4 4L19 7" /></svg></span>
         已加入購物車
       </div>
     </main>

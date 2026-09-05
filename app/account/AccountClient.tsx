@@ -1002,22 +1002,22 @@ function OrderModal({
           <div className="flex flex-wrap gap-2">
             <button
               onClick={onReorder}
-              className="flex-1 rounded-full bg-[#ada265] px-5 py-3 font-semibold text-white transition hover:bg-[#9a9059]"
+              className="inline-flex items-center gap-1.5 rounded-full bg-[#ada265] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#9a9059]"
             >
-              🛒 再次加入購物車
+              <IconCart /> 再次加入購物車
             </button>
             {canPayNow(order) ? (
               isOnlinePayment(order.payment_method ?? '') ? (
                 <a
                   href={`/api/payment/newebpay/checkout?order=${encodeURIComponent(order.order_no)}`}
-                  className="rounded-full border border-[#d7c9bd] px-5 py-3 text-center font-semibold text-[#6b6156] hover:bg-[#efe8dd]"
+                  className="inline-flex items-center rounded-full border border-[#d7c9bd] px-4 py-2 text-sm font-semibold text-[#6b6156] hover:bg-[#efe8dd]"
                 >
                   立即付款
                 </a>
               ) : (
                 <button
                   onClick={() => onPay(order)}
-                  className="rounded-full border border-[#d7c9bd] px-5 py-3 font-semibold text-[#6b6156] hover:bg-[#efe8dd]"
+                  className="inline-flex items-center rounded-full border border-[#d7c9bd] px-4 py-2 text-sm font-semibold text-[#6b6156] hover:bg-[#efe8dd]"
                 >
                   立即付款 / 回報匯款
                 </button>
@@ -1026,7 +1026,7 @@ function OrderModal({
             {canRequestCancel(order) ? (
               <button
                 onClick={() => onCancel(order)}
-                className="rounded-full border border-[#d7c9bd] px-5 py-3 font-semibold text-[#6b6156] hover:bg-[#efe8dd]"
+                className="inline-flex items-center rounded-full border border-[#d7c9bd] px-4 py-2 text-sm font-semibold text-[#6b6156] hover:bg-[#efe8dd]"
               >
                 申請取消
               </button>
@@ -1034,7 +1034,7 @@ function OrderModal({
             {canRequestReturn(order) && !hasActiveReturn ? (
               <button
                 onClick={() => setShowReturn(true)}
-                className="rounded-full border border-[#d7c9bd] px-5 py-3 font-semibold text-[#6b6156] hover:bg-[#efe8dd]"
+                className="inline-flex items-center rounded-full border border-[#d7c9bd] px-4 py-2 text-sm font-semibold text-[#6b6156] hover:bg-[#efe8dd]"
               >
                 申請退貨
               </button>
@@ -1437,10 +1437,12 @@ function OrderProgress({ order }: { order: Order }) {
               <div className="flex w-full items-center">
                 <div className={`h-0.5 flex-1 ${i === 0 ? 'opacity-0' : ''}`} style={{ background: active ? color : '#e5ded4' }} />
                 <div
-                  className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold text-white"
+                  className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-white"
                   style={{ background: color }}
                 >
-                  {s.done ? '✓' : ''}
+                  {s.done ? (
+                    <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 13l4 4L19 7" /></svg>
+                  ) : null}
                 </div>
                 <div className={`h-0.5 flex-1 ${i === steps.length - 1 ? 'opacity-0' : ''}`} style={{ background: steps[i + 1]?.done || steps[i + 1]?.current ? color : '#e5ded4' }} />
               </div>
@@ -1452,6 +1454,15 @@ function OrderProgress({ order }: { order: Order }) {
         })}
       </div>
     </div>
+  );
+}
+
+function IconCart() {
+  return (
+    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="9" cy="20" r="1.4" /><circle cx="18" cy="20" r="1.4" />
+      <path d="M2.5 3h2l2.2 11.2a1.5 1.5 0 0 0 1.5 1.2h8.3a1.5 1.5 0 0 0 1.5-1.2L21 7H5.2" />
+    </svg>
   );
 }
 

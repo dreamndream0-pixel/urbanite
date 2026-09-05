@@ -73,7 +73,7 @@ export function buildProgress(order: {
   // 訂單成立後直接「待出貨」;最後一節為「已取貨/送達(付款)」。
   const flags = cod
     ? [true, true, shipped, inTransit, completed]
-    : [true, order.paid, shipped, inTransit, completed];
+    : [true, order.paid, order.paid || shipped, shipped, inTransit, completed];
   const labels = cod
     ? [
         { key: 'created', label: '訂單成立' },
@@ -85,6 +85,7 @@ export function buildProgress(order: {
     : [
         { key: 'created', label: '訂單成立' },
         { key: 'paid', label: order.paid ? '已付款' : '尚未付款' },
+        { key: 'confirmed', label: '待出貨' },
         { key: 'shipped', label: '商品出貨' },
         { key: 'transit', label: isPickup ? '待取貨' : '配送中' },
         { key: 'done', label: isPickup ? '已取貨完成' : '訂單完成' },
