@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { decodeNewebpayLogisticsResponse, retToFulfillmentStatus } from '@/lib/newebpay-logistics';
+import { finalizePickedUp } from '@/lib/pickup-complete';
 
 export async function POST(request: Request) {
   try {
@@ -10,7 +11,9 @@ export async function POST(request: Request) {
     if (!orderNo) return new NextResponse('0|Missing MerchantOrderNo', { status: 400 });
 
     const supabase = createAdminClient();
-    const { data: order } = await supabase.from('orders').select('id, fulfillment_status').eq('order_no', orderNo).maybeSingle();
+    const { data: order } = await supabase.from('orders')
+      .select('id, total, paid, payment_status, fulfillment_status, shipping_method, payment_method')
+      .eq('order_no', orderNo).maybeSingle();
     if (!order) return new NextResponse('0|Order not found', { status: 404 });
 
     const { data: shipment } = await supabase
@@ -46,15 +49,20 @@ export async function POST(request: Request) {
       delivered_at: nextStatus === 'DELIVERED' ? new Date().toISOString() : undefined,
       raw_response: payload,
     }).eq('id', shipment.id);
-    await supabase.from('orders').update({ fulfillment_status: nextStatus }).eq('id', order.id);
-    await supabase.from('order_status_history').insert({
-      order_id: order.id,
-      type: 'fulfillment',
-      from_status: order.fulfillment_status ?? '',
-      to_status: nextStatus,
-      note: description,
-      created_by: 'NewebPay Logistics',
-    });
+    if (nextStatus === 'PICKED_UP') {
+      // 買家取貨完成(代碼 6):完成訂單,門市代收同時收款
+      await finalizePickedUp(supabase, order, 'NewebPay Logistics');
+    } else {
+      await supabase.from('orders').update({ fulfillment_status: nextStatus }).eq('id', order.id);
+      await supabase.from('order_status_history').insert({
+        order_id: order.id,
+        type: 'fulfillment',
+        from_status: order.fulfillment_status ?? '',
+        to_status: nextStatus,
+        note: description,
+        created_by: 'NewebPay Logistics',
+      });
+    }
 
     return new NextResponse('1|OK');
   } catch (error) {

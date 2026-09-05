@@ -1,5 +1,6 @@
 // 訂單三套狀態(訂單 / 付款 / 物流)的定義、中文標籤與換算。
 // 後台仍以中文 status 作為主要操作,英文狀態由此檔集中換算與同步。
+import { isCollectOnDelivery } from '@/lib/payment';
 
 export type OrderStatus =
   | 'PENDING' | 'CONFIRMED' | 'PROCESSING' | 'COMPLETED' | 'CANCELLED' | 'CLOSED';
@@ -56,23 +57,38 @@ export function buildProgress(order: {
   paid: boolean;
   fulfillment_status?: string;
   shipping_method?: string;
+  payment_method?: string;
   created_at?: string;
 }): ProgressStep[] {
   const cancelled = order.status === '取消';
   const f = order.fulfillment_status ?? '';
-  const isPickup = /超商|取貨|7-?11|7-ELEVEN|全家|family|萊爾富|hi-?life|ok/i.test(order.shipping_method ?? '');
+  const sm = order.shipping_method ?? '';
+  const isPickup = /超商|取貨|7-?11|7-ELEVEN|全家|family|萊爾富|hi-?life|ok/i.test(sm);
+  const cod = isCollectOnDelivery(sm, order.payment_method ?? '');
   const shipped = ['SHIPPED', 'IN_TRANSIT', 'AT_STORE', 'PICKED_UP', 'DELIVERED'].includes(f) || order.status === '已出貨' || order.status === '已完成';
   const inTransit = ['IN_TRANSIT', 'AT_STORE', 'PICKED_UP', 'DELIVERED'].includes(f) || order.status === '已完成';
   const completed = order.status === '已完成' || f === 'DELIVERED' || f === 'PICKED_UP';
 
-  const flags = [true, order.paid, shipped, inTransit, completed];
-  const labels = [
-    { key: 'created', label: '訂單成立' },
-    { key: 'paid', label: '付款完成' },
-    { key: 'shipped', label: '商品出貨' },
-    { key: 'transit', label: isPickup ? '待取貨' : '配送中' },
-    { key: 'done', label: isPickup ? '已取貨完成' : '訂單完成' },
-  ];
+  // 取貨付款/貨到付款:錢在取貨/到貨時才付,進度不放「付款完成」,
+  // 訂單成立後直接「待出貨」;最後一節為「已取貨/送達(付款)」。
+  const flags = cod
+    ? [true, true, shipped, inTransit, completed]
+    : [true, order.paid, shipped, inTransit, completed];
+  const labels = cod
+    ? [
+        { key: 'created', label: '訂單成立' },
+        { key: 'confirmed', label: '待出貨' },
+        { key: 'shipped', label: '商品出貨' },
+        { key: 'transit', label: isPickup ? '待取貨' : '配送中' },
+        { key: 'done', label: isPickup ? '已取貨完成' : '已送達' },
+      ]
+    : [
+        { key: 'created', label: '訂單成立' },
+        { key: 'paid', label: '付款完成' },
+        { key: 'shipped', label: '商品出貨' },
+        { key: 'transit', label: isPickup ? '待取貨' : '配送中' },
+        { key: 'done', label: isPickup ? '已取貨完成' : '訂單完成' },
+      ];
   if (cancelled) {
     return [
       { key: 'created', label: '訂單成立', done: true, current: false },

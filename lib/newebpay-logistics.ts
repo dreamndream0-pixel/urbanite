@@ -195,22 +195,37 @@ export function normalizeLogisticsPhone(phone = ''): string {
   return digits.slice(0, 10);
 }
 
+// 依藍新官方貨態代碼表(RetId → RetString)對應到本站物流狀態。
+// 官方代碼表(超商 C2C):
+//   0_1 訂單未處理 / 0_2 物流單號已過期 / 0_3 取消出貨 / 1 訂單處理中 → 待出貨(尚未進物流)
+//   2 超商已收件 / 3 已重選門市待重新出貨 / 4 進物流中心驗收完成 / 11 取貨門市關店待重選 → 運送中
+//   5 商品送達取貨門市 → 待取貨
+//   6 買家取貨完成 → 已取貨(超商)/ 已送達(宅配)
+//   -1 已退回廠商 / -7 判賠 / -10、-11、15 銷毀拋棄 → 已退回(終結)
+//   其餘負數與 10/12/13/14/16(退回途中、待確認匯款…) → 退貨處理中
 export function retToFulfillmentStatus(
   retId: unknown,
   opts: { description?: string; isPickup?: boolean } = {},
 ): string {
-  const id = String(retId ?? '');
+  const id = String(retId ?? '').trim();
+  if (id) {
+    if (id.startsWith('0') || id === '1') return 'READY_TO_SHIP';   // 待處理 / 處理中
+    if (['2', '3', '4', '11'].includes(id)) return 'IN_TRANSIT';    // 運送中
+    if (id === '5') return 'AT_STORE';                              // 送達取貨門市 → 待取貨
+    if (id === '6') return opts.isPickup ? 'PICKED_UP' : 'DELIVERED'; // 取貨完成
+    if (['-1', '-7', '-10', '-11', '15'].includes(id)) return 'RETURNED'; // 退回廠商/判賠/銷毀
+    if (id.startsWith('-') || ['10', '12', '13', '14', '16'].includes(id)) return 'RETURNING';
+  }
+  // 代碼缺失時以描述文字輔助判斷
   const text = String(opts.description ?? '');
-  // 藍新各超商的數字貨態代碼不一致,超商取貨優先用「貨態描述」判斷到店/退回(較穩定)。
-  const returnedText = /退回|退貨|逾期(未取|退)|未取.*退|退件/.test(text);
-  const arrivedAtStore = !returnedText && (
+  const returnedText = /退回|退貨|逾期(未取|退)|未取.*退|退件|銷毀|判賠/.test(text);
+  const pickedUpText = /取貨完成|取件完成|已取貨/.test(text);
+  const arrivedAtStore = !returnedText && !pickedUpText && (
     /到店|到門市|貨到門市|可取(件|貨)|待取貨?|取件通知/.test(text)
     || (/門市/.test(text) && /(到達|送達|配達|抵達|到店|可取|取件|待取)/.test(text))
   );
+  if (opts.isPickup && pickedUpText) return 'PICKED_UP';
   if (opts.isPickup && arrivedAtStore) return 'AT_STORE';
   if (returnedText) return 'RETURNING';
-  if (id === '6') return 'DELIVERED';
-  if (['2', '3', '4', '5'].includes(id)) return 'IN_TRANSIT';
-  if (id.startsWith('-') || ['10', '12', '13', '14', '15', '16'].includes(id)) return 'RETURNING';
   return 'READY_TO_SHIP';
 }

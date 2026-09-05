@@ -11,7 +11,7 @@ import {
   tradeTypeFromMethod,
 } from '@/lib/newebpay-logistics';
 import { getConfiguredSiteUrl } from '@/lib/site-url';
-import { isCollectOnDelivery } from '@/lib/payment';
+import { finalizePickedUp } from '@/lib/pickup-complete';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getAdminUser } from '@/lib/supabase/server';
 import type { Shipment } from '@/lib/types';
@@ -218,7 +218,9 @@ export async function PATCH(
   if (!shipment) return NextResponse.json({ error: '找不到物流資料' }, { status: 404 });
 
   if (action === 'trace') {
-    const { data: order } = await supabase.from('orders').select('id, order_no, fulfillment_status').eq('id', id).maybeSingle();
+    const { data: order } = await supabase.from('orders')
+      .select('id, order_no, total, paid, payment_status, fulfillment_status, shipping_method, payment_method')
+      .eq('id', id).maybeSingle();
     if (!order?.order_no) return NextResponse.json({ error: '找不到訂單單號' }, { status: 404 });
     if (!shipment.lgs_type || !shipment.ship_type) return NextResponse.json({ error: '此物流單不是藍新物流單' }, { status: 400 });
     const trace = await requestNewebpayLogistics('trace', { MerchantOrderNo: order.order_no });
@@ -254,15 +256,20 @@ export async function PATCH(
       delivered_at: nextStatus === 'DELIVERED' ? new Date().toISOString() : shipment.delivered_at,
       raw_response: trace.data,
     }).eq('id', shipmentId);
-    await supabase.from('orders').update({ fulfillment_status: nextStatus }).eq('id', id);
-    await supabase.from('order_status_history').insert({
-      order_id: id,
-      type: 'fulfillment',
-      from_status: order.fulfillment_status ?? '',
-      to_status: nextStatus,
-      note: eventDescription,
-      created_by: admin.email || '後台管理員',
-    });
+    if (nextStatus === 'PICKED_UP') {
+      // 買家取貨完成(代碼 6):完成訂單,門市代收同時收款
+      await finalizePickedUp(supabase, order, 'NewebPay Logistics');
+    } else {
+      await supabase.from('orders').update({ fulfillment_status: nextStatus }).eq('id', id);
+      await supabase.from('order_status_history').insert({
+        order_id: id,
+        type: 'fulfillment',
+        from_status: order.fulfillment_status ?? '',
+        to_status: nextStatus,
+        note: eventDescription,
+        created_by: admin.email || '後台管理員',
+      });
+    }
     return NextResponse.json(event, { status: 201 });
   }
 
@@ -321,54 +328,16 @@ export async function PATCH(
       event_at: nowIso,
     });
 
-    const orderPatch: Record<string, unknown> = { fulfillment_status: nextFulfillment };
-    // 已取貨且為門市代收 → 同時完成收款
-    const codCollected = action === 'picked_up' && isCollectOnDelivery(order.shipping_method || '', order.payment_method || '') && !order.paid;
-    if (codCollected) {
-      orderPatch.paid = true;
-      orderPatch.payment_status = 'PAID';
-      orderPatch.paid_amount = Number(order.total) || 0;
-    }
-    // 已取貨 = 超商取貨流程結束 → 訂單完成
     if (action === 'picked_up') {
-      orderPatch.status = '已完成';
-      orderPatch.order_status = 'COMPLETED';
+      const { cod } = await finalizePickedUp(supabase, order, admin.email || '後台管理員');
+      return NextResponse.json({ ok: true, fulfillment_status: 'PICKED_UP', paid: cod || order.paid, status: '已完成' }, { status: 200 });
     }
-    await supabase.from('orders').update(orderPatch).eq('id', id);
+    // 到店待取:僅更新物流狀態
+    await supabase.from('orders').update({ fulfillment_status: 'AT_STORE' }).eq('id', id);
     await supabase.from('order_status_history').insert({
-      order_id: id,
-      type: 'fulfillment',
-      from_status: order.fulfillment_status ?? '',
-      to_status: nextFulfillment,
-      note: desc,
-      created_by: admin.email || '後台管理員',
+      order_id: id, type: 'fulfillment', from_status: order.fulfillment_status ?? '', to_status: 'AT_STORE', note: desc, created_by: admin.email || '後台管理員',
     });
-    if (action === 'picked_up') {
-      await supabase.from('order_status_history').insert({
-        order_id: id,
-        type: 'order',
-        from_status: order.fulfillment_status ? 'PROCESSING' : '',
-        to_status: 'COMPLETED',
-        note: '訂單完成(已取貨)',
-        created_by: admin.email || '後台管理員',
-      });
-    }
-    if (codCollected) {
-      await supabase.from('order_status_history').insert({
-        order_id: id,
-        type: 'payment',
-        from_status: order.payment_status ?? 'UNPAID',
-        to_status: 'PAID',
-        note: '門市取貨付款,已收款',
-        created_by: admin.email || '後台管理員',
-      });
-    }
-    return NextResponse.json({
-      ok: true,
-      fulfillment_status: nextFulfillment,
-      paid: codCollected || order.paid,
-      status: action === 'picked_up' ? '已完成' : undefined,
-    }, { status: 200 });
+    return NextResponse.json({ ok: true, fulfillment_status: 'AT_STORE', paid: order.paid }, { status: 200 });
   }
 
   // 查詢配送單(NPA-B55):取回目前配送單明細/狀態
