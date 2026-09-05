@@ -4,6 +4,7 @@ import { getAdminUser, getSessionUser } from '@/lib/supabase/server';
 import { evaluateCoupon } from '@/lib/discount';
 import { isStorePickup, shipTypeFromMethod } from '@/lib/newebpay-logistics';
 import { deriveStatuses } from '@/lib/order-status';
+import { initialOrderStatus } from '@/lib/payment';
 import { computeShipping, resolveMethodFee } from '@/lib/shipping';
 import type { Discount, Order, OrderItem, Product } from '@/lib/types';
 
@@ -205,6 +206,8 @@ export async function POST(request: Request) {
   }
 
   const total = Math.max(0, subtotal + shipping - discount);
+  // 需線上付款 → 尚未付款;門市代收/貨到付款 → 待出貨
+  const initialStatus = initialOrderStatus(shippingMethod, paymentMethod);
 
   // 訂單編號:UR + 台灣日期(YYYYMMDD) + 當日流水號(4 碼),例如 UR202608290001
   const tw = new Date(Date.now() + 8 * 3600 * 1000);
@@ -248,10 +251,10 @@ export async function POST(request: Request) {
       paid_amount: 0,
       refund_amount: 0,
       net_amount: total,
-      status: '待出貨',
+      status: initialStatus,
       paid: false,
       stock_committed: true,
-      ...deriveStatuses('待出貨', false),
+      ...deriveStatuses(initialStatus, false),
       user_id: user?.id ?? null,
     })
     .select()
@@ -275,8 +278,8 @@ export async function POST(request: Request) {
       order_id: order.id,
       type: 'order',
       from_status: '',
-      to_status: 'PENDING',
-      note: '訂單成立',
+      to_status: deriveStatuses(initialStatus, false).order_status,
+      note: initialStatus === '尚未付款' ? '訂單成立,待付款' : '訂單成立',
       created_by: 'SYSTEM',
     });
   } catch {
