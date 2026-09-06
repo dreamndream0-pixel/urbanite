@@ -2208,7 +2208,7 @@ export default function AdminDashboard({
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <p className="text-[10px] font-semibold tracking-[0.25em] text-[#b3a897]">MARKETING / OVERVIEW</p>
-                  <h2 className="font-serif-tc mt-1 text-[26px] font-bold leading-tight">促銷管理</h2>
+                  <h2 className="font-serif-tc mt-1 text-[40px] font-bold leading-tight">促銷管理</h2>
                   <p className="mt-1 text-sm text-[#8a7f72]">掌握優惠成效，管理每一次回購。</p>
                 </div>
                 <div className="flex items-center gap-2">
@@ -2226,17 +2226,17 @@ export default function AdminDashboard({
               {/* 營收卡 */}
               <div className="rounded-2xl bg-[#414a33] p-5 text-white sm:p-6">
                 <p className="text-sm text-white/70">優惠券帶來營收</p>
-                <p className="font-serif-tc mt-1 text-[34px] font-semibold leading-none">{formatter.format(couponStats.revenue)}</p>
+                <p className="font-serif-tc mt-1 text-[48px] font-semibold leading-none">{formatter.format(couponStats.revenue)}</p>
                 <div className="my-4 h-px bg-white/20" />
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <p className="text-xs text-white/70">優惠券折抵</p>
-                    <p className="mt-1 text-xl font-bold leading-none">{formatter.format(couponStats.discountTotal)}</p>
+                    <p className="mt-1 text-[26px] font-bold leading-none">{formatter.format(couponStats.discountTotal)}</p>
                   </div>
                   <div className="border-l border-white/20 pl-4">
                     <p className="text-xs text-white/70">使用率</p>
                     <div className="mt-1 flex items-center gap-3">
-                      <p className="text-xl font-bold leading-none">{couponStats.usageRate}%</p>
+                      <p className="text-[26px] font-bold leading-none">{couponStats.usageRate}%</p>
                       <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/20">
                         <span className="block h-full rounded-full bg-[#cddba9]" style={{ width: `${Math.min(100, couponStats.usageRate)}%` }} />
                       </span>
@@ -2250,7 +2250,7 @@ export default function AdminDashboard({
                 {([['本月發放', couponStats.monthIssued], ['已領取', couponStats.claimed], ['已使用', couponStats.used]] as const).map(([label, n], i) => (
                   <div key={label} className={i > 0 ? 'border-l border-[#efe8dd] px-4 text-center' : 'px-4 text-center'}>
                     <p className="text-xs text-[#8a7f72]">{label}</p>
-                    <p className="mt-1 text-xl font-bold leading-none">{n} 張</p>
+                    <p className="mt-1 text-[26px] font-bold leading-none">{n} 張</p>
                   </div>
                 ))}
               </div>
@@ -2259,7 +2259,7 @@ export default function AdminDashboard({
               <div>
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div className="flex items-center gap-2.5">
-                    <h3 className="font-serif-tc text-xl font-bold">優惠券管理</h3>
+                    <h3 className="font-serif-tc text-[26px] font-bold">優惠券管理</h3>
                     <span className="rounded-full bg-[#eee7db] px-2.5 py-1 text-xs font-semibold text-[#8a7f72]">{String(discounts.length).padStart(2, '0')}</span>
                   </div>
                   <button
@@ -2367,11 +2367,11 @@ export default function AdminDashboard({
                             </div>
                             <div className="shrink-0 rounded-xl bg-[#eef1e6] px-4 py-3 text-center text-[#414a33]">
                               {d.type === 'free_shipping' ? (
-                                <p className="font-serif-tc text-xl font-semibold">免運</p>
+                                <p className="font-serif-tc text-2xl font-semibold">免運</p>
                               ) : d.type === 'percent' ? (
-                                <p className="font-serif-tc text-2xl font-semibold leading-none">{d.value}%<span className="ml-1 text-xs font-sans">OFF</span></p>
+                                <p className="font-serif-tc text-[32px] font-semibold leading-none">{d.value}%<span className="ml-1 text-xs font-sans">OFF</span></p>
                               ) : (
-                                <p className="font-serif-tc text-2xl font-semibold leading-none"><span className="mr-1 text-xs font-sans">NT$</span>{d.value}<span className="ml-1 text-xs font-sans">OFF</span></p>
+                                <p className="font-serif-tc text-[32px] font-semibold leading-none"><span className="mr-1 text-xs font-sans">NT$</span>{d.value}<span className="ml-1 text-xs font-sans">OFF</span></p>
                               )}
                             </div>
                           </div>
