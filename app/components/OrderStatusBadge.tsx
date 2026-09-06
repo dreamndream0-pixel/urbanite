@@ -1,4 +1,5 @@
 import type { Order } from '@/lib/types';
+import { isCollectOnDelivery } from '@/lib/payment';
 
 type Tone = 'amber' | 'green' | 'blue' | 'red' | 'grey';
 type IconName = 'clock' | 'truck' | 'store' | 'check' | 'x' | 'undo' | 'box';
@@ -41,14 +42,62 @@ function Icon({ name }: { name: IconName }) {
   }
 }
 
+function Pill({ label, tone, icon, className = '' }: { label: string; tone: Tone; icon: IconName; className?: string }) {
+  return (
+    <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-semibold ${TONE[tone]} ${className}`}>
+      <Icon name={icon} />
+      {label}
+    </span>
+  );
+}
+
 // 狀態徽章(圖示 + 顏色)
 export function OrderStatusBadge({ order, className = '' }: { order: Pick<Order, 'status' | 'fulfillment_status' | 'paid'>; className?: string }) {
   const s = orderDisplayStatus(order);
+  return <Pill label={s.label} tone={s.tone} icon={s.icon} className={className} />;
+}
+
+// 卡片用的徽章組合:一個付款徽章(待付款/已付款)+ 一個物流徽章(取貨/配送方式)。
+// 取貨付款單:待付款 → 已付款;超商取貨付款 → 已取貨。避免「尚未付款 + 未付款」重複。
+export function OrderCardBadges({ order, className = '' }: {
+  order: Pick<Order, 'status' | 'fulfillment_status' | 'paid' | 'shipping_method' | 'payment_method' | 'cancel_status' | 'payment_ref' | 'payment_proof_url' | 'payment_proof_note'>;
+  className?: string;
+}) {
+  const f = order.fulfillment_status ?? '';
+  const sm = order.shipping_method ?? '';
+  const cod = isCollectOnDelivery(sm, order.payment_method ?? '');
+  const isStore = /超商|取貨|7-?11|全家|萊爾富|ok/i.test(sm);
+  const isHome = /宅配/.test(sm);
+  const cancelled = order.status === '取消';
+
+  // 物流 / 取貨徽章
+  let fb: { label: string; tone: Tone; icon: IconName };
+  if (cancelled) fb = { label: '已取消', tone: 'red', icon: 'x' };
+  else if (f === 'RETURNED') fb = { label: '已退貨', tone: 'red', icon: 'undo' };
+  else if (f === 'RETURNING' || order.status === '退貨') fb = { label: '退貨中', tone: 'red', icon: 'undo' };
+  else if (f === 'PICKED_UP') fb = { label: '已取貨', tone: 'green', icon: 'store' };
+  else if (f === 'DELIVERED') fb = { label: '已送達', tone: 'green', icon: 'truck' };
+  else if (f === 'IN_TRANSIT') fb = { label: '配送中', tone: 'blue', icon: 'truck' };
+  else if (f === 'AT_STORE') fb = { label: '待取貨', tone: 'blue', icon: 'store' };
+  else if (f === 'SHIPPED' || order.status === '已出貨') fb = { label: '已出貨', tone: 'blue', icon: 'truck' };
+  else {
+    const label = isHome ? (cod ? '宅配貨到付款' : '宅配')
+      : isStore ? (cod ? '超商取貨付款' : '超商取貨')
+      : (sm || '—');
+    fb = { label, tone: 'grey', icon: isStore ? 'store' : 'truck' };
+  }
+
   return (
-    <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-semibold ${TONE[s.tone]} ${className}`}>
-      <Icon name={s.icon} />
-      {s.label}
-    </span>
+    <div className={`flex flex-wrap items-center gap-2 ${className}`}>
+      {!cancelled ? (
+        order.paid
+          ? <Pill label="已付款" tone="green" icon="check" className="!text-xs" />
+          : <Pill label="待付款" tone="amber" icon="clock" className="!text-xs" />
+      ) : null}
+      {isPaymentReported(order) ? <Pill label="通知已付款" tone="blue" icon="clock" className="!text-xs" /> : null}
+      {order.cancel_status === 'REQUESTED' ? <Pill label="取消審核中" tone="red" icon="clock" className="!text-xs" /> : null}
+      <Pill label={fb.label} tone={fb.tone} icon={fb.icon} className="!text-xs" />
+    </div>
   );
 }
 

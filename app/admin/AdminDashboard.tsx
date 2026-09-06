@@ -28,7 +28,7 @@ import {
   buildProgress,
 } from '@/lib/order-status';
 import { uiAlert, uiConfirm, uiPrompt } from '@/lib/ui-dialog';
-import { OrderStatusBadge, orderNeedsAttention, AttentionDot, isPaymentReported } from '@/app/components/OrderStatusBadge';
+import { OrderCardBadges, orderNeedsAttention, AttentionDot, isPaymentReported } from '@/app/components/OrderStatusBadge';
 
 const formatter = new Intl.NumberFormat('zh-TW', {
   style: 'currency',
@@ -1543,9 +1543,6 @@ export default function AdminDashboard({
                   <div className="space-y-4">
                     {shown.map((order) => {
                       const dateShort = order.created_at ? new Date(order.created_at).toLocaleString('zh-TW', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : '';
-                      const shipShort = /宅配/.test(order.shipping_method ?? '') ? '宅配'
-                        : /超商|取貨|7-?11|全家|萊爾富|ok/i.test(order.shipping_method ?? '') ? '超商取貨'
-                        : (order.shipping_method || '—');
                       return (
                         <div key={order.id} className="rounded-2xl border border-[#eee5da] bg-white p-4 shadow-sm sm:p-5">
                           {/* 標題列 */}
@@ -1563,25 +1560,9 @@ export default function AdminDashboard({
                             </span>
                           </button>
 
-                          {/* 狀態 + 顧客 */}
-                          <div className="mt-3 flex flex-wrap items-start justify-between gap-3">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <OrderStatusBadge order={order} className="!text-xs" />
-                              <span className={`rounded-full px-3 py-1 text-xs font-semibold ${order.paid ? 'bg-[#e9f7ee] text-[#1f7a44]' : 'bg-[#fdf3e7] text-[#9a6a1f]'}`}>{order.paid ? '已付款' : '未付款'}</span>
-                              <span className="inline-flex items-center gap-1 rounded-full bg-[#f3ede4] px-3 py-1 text-xs font-semibold text-[#6b6156]">
-                                <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 7h11v9H3zM14 10h4l3 3v3h-7z" /><circle cx="7" cy="18" r="1.4" /><circle cx="17.5" cy="18" r="1.4" /></svg>
-                                {shipShort}
-                              </span>
-                              {isPaymentReported(order) ? (
-                                <span className="inline-flex items-center gap-1 rounded-full bg-[#eaf1fb] px-3 py-1 text-xs font-semibold text-[#2b5fa5]">
-                                  <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.7 21a2 2 0 0 1-3.4 0" /></svg>
-                                  通知已付款
-                                </span>
-                              ) : null}
-                              {order.cancel_status === 'REQUESTED' ? (
-                                <span className="rounded-full bg-[#fbe9e7] px-3 py-1 text-xs font-semibold text-[#c0392b]">取消審核中</span>
-                              ) : null}
-                            </div>
+                          {/* 狀態徽章 */}
+                          <div className="mt-3">
+                            <OrderCardBadges order={order} />
                           </div>
 
                           {/* 商品列 */}
