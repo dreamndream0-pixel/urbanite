@@ -106,6 +106,7 @@ export default function AccountClient({
   const [paymentAccounts, setPaymentAccounts] = useState<{ name: string; info: string }[]>([]);
   const [logoUrl, setLogoUrl] = useState('');
   const [returnInfo, setReturnInfo] = useState('');
+  const [couponHero, setCouponHero] = useState('');
   const [toast, setToast] = useState('');
   const [cartCount, setCartCount] = useState(0);
 
@@ -123,6 +124,7 @@ export default function AccountClient({
       .then((data: SiteSettings | null) => {
         setPaymentAccounts(data?.payment_accounts ?? []);
         setReturnInfo(data?.return_info ?? '');
+        setCouponHero(data?.coupon_hero_image ?? '');
         if (data?.logo_url) setLogoUrl(data.logo_url);
       })
       .catch(() => {});
@@ -274,7 +276,7 @@ export default function AccountClient({
           />
         )}
 
-        {tab === 'coupons' && <CouponsTab coupons={coupons} />}
+        {tab === 'coupons' && <CouponsTab coupons={coupons} heroImage={couponHero} />}
 
         {tab === 'orders' && (
           <OrdersTab
@@ -606,7 +608,7 @@ function ToggleRow({ label, checked, onChange }: { label: string; checked: boole
 }
 
 /* ---------- 優惠券及購物金 ---------- */
-function CouponsTab({ coupons }: { coupons: Discount[] }) {
+function CouponsTab({ coupons, heroImage = '' }: { coupons: Discount[]; heroImage?: string }) {
   const [owned, setOwned] = useState<UserCoupon[]>([]);
   const [claimable, setClaimable] = useState<Discount[]>(coupons);
   const [ready, setReady] = useState(true);
@@ -652,8 +654,11 @@ function CouponsTab({ coupons }: { coupons: Discount[] }) {
     <div className="space-y-9">
       {/* HERO:全出血標題 + 購物金卡 */}
       <section className="relative -mx-4 -mt-8 overflow-hidden bg-[#e9dfd0] sm:-mx-6">
-        <div className="pointer-events-none absolute inset-y-0 right-0 w-[52%] bg-[#e4d9c8]">
-          <p className="font-script absolute right-6 top-8 text-right text-[34px] leading-[1.15] text-[#b0a08a] sm:text-[42px]">
+        <div
+          className="pointer-events-none absolute inset-y-0 right-0 w-[52%] bg-[#e4d9c8] bg-cover bg-center"
+          style={heroImage ? { backgroundImage: `url("${heroImage}")` } : undefined}
+        >
+          <p className={`font-script absolute right-6 top-8 text-right text-[34px] leading-[1.15] sm:text-[42px] ${heroImage ? 'text-white/90 drop-shadow' : 'text-[#b0a08a]'}`}>
             Good<br />Outfit<br />Brighter<br />Days.
           </p>
         </div>

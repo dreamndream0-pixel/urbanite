@@ -437,6 +437,8 @@ export default function AdminDashboard({
   const [newCat, setNewCat] = useState({ slug: '', name: '', en: '', parent_id: '' });
   const [newDiscount, setNewDiscount] = useState<DiscountDraft>(blankDiscountDraft());
   const [couponImgBusy, setCouponImgBusy] = useState(false);
+  const [editingCouponId, setEditingCouponId] = useState<string | null>(null);
+  const [couponMenuId, setCouponMenuId] = useState<string | null>(null);
   const [couponModalOpen, setCouponModalOpen] = useState(false);
   const [discountQuery, setDiscountQuery] = useState('');
   const [discountStatus, setDiscountStatus] = useState('全部');
@@ -444,6 +446,8 @@ export default function AdminDashboard({
   const [couponUsages] = useState<CouponUsage[]>(initialCouponUsages);
   const [manualCouponByUser, setManualCouponByUser] = useState<Record<string, string>>({});
   const [logoUrl, setLogoUrl] = useState(initialLogoUrl);
+  const [couponHero, setCouponHero] = useState(initialSettings?.coupon_hero_image ?? '');
+  const [heroBusy, setHeroBusy] = useState(false);
   const [footerDraft, setFooterDraft] = useState({
     sections: JSON.stringify(initialSettings?.footer_sections ?? [], null, 2),
     about: (initialSettings?.footer_about_links ?? [
@@ -1046,26 +1050,54 @@ export default function AdminDashboard({
     } finally { setCouponImgBusy(false); }
   }
 
+  // 開啟「編輯優惠券」:把既有券填回表單(含券樣式圖)
+  function openEditCoupon(d: Discount) {
+    setEditingCouponId(d.id);
+    setNewDiscount({
+      name: d.name ?? '',
+      code: d.code,
+      type: (d.type === 'amount' || d.type === 'free_shipping' ? d.type : 'percent') as DiscountDraft['type'],
+      value: d.value ?? 0,
+      min_spend: d.min_spend ?? 0,
+      max_discount: d.max_discount ?? 0,
+      start_at: d.start_at ? String(d.start_at).slice(0, 16) : '',
+      end_at: d.end_at ? String(d.end_at).slice(0, 16) : '',
+      total_limit: d.total_limit ?? 0,
+      per_user_limit: d.per_user_limit ?? 1,
+      applicable_products: (d.applicable_products ?? []).join('\n'),
+      applicable_categories: (d.applicable_categories ?? []).join('\n'),
+      applicable_users: (d.applicable_users === 'new' || d.applicable_users === 'vip' ? d.applicable_users : 'all') as DiscountDraft['applicable_users'],
+      is_first_purchase_only: Boolean(d.is_first_purchase_only),
+      stackable: Boolean(d.stackable),
+      status: (d.status ?? (d.active ? '啟用' : '停用')) as DiscountDraft['status'],
+      image: d.image ?? 'preset-1',
+    });
+    setCouponModalOpen(true);
+  }
+
   async function addDiscount() {
     const code = newDiscount.code.trim().toUpperCase();
     if (!code) return void uiAlert('請填寫折扣碼');
-    const res = await fetch('/api/discounts', {
-      method: 'POST',
+    const payload = {
+      ...newDiscount,
+      code,
+      applicable_products: splitLines(newDiscount.applicable_products),
+      applicable_categories: splitLines(newDiscount.applicable_categories),
+      active: newDiscount.status === '啟用',
+    };
+    const editing = editingCouponId;
+    const res = await fetch(editing ? `/api/discounts/${editing}` : '/api/discounts', {
+      method: editing ? 'PATCH' : 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        ...newDiscount,
-        code,
-        applicable_products: splitLines(newDiscount.applicable_products),
-        applicable_categories: splitLines(newDiscount.applicable_categories),
-        active: newDiscount.status === '啟用',
-      }),
+      body: JSON.stringify(payload),
     });
     const data = await res.json();
     if (res.ok) {
-      setDiscounts((l) => [data as Discount, ...l]);
+      setDiscounts((l) => (editing ? l.map((x) => (x.id === editing ? (data as Discount) : x)) : [data as Discount, ...l]));
       setNewDiscount(blankDiscountDraft());
+      setEditingCouponId(null);
       setCouponModalOpen(false);
-    } else void uiAlert(data.error ?? '新增失敗(折扣碼可能重複)');
+    } else void uiAlert(data.error ?? (editing ? '更新失敗' : '新增失敗(折扣碼可能重複)'));
   }
 
   async function toggleDiscount(id: string, active: boolean) {
@@ -1162,6 +1194,40 @@ export default function AdminDashboard({
     const data = await res.json().catch(() => null);
     if (!res.ok) return void uiAlert(data?.error ?? '撤回失敗');
     setUserCoupons((list) => list.map((item) => (item.id === id ? (data as UserCoupon) : item)));
+  }
+
+  // 優惠券頁 hero 背景圖:上傳後存進 site_settings.coupon_hero_image
+  async function uploadCouponHero(file: File) {
+    setHeroBusy(true);
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      fd.append('folder', 'coupons');
+      fd.append('productId', 'hero');
+      const up = await fetch('/api/products/image', { method: 'POST', body: fd });
+      const data = await up.json().catch(() => null);
+      if (!up.ok || !data?.url) return void uiAlert(data?.error ?? '上傳失敗');
+      const res = await fetch('/api/settings', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ coupon_hero_image: data.url }),
+      });
+      if (!res.ok) return void uiAlert((await res.json()).error ?? '儲存失敗');
+      setCouponHero(data.url);
+    } finally { setHeroBusy(false); }
+  }
+
+  async function clearCouponHero() {
+    setHeroBusy(true);
+    try {
+      const res = await fetch('/api/settings', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ coupon_hero_image: '' }),
+      });
+      if (!res.ok) return void uiAlert((await res.json()).error ?? '移除失敗');
+      setCouponHero('');
+    } finally { setHeroBusy(false); }
   }
 
   async function uploadLogo(file: File) {
@@ -2138,125 +2204,212 @@ export default function AdminDashboard({
           {/* ===== 促銷管理 ===== */}
           {section === 'promotions' && (
             <div className="space-y-6">
-              <div className="grid grid-cols-2 gap-4 lg:grid-cols-6">
-                <StatCard label="本月發放" value={`${couponStats.monthIssued} 張`} />
-                <StatCard label="已領取" value={`${couponStats.claimed} 張`} />
-                <StatCard label="已使用" value={`${couponStats.used} 張`} />
-                <StatCard label="使用率" value={`${couponStats.usageRate}%`} />
-                <StatCard label="優惠券折抵" value={formatter.format(couponStats.discountTotal)} />
-                <StatCard label="帶來營收" value={formatter.format(couponStats.revenue)} />
-              </div>
-              <Card
-                title="優惠券管理"
-                action={
-                  <button
-                    onClick={() => setCouponModalOpen(true)}
-                    className="rounded-full bg-[#1f1b19] px-4 py-2 text-sm font-semibold text-white hover:bg-black"
-                  >
-                    ＋ 新增優惠券
-                  </button>
-                }
-              >
-                <div className="mb-4 flex flex-wrap gap-2">
-                  <input
-                    value={discountQuery}
-                    onChange={(e) => setDiscountQuery(e.target.value)}
-                    placeholder="搜尋優惠碼 / 名稱"
-                    className="min-w-56 rounded-lg border border-[#e5ded4] px-3 py-2 text-sm"
-                  />
-                  <select
-                    value={discountStatus}
-                    onChange={(e) => setDiscountStatus(e.target.value)}
-                    className="rounded-lg border border-[#e5ded4] px-3 py-2 text-sm"
-                  >
-                    {['全部', '草稿', '啟用', '停用', '已結束'].map((status) => (
-                      <option key={status}>{status}</option>
-                    ))}
-                  </select>
-                  <button
-                    type="button"
-                    onClick={exportDiscounts}
-                    className="rounded-full border border-[#d7c9bd] px-4 py-2 text-sm font-semibold"
-                  >
+              {/* 標題 */}
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p className="text-[11px] font-semibold tracking-[0.3em] text-[#b3a897]">MARKETING / OVERVIEW</p>
+                  <h2 className="font-serif-tc mt-1 text-[32px] font-bold leading-tight">促銷管理</h2>
+                  <p className="mt-1 text-sm text-[#8a7f72]">掌握優惠成效，管理每一次回購。</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="inline-flex h-10 items-center gap-2 rounded-full border border-[#ded5c8] px-4 text-sm font-semibold text-[#6b6156]">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M3 10h18M8 3v4M16 3v4" /></svg>
+                    本月
+                  </span>
+                  <button onClick={exportDiscounts} className="inline-flex h-10 items-center gap-2 rounded-full border border-[#ded5c8] px-4 text-sm font-semibold text-[#6b6156] hover:bg-[#efe8dd]">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 16V4M8 8l4-4 4 4M5 20h14" /></svg>
                     匯出
                   </button>
                 </div>
+              </div>
+
+              {/* 營收卡 */}
+              <div className="rounded-2xl bg-[#414a33] p-6 text-white sm:p-7">
+                <p className="text-sm text-white/70">優惠券帶來營收</p>
+                <p className="font-serif-tc mt-1 text-[40px] font-semibold leading-none">{formatter.format(couponStats.revenue)}</p>
+                <div className="my-5 h-px bg-white/20" />
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-xs text-white/70">優惠券折抵</p>
+                    <p className="mt-1 text-2xl font-bold">{formatter.format(couponStats.discountTotal)}</p>
+                  </div>
+                  <div className="border-l border-white/20 pl-4">
+                    <p className="text-xs text-white/70">使用率</p>
+                    <div className="mt-1 flex items-center gap-3">
+                      <p className="text-2xl font-bold">{couponStats.usageRate}%</p>
+                      <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/20">
+                        <span className="block h-full rounded-full bg-[#cddba9]" style={{ width: `${Math.min(100, couponStats.usageRate)}%` }} />
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* 三欄統計 */}
+              <div className="grid grid-cols-3 rounded-2xl bg-white py-5">
+                {([['本月發放', couponStats.monthIssued], ['已領取', couponStats.claimed], ['已使用', couponStats.used]] as const).map(([label, n], i) => (
+                  <div key={label} className={i > 0 ? 'border-l border-[#efe8dd] px-4 text-center' : 'px-4 text-center'}>
+                    <p className="text-sm text-[#8a7f72]">{label}</p>
+                    <p className="mt-1 text-2xl font-bold">{n} 張</p>
+                  </div>
+                ))}
+              </div>
+
+              {/* 優惠券管理 */}
+              <div>
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <h3 className="font-serif-tc text-2xl font-bold">優惠券管理</h3>
+                    <span className="rounded-full bg-[#eee7db] px-3 py-1 text-xs font-semibold text-[#8a7f72]">{String(discounts.length).padStart(2, '0')}</span>
+                  </div>
+                  <button
+                    onClick={() => { setEditingCouponId(null); setNewDiscount(blankDiscountDraft()); setCouponModalOpen(true); }}
+                    className="inline-flex h-11 items-center gap-2 rounded-full bg-[#414a33] px-6 text-sm font-semibold text-white hover:bg-[#39412c]"
+                  >
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
+                    新增優惠券
+                  </button>
+                </div>
+
+                {/* 搜尋 */}
+                <div className="mt-4 flex items-center gap-2">
+                  <div className="relative flex-1">
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#a99e8f" strokeWidth="1.9" strokeLinecap="round" className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="M20 20l-3.5-3.5" /></svg>
+                    <input
+                      value={discountQuery}
+                      onChange={(e) => setDiscountQuery(e.target.value)}
+                      placeholder="搜尋優惠碼或名稱"
+                      className="h-12 w-full rounded-full border border-[#e5ded4] bg-white pl-11 pr-4 text-sm"
+                    />
+                  </div>
+                  <select
+                    value={discountStatus}
+                    onChange={(e) => setDiscountStatus(e.target.value)}
+                    aria-label="狀態篩選"
+                    className="h-12 rounded-full border border-[#e5ded4] bg-white px-4 text-sm"
+                  >
+                    {['全部', '草稿', '啟用', '停用', '已結束'].map((status) => <option key={status}>{status}</option>)}
+                  </select>
+                </div>
+
+                {/* 狀態分頁 */}
+                <div className="mt-4 -mx-1 overflow-x-auto overflow-y-hidden border-b border-[#e5ded4] px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                  <div className="flex min-w-max gap-7">
+                    {([['全部', '全部'], ['啟用', '啟用中'], ['草稿', '草稿'], ['停用', '已停用']] as const).map(([value, label]) => {
+                      const n = value === '全部'
+                        ? discounts.length
+                        : discounts.filter((x) => (x.status ?? (x.active ? '啟用' : '停用')) === value).length;
+                      const active = discountStatus === value;
+                      return (
+                        <button
+                          key={value}
+                          onClick={() => setDiscountStatus(value)}
+                          className={`-mb-px shrink-0 border-b-2 pb-2.5 pt-1 text-sm font-semibold transition ${active ? 'border-[#414a33] text-[#2c2826]' : 'border-transparent text-[#8a7f72]'}`}
+                        >
+                          {label} <span className={active ? 'text-[#414a33]' : 'text-[#a99e8f]'}>{n}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* 優惠券卡片 */}
                 {filteredDiscounts.length === 0 ? (
-                  <Empty>沒有符合條件的優惠券。</Empty>
+                  <div className="mt-5"><Empty>沒有符合條件的優惠券。</Empty></div>
                 ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="border-b border-[#e5ded4] text-left text-[#8a7f72]">
-                          <th className="py-2 pr-3">優惠碼</th>
-                          <th className="py-2 pr-3">內容</th>
-                          <th className="py-2 pr-3">期間</th>
-                          <th className="py-2 pr-3">限制</th>
-                          <th className="py-2 pr-3">已領 / 已用</th>
-                          <th className="py-2 pr-3">折抵 / 營收</th>
-                          <th className="py-2">操作</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {filteredDiscounts.map((d) => {
-                          const usage = couponUsages.filter((item) => item.coupon_id === d.id);
-                          const claimed = userCoupons.filter((item) => item.coupon_id === d.id).length;
-                          const status = d.status ?? (d.active ? '啟用' : '停用');
-                          return (
-                            <tr key={d.id} className="border-b border-[#efe8dd] align-top">
-                              <td className="py-3 pr-3">
-                                <p className="font-mono font-bold text-[#2b8bd8]">{d.code}</p>
-                                <p className="text-xs text-[#8a7f72]">{status}</p>
-                              </td>
-                              <td className="py-3 pr-3">
-                                <p className="font-semibold">{d.name || couponText(d)}</p>
-                                <p className="text-xs text-[#6b6156]">
-                                  {couponText(d)}
-                                  {d.min_spend ? ` / 滿 ${formatter.format(d.min_spend)}` : ''}
-                                  {d.max_discount ? ` / 最高 ${formatter.format(d.max_discount)}` : ''}
-                                </p>
-                              </td>
-                              <td className="py-3 pr-3 text-xs text-[#6b6156]">
-                                <p>{d.start_at ? new Date(d.start_at).toLocaleDateString('zh-TW') : '不限開始'}</p>
-                                <p>{d.end_at ? new Date(d.end_at).toLocaleDateString('zh-TW') : '不限結束'}</p>
-                              </td>
-                              <td className="py-3 pr-3 text-xs text-[#6b6156]">
-                                <p>總上限 {d.total_limit ?? '不限'} / 每會員 {d.per_user_limit ?? 1}</p>
-                                <p>{d.applicable_users === 'new' || d.is_first_purchase_only ? '新會員首購' : d.applicable_users === 'vip' ? 'VIP' : '全部會員'}</p>
-                                <p>{d.stackable ? '可併用' : '單張使用'}</p>
-                              </td>
-                              <td className="py-3 pr-3">{claimed} / {usage.length}</td>
-                              <td className="py-3 pr-3 text-xs">
-                                <p>{formatter.format(usage.reduce((sum, item) => sum + item.discount_amount, 0))}</p>
-                                <p className="text-[#8a7f72]">{formatter.format(usage.reduce((sum, item) => sum + item.final_amount, 0))}</p>
-                              </td>
-                              <td className="py-3">
-                                <div className="flex flex-wrap gap-2">
-                                  <button onClick={() => toggleDiscount(d.id, !d.active)} className="rounded-full border border-[#d7c9bd] px-3 py-1 text-xs font-semibold">
-                                    {d.active ? '暫停' : '啟用'}
-                                  </button>
-                                  <button onClick={() => copyDiscount(d)} className="rounded-full border border-[#d7c9bd] px-3 py-1 text-xs font-semibold">
-                                    複製
-                                  </button>
-                                  <button onClick={() => deleteDiscount(d.id)} className="rounded-full border border-[#e0b4b4] px-3 py-1 text-xs font-semibold text-[#c0392b]">
-                                    刪除
-                                  </button>
-                                </div>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
+                  <div className="mt-5 space-y-4">
+                    {filteredDiscounts.map((d) => {
+                      const usage = couponUsages.filter((item) => item.coupon_id === d.id);
+                      const claimed = userCoupons.filter((item) => item.coupon_id === d.id).length;
+                      const status = d.status ?? (d.active ? '啟用' : '停用');
+                      const statusTone = status === '啟用' ? 'bg-[#e6ecdb] text-[#414a33]'
+                        : status === '停用' ? 'bg-[#fbe9e7] text-[#c0392b]'
+                        : 'bg-[#efe9e0] text-[#8a7f72]';
+                      const statusLabel = status === '啟用' ? '啟用中' : status === '停用' ? '已停用' : status;
+                      return (
+                        <div key={d.id} className="rounded-2xl bg-white p-5">
+                          <div className="flex items-start justify-between gap-3">
+                            <span className={`rounded-full px-3 py-1 text-xs font-semibold ${statusTone}`}>{statusLabel}</span>
+                            <div className="relative">
+                              <button onClick={() => setCouponMenuId(couponMenuId === d.id ? null : d.id)} aria-label="更多操作" className="rounded-full p-1.5 text-[#8a7f72] hover:bg-[#f3ede4]">
+                                <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.7" /><circle cx="12" cy="12" r="1.7" /><circle cx="19" cy="12" r="1.7" /></svg>
+                              </button>
+                              {couponMenuId === d.id ? (
+                                <>
+                                  <button aria-hidden tabIndex={-1} onClick={() => setCouponMenuId(null)} className="fixed inset-0 z-40 cursor-default" />
+                                  <div className="absolute right-0 top-full z-50 mt-1 w-32 overflow-hidden rounded-lg border border-[#e5ded4] bg-white shadow-lg">
+                                    <button onClick={() => { setCouponMenuId(null); copyDiscount(d); }} className="block w-full px-4 py-2.5 text-left text-sm hover:bg-[#f6f2ec]">複製</button>
+                                    <button onClick={() => { setCouponMenuId(null); deleteDiscount(d.id); }} className="block w-full px-4 py-2.5 text-left text-sm text-[#c0392b] hover:bg-[#fbf3f0]">刪除</button>
+                                  </div>
+                                </>
+                              ) : null}
+                            </div>
+                          </div>
+
+                          <div className="mt-2 flex items-start justify-between gap-4">
+                            <div className="min-w-0">
+                              <p className="text-lg font-bold">{d.name || couponText(d)}</p>
+                              <span className="mt-2 inline-flex items-center gap-2 rounded-lg bg-[#f4f0e8] px-3 py-1.5">
+                                <span className="font-mono text-sm">{d.code}</span>
+                                <button
+                                  onClick={() => { navigator.clipboard?.writeText(d.code); }}
+                                  aria-label="複製優惠碼"
+                                  className="text-[#a99e8f] hover:text-[#6b6156]"
+                                >
+                                  <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2" /><path d="M5 15V5a2 2 0 0 1 2-2h10" /></svg>
+                                </button>
+                              </span>
+                              <p className="mt-2 text-sm text-[#8a7f72]">
+                                {d.min_spend ? `滿 ${formatter.format(d.min_spend)}，` : ''}
+                                {d.type === 'free_shipping' ? '免運' : d.type === 'percent' ? `${d.value}% 折扣` : `折抵 ${formatter.format(d.value)}`}
+                                {d.max_discount ? `，最高折抵 ${formatter.format(d.max_discount)}` : ''}
+                              </p>
+                            </div>
+                            <div className="shrink-0 rounded-xl bg-[#eef1e6] px-5 py-4 text-center text-[#414a33]">
+                              {d.type === 'free_shipping' ? (
+                                <p className="font-serif-tc text-2xl font-semibold">免運</p>
+                              ) : d.type === 'percent' ? (
+                                <p className="font-serif-tc text-[28px] font-semibold leading-none">{d.value}%<span className="ml-1 text-sm font-sans">OFF</span></p>
+                              ) : (
+                                <p className="font-serif-tc text-[28px] font-semibold leading-none"><span className="mr-1 text-sm font-sans">NT$</span>{d.value}<span className="ml-1 text-sm font-sans">OFF</span></p>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="mt-4 flex flex-wrap items-center justify-between gap-4 border-t border-[#f0ebe2] pt-4">
+                            <div className="space-y-1.5 text-sm text-[#6b6156]">
+                              <p className="flex items-center gap-2">
+                                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="#a99e8f" strokeWidth="1.7" aria-hidden="true"><circle cx="12" cy="8" r="4" /><path d="M4 21c0-4 3.5-6 8-6s8 2 8 6" strokeLinecap="round" /></svg>
+                                {d.applicable_users === 'new' || d.is_first_purchase_only ? '新會員首購' : d.applicable_users === 'vip' ? 'VIP 會員' : '全部會員'}・每人限用 {d.per_user_limit ?? 1} 次
+                              </p>
+                              <p className="flex items-center gap-2">
+                                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="#a99e8f" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 3l9 4-9 4-9-4 9-4zM3 12l9 4 9-4M3 17l9 4 9-4" /></svg>
+                                {d.total_limit ? `發放上限 ${d.total_limit.toLocaleString()} 張` : '發放數量不限'}・{d.end_at ? `到 ${new Date(d.end_at).toLocaleDateString('zh-TW')}` : '無期限'}
+                              </p>
+                            </div>
+                            <div className="text-sm text-[#6b6156]">
+                              <p>已領取 {claimed}</p>
+                              <p>已使用 {usage.length}</p>
+                            </div>
+                            <div className="flex gap-2">
+                              <button onClick={() => openEditCoupon(d)} className="inline-flex h-10 items-center rounded-full border border-[#ded5c8] px-6 text-sm font-semibold text-[#6b6156] hover:bg-[#efe8dd]">編輯</button>
+                              <button onClick={() => toggleDiscount(d.id, !d.active)} className="inline-flex h-10 items-center rounded-full bg-[#414a33] px-6 text-sm font-semibold text-white hover:bg-[#39412c]">
+                                {d.active ? '暫停' : '啟用'}
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
-              </Card>
+              </div>
               {couponModalOpen && (
-              <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4" onClick={() => setCouponModalOpen(false)}>
+              <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4" onClick={() => { setCouponModalOpen(false); setEditingCouponId(null); }}>
               <div className="flex max-h-[92dvh] w-full max-w-3xl flex-col overflow-hidden rounded-t-2xl bg-white sm:rounded-2xl" onClick={(e) => e.stopPropagation()}>
                 <div className="flex shrink-0 items-center justify-between border-b border-[#e5ded4] px-5 py-4">
-                  <h2 className="text-lg font-semibold">新增優惠券</h2>
-                  <button onClick={() => setCouponModalOpen(false)} aria-label="關閉" className="rounded-md p-1 text-2xl leading-none hover:bg-[#efe8dd]">×</button>
+                  <h2 className="text-lg font-semibold">{editingCouponId ? '編輯優惠券' : '新增優惠券'}</h2>
+                  <button onClick={() => { setCouponModalOpen(false); setEditingCouponId(null); }} aria-label="關閉" className="rounded-md p-1 text-2xl leading-none hover:bg-[#efe8dd]">×</button>
                 </div>
                 <div className="flex-1 overflow-y-auto overscroll-contain p-5">
                 <div className="grid gap-4 md:grid-cols-3">
@@ -2324,8 +2477,8 @@ export default function AdminDashboard({
                 </div>
                 </div>
                 <div className="flex shrink-0 justify-end gap-2 border-t border-[#e5ded4] px-5 py-4">
-                  <button onClick={() => setCouponModalOpen(false)} className="rounded-full border border-[#d7c9bd] px-5 py-2.5 text-sm font-semibold text-[#6b6156] hover:bg-[#efe8dd]">取消</button>
-                  <button onClick={() => { addDiscount(); }} className="rounded-full bg-[#1f1b19] px-5 py-2.5 text-sm font-semibold text-white">新增優惠券</button>
+                  <button onClick={() => { setCouponModalOpen(false); setEditingCouponId(null); }} className="rounded-full border border-[#d7c9bd] px-5 py-2.5 text-sm font-semibold text-[#6b6156] hover:bg-[#efe8dd]">取消</button>
+                  <button onClick={() => { addDiscount(); }} className="rounded-full bg-[#414a33] px-5 py-2.5 text-sm font-semibold text-white">{editingCouponId ? '儲存變更' : '新增優惠券'}</button>
                 </div>
               </div>
               </div>
@@ -2539,6 +2692,37 @@ export default function AdminDashboard({
                     </label>
                     <p className="mt-2 max-w-xs text-xs text-[#8a7f72]">
                       PNG / JPG / WEBP / SVG,建議寬版、透明背景,小於 3MB。上傳後首頁與後台 Logo 都會更新。
+                    </p>
+                  </div>
+                </div>
+              </Card>
+              )}
+
+              {settingsTab === 'general' && (
+              <Card title="優惠券頁形象圖">
+                <div className="flex flex-wrap items-center gap-5">
+                  <div className="flex h-20 w-40 items-center justify-center overflow-hidden rounded-lg border border-[#e5ded4] bg-[#e4d9c8] bg-cover bg-center"
+                       style={couponHero ? { backgroundImage: `url("${couponHero}")` } : undefined}>
+                    {couponHero ? null : <span className="text-sm text-[#8a7f72]">尚未設定</span>}
+                  </div>
+                  <div>
+                    <div className="flex flex-wrap gap-2">
+                      <label className={`inline-block cursor-pointer rounded-full bg-[#1f1b19] px-4 py-2 text-sm font-semibold text-white ${heroBusy ? 'opacity-50' : ''}`}>
+                        {heroBusy ? '處理中…' : '上傳形象圖'}
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          disabled={heroBusy}
+                          onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadCouponHero(f); e.target.value = ''; }}
+                        />
+                      </label>
+                      {couponHero ? (
+                        <button onClick={clearCouponHero} disabled={heroBusy} className="rounded-full border border-[#e0b4b4] px-4 py-2 text-sm font-semibold text-[#c0392b] disabled:opacity-50">移除</button>
+                      ) : null}
+                    </div>
+                    <p className="mt-2 max-w-xs text-xs text-[#8a7f72]">
+                      顯示在會員「優惠券及購物金」頁最上方的右側背景。建議直式或方形的情境照(布料、吊牌、衣架等)。
                     </p>
                   </div>
                 </div>

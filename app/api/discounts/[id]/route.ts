@@ -22,6 +22,7 @@ export async function PATCH(
 
   const update: Record<string, unknown> = {};
   if (typeof body.name === 'string') update.name = body.name.trim();
+  if (typeof body.image === 'string') update.image = body.image || null;
   if (typeof body.code === 'string') update.code = body.code.trim().toUpperCase();
   if (typeof body.value === 'number') update.value = body.value;
   if (typeof body.min_spend === 'number') update.min_spend = body.min_spend;

@@ -74,6 +74,8 @@ export type SiteSettings = {
   shipping_fees?: { name: string; fee: number }[];
   // 退貨收件資訊(賣家退貨寄回地址/聯絡方式,顯示給買家)
   return_info?: string;
+  // 會員「優惠券及購物金」頁 hero 右側背景圖
+  coupon_hero_image?: string;
   updated_at?: string;
 };
 
