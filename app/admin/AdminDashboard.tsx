@@ -1469,26 +1469,27 @@ export default function AdminDashboard({
 
           {/* ===== 訂單管理 ===== */}
           {section === 'orders' && (
-            <section className="rounded-xl border border-[#e5ded4] bg-white p-5">
-              {/* 搜尋 + 篩選 */}
-              <div className="mb-3 flex flex-wrap gap-2">
-                <input
-                  value={orderSearch}
-                  onChange={(e) => setOrderSearch(e.target.value)}
-                  placeholder="搜尋:單號 / 姓名 / Email / 手機 / 商品 / SKU"
-                  className="min-w-[200px] flex-1 rounded-lg border border-[#d7c9bd] px-3 py-2 text-sm"
-                />
-                <select
-                  value={orderPaidFilter}
-                  onChange={(e) => setOrderPaidFilter(e.target.value as '全部' | '已付款' | '未付款')}
-                  className="rounded-lg border border-[#d7c9bd] bg-white px-3 py-2 text-sm"
-                >
-                  <option value="全部">付款:全部</option>
-                  <option value="已付款">已付款</option>
-                  <option value="未付款">未付款</option>
-                </select>
-              </div>
+           <div className="space-y-4">
+            {/* 搜尋 + 篩選(獨立在最上方) */}
+            <div className="flex flex-wrap gap-2">
+              <input
+                value={orderSearch}
+                onChange={(e) => setOrderSearch(e.target.value)}
+                placeholder="搜尋:單號 / 姓名 / Email / 手機 / 商品 / SKU"
+                className="min-w-[200px] flex-1 rounded-lg border border-[#d7c9bd] bg-white px-3 py-2.5 text-sm"
+              />
+              <select
+                value={orderPaidFilter}
+                onChange={(e) => setOrderPaidFilter(e.target.value as '全部' | '已付款' | '未付款')}
+                className="rounded-lg border border-[#d7c9bd] bg-white px-3 py-2.5 text-sm"
+              >
+                <option value="全部">付款:全部</option>
+                <option value="已付款">已付款</option>
+                <option value="未付款">未付款</option>
+              </select>
+            </div>
 
+            <section className="rounded-xl border border-[#e5ded4] bg-white p-5">
               {/* 狀態分類(底線式,可左右滑動) */}
               <div className="mb-4 -mx-4 overflow-x-auto overflow-y-hidden border-b border-[#e5ded4] px-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                 <div className="flex min-w-max gap-6">
@@ -1604,6 +1605,7 @@ export default function AdminDashboard({
                 );
               })()}
             </section>
+           </div>
           )}
 
           {/* ===== 商品及分類 ===== */}
