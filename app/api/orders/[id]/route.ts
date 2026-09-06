@@ -73,12 +73,17 @@ export async function PATCH(
     .maybeSingle();
   if (!current) return NextResponse.json({ error: '找不到訂單' }, { status: 404 });
 
-  const nextStatus = typeof body.status === 'string' ? body.status : current.status;
   const nextPaid = typeof body.paid === 'boolean' ? body.paid : current.paid;
+  let nextStatus = typeof body.status === 'string' ? body.status : current.status;
 
   const update: Record<string, unknown> = {};
   if (typeof body.status === 'string') update.status = body.status;
   if (typeof body.paid === 'boolean') update.paid = body.paid;
+  // 手動標記已付款:若訂單還停在「尚未付款」,推進到「待出貨」(與線上付款自動入帳一致)
+  if (nextPaid && !current.paid && nextStatus === '尚未付款') {
+    nextStatus = '待出貨';
+    update.status = '待出貨';
+  }
   if (typeof body.admin_note === 'string') update.admin_note = body.admin_note;
   const hasRefund = typeof body.refund_amount === 'number';
   if (hasRefund) update.refund_amount = Math.max(0, Math.min(current.total, Math.floor(body.refund_amount)));

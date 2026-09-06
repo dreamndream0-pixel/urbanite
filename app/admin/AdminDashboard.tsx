@@ -37,9 +37,8 @@ const formatter = new Intl.NumberFormat('zh-TW', {
 });
 
 const ORDER_STATUSES = ['尚未付款', '待出貨', '已出貨', '已完成', '取消', '退貨'];
-const PAYMENT_REPORTED_TAB = '通知已付款';
 const CANCEL_REVIEW_TAB = '待審核取消';
-const ORDER_TAB_KEYS = ['全部', CANCEL_REVIEW_TAB, '尚未付款', PAYMENT_REPORTED_TAB, '待出貨', '已出貨', '已完成', '取消', '退貨'];
+const ORDER_TAB_KEYS = ['全部', CANCEL_REVIEW_TAB, '尚未付款', '待出貨', '已出貨', '已完成', '取消', '退貨'];
 const PRODUCT_STATUSES = ['上架中', '加購品', '已下架'];
 const DEFAULT_PAYMENT_METHODS = ['信用卡付款', 'Apple Pay', '轉帳匯款'];
 const DEFAULT_SHIPPING_METHODS = ['全家取貨付款', '全家取貨不付款', '7-11取貨付款', '7-11取貨不付款', '宅配到府'];
@@ -1498,11 +1497,15 @@ export default function AdminDashboard({
                       ? orders
                       : s === CANCEL_REVIEW_TAB
                         ? orders.filter((o) => o.cancel_status === 'REQUESTED')
-                        : s === PAYMENT_REPORTED_TAB
-                          ? orders.filter(isPaymentReported)
+                        : s === '尚未付款'
+                          ? orders.filter((o) => o.status === '尚未付款' && !o.paid)
                           : orders.filter((o) => o.status === s);
                     const n = tabOrders.length;
-                    const attention = s === CANCEL_REVIEW_TAB ? n > 0 : tabOrders.some((o) => orderNeedsAttention(o, 'admin'));
+                    const attention = s === CANCEL_REVIEW_TAB
+                      ? n > 0
+                      : s === '尚未付款'
+                        ? tabOrders.some(isPaymentReported)
+                        : tabOrders.some((o) => orderNeedsAttention(o, 'admin'));
                     const active = orderFilter === s;
                     return (
                       <button
@@ -1522,10 +1525,10 @@ export default function AdminDashboard({
               {(() => {
                 const q = orderSearch.trim().toLowerCase();
                 const shown = orders.filter((o) => {
-                  if (orderFilter === PAYMENT_REPORTED_TAB) {
-                    if (!isPaymentReported(o)) return false;
-                  } else if (orderFilter === CANCEL_REVIEW_TAB) {
+                  if (orderFilter === CANCEL_REVIEW_TAB) {
                     if (o.cancel_status !== 'REQUESTED') return false;
+                  } else if (orderFilter === '尚未付款') {
+                    if (o.status !== '尚未付款' || o.paid) return false;
                   } else if (orderFilter !== '全部' && o.status !== orderFilter) return false;
                   if (orderPaidFilter === '已付款' && !o.paid) return false;
                   if (orderPaidFilter === '未付款' && o.paid) return false;
