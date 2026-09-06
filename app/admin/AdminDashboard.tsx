@@ -2288,7 +2288,7 @@ export default function AdminDashboard({
                           onClick={() => setNewDiscount({ ...newDiscount, image: p.key })}
                           title={p.label}
                           className={`h-10 w-12 rounded-lg border-2 transition ${newDiscount.image === p.key ? 'border-[#1f1b19]' : 'border-[#e5ded4] hover:border-[#c9b8a8]'}`}
-                          style={{ backgroundImage: p.bg }}
+                          style={{ backgroundColor: p.color }}
                         />
                       ))}
                       <label className={`flex h-10 cursor-pointer items-center gap-1 rounded-lg border border-dashed border-[#d7c9bd] px-3 text-xs font-semibold text-[#6b6156] hover:bg-[#efe8dd] ${couponImgBusy ? 'opacity-50' : ''}`}>
@@ -2296,10 +2296,27 @@ export default function AdminDashboard({
                         <input type="file" accept="image/*" className="hidden" disabled={couponImgBusy} onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadCouponImage(f); e.target.value = ''; }} />
                       </label>
                     </div>
+                    {products.filter((p) => p.image).length > 0 ? (
+                      <>
+                        <p className="mb-2 mt-3 text-xs text-[#8a7f72]">或從店內圖片挑選(照片風格)</p>
+                        <div className="flex flex-wrap gap-2">
+                          {products.filter((p) => p.image).slice(0, 12).map((p) => (
+                            <button
+                              key={p.id}
+                              type="button"
+                              title={p.name}
+                              onClick={() => setNewDiscount({ ...newDiscount, image: p.image })}
+                              className={`h-12 w-16 rounded-lg border-2 bg-cover bg-center transition ${newDiscount.image === p.image ? 'border-[#1f1b19]' : 'border-[#e5ded4] hover:border-[#c9b8a8]'}`}
+                              style={{ backgroundImage: `url("${p.image}")` }}
+                            />
+                          ))}
+                        </div>
+                      </>
+                    ) : null}
                     {/^https?:\/\//.test(newDiscount.image) ? (
-                      <div className="mt-2 flex items-center gap-2">
+                      <div className="mt-3 flex items-center gap-2">
                         <span className="h-10 w-16 rounded-lg border border-[#e5ded4] bg-cover bg-center" style={{ backgroundImage: `url("${newDiscount.image}")` }} />
-                        <span className="text-xs font-semibold text-[#1f7a44]">已上傳自訂圖</span>
+                        <span className="text-xs font-semibold text-[#1f7a44]">已選用照片</span>
                         <button type="button" onClick={() => setNewDiscount({ ...newDiscount, image: 'preset-1' })} className="text-xs text-[#c0392b] underline">移除</button>
                       </div>
                     ) : null}
