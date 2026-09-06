@@ -385,6 +385,19 @@ export default function AdminDashboard({
 }) {
   const router = useRouter();
   const [section, setSection] = useState<SectionKey>('overview');
+  // 重新整理停留在目前分頁:進頁時讀網址 ?section=,切換時寫回網址
+  useEffect(() => {
+    const s = new URLSearchParams(window.location.search).get('section');
+    if (s && NAV.some((n) => n.key === s)) setSection(s as SectionKey);
+  }, []);
+  const changeSection = (key: SectionKey) => {
+    setSection(key);
+    try {
+      const url = new URL(window.location.href);
+      url.searchParams.set('section', key);
+      window.history.replaceState(null, '', url);
+    } catch { /* 略過 */ }
+  };
   const [menuOpen, setMenuOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true); // 桌機側邊選單預設常開
   const [products, setProducts] = useState<Product[]>(initialProducts);
@@ -1373,7 +1386,7 @@ export default function AdminDashboard({
               <button
                 key={n.key}
                 onClick={() => {
-                  setSection(n.key);
+                  changeSection(n.key);
                   setMenuOpen(false);
                 }}
                 className={`flex items-center gap-3 rounded-lg px-3 py-3 text-left text-sm font-medium transition ${

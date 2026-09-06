@@ -89,6 +89,15 @@ export default function AccountClient({
     const t = new URLSearchParams(window.location.search).get('tab');
     if (t === 'profile' || t === 'coupons' || t === 'orders' || t === 'favorites') setTab(t);
   }, []);
+  // 切換分頁時同步網址,重新整理停留在原分頁
+  const changeTab = (key: TabKey) => {
+    setTab(key);
+    try {
+      const url = new URL(window.location.href);
+      url.searchParams.set('tab', key);
+      window.history.replaceState(null, '', url);
+    } catch { /* 略過 */ }
+  };
   const [orderList, setOrderList] = useState<Order[]>(orders);
   const [openOrder, setOpenOrder] = useState<Order | null>(null);
   const [cancelTarget, setCancelTarget] = useState<Order | null>(null);
@@ -208,7 +217,7 @@ export default function AccountClient({
           {/* 右:追蹤清單、購物車(中)、我的帳號(最右) */}
           <div className="flex items-center justify-end gap-1 sm:gap-2">
             <button
-              onClick={() => setTab('favorites')}
+              onClick={() => changeTab('favorites')}
               aria-label="追蹤清單"
               className="relative rounded-md p-2 hover:bg-[#efe8dd]"
             >
@@ -238,7 +247,7 @@ export default function AccountClient({
           {TABS.map((t) => (
             <button
               key={t.key}
-              onClick={() => setTab(t.key)}
+              onClick={() => changeTab(t.key)}
               className={`-mb-px whitespace-nowrap border-b-2 px-4 py-3 text-sm font-semibold transition ${
                 tab === t.key
                   ? 'border-[#1f1b19] text-[#1f1b19]'
