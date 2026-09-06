@@ -29,6 +29,7 @@ function discountPayload(body: Record<string, unknown>, code: string) {
     stackable: Boolean(body.stackable),
     status: String(body.status ?? (body.active === false ? '停用' : '啟用')),
     active: body.active ?? String(body.status ?? '啟用') === '啟用',
+    image: body.image ? String(body.image) : null,
   };
 }
 
@@ -64,6 +65,14 @@ export async function POST(request: Request) {
     .select()
     .single();
 
+  // image 欄位可能尚未建立:先去掉 image 重試(保留其餘欄位),仍失敗才降到最小欄位
+  if (error && /image|schema cache/i.test(error.message)) {
+    const { image: _drop, ...withoutImage } = insert;
+    void _drop;
+    const retry = await supabase.from('discounts').insert(withoutImage).select().single();
+    data = retry.data;
+    error = retry.error;
+  }
   if (error && /name|max_discount|schema cache/i.test(error.message)) {
     const retry = await supabase
       .from('discounts')

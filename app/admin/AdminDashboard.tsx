@@ -29,6 +29,7 @@ import {
 } from '@/lib/order-status';
 import { uiAlert, uiConfirm, uiPrompt } from '@/lib/ui-dialog';
 import { OrderCardBadges, orderNeedsAttention, AttentionDot, isPaymentReported } from '@/app/components/OrderStatusBadge';
+import { COUPON_PRESETS } from '@/lib/coupon-presets';
 
 const formatter = new Intl.NumberFormat('zh-TW', {
   style: 'currency',
@@ -106,6 +107,7 @@ type DiscountDraft = {
   is_first_purchase_only: boolean;
   stackable: boolean;
   status: '草稿' | '啟用' | '停用' | '已結束';
+  image: string;
 };
 
 function blankDiscountDraft(): DiscountDraft {
@@ -126,6 +128,7 @@ function blankDiscountDraft(): DiscountDraft {
     is_first_purchase_only: false,
     stackable: false,
     status: '啟用',
+    image: 'preset-1',
   };
 }
 
@@ -433,6 +436,7 @@ export default function AdminDashboard({
   const [editBannerId, setEditBannerId] = useState<string | null>(null);
   const [newCat, setNewCat] = useState({ slug: '', name: '', en: '', parent_id: '' });
   const [newDiscount, setNewDiscount] = useState<DiscountDraft>(blankDiscountDraft());
+  const [couponImgBusy, setCouponImgBusy] = useState(false);
   const [couponModalOpen, setCouponModalOpen] = useState(false);
   const [discountQuery, setDiscountQuery] = useState('');
   const [discountStatus, setDiscountStatus] = useState('全部');
@@ -1026,6 +1030,20 @@ export default function AdminDashboard({
     const res = await fetch(`/api/categories/${id}`, { method: 'DELETE' });
     if (res.ok) setCategories((l) => l.filter((c) => c.id !== id));
     else void uiAlert('刪除失敗');
+  }
+
+  async function uploadCouponImage(file: File) {
+    setCouponImgBusy(true);
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      fd.append('folder', 'coupons');
+      fd.append('productId', 'coupon');
+      const up = await fetch('/api/products/image', { method: 'POST', body: fd });
+      const data = await up.json().catch(() => null);
+      if (!up.ok || !data?.url) return void uiAlert(data?.error ?? '上傳失敗');
+      setNewDiscount((d) => ({ ...d, image: data.url }));
+    } finally { setCouponImgBusy(false); }
   }
 
   async function addDiscount() {
@@ -2259,6 +2277,32 @@ export default function AdminDashboard({
                   <div className="flex flex-col justify-end gap-3 text-sm font-semibold">
                     <label className="flex items-center gap-2"><input type="checkbox" checked={newDiscount.is_first_purchase_only} onChange={(e) => setNewDiscount({ ...newDiscount, is_first_purchase_only: e.target.checked })} /> 新會員首購限定</label>
                     <label className="flex items-center gap-2"><input type="checkbox" checked={newDiscount.stackable} onChange={(e) => setNewDiscount({ ...newDiscount, stackable: e.target.checked })} /> 可與其他優惠併用</label>
+                  </div>
+                  <div className="sm:col-span-2">
+                    <p className="mb-2 text-sm font-medium text-[#6b6156]">券樣式圖(顯示在客人優惠券左側)</p>
+                    <div className="flex flex-wrap items-center gap-2">
+                      {COUPON_PRESETS.map((p) => (
+                        <button
+                          key={p.key}
+                          type="button"
+                          onClick={() => setNewDiscount({ ...newDiscount, image: p.key })}
+                          title={p.label}
+                          className={`h-10 w-12 rounded-lg border-2 transition ${newDiscount.image === p.key ? 'border-[#1f1b19]' : 'border-[#e5ded4] hover:border-[#c9b8a8]'}`}
+                          style={{ backgroundImage: p.bg }}
+                        />
+                      ))}
+                      <label className={`flex h-10 cursor-pointer items-center gap-1 rounded-lg border border-dashed border-[#d7c9bd] px-3 text-xs font-semibold text-[#6b6156] hover:bg-[#efe8dd] ${couponImgBusy ? 'opacity-50' : ''}`}>
+                        {couponImgBusy ? '上傳中…' : '＋ 上傳照片'}
+                        <input type="file" accept="image/*" className="hidden" disabled={couponImgBusy} onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadCouponImage(f); e.target.value = ''; }} />
+                      </label>
+                    </div>
+                    {/^https?:\/\//.test(newDiscount.image) ? (
+                      <div className="mt-2 flex items-center gap-2">
+                        <span className="h-10 w-16 rounded-lg border border-[#e5ded4] bg-cover bg-center" style={{ backgroundImage: `url("${newDiscount.image}")` }} />
+                        <span className="text-xs font-semibold text-[#1f7a44]">已上傳自訂圖</span>
+                        <button type="button" onClick={() => setNewDiscount({ ...newDiscount, image: 'preset-1' })} className="text-xs text-[#c0392b] underline">移除</button>
+                      </div>
+                    ) : null}
                   </div>
                 </div>
                 </div>
