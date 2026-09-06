@@ -707,7 +707,7 @@ function CouponsTab({ coupons }: { coupons: Discount[] }) {
                   tags={[couponScope(c), c.end_at ? `到 ${new Date(c.end_at).toLocaleDateString('zh-TW')}` : '無期限']}
                   dim={item.status !== 'available'}
                   action={
-                    <span className={`inline-block rounded-full px-4 py-2 text-xs font-semibold ${item.status === 'available' ? 'bg-[#2b2723] text-white' : 'bg-[#f0e9dd] text-[#8a7f72]'}`}>
+                    <span className={`inline-block rounded-full px-5 py-2.5 text-sm font-semibold sm:px-7 sm:py-3 sm:text-base ${item.status === 'available' ? 'bg-[#2b2723] text-white' : 'bg-[#f0e9dd] text-[#8a7f72]'}`}>
                       {item.status === 'used' ? '已使用' : item.status === 'revoked' ? '已撤回' : item.status === 'expired' ? '已過期' : '結帳可用'}
                     </span>
                   }
@@ -743,7 +743,7 @@ function CouponsTab({ coupons }: { coupons: Discount[] }) {
                     type="button"
                     onClick={() => claimCoupon(c.id)}
                     disabled={!ready}
-                    className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-[#2b2723] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-black disabled:opacity-40"
+                    className="inline-flex shrink-0 items-center gap-2 rounded-full bg-[#2b2723] px-6 py-3 text-sm font-semibold text-white transition hover:bg-black disabled:opacity-40 sm:px-7 sm:text-base"
                   >
                     領取
                     <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 4v12M6 12l6 6 6-6M5 20h14" /></svg>
@@ -778,32 +778,45 @@ function CouponTicket({ code, image, desc, tags, action, dim = false, showScript
   showScript?: boolean;
 }) {
   const dark = couponImageIsDark(image, code);
+  // 郵票鋸齒邊(左右兩側各咬出一排半圓)
+  const scallop = {
+    WebkitMaskImage: 'radial-gradient(circle 6px at 0 6px, transparent 6px, #000 6.5px), radial-gradient(circle 6px at 100% 6px, transparent 6px, #000 6.5px)',
+    maskImage: 'radial-gradient(circle 6px at 0 6px, transparent 6px, #000 6.5px), radial-gradient(circle 6px at 100% 6px, transparent 6px, #000 6.5px)',
+    WebkitMaskSize: '100% 12px, 100% 12px',
+    maskSize: '100% 12px, 100% 12px',
+    WebkitMaskRepeat: 'repeat-y, repeat-y',
+    maskRepeat: 'repeat-y, repeat-y',
+    WebkitMaskComposite: 'source-in',
+    maskComposite: 'intersect',
+  } as const;
   return (
-    <div className={`relative flex min-h-[136px] rounded-2xl bg-white shadow-[0_1px_3px_rgba(31,27,25,0.06)] sm:min-h-[164px] ${dim ? 'opacity-70' : ''}`}>
-      {/* 左右外緣打孔缺口 */}
-      <span className="absolute -left-2.5 top-1/2 z-10 h-5 w-5 -translate-y-1/2 rounded-full bg-[#f6f2ec]" />
-      <span className="absolute -right-2.5 top-1/2 z-10 h-5 w-5 -translate-y-1/2 rounded-full bg-[#f6f2ec]" />
-      <div className="relative w-[118px] shrink-0 rounded-l-2xl bg-[#e5ded4] bg-cover bg-center sm:w-[190px]" style={couponImageStyle(image, code)}>
-        <span className={`absolute left-3 top-1/2 origin-center -translate-y-1/2 -rotate-90 whitespace-nowrap text-[9px] tracking-[0.28em] ${dark ? 'text-white/75' : 'text-[#6b6156]/65'}`}>
+    <div className={`flex items-stretch gap-2.5 sm:gap-3.5 ${dim ? 'opacity-70' : ''}`}>
+      {/* 照片(郵票邊) */}
+      <div
+        className="relative w-[27%] max-w-[215px] shrink-0 self-stretch bg-[#e5ded4] bg-cover bg-center"
+        style={{ ...couponImageStyle(image, code), ...scallop }}
+      >
+        <span className={`absolute left-4 top-1/2 origin-center -translate-y-1/2 -rotate-90 whitespace-nowrap text-[10px] tracking-[0.32em] sm:text-xs ${dark ? 'text-white/80' : 'text-[#6b6156]/70'}`} style={{ fontFamily: 'Georgia, serif' }}>
           SPECIAL FOR YOU
         </span>
       </div>
-      <div className="relative flex flex-1 items-center justify-between gap-3 rounded-r-2xl border-l border-dashed border-[#ded5c8] px-4 py-5 sm:px-7">
-        <span className="absolute -left-[7px] -top-[7px] h-3.5 w-3.5 rounded-full bg-[#f6f2ec]" />
-        <span className="absolute -bottom-[7px] -left-[7px] h-3.5 w-3.5 rounded-full bg-[#f6f2ec]" />
+      {/* 內容 */}
+      <div className="relative flex min-h-[140px] flex-1 items-center justify-between gap-4 rounded-2xl bg-[#faf7f2] px-5 py-5 sm:min-h-[186px] sm:px-8">
+        <span className="absolute -left-[7px] top-3 h-3.5 w-3.5 rounded-full bg-[#f6f2ec]" />
+        <span className="absolute -left-[7px] bottom-3 h-3.5 w-3.5 rounded-full bg-[#f6f2ec]" />
         <div className="min-w-0">
-          <p className="text-lg font-bold tracking-wide sm:text-xl">{code}</p>
-          <p className="mt-1 text-sm text-[#6b6156]">{desc}</p>
-          <div className="mt-2.5 flex flex-wrap gap-2">
+          <p className="text-xl font-bold tracking-wide sm:text-[28px]">{code}</p>
+          <p className="mt-1.5 text-sm text-[#6b6156] sm:mt-2 sm:text-base">{desc}</p>
+          <div className="mt-3 flex flex-wrap gap-2 sm:mt-4 sm:gap-2.5">
             {tags.map((t) => (
-              <span key={t} className="rounded-md bg-[#f3ede3] px-2.5 py-1 text-[11px] text-[#8a7f72]">{t}</span>
+              <span key={t} className="rounded-lg bg-[#efe9e0] px-3 py-1.5 text-xs text-[#8a7f72] sm:px-4 sm:py-2 sm:text-sm">{t}</span>
             ))}
           </div>
         </div>
-        <div className="shrink-0 text-right">
+        <div className="flex shrink-0 flex-col items-end gap-2 sm:gap-3">
           {action}
           {showScript ? (
-            <p className="mt-2 hidden text-[13px] italic leading-tight text-[#c4b6a2] sm:block" style={{ fontFamily: 'Georgia, serif' }}>{couponScript(code)}</p>
+            <p className="hidden text-right text-[15px] italic leading-[1.5] text-[#c4b6a2] sm:block" style={{ fontFamily: 'Georgia, serif' }}>{couponScript(code)}</p>
           ) : null}
         </div>
       </div>
