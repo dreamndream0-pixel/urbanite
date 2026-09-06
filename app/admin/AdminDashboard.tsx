@@ -38,6 +38,8 @@ const formatter = new Intl.NumberFormat('zh-TW', {
 
 const ORDER_STATUSES = ['尚未付款', '待出貨', '已出貨', '已完成', '取消', '退貨'];
 const PAYMENT_REPORTED_TAB = '通知已付款';
+const CANCEL_REVIEW_TAB = '待審核取消';
+const ORDER_TAB_KEYS = ['全部', CANCEL_REVIEW_TAB, '尚未付款', PAYMENT_REPORTED_TAB, '待出貨', '已出貨', '已完成', '取消', '退貨'];
 const PRODUCT_STATUSES = ['上架中', '加購品', '已下架'];
 const DEFAULT_PAYMENT_METHODS = ['信用卡付款', 'Apple Pay', '轉帳匯款'];
 const DEFAULT_SHIPPING_METHODS = ['全家取貨付款', '全家取貨不付款', '7-11取貨付款', '7-11取貨不付款', '宅配到府'];
@@ -396,7 +398,6 @@ export default function AdminDashboard({
   const [orderFilter, setOrderFilter] = useState<string>('全部');
   const [orderSearch, setOrderSearch] = useState('');
   const [orderPaidFilter, setOrderPaidFilter] = useState<'全部' | '已付款' | '未付款'>('全部');
-  const [orderCancelOnly, setOrderCancelOnly] = useState(false);
   const [openOrderId, setOpenOrderId] = useState<string | null>(null);
   const [productsTab, setProductsTab] = useState<'items' | 'categories'>('items');
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
@@ -1460,7 +1461,12 @@ export default function AdminDashboard({
 
           {/* ===== 訂單管理 ===== */}
           {section === 'orders' && (
-            <Card title={`訂單(${orders.length})`}>
+            <section className="rounded-xl border border-[#e5ded4] bg-white p-5">
+              <div className="mb-4">
+                <p className="text-[11px] font-semibold tracking-[0.28em] text-[#b3a897]">ORDER MANAGEMENT</p>
+                <h2 className="mt-1 text-2xl font-bold leading-tight">訂單管理</h2>
+                <p className="mt-0.5 text-sm text-[#8a7f72]">管理與追蹤所有訂單,掌握出貨進度</p>
+              </div>
               {/* 搜尋 + 篩選 */}
               <div className="mb-3 flex flex-wrap gap-2">
                 <input
@@ -1478,47 +1484,35 @@ export default function AdminDashboard({
                   <option value="已付款">已付款</option>
                   <option value="未付款">未付款</option>
                 </select>
-                {(() => {
-                  const pending = orders.filter((o) => o.cancel_status === 'REQUESTED').length;
-                  return (
-                    <button
-                      onClick={() => setOrderCancelOnly((v) => !v)}
-                      className={`rounded-lg border px-3 py-2 text-sm font-semibold transition ${
-                        orderCancelOnly ? 'border-[#c0392b] bg-[#c0392b] text-white' : 'border-[#e0b4b4] text-[#c0392b]'
-                      }`}
-                    >
-                      待審核取消 <span className={orderCancelOnly ? 'text-white/80' : 'text-[#c0392b]'}>{pending}</span>
-                    </button>
-                  );
-                })()}
               </div>
 
-              {/* 狀態分類 */}
-              <div className="mb-4 -mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
-                {['全部', '尚未付款', PAYMENT_REPORTED_TAB, '待出貨', '已出貨', '已完成', '取消', '退貨'].map((s) => {
-                  const tabOrders = s === '全部'
-                    ? orders
-                    : s === PAYMENT_REPORTED_TAB
-                      ? orders.filter(isPaymentReported)
-                      : orders.filter((o) => o.status === s);
-                  const n = tabOrders.length;
-                  const attention = tabOrders.some((o) => orderNeedsAttention(o, 'admin'));
-                  return (
-                    <button
-                      key={s}
-                      onClick={() => setOrderFilter(s)}
-                      className={`relative shrink-0 rounded-full border px-3 py-1.5 text-sm font-semibold transition ${
-                        orderFilter === s
-                          ? 'border-[#1f1b19] bg-[#1f1b19] text-white'
-                          : 'border-[#d7c9bd] text-[#6b6156]'
-                      }`}
-                    >
-                      {attention ? <AttentionDot className="absolute -right-0.5 -top-0.5" /> : null}
-                      {s}
-                      <span className={`ml-1 ${orderFilter === s ? 'text-white/70' : 'text-[#a99e8f]'}`}>{n}</span>
-                    </button>
-                  );
-                })}
+              {/* 狀態分類(底線式,可左右滑動) */}
+              <div className="mb-4 -mx-4 overflow-x-auto overflow-y-hidden border-b border-[#e5ded4] px-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                <div className="flex min-w-max gap-6">
+                  {ORDER_TAB_KEYS.map((s) => {
+                    const tabOrders = s === '全部'
+                      ? orders
+                      : s === CANCEL_REVIEW_TAB
+                        ? orders.filter((o) => o.cancel_status === 'REQUESTED')
+                        : s === PAYMENT_REPORTED_TAB
+                          ? orders.filter(isPaymentReported)
+                          : orders.filter((o) => o.status === s);
+                    const n = tabOrders.length;
+                    const attention = s === CANCEL_REVIEW_TAB ? n > 0 : tabOrders.some((o) => orderNeedsAttention(o, 'admin'));
+                    const active = orderFilter === s;
+                    return (
+                      <button
+                        key={s}
+                        onClick={() => setOrderFilter(s)}
+                        className={`relative -mb-px shrink-0 border-b-2 pb-2 pt-1 text-center transition ${active ? 'border-[#1f1b19]' : 'border-transparent'}`}
+                      >
+                        {attention ? <AttentionDot className="absolute right-0 top-0" /> : null}
+                        <span className={`block whitespace-nowrap text-sm font-semibold ${active ? 'text-[#1f1b19]' : 'text-[#8a7f72]'}`}>{s}</span>
+                        <span className={`block text-sm ${active ? 'font-semibold text-[#1f1b19]' : 'text-[#a99e8f]'}`}>{n}</span>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
 
               {(() => {
@@ -1526,10 +1520,11 @@ export default function AdminDashboard({
                 const shown = orders.filter((o) => {
                   if (orderFilter === PAYMENT_REPORTED_TAB) {
                     if (!isPaymentReported(o)) return false;
+                  } else if (orderFilter === CANCEL_REVIEW_TAB) {
+                    if (o.cancel_status !== 'REQUESTED') return false;
                   } else if (orderFilter !== '全部' && o.status !== orderFilter) return false;
                   if (orderPaidFilter === '已付款' && !o.paid) return false;
                   if (orderPaidFilter === '未付款' && o.paid) return false;
-                  if (orderCancelOnly && o.cancel_status !== 'REQUESTED') return false;
                   if (q) {
                     const hay = [
                       o.order_no, o.customer_name, o.email, o.phone,
@@ -1541,97 +1536,103 @@ export default function AdminDashboard({
                 });
                 if (shown.length === 0) return <Empty>沒有符合條件的訂單。</Empty>;
                 return (
-                  <div className="space-y-3">
+                  <div className="space-y-4">
                     {shown.map((order) => {
                       const name =
                         (order.user_id && customerByUser.get(order.user_id)?.name) || order.customer_name;
+                      const dateShort = order.created_at ? new Date(order.created_at).toLocaleString('zh-TW', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : '';
+                      const shipShort = /宅配/.test(order.shipping_method ?? '') ? '宅配'
+                        : /超商|取貨|7-?11|全家|萊爾富|ok/i.test(order.shipping_method ?? '') ? '超商取貨'
+                        : (order.shipping_method || '—');
                       return (
-                        <button
-                          key={order.id}
-                          onClick={() => setOpenOrderId(order.id)}
-                          className="block w-full rounded-lg border border-[#e5ded4] p-4 text-left transition hover:border-[#c9b8a8] hover:shadow-sm"
-                        >
-                          <div className="flex items-start justify-between gap-3">
+                        <div key={order.id} className="rounded-2xl border border-[#eee5da] bg-white p-4 shadow-sm sm:p-5">
+                          {/* 標題列 */}
+                          <button onClick={() => setOpenOrderId(order.id)} className="flex w-full items-start justify-between gap-3 text-left">
                             <div className="min-w-0">
-                              <p className="flex items-center gap-1.5 font-semibold">
+                              <p className="flex items-center gap-1.5 text-lg font-bold">
                                 {orderNeedsAttention(order, 'admin') ? <AttentionDot /> : null}
                                 {order.order_no}
                               </p>
-                              <p className="text-sm text-[#8a7f72]">
-                                {name}
-                                {order.user_id && customerByUser.has(order.user_id) ? (
-                                  <span className="ml-2 rounded-full bg-[#eef3ec] px-2 py-0.5 text-xs font-semibold text-[#4a7a44]">
-                                    會員
-                                  </span>
-                                ) : (
-                                  <span className="ml-2 rounded-full bg-[#f3ede4] px-2 py-0.5 text-xs font-semibold text-[#8a7f72]">
-                                    訪客
-                                  </span>
-                                )}
-                              </p>
+                              <p className="mt-0.5 text-xs text-[#8a7f72]">{dateShort}</p>
                             </div>
-                            <span className="shrink-0 font-semibold">{formatter.format(order.total)}</span>
+                            <span className="flex shrink-0 items-center gap-1 text-lg font-bold">
+                              {formatter.format(order.total)}
+                              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#c9b8a8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6" /></svg>
+                            </span>
+                          </button>
+
+                          {/* 狀態 + 顧客 */}
+                          <div className="mt-3 flex flex-wrap items-start justify-between gap-3">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <OrderStatusBadge order={order} className="!text-xs" />
+                              <span className={`rounded-full px-3 py-1 text-xs font-semibold ${order.paid ? 'bg-[#e9f7ee] text-[#1f7a44]' : 'bg-[#fdf3e7] text-[#9a6a1f]'}`}>{order.paid ? '已付款' : '未付款'}</span>
+                              <span className="inline-flex items-center gap-1 rounded-full bg-[#f3ede4] px-3 py-1 text-xs font-semibold text-[#6b6156]">
+                                <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 7h11v9H3zM14 10h4l3 3v3h-7z" /><circle cx="7" cy="18" r="1.4" /><circle cx="17.5" cy="18" r="1.4" /></svg>
+                                {shipShort}
+                              </span>
+                              {isPaymentReported(order) ? (
+                                <span className="inline-flex items-center gap-1 rounded-full bg-[#eaf1fb] px-3 py-1 text-xs font-semibold text-[#2b5fa5]">
+                                  <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.7 21a2 2 0 0 1-3.4 0" /></svg>
+                                  通知已付款
+                                </span>
+                              ) : null}
+                              {order.cancel_status === 'REQUESTED' ? (
+                                <span className="rounded-full bg-[#fbe9e7] px-3 py-1 text-xs font-semibold text-[#c0392b]">取消審核中</span>
+                              ) : null}
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#a99e8f" strokeWidth="1.6" aria-hidden="true"><circle cx="12" cy="8" r="4" /><path d="M4 21c0-4 3.5-6 8-6s8 2 8 6" strokeLinecap="round" /></svg>
+                              <div className="min-w-0 text-right">
+                                <p className="truncate text-sm font-semibold text-[#2c2826]">{name}</p>
+                                <p className="truncate text-xs text-[#a99e8f]">{order.email}</p>
+                              </div>
+                            </div>
                           </div>
 
-                          {/* 商品縮圖 */}
-                          <div className="mt-3 flex flex-wrap gap-2">
+                          {/* 商品列 */}
+                          <div className="mt-3 space-y-2 border-t border-[#f1ebe1] pt-3">
                             {order.items.map((it, i) => (
-                              <div
-                                key={i}
-                                className="relative h-12 w-12 shrink-0 overflow-hidden rounded-md border border-[#eee5da] bg-[#e9e1d6]"
-                                title={`${it.name} (${it.variant}) ×${it.quantity}`}
-                              >
-                                {it.image || imageByName.get(it.name) ? (
-                                  <img
-                                    src={it.image || imageByName.get(it.name)}
-                                    alt={it.name}
-                                    className="h-full w-full object-cover"
-                                  />
-                                ) : null}
-                                {it.quantity > 1 && (
-                                  <span className="absolute bottom-0 right-0 rounded-tl bg-black/60 px-1 text-[10px] font-semibold text-white">
-                                    ×{it.quantity}
-                                  </span>
-                                )}
+                              <div key={i} className="flex items-center gap-3">
+                                <div className="h-12 w-12 shrink-0 overflow-hidden rounded-lg border border-[#eee5da] bg-[#e9e1d6]">
+                                  {it.image || imageByName.get(it.name) ? (
+                                    <img src={it.image || imageByName.get(it.name)} alt={it.name} className="h-full w-full object-cover" />
+                                  ) : null}
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                  <p className="truncate text-sm font-medium">{it.name}</p>
+                                  <p className="text-xs text-[#8a7f72]">{it.variant} × {it.quantity}</p>
+                                </div>
+                                <span className="shrink-0 text-sm font-semibold">{formatter.format(it.price * it.quantity)}</span>
                               </div>
                             ))}
                           </div>
 
+                          {/* 金額 */}
+                          <div className="mt-3 space-y-1 border-t border-[#f1ebe1] pt-3 text-sm">
+                            <div className="flex justify-between text-[#8a7f72]"><span>商品金額</span><span>{formatter.format(order.subtotal)}</span></div>
+                            <div className="flex justify-between text-[#8a7f72]"><span>運費</span><span>{order.shipping === 0 ? '免運' : formatter.format(order.shipping)}</span></div>
+                            {order.discount > 0 ? <div className="flex justify-between text-[#8a7f72]"><span>折扣 {order.discount_code || ''}</span><span>-{formatter.format(order.discount)}</span></div> : null}
+                            <div className="flex justify-between pt-1 text-base font-bold"><span>訂單合計</span><span>{formatter.format(order.total)}</span></div>
+                          </div>
+
                           {order.note ? (
-                            <p className="mt-2 line-clamp-1 rounded-lg bg-[#faf6ee] px-3 py-1.5 text-sm text-[#6b6156]">
-                              備註:{order.note}
-                            </p>
+                            <p className="mt-3 line-clamp-1 rounded-lg bg-[#faf6ee] px-3 py-1.5 text-sm text-[#6b6156]">備註:{order.note}</p>
                           ) : null}
 
-                          <div className="mt-3 flex flex-wrap items-center gap-2">
-                            <OrderStatusBadge order={order} className="!text-xs" />
-                            <span
-                              className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                                order.paid ? 'bg-[#e9f7ee] text-[#1f7a44]' : 'bg-[#fdf3e7] text-[#9a6a1f]'
-                              }`}
-                            >
-                              {order.paid ? '已付款' : '未付款'}
-                            </span>
-                            {isPaymentReported(order) ? (
-                              <span className="inline-flex items-center gap-1 rounded-full bg-[#eaf1fb] px-3 py-1 text-xs font-semibold text-[#2b5fa5]">
-                                <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.7 21a2 2 0 0 1-3.4 0" /></svg>
-                                通知已付款
-                              </span>
-                            ) : null}
-                            {order.cancel_status === 'REQUESTED' ? (
-                              <span className="rounded-full bg-[#fbe9e7] px-3 py-1 text-xs font-semibold text-[#c0392b]">
-                                取消審核中
-                              </span>
-                            ) : null}
-                            <span className="ml-auto text-xs text-[#a99e8f]">點看完整訂單 ›</span>
+                          {/* 底部操作 */}
+                          <div className="mt-4 flex items-center justify-between gap-2">
+                            <button onClick={() => setOpenOrderId(order.id)} className="inline-flex h-10 items-center rounded-full border border-[#d7c9bd] px-6 text-sm font-semibold text-[#6b6156] hover:bg-[#efe8dd]">查看完整訂單</button>
+                            <button onClick={() => setOpenOrderId(order.id)} aria-label="更多操作" className="flex h-10 w-10 items-center justify-center rounded-full bg-[#f3ede4] text-[#6b6156] hover:bg-[#ece2d5]">
+                              <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.6" /><circle cx="12" cy="12" r="1.6" /><circle cx="19" cy="12" r="1.6" /></svg>
+                            </button>
                           </div>
-                        </button>
+                        </div>
                       );
                     })}
                   </div>
                 );
               })()}
-            </Card>
+            </section>
           )}
 
           {/* ===== 商品及分類 ===== */}
