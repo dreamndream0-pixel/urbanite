@@ -699,7 +699,7 @@ function CouponsTab({ coupons, heroImage = '' }: { coupons: Discount[]; heroImag
         ) : ownedShown.length === 0 ? (
           <p className="mt-5 rounded-xl bg-white p-5 text-sm text-[#6b6156]">目前沒有{couponTab === 'available' ? '可用' : couponTab === 'used' ? '已使用' : '已過期'}的優惠券。</p>
         ) : (
-          <div className="mt-5 space-y-4">
+          <div className="mt-5 space-y-3">
             {ownedShown.map((item) => {
               const c = item.coupon;
               if (!c) return null;
@@ -734,7 +734,7 @@ function CouponsTab({ coupons, heroImage = '' }: { coupons: Discount[]; heroImag
         {claimable.length === 0 ? (
           <p className="mt-5 rounded-xl bg-white p-5 text-sm text-[#6b6156]">目前沒有可領取的優惠券。</p>
         ) : (
-          <div className="mt-5 space-y-4">
+          <div className="mt-5 space-y-3">
             {claimable.map((c) => (
               <CouponTicket
                 key={c.id}
@@ -773,7 +773,7 @@ function CouponsTab({ coupons, heroImage = '' }: { coupons: Discount[]; heroImag
   );
 }
 
-/* 票券卡:左側圖 + 打孔缺口 + 虛線接縫 */
+/* 票券卡:左側圖 + 打孔缺口 + 右側操作票根 */
 function CouponTicket({ code, image, desc, tags, action, dim = false, showScript = true, divided = false }: {
   code: string;
   image?: string;
@@ -786,37 +786,37 @@ function CouponTicket({ code, image, desc, tags, action, dim = false, showScript
 }) {
   const dark = couponImageIsDark(image, code);
   return (
-    <div className={`flex items-stretch ${dim ? 'opacity-70' : ''}`}>
-      {/* 照片(郵票鋸齒邊,與右側票面相接) */}
+    <div className={`relative flex items-stretch drop-shadow-[0_8px_18px_rgba(64,52,43,0.08)] ${dim ? 'opacity-65' : ''}`}>
+      {/* 照片票根 */}
       <div
-        className="ticket-seam-l relative w-[26%] max-w-[210px] shrink-0 self-stretch bg-[#e5ded4] bg-cover bg-center"
+        className="ticket-seam-l relative w-[25%] min-w-[112px] max-w-[190px] shrink-0 self-stretch rounded-l-2xl bg-[#e5ded4] bg-cover bg-center"
         style={couponImageStyle(image, code)}
       >
-        <span className={`font-serif-tc absolute left-2.5 top-1/2 origin-center -translate-y-1/2 -rotate-90 whitespace-nowrap text-center text-[8px] leading-[1.5] tracking-[0.22em] sm:left-3.5 sm:text-[9px] ${dark ? 'text-white/80' : 'text-[#6b6156]/70'}`}>
+        <div className="absolute inset-0 bg-black/[0.03]" />
+        <span className={`font-serif-tc absolute left-3 top-1/2 origin-center -translate-y-1/2 -rotate-90 whitespace-nowrap text-center text-[8px] leading-[1.5] tracking-[0.25em] sm:left-4 sm:text-[9px] ${dark ? 'text-white/85 drop-shadow' : 'text-[#6b6156]/70'}`}>
           <span className="block">SPECIAL</span>
           <span className="block">FOR YOU.</span>
         </span>
       </div>
-      {/* 內容 */}
-      <div className="ticket-seam-r relative flex min-h-[80px] flex-1 items-stretch rounded-r-2xl bg-[#faf8f4] sm:min-h-[94px]">
-        <div className="flex min-w-0 flex-1 flex-col justify-center px-4 py-3 sm:px-6">
-          <p className="text-base font-bold tracking-wide sm:text-xl">{code}</p>
-          <p className="mt-0.5 text-xs text-[#6b6156] sm:mt-1 sm:text-sm">{desc}</p>
-          <div className="mt-1.5 flex flex-wrap gap-1.5 sm:mt-2 sm:gap-2">
+      <div className="ticket-seam-r relative flex min-h-[112px] flex-1 items-stretch rounded-r-2xl border border-l-0 border-[#eadfd4] bg-[#fffaf5] sm:min-h-[124px]">
+        <div className="flex min-w-0 flex-1 flex-col justify-center px-4 py-4 sm:px-6">
+          <p className="font-serif-tc text-lg font-bold tracking-[0.08em] text-[#2c2826] sm:text-[22px]">{code}</p>
+          <p className="mt-1 text-xs font-medium text-[#6b6156] sm:text-sm">{desc}</p>
+          <div className="mt-2 flex flex-wrap gap-1.5 sm:mt-3 sm:gap-2">
             {tags.map((t) => (
-              <span key={t} className="rounded-md bg-[#f2ebe2] px-2 py-0.5 text-[10px] text-[#8a7f72] sm:px-3 sm:py-1 sm:text-xs">{t}</span>
+              <span key={t} className="rounded-md bg-[#f3ede6] px-2 py-0.5 text-[10px] text-[#8a7f72] sm:px-3 sm:py-1 sm:text-xs">{t}</span>
             ))}
           </div>
         </div>
         {divided ? (
-          <div className="flex shrink-0 items-center self-stretch border-l border-dashed border-[#ded5c8] px-3 sm:px-6">
+          <div className="flex w-[31%] min-w-[112px] shrink-0 items-center justify-center self-stretch border-l border-dashed border-[#ded5c8] px-3 sm:w-[28%] sm:px-6">
             {action}
           </div>
         ) : (
-          <div className="flex shrink-0 flex-col items-end justify-center gap-1 px-3 py-3 sm:gap-1.5 sm:px-6">
+          <div className="flex w-[31%] min-w-[112px] shrink-0 flex-col items-center justify-center gap-2 border-l border-dashed border-[#ded5c8] px-3 py-3 sm:w-[28%] sm:px-6">
             {action}
             {showScript ? (
-              <p className="font-script hidden text-right text-[15px] leading-[1.15] text-[#c2b3a0] sm:block">{couponScript(code)}</p>
+              <p className="font-script hidden text-center text-[15px] leading-[1.15] text-[#c2b3a0] sm:block">{couponScript(code)}</p>
             ) : null}
           </div>
         )}
