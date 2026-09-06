@@ -707,7 +707,7 @@ function CouponsTab({ coupons }: { coupons: Discount[] }) {
                   tags={[couponScope(c), c.end_at ? `到 ${new Date(c.end_at).toLocaleDateString('zh-TW')}` : '無期限']}
                   dim={item.status !== 'available'}
                   action={
-                    <span className={`inline-block rounded-full px-5 py-2.5 text-sm font-semibold sm:px-7 sm:py-3 sm:text-base ${item.status === 'available' ? 'bg-[#2b2723] text-white' : 'bg-[#f0e9dd] text-[#8a7f72]'}`}>
+                    <span className={`inline-block whitespace-nowrap rounded-full px-3.5 py-1.5 text-xs font-semibold sm:px-5 sm:py-2 sm:text-sm ${item.status === 'available' ? 'bg-[#2b2723] text-white' : 'bg-[#f0e9dd] text-[#8a7f72]'}`}>
                       {item.status === 'used' ? '已使用' : item.status === 'revoked' ? '已撤回' : item.status === 'expired' ? '已過期' : '結帳可用'}
                     </span>
                   }
@@ -744,7 +744,7 @@ function CouponsTab({ coupons }: { coupons: Discount[] }) {
                     type="button"
                     onClick={() => claimCoupon(c.id)}
                     disabled={!ready}
-                    className="inline-flex shrink-0 items-center gap-2 rounded-full bg-[#2b2723] px-6 py-3 text-sm font-semibold text-white transition hover:bg-black disabled:opacity-40 sm:px-7 sm:text-base"
+                    className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full bg-[#2b2723] px-4 py-2 text-xs font-semibold text-white transition hover:bg-black disabled:opacity-40 sm:px-5 sm:py-2.5 sm:text-sm"
                   >
                     領取
                     <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 4v12M6 12l6 6 6-6M5 20h14" /></svg>
@@ -780,42 +780,38 @@ function CouponTicket({ code, image, desc, tags, action, dim = false, showScript
   divided?: boolean;
 }) {
   const dark = couponImageIsDark(image, code);
-  const notch = 'absolute -left-[7px] h-3.5 w-3.5 rounded-full bg-[#f6f2ec]';
   return (
-    <div className={`flex items-stretch gap-2 sm:gap-2.5 ${dim ? 'opacity-70' : ''}`}>
-      {/* 照片(郵票鋸齒邊) */}
+    <div className={`flex items-stretch ${dim ? 'opacity-70' : ''}`}>
+      {/* 照片(郵票鋸齒邊,與右側票面相接) */}
       <div
         className="ticket-stamp relative w-[26%] max-w-[210px] shrink-0 self-stretch bg-[#e5ded4] bg-cover bg-center"
         style={couponImageStyle(image, code)}
       >
-        <span className={`font-serif-tc absolute left-4 top-1/2 origin-center -translate-y-1/2 -rotate-90 whitespace-nowrap text-[10px] tracking-[0.34em] sm:text-xs ${dark ? 'text-white/80' : 'text-[#6b6156]/70'}`}>
-          SPECIAL FOR YOU
+        <span className={`font-serif-tc absolute left-2.5 top-1/2 origin-center -translate-y-1/2 -rotate-90 whitespace-nowrap text-center text-[8px] leading-[1.5] tracking-[0.22em] sm:left-3.5 sm:text-[9px] ${dark ? 'text-white/80' : 'text-[#6b6156]/70'}`}>
+          <span className="block">SPECIAL</span>
+          <span className="block">FOR YOU.</span>
         </span>
       </div>
       {/* 內容 */}
-      <div className="relative flex min-h-[150px] flex-1 items-stretch rounded-2xl bg-[#faf8f4] sm:min-h-[182px]">
-        <span className={`${notch} -top-[7px]`} />
-        <span className={`${notch} -bottom-[7px]`} />
-        <div className="flex min-w-0 flex-1 flex-col justify-center px-5 py-5 sm:px-7">
-          <p className="text-xl font-bold tracking-wide sm:text-[28px]">{code}</p>
-          <p className="mt-1.5 text-sm text-[#6b6156] sm:mt-2 sm:text-base">{desc}</p>
-          <div className="mt-3 flex flex-wrap gap-2 sm:mt-4 sm:gap-2.5">
+      <div className="relative flex min-h-[80px] flex-1 items-stretch rounded-r-2xl bg-[#faf8f4] sm:min-h-[94px]">
+        <div className="flex min-w-0 flex-1 flex-col justify-center px-4 py-3 sm:px-6">
+          <p className="text-base font-bold tracking-wide sm:text-xl">{code}</p>
+          <p className="mt-0.5 text-xs text-[#6b6156] sm:mt-1 sm:text-sm">{desc}</p>
+          <div className="mt-1.5 flex flex-wrap gap-1.5 sm:mt-2 sm:gap-2">
             {tags.map((t) => (
-              <span key={t} className="rounded-lg bg-[#f2ebe2] px-3 py-1.5 text-xs text-[#8a7f72] sm:px-4 sm:py-2 sm:text-sm">{t}</span>
+              <span key={t} className="rounded-md bg-[#f2ebe2] px-2 py-0.5 text-[10px] text-[#8a7f72] sm:px-3 sm:py-1 sm:text-xs">{t}</span>
             ))}
           </div>
         </div>
         {divided ? (
-          <div className="relative flex shrink-0 items-center self-stretch border-l border-dashed border-[#ded5c8] px-4 sm:px-7">
-            <span className={`${notch} -top-[7px]`} />
-            <span className={`${notch} -bottom-[7px]`} />
+          <div className="flex shrink-0 items-center self-stretch border-l border-dashed border-[#ded5c8] px-3 sm:px-6">
             {action}
           </div>
         ) : (
-          <div className="flex shrink-0 flex-col items-end justify-center gap-2.5 px-4 py-5 sm:gap-3.5 sm:px-7">
+          <div className="flex shrink-0 flex-col items-end justify-center gap-1 px-3 py-3 sm:gap-1.5 sm:px-6">
             {action}
             {showScript ? (
-              <p className="font-script hidden text-right text-[19px] leading-[1.25] text-[#c2b3a0] sm:block">{couponScript(code)}</p>
+              <p className="font-script hidden text-right text-[15px] leading-[1.15] text-[#c2b3a0] sm:block">{couponScript(code)}</p>
             ) : null}
           </div>
         )}

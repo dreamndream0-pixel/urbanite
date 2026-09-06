@@ -84,12 +84,12 @@ img {
 }
 /* 票券郵票鋸齒邊(左右各咬一排半圓) */
 .ticket-stamp {
-  -webkit-mask-image: radial-gradient(circle 6px at 0 6px, transparent 6px, #000 6.5px),
-    radial-gradient(circle 6px at 100% 6px, transparent 6px, #000 6.5px);
-  mask-image: radial-gradient(circle 6px at 0 6px, transparent 6px, #000 6.5px),
-    radial-gradient(circle 6px at 100% 6px, transparent 6px, #000 6.5px);
-  -webkit-mask-size: 100% 12px, 100% 12px;
-  mask-size: 100% 12px, 100% 12px;
+  -webkit-mask-image: radial-gradient(circle 5px at 0 5px, transparent 5px, #000 5.5px),
+    radial-gradient(circle 5px at 100% 5px, transparent 5px, #000 5.5px);
+  mask-image: radial-gradient(circle 5px at 0 5px, transparent 5px, #000 5.5px),
+    radial-gradient(circle 5px at 100% 5px, transparent 5px, #000 5.5px);
+  -webkit-mask-size: 100% 10px, 100% 10px;
+  mask-size: 100% 10px, 100% 10px;
   -webkit-mask-repeat: repeat-y, repeat-y;
   mask-repeat: repeat-y, repeat-y;
   -webkit-mask-composite: source-in;
