@@ -2317,7 +2317,7 @@ export default function AdminDashboard({
                 {filteredDiscounts.length === 0 ? (
                   <div className="mt-5"><Empty>沒有符合條件的優惠券。</Empty></div>
                 ) : (
-                  <div className="mt-5 space-y-4">
+                  <div className="mt-5 space-y-3">
                     {filteredDiscounts.map((d) => {
                       const usage = couponUsages.filter((item) => item.coupon_id === d.id);
                       const claimed = userCoupons.filter((item) => item.coupon_id === d.id).length;
@@ -2327,7 +2327,7 @@ export default function AdminDashboard({
                         : 'bg-[#efe9e0] text-[#8a7f72]';
                       const statusLabel = status === '啟用' ? '啟用中' : status === '停用' ? '已停用' : status;
                       return (
-                        <div key={d.id} className="rounded-2xl bg-white p-5">
+                        <div key={d.id} className="rounded-2xl bg-white p-4">
                           <div className="flex items-start justify-between gap-3">
                             <span className={`rounded-full px-3 py-1 text-xs font-semibold ${statusTone}`}>{statusLabel}</span>
                             <div className="relative">
@@ -2346,10 +2346,10 @@ export default function AdminDashboard({
                             </div>
                           </div>
 
-                          <div className="mt-2 flex items-start justify-between gap-4">
-                            <div className="min-w-0">
+                          <div className="mt-2 flex items-start gap-4">
+                            <div className="min-w-0 flex-1">
                               <p className="text-base font-bold">{d.name || couponText(d)}</p>
-                              <span className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-[#f4f0e8] px-2.5 py-1.5">
+                              <span className="mt-1.5 inline-flex items-center gap-1.5 rounded-lg bg-[#f4f0e8] px-2.5 py-1.5">
                                 <span className="font-mono text-sm">{d.code}</span>
                                 <button
                                   onClick={() => { navigator.clipboard?.writeText(d.code); }}
@@ -2359,13 +2359,13 @@ export default function AdminDashboard({
                                   <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2" /><path d="M5 15V5a2 2 0 0 1 2-2h10" /></svg>
                                 </button>
                               </span>
-                              <p className="mt-2 text-sm text-[#8a7f72]">
+                              <p className="mt-1.5 text-sm text-[#8a7f72]">
                                 {d.min_spend ? `滿 ${formatter.format(d.min_spend)}，` : ''}
                                 {d.type === 'free_shipping' ? '免運' : d.type === 'percent' ? `${d.value}% 折扣` : `折抵 ${formatter.format(d.value)}`}
                                 {d.max_discount ? `，最高折抵 ${formatter.format(d.max_discount)}` : ''}
                               </p>
                             </div>
-                            <div className="shrink-0 rounded-xl bg-[#eef1e6] px-4 py-3 text-center text-[#414a33]">
+                            <div className="shrink-0 rounded-xl bg-[#eef1e6] px-3.5 py-2.5 text-center text-[#414a33]">
                               {d.type === 'free_shipping' ? (
                                 <p className="font-serif-tc text-xl font-semibold">免運</p>
                               ) : d.type === 'percent' ? (
@@ -2376,7 +2376,7 @@ export default function AdminDashboard({
                             </div>
                           </div>
 
-                          <div className="mt-4 flex flex-nowrap items-center justify-between gap-2 border-t border-[#f0ebe2] pt-4">
+                          <div className="mt-3 flex flex-nowrap items-center justify-between gap-2 border-t border-[#f0ebe2] pt-3">
                             <div className="min-w-0 flex-1 space-y-1 text-[clamp(9px,2.3vw,14px)] text-[#6b6156]">
                               <p className="flex items-center gap-1 overflow-hidden text-ellipsis whitespace-nowrap">
                                 <svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="#a99e8f" strokeWidth="1.7" className="shrink-0" aria-hidden="true"><circle cx="12" cy="8" r="4" /><path d="M4 21c0-4 3.5-6 8-6s8 2 8 6" strokeLinecap="round" /></svg>
