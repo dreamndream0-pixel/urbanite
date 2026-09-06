@@ -86,10 +86,10 @@ img {
    左票券右緣(.ticket-seam-l)與右票面左緣(.ticket-seam-r)同形狀對接,形成穿孔接縫。 */
 .ticket-seam-l,
 .ticket-seam-r {
-  --rc: 10px;  /* 上下內圓角 */
+  --rc: 5.5px; /* 上下內圓角(與缺口同尺寸,讓轉角融入同一節奏,不再是獨立大缺口) */
   --r: 3.5px;  /* 缺口半徑 */
   --o: 1.1px;  /* 圓心內移 → 窄頸(超過半圓) */
-  --p: 13px;   /* 缺口週期 */
+  --p: 11.4px; /* 缺口週期:實測票面高度約 91px,取 91/8 讓整排剛好 8 個孔 */
   -webkit-mask-size: 100% 100%, 100% 100%, 100% var(--p);
   mask-size: 100% 100%, 100% 100%, 100% var(--p);
   -webkit-mask-repeat: no-repeat, no-repeat, repeat-y;
