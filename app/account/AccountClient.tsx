@@ -779,15 +779,18 @@ function CouponTicket({ code, image, desc, tags, action, dim = false, showScript
 }) {
   const dark = couponImageIsDark(image, code);
   return (
-    <div className={`relative flex rounded-2xl bg-white shadow-[0_1px_3px_rgba(31,27,25,0.06)] ${dim ? 'opacity-70' : ''}`}>
-      <div className="relative w-[96px] shrink-0 rounded-l-2xl bg-[#e5ded4] bg-cover bg-center sm:w-[136px]" style={couponImageStyle(image, code)}>
-        <span className={`absolute left-2.5 top-1/2 origin-center -translate-y-1/2 -rotate-90 whitespace-nowrap text-[9px] tracking-[0.28em] ${dark ? 'text-white/75' : 'text-[#6b6156]/65'}`}>
+    <div className={`relative flex min-h-[136px] rounded-2xl bg-white shadow-[0_1px_3px_rgba(31,27,25,0.06)] sm:min-h-[164px] ${dim ? 'opacity-70' : ''}`}>
+      {/* 左右外緣打孔缺口 */}
+      <span className="absolute -left-2.5 top-1/2 z-10 h-5 w-5 -translate-y-1/2 rounded-full bg-[#f6f2ec]" />
+      <span className="absolute -right-2.5 top-1/2 z-10 h-5 w-5 -translate-y-1/2 rounded-full bg-[#f6f2ec]" />
+      <div className="relative w-[118px] shrink-0 rounded-l-2xl bg-[#e5ded4] bg-cover bg-center sm:w-[190px]" style={couponImageStyle(image, code)}>
+        <span className={`absolute left-3 top-1/2 origin-center -translate-y-1/2 -rotate-90 whitespace-nowrap text-[9px] tracking-[0.28em] ${dark ? 'text-white/75' : 'text-[#6b6156]/65'}`}>
           SPECIAL FOR YOU
         </span>
       </div>
-      <div className="relative flex flex-1 items-center justify-between gap-3 rounded-r-2xl border-l border-dashed border-[#ded5c8] px-4 py-4 sm:px-6">
-        <span className="absolute -left-2 -top-2 h-4 w-4 rounded-full bg-[#f6f2ec]" />
-        <span className="absolute -bottom-2 -left-2 h-4 w-4 rounded-full bg-[#f6f2ec]" />
+      <div className="relative flex flex-1 items-center justify-between gap-3 rounded-r-2xl border-l border-dashed border-[#ded5c8] px-4 py-5 sm:px-7">
+        <span className="absolute -left-[7px] -top-[7px] h-3.5 w-3.5 rounded-full bg-[#f6f2ec]" />
+        <span className="absolute -bottom-[7px] -left-[7px] h-3.5 w-3.5 rounded-full bg-[#f6f2ec]" />
         <div className="min-w-0">
           <p className="text-lg font-bold tracking-wide sm:text-xl">{code}</p>
           <p className="mt-1 text-sm text-[#6b6156]">{desc}</p>
