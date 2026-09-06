@@ -81,6 +81,7 @@ export type Discount = {
   id: string;
   name?: string;
   code: string;
+  image?: string | null; // 券左側圖:preset-N 預設漸層 或 上傳照片網址
   type: 'percent' | 'amount' | 'free_shipping' | string;
   value: number;
   min_spend: number;

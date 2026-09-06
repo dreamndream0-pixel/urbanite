@@ -7,6 +7,7 @@ import type { Customer, Discount, Order, OrderStatusHistory, Product, Recipient,
 import { TW_CITIES, TW_REGIONS } from '@/lib/tw-regions';
 import { isOnlinePayment, paymentDeadline } from '@/lib/payment';
 import { OrderStatusBadge, orderNeedsAttention, AttentionDot } from '@/app/components/OrderStatusBadge';
+import { couponImageStyle, couponScript } from '@/lib/coupon-presets';
 import { uiAlert } from '@/lib/ui-dialog';
 import AccountMenu from '@/app/components/AccountMenu';
 import {
@@ -645,93 +646,108 @@ function CouponsTab({ coupons }: { coupons: Discount[] }) {
     refreshCoupons();
   }, []);
 
+  const ownedShown = owned.filter((item) => (couponTab === 'expired' ? ['expired', 'revoked'].includes(item.status) : item.status === couponTab));
+  const tag = (t: string) => <span className="rounded-full bg-[#f0e9dd] px-2.5 py-0.5 text-[11px] font-medium text-[#8a7f72]">{t}</span>;
   return (
-    <div className="space-y-6">
-      <div className="rounded-2xl border border-[#e5ded4] bg-white p-6">
-        <h2 className="text-lg font-semibold">購物金</h2>
-        <p className="mt-3 text-3xl font-bold text-[#c84767]">{formatter.format(0)}</p>
-        <p className="mt-1 text-sm text-[#8a7f72]">目前尚無購物金,消費與活動可累積。</p>
+    <div className="space-y-8">
+      {/* 標題 banner */}
+      <div className="overflow-hidden rounded-2xl border border-[#e5ded4]" style={{ background: 'linear-gradient(120deg,#efe7db 0%,#e7ddcc 55%,#dccdb7 100%)' }}>
+        <div className="px-6 py-8 sm:px-9 sm:py-10">
+          <h2 className="text-3xl font-bold tracking-[0.14em] text-[#2c2826]" style={{ fontFamily: 'Georgia, "Noto Serif TC", serif' }}>我的優惠</h2>
+          <p className="mt-1.5 text-[11px] font-semibold tracking-[0.34em] text-[#a99e8f]">MY COUPONS</p>
+          <p className="mt-3 text-sm text-[#6b6156]">收藏喜歡的優惠,享受更好的購物體驗。</p>
+        </div>
       </div>
 
-      <div className="rounded-2xl border border-[#e5ded4] bg-white p-6">
+      {/* 購物金 */}
+      <div className="rounded-2xl border border-[#e5ded4] bg-white p-5">
+        <div className="flex items-center gap-4">
+          <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-[#f3ede4] text-[#6b6156]">
+            <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M20 12v9H4v-9M2 7h20v5H2zM12 22V7M12 7S9 3 6.5 4.5 8 9 12 7zM12 7s3-4 5.5-2.5S16 9 12 7z" /></svg>
+          </span>
+          <div>
+            <p className="text-sm text-[#8a7f72]">購物金</p>
+            <p className="text-2xl font-bold">{formatter.format(0)}</p>
+            <p className="mt-0.5 text-xs text-[#a99e8f]">目前尚無購物金,消費與活動可累積。</p>
+          </div>
+        </div>
+      </div>
+
+      {/* 我的優惠券 */}
+      <div>
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-lg font-semibold">我的優惠券</h2>
-          <div className="flex rounded-full bg-[#f6f2ec] p-1 text-sm font-semibold">
-            {[
-              ['available', '可使用'],
-              ['used', '已使用'],
-              ['expired', '已過期'],
-            ].map(([key, label]) => (
-              <button
-                key={key}
-                type="button"
-                onClick={() => setCouponTab(key as typeof couponTab)}
-                className={`rounded-full px-3 py-1 ${couponTab === key ? 'bg-[#1f1b19] text-white' : 'text-[#8a7f72]'}`}
-              >
-                {label}
-              </button>
+          <h3 className="text-xl font-bold">我的優惠券</h3>
+          <div className="flex rounded-full bg-[#f0e9dd] p-1 text-sm font-semibold">
+            {([['available', `可使用${owned.filter((i) => i.status === 'available').length ? `(${owned.filter((i) => i.status === 'available').length})` : ''}`], ['used', '已使用'], ['expired', '已過期']] as const).map(([key, label]) => (
+              <button key={key} type="button" onClick={() => setCouponTab(key)} className={`rounded-full px-3.5 py-1.5 transition ${couponTab === key ? 'bg-[#1f1b19] text-white' : 'text-[#8a7f72]'}`}>{label}</button>
             ))}
           </div>
         </div>
-        {!ready && (
-          <p className="mt-3 rounded-lg bg-[#fff8e8] px-4 py-3 text-sm text-[#8a6d2f]">
-            會員領券資料表尚未建立,目前先顯示可輸入的優惠碼。
-          </p>
-        )}
+        {!ready && <p className="mt-3 rounded-lg bg-[#fff8e8] px-4 py-3 text-sm text-[#8a6d2f]">會員領券資料表尚未建立,目前先顯示可輸入的優惠碼。</p>}
         {loading ? (
-          <p className="mt-4 rounded-lg bg-[#f6f2ec] p-5 text-sm text-[#6b6156]">載入優惠券中...</p>
-        ) : owned.filter((item) => (couponTab === 'expired' ? ['expired', 'revoked'].includes(item.status) : item.status === couponTab)).length === 0 ? (
-          <p className="mt-4 rounded-lg bg-[#f6f2ec] p-5 text-sm text-[#6b6156]">目前沒有可用的優惠券。</p>
+          <p className="mt-4 rounded-xl bg-[#f6f2ec] p-5 text-sm text-[#6b6156]">載入優惠券中...</p>
+        ) : ownedShown.length === 0 ? (
+          <p className="mt-4 rounded-xl bg-[#f6f2ec] p-5 text-sm text-[#6b6156]">目前沒有{couponTab === 'available' ? '可用' : couponTab === 'used' ? '已使用' : '已過期'}的優惠券。</p>
         ) : (
           <div className="mt-4 space-y-3">
-            {owned.filter((item) => (couponTab === 'expired' ? ['expired', 'revoked'].includes(item.status) : item.status === couponTab)).map((item) => {
+            {ownedShown.map((item) => {
               const c = item.coupon;
               if (!c) return null;
               return (
-              <div
-                key={item.id}
-                className="flex items-center justify-between gap-3 rounded-xl border border-dashed border-[#d7c9bd] bg-[#faf7f2] p-4"
-              >
-                <div>
-                  <p className="text-xs font-semibold text-[#8a7f72]">{item.status === 'used' ? '已使用' : item.status === 'revoked' ? '已撤回' : item.status === 'expired' ? '已過期' : '可使用'}</p>
-                  <p className="font-mono text-lg font-bold tracking-wide">{c.code}</p>
-                  <p className="text-sm text-[#8a7f72]">{couponLabel(c)}</p>
-                  <p className="mt-1 text-xs text-[#8a7f72]">
-                    {couponScope(c)}
-                    {c.end_at ? ` / 到 ${new Date(c.end_at).toLocaleDateString('zh-TW')}` : ' / 無期限'}
-                  </p>
+                <div key={item.id} className={`flex overflow-hidden rounded-2xl border border-[#e5ded4] bg-white shadow-sm ${item.status !== 'available' ? 'opacity-70' : ''}`}>
+                  <div className="w-24 shrink-0 sm:w-32" style={couponImageStyle(c.image ?? undefined, c.code)} />
+                  <div className="flex flex-1 items-center justify-between gap-3 p-4">
+                    <div className="min-w-0">
+                      <p className="font-mono text-lg font-bold tracking-wide">{c.code}</p>
+                      <p className="mt-0.5 text-sm text-[#6b6156]">{couponLabel(c)}</p>
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        {tag(couponScope(c))}
+                        {tag(c.end_at ? `到 ${new Date(c.end_at).toLocaleDateString('zh-TW')}` : '無期限')}
+                      </div>
+                    </div>
+                    <div className="shrink-0 text-right">
+                      <span className={`inline-block rounded-full px-3 py-1 text-xs font-semibold ${item.status === 'available' ? 'bg-[#1f1b19] text-white' : 'bg-[#f0e9dd] text-[#8a7f72]'}`}>
+                        {item.status === 'used' ? '已使用' : item.status === 'revoked' ? '已撤回' : item.status === 'expired' ? '已過期' : '結帳可用'}
+                      </span>
+                      <p className="mt-2 hidden text-xs italic text-[#c3b39f] sm:block" style={{ fontFamily: 'Georgia, serif' }}>{couponScript(c.code)}</p>
+                    </div>
+                  </div>
                 </div>
-                {item.status === 'available' && (
-                  <span className="rounded-full bg-[#1f1b19] px-3 py-1 text-xs font-semibold text-white">
-                    結帳可用
-                  </span>
-                )}
-              </div>
               );
             })}
           </div>
         )}
       </div>
 
-      <div className="rounded-2xl border border-[#e5ded4] bg-white p-6">
-        <h2 className="text-lg font-semibold">可領取優惠券</h2>
+      {/* 可領取優惠券 */}
+      <div>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h3 className="text-xl font-bold">可領取優惠券</h3>
+          <p className="text-xs text-[#a99e8f]">不定期推出優惠活動,記得常回來看看!</p>
+        </div>
         {claimable.length === 0 ? (
-          <p className="mt-4 rounded-lg bg-[#f6f2ec] p-5 text-sm text-[#6b6156]">目前沒有可領取的優惠券。</p>
+          <p className="mt-4 rounded-xl bg-[#f6f2ec] p-5 text-sm text-[#6b6156]">目前沒有可領取的優惠券。</p>
         ) : (
-          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          <div className="mt-4 space-y-3">
             {claimable.map((c) => (
-              <div key={c.id} className="rounded-xl border border-[#e5ded4] p-4">
-                <p className="font-mono text-lg font-bold tracking-wide">{c.code}</p>
-                <p className="mt-1 text-sm text-[#8a7f72]">{couponLabel(c)}</p>
-                <p className="mt-1 text-xs text-[#8a7f72]">{couponScope(c)}</p>
-                <button
-                  type="button"
-                  onClick={() => claimCoupon(c.id)}
-                  disabled={!ready}
-                  className="mt-4 rounded-full bg-[#1f1b19] px-4 py-2 text-sm font-semibold text-white disabled:opacity-40"
-                >
-                  領取
-                </button>
+              <div key={c.id} className="flex overflow-hidden rounded-2xl border border-[#e5ded4] bg-white shadow-sm">
+                <div className="w-24 shrink-0 sm:w-32" style={couponImageStyle(c.image ?? undefined, c.code)} />
+                <div className="flex flex-1 items-center justify-between gap-3 p-4">
+                  <div className="min-w-0">
+                    <p className="font-mono text-lg font-bold tracking-wide">{c.code}</p>
+                    <p className="mt-0.5 text-sm text-[#6b6156]">{couponLabel(c)}</p>
+                    <div className="mt-2 flex flex-wrap gap-1.5">{tag(couponScope(c))}</div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => claimCoupon(c.id)}
+                    disabled={!ready}
+                    className="inline-flex shrink-0 items-center gap-1 rounded-full bg-[#1f1b19] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-black disabled:opacity-40"
+                  >
+                    領取
+                    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 4v12M6 12l6 6 6-6M5 20h14" /></svg>
+                  </button>
+                </div>
               </div>
             ))}
           </div>
