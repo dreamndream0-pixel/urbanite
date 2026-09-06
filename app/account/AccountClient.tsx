@@ -650,29 +650,29 @@ function CouponsTab({ coupons }: { coupons: Discount[] }) {
   const availableCount = owned.filter((i) => i.status === 'available').length;
   return (
     <div className="space-y-9">
-      {/* HERO:標題 + 購物金(疊在 banner 內) */}
-      <section className="relative overflow-hidden rounded-[20px] bg-[#e9dfd0]">
-        <div className="pointer-events-none absolute inset-y-0 right-0 hidden w-[46%] bg-[#e3d7c4] sm:block">
-          <p className="absolute right-7 top-7 text-right text-[22px] leading-[1.35] text-[#b3a48d]" style={{ fontFamily: 'Georgia, serif', fontStyle: 'italic' }}>
+      {/* HERO:全出血標題 + 購物金卡 */}
+      <section className="relative -mx-4 -mt-8 overflow-hidden bg-[#e9dfd0] sm:-mx-6">
+        <div className="pointer-events-none absolute inset-y-0 right-0 w-[52%] bg-[#e4d9c8]">
+          <p className="font-script absolute right-6 top-8 text-right text-[34px] leading-[1.15] text-[#b0a08a] sm:text-[42px]">
             Good<br />Outfit<br />Brighter<br />Days.
           </p>
         </div>
-        <div className="relative px-6 pb-5 pt-8 sm:px-9 sm:pb-6 sm:pt-10">
-          <h2 className="text-[30px] font-semibold leading-none tracking-[0.2em] text-[#2c2826]" style={{ fontFamily: 'Georgia, "Noto Serif TC", serif' }}>我的優惠</h2>
-          <p className="mt-2.5 text-[11px] tracking-[0.36em] text-[#a2957f]">MY COUPONS</p>
-          <p className="mt-3.5 text-sm text-[#6b6156]">收藏喜歡的優惠，享受更好的購物體驗。</p>
+        <div className="relative px-5 pb-5 pt-9 sm:px-8 sm:pb-6 sm:pt-11">
+          <h2 className="font-serif-tc text-[34px] font-semibold leading-none tracking-[0.22em] text-[#2c2826] sm:text-[40px]">我的優惠</h2>
+          <p className="mt-3 text-[11px] tracking-[0.4em] text-[#a2957f] sm:text-xs">MY COUPONS</p>
+          <p className="mt-3.5 text-sm text-[#6b6156] sm:text-base">收藏喜歡的優惠，享受更好的購物體驗。</p>
 
-          <div className="mt-6 flex items-center gap-4 rounded-2xl bg-white/55 p-4 backdrop-blur-[2px]">
-            <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white/70 text-[#6b6156]">
-              <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M20 12v9H4v-9M2 7h20v5H2zM12 22V7M12 7S9 3 6.5 4.5 8 9 12 7zM12 7s3-4 5.5-2.5S16 9 12 7z" /></svg>
+          <div className="mt-7 flex items-center gap-4 rounded-2xl bg-white/50 p-4 backdrop-blur-[2px] sm:p-5">
+            <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-white/60 text-[#6b6156]">
+              <svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M20 12v9H4v-9M2 7h20v5H2zM12 22V7M12 7S9 3 6.5 4.5 8 9 12 7zM12 7s3-4 5.5-2.5S16 9 12 7z" /></svg>
             </span>
             <div className="min-w-0">
-              <p className="text-sm text-[#7d7264]">購物金</p>
-              <p className="flex items-center gap-2 text-[30px] font-bold leading-tight text-[#2c2826]">
+              <p className="text-base font-medium text-[#5f564b]">購物金</p>
+              <p className="flex items-center gap-2 text-[34px] font-bold leading-tight text-[#2c2826]">
                 {formatter.format(0)}
-                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#a2957f" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6" /></svg>
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#a2957f" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6" /></svg>
               </p>
-              <p className="mt-1 text-xs text-[#8a7f72]">目前尚無購物金，消費與活動可累積。</p>
+              <p className="mt-1 text-xs text-[#7d7264] sm:text-sm">目前尚無購物金，消費與活動可累積。</p>
             </div>
           </div>
         </div>
@@ -681,7 +681,7 @@ function CouponsTab({ coupons }: { coupons: Discount[] }) {
       {/* 我的優惠券 */}
       <section>
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h3 className="text-[22px] font-bold tracking-wide">我的優惠券</h3>
+          <h3 className="font-serif-tc text-[24px] font-bold tracking-[0.06em] sm:text-[26px]">我的優惠券</h3>
           <div className="flex rounded-full bg-[#eae1d4] p-1 text-sm font-medium">
             {([['available', `可使用 (${availableCount})`], ['used', '已使用'], ['expired', '已過期']] as const).map(([key, label]) => (
               <button key={key} type="button" onClick={() => setCouponTab(key)} className={`rounded-full px-5 py-1.5 transition ${couponTab === key ? 'bg-[#2b2723] font-semibold text-white' : 'text-[#8a7f72]'}`}>{label}</button>
@@ -723,8 +723,8 @@ function CouponsTab({ coupons }: { coupons: Discount[] }) {
       {/* 可領取優惠券 */}
       <section>
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h3 className="text-[22px] font-bold tracking-wide">可領取優惠券</h3>
-          <p className="text-xs text-[#a99e8f]">不定期推出優惠活動，記得常回來看看！</p>
+          <h3 className="font-serif-tc text-[24px] font-bold tracking-[0.06em] sm:text-[26px]">可領取優惠券</h3>
+          <p className="text-xs text-[#a99e8f] sm:text-sm">不定期推出優惠活動，記得常回來看看！</p>
         </div>
         {claimable.length === 0 ? (
           <p className="mt-5 rounded-xl bg-white p-5 text-sm text-[#6b6156]">目前沒有可領取的優惠券。</p>
@@ -738,6 +738,7 @@ function CouponsTab({ coupons }: { coupons: Discount[] }) {
                 desc={couponLabel(c)}
                 tags={[couponScope(c)]}
                 showScript={false}
+                divided
                 action={
                   <button
                     type="button"
@@ -757,18 +758,18 @@ function CouponsTab({ coupons }: { coupons: Discount[] }) {
 
       {/* 底部標語 */}
       <div className="flex items-center gap-5 pt-1 text-[#b3a48d]">
-        <p className="shrink-0 text-[11px] leading-[1.7] tracking-[0.16em]" style={{ fontFamily: 'Georgia, serif' }}>
+        <p className="font-serif-tc shrink-0 text-[11px] leading-[1.8] tracking-[0.18em] sm:text-xs">
           &quot;A BETTER OUTFIT<br />A BRIGHTER YOU.&quot;
         </p>
         <span className="h-px flex-1 bg-[#ded5c8]" />
-        <p className="shrink-0 text-[11px] tracking-[0.32em]">URBANITE</p>
+        <p className="font-serif-tc shrink-0 text-[11px] tracking-[0.34em] sm:text-xs">URBANITE</p>
       </div>
     </div>
   );
 }
 
 /* 票券卡:左側圖 + 打孔缺口 + 虛線接縫 */
-function CouponTicket({ code, image, desc, tags, action, dim = false, showScript = true }: {
+function CouponTicket({ code, image, desc, tags, action, dim = false, showScript = true, divided = false }: {
   code: string;
   image?: string;
   desc: string;
@@ -776,49 +777,48 @@ function CouponTicket({ code, image, desc, tags, action, dim = false, showScript
   action: ReactNode;
   dim?: boolean;
   showScript?: boolean;
+  divided?: boolean;
 }) {
   const dark = couponImageIsDark(image, code);
-  // 郵票鋸齒邊(左右兩側各咬出一排半圓)
-  const scallop = {
-    WebkitMaskImage: 'radial-gradient(circle 6px at 0 6px, transparent 6px, #000 6.5px), radial-gradient(circle 6px at 100% 6px, transparent 6px, #000 6.5px)',
-    maskImage: 'radial-gradient(circle 6px at 0 6px, transparent 6px, #000 6.5px), radial-gradient(circle 6px at 100% 6px, transparent 6px, #000 6.5px)',
-    WebkitMaskSize: '100% 12px, 100% 12px',
-    maskSize: '100% 12px, 100% 12px',
-    WebkitMaskRepeat: 'repeat-y, repeat-y',
-    maskRepeat: 'repeat-y, repeat-y',
-    WebkitMaskComposite: 'source-in',
-    maskComposite: 'intersect',
-  } as const;
+  const notch = 'absolute -left-[7px] h-3.5 w-3.5 rounded-full bg-[#f6f2ec]';
   return (
-    <div className={`flex items-stretch gap-2.5 sm:gap-3.5 ${dim ? 'opacity-70' : ''}`}>
-      {/* 照片(郵票邊) */}
+    <div className={`flex items-stretch gap-2 sm:gap-2.5 ${dim ? 'opacity-70' : ''}`}>
+      {/* 照片(郵票鋸齒邊) */}
       <div
-        className="relative w-[27%] max-w-[215px] shrink-0 self-stretch bg-[#e5ded4] bg-cover bg-center"
-        style={{ ...couponImageStyle(image, code), ...scallop }}
+        className="ticket-stamp relative w-[26%] max-w-[210px] shrink-0 self-stretch bg-[#e5ded4] bg-cover bg-center"
+        style={couponImageStyle(image, code)}
       >
-        <span className={`absolute left-4 top-1/2 origin-center -translate-y-1/2 -rotate-90 whitespace-nowrap text-[10px] tracking-[0.32em] sm:text-xs ${dark ? 'text-white/80' : 'text-[#6b6156]/70'}`} style={{ fontFamily: 'Georgia, serif' }}>
+        <span className={`font-serif-tc absolute left-4 top-1/2 origin-center -translate-y-1/2 -rotate-90 whitespace-nowrap text-[10px] tracking-[0.34em] sm:text-xs ${dark ? 'text-white/80' : 'text-[#6b6156]/70'}`}>
           SPECIAL FOR YOU
         </span>
       </div>
       {/* 內容 */}
-      <div className="relative flex min-h-[140px] flex-1 items-center justify-between gap-4 rounded-2xl bg-[#faf7f2] px-5 py-5 sm:min-h-[186px] sm:px-8">
-        <span className="absolute -left-[7px] top-3 h-3.5 w-3.5 rounded-full bg-[#f6f2ec]" />
-        <span className="absolute -left-[7px] bottom-3 h-3.5 w-3.5 rounded-full bg-[#f6f2ec]" />
-        <div className="min-w-0">
+      <div className="relative flex min-h-[150px] flex-1 items-stretch rounded-2xl bg-[#faf8f4] sm:min-h-[182px]">
+        <span className={`${notch} -top-[7px]`} />
+        <span className={`${notch} -bottom-[7px]`} />
+        <div className="flex min-w-0 flex-1 flex-col justify-center px-5 py-5 sm:px-7">
           <p className="text-xl font-bold tracking-wide sm:text-[28px]">{code}</p>
           <p className="mt-1.5 text-sm text-[#6b6156] sm:mt-2 sm:text-base">{desc}</p>
           <div className="mt-3 flex flex-wrap gap-2 sm:mt-4 sm:gap-2.5">
             {tags.map((t) => (
-              <span key={t} className="rounded-lg bg-[#efe9e0] px-3 py-1.5 text-xs text-[#8a7f72] sm:px-4 sm:py-2 sm:text-sm">{t}</span>
+              <span key={t} className="rounded-lg bg-[#f2ebe2] px-3 py-1.5 text-xs text-[#8a7f72] sm:px-4 sm:py-2 sm:text-sm">{t}</span>
             ))}
           </div>
         </div>
-        <div className="flex shrink-0 flex-col items-end gap-2 sm:gap-3">
-          {action}
-          {showScript ? (
-            <p className="hidden text-right text-[15px] italic leading-[1.5] text-[#c4b6a2] sm:block" style={{ fontFamily: 'Georgia, serif' }}>{couponScript(code)}</p>
-          ) : null}
-        </div>
+        {divided ? (
+          <div className="relative flex shrink-0 items-center self-stretch border-l border-dashed border-[#ded5c8] px-4 sm:px-7">
+            <span className={`${notch} -top-[7px]`} />
+            <span className={`${notch} -bottom-[7px]`} />
+            {action}
+          </div>
+        ) : (
+          <div className="flex shrink-0 flex-col items-end justify-center gap-2.5 px-4 py-5 sm:gap-3.5 sm:px-7">
+            {action}
+            {showScript ? (
+              <p className="font-script hidden text-right text-[19px] leading-[1.25] text-[#c2b3a0] sm:block">{couponScript(code)}</p>
+            ) : null}
+          </div>
+        )}
       </div>
     </div>
   );

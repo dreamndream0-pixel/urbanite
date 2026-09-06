@@ -74,3 +74,24 @@ img {
 .product-card:active {
   animation: card-wiggle 0.4s ease-in-out;
 }
+
+/* 優惠券頁字體:中文襯線標題 + 手寫花體 */
+.font-serif-tc {
+  font-family: 'Noto Serif TC', 'Songti TC', 'PingFang TC', serif;
+}
+.font-script {
+  font-family: 'Parisienne', 'Snell Roundhand', cursive;
+}
+/* 票券郵票鋸齒邊(左右各咬一排半圓) */
+.ticket-stamp {
+  -webkit-mask-image: radial-gradient(circle 6px at 0 6px, transparent 6px, #000 6.5px),
+    radial-gradient(circle 6px at 100% 6px, transparent 6px, #000 6.5px);
+  mask-image: radial-gradient(circle 6px at 0 6px, transparent 6px, #000 6.5px),
+    radial-gradient(circle 6px at 100% 6px, transparent 6px, #000 6.5px);
+  -webkit-mask-size: 100% 12px, 100% 12px;
+  mask-size: 100% 12px, 100% 12px;
+  -webkit-mask-repeat: repeat-y, repeat-y;
+  mask-repeat: repeat-y, repeat-y;
+  -webkit-mask-composite: source-in;
+  mask-composite: intersect;
+}
