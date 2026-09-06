@@ -1544,13 +1544,10 @@ export default function AdminDashboard({
                               </p>
                               <p className="mt-0.5 text-xs text-[#8a7f72]">{dateShort}</p>
                             </div>
-                            <div className="shrink-0 text-right">
-                              <p className="text-lg font-bold">{formatter.format(order.total)}</p>
-                              <span className="mt-0.5 inline-flex items-center gap-0.5 text-xs font-semibold text-[#8a7f72]">
-                                查看完整訂單
-                                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6" /></svg>
-                              </span>
-                            </div>
+                            <span className="mt-1 inline-flex shrink-0 items-center gap-0.5 text-xs font-semibold text-[#8a7f72]">
+                              查看完整訂單
+                              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6" /></svg>
+                            </span>
                           </button>
 
                           {/* 狀態 + 顧客 */}
