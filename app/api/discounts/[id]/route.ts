@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getAdminUser } from '@/lib/supabase/server';
+import { taipeiInputToISO } from '@/lib/taipei-time';
 import type { Discount } from '@/lib/types';
 
 function list(value: unknown): string[] {
@@ -30,8 +31,8 @@ export async function PATCH(
   if (typeof body.total_limit === 'number') update.total_limit = body.total_limit || null;
   if (typeof body.per_user_limit === 'number') update.per_user_limit = body.per_user_limit || 1;
   if (typeof body.active === 'boolean') update.active = body.active;
-  if (typeof body.start_at === 'string') update.start_at = body.start_at || null;
-  if (typeof body.end_at === 'string') update.end_at = body.end_at || null;
+  if (typeof body.start_at === 'string') update.start_at = taipeiInputToISO(body.start_at);
+  if (typeof body.end_at === 'string') update.end_at = taipeiInputToISO(body.end_at);
   if (typeof body.status === 'string') {
     update.status = body.status;
     update.active = body.status === '啟用';

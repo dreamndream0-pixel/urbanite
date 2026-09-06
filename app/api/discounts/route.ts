@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getAdminUser } from '@/lib/supabase/server';
+import { taipeiInputToISO } from '@/lib/taipei-time';
 import type { Discount } from '@/lib/types';
 
 function list(value: unknown): string[] {
@@ -18,8 +19,8 @@ function discountPayload(body: Record<string, unknown>, code: string) {
     value: type === 'free_shipping' ? 0 : Number(body.value) || 0,
     min_spend: Number(body.min_spend) || 0,
     max_discount: Number(body.max_discount) || null,
-    start_at: body.start_at ? String(body.start_at) : null,
-    end_at: body.end_at ? String(body.end_at) : null,
+    start_at: taipeiInputToISO(body.start_at),
+    end_at: taipeiInputToISO(body.end_at),
     total_limit: Number(body.total_limit) || null,
     per_user_limit: Number(body.per_user_limit) || 1,
     applicable_products: list(body.applicable_products),

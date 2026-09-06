@@ -30,6 +30,7 @@ import {
 import { uiAlert, uiConfirm, uiPrompt } from '@/lib/ui-dialog';
 import { OrderCardBadges, orderNeedsAttention, AttentionDot, isPaymentReported } from '@/app/components/OrderStatusBadge';
 import { COUPON_PRESETS } from '@/lib/coupon-presets';
+import { isoToTaipeiInput } from '@/lib/taipei-time';
 
 const formatter = new Intl.NumberFormat('zh-TW', {
   style: 'currency',
@@ -1060,8 +1061,8 @@ export default function AdminDashboard({
       value: d.value ?? 0,
       min_spend: d.min_spend ?? 0,
       max_discount: d.max_discount ?? 0,
-      start_at: d.start_at ? String(d.start_at).slice(0, 16) : '',
-      end_at: d.end_at ? String(d.end_at).slice(0, 16) : '',
+      start_at: isoToTaipeiInput(d.start_at),
+      end_at: isoToTaipeiInput(d.end_at),
       total_limit: d.total_limit ?? 0,
       per_user_limit: d.per_user_limit ?? 1,
       applicable_products: (d.applicable_products ?? []).join('\n'),
