@@ -492,10 +492,6 @@ export default function AdminDashboard({
 
   // ---- 衍生資料 ----
   // user_id → 會員檔案,用來把訂單對照回會員
-  const customerByUser = useMemo(
-    () => new Map(customers.map((c) => [c.user_id, c])),
-    [customers],
-  );
   // 舊訂單品項沒存圖片,用商品名稱對應現有商品圖當備援
   const imageByName = useMemo(
     () => new Map(products.filter((p) => p.image).map((p) => [p.name, p.image])),
@@ -1462,11 +1458,6 @@ export default function AdminDashboard({
           {/* ===== 訂單管理 ===== */}
           {section === 'orders' && (
             <section className="rounded-xl border border-[#e5ded4] bg-white p-5">
-              <div className="mb-4">
-                <p className="text-[11px] font-semibold tracking-[0.28em] text-[#b3a897]">ORDER MANAGEMENT</p>
-                <h2 className="mt-1 text-2xl font-bold leading-tight">訂單管理</h2>
-                <p className="mt-0.5 text-sm text-[#8a7f72]">管理與追蹤所有訂單,掌握出貨進度</p>
-              </div>
               {/* 搜尋 + 篩選 */}
               <div className="mb-3 flex flex-wrap gap-2">
                 <input
@@ -1538,8 +1529,6 @@ export default function AdminDashboard({
                 return (
                   <div className="space-y-4">
                     {shown.map((order) => {
-                      const name =
-                        (order.user_id && customerByUser.get(order.user_id)?.name) || order.customer_name;
                       const dateShort = order.created_at ? new Date(order.created_at).toLocaleString('zh-TW', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : '';
                       const shipShort = /宅配/.test(order.shipping_method ?? '') ? '宅配'
                         : /超商|取貨|7-?11|全家|萊爾富|ok/i.test(order.shipping_method ?? '') ? '超商取貨'
@@ -1555,10 +1544,13 @@ export default function AdminDashboard({
                               </p>
                               <p className="mt-0.5 text-xs text-[#8a7f72]">{dateShort}</p>
                             </div>
-                            <span className="flex shrink-0 items-center gap-1 text-lg font-bold">
-                              {formatter.format(order.total)}
-                              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#c9b8a8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6" /></svg>
-                            </span>
+                            <div className="shrink-0 text-right">
+                              <p className="text-lg font-bold">{formatter.format(order.total)}</p>
+                              <span className="mt-0.5 inline-flex items-center gap-0.5 text-xs font-semibold text-[#8a7f72]">
+                                查看完整訂單
+                                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6" /></svg>
+                              </span>
+                            </div>
                           </button>
 
                           {/* 狀態 + 顧客 */}
@@ -1579,13 +1571,6 @@ export default function AdminDashboard({
                               {order.cancel_status === 'REQUESTED' ? (
                                 <span className="rounded-full bg-[#fbe9e7] px-3 py-1 text-xs font-semibold text-[#c0392b]">取消審核中</span>
                               ) : null}
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#a99e8f" strokeWidth="1.6" aria-hidden="true"><circle cx="12" cy="8" r="4" /><path d="M4 21c0-4 3.5-6 8-6s8 2 8 6" strokeLinecap="round" /></svg>
-                              <div className="min-w-0 text-right">
-                                <p className="truncate text-sm font-semibold text-[#2c2826]">{name}</p>
-                                <p className="truncate text-xs text-[#a99e8f]">{order.email}</p>
-                              </div>
                             </div>
                           </div>
 
@@ -1618,14 +1603,6 @@ export default function AdminDashboard({
                           {order.note ? (
                             <p className="mt-3 line-clamp-1 rounded-lg bg-[#faf6ee] px-3 py-1.5 text-sm text-[#6b6156]">備註:{order.note}</p>
                           ) : null}
-
-                          {/* 底部操作 */}
-                          <div className="mt-4 flex items-center justify-between gap-2">
-                            <button onClick={() => setOpenOrderId(order.id)} className="inline-flex h-10 items-center rounded-full border border-[#d7c9bd] px-6 text-sm font-semibold text-[#6b6156] hover:bg-[#efe8dd]">查看完整訂單</button>
-                            <button onClick={() => setOpenOrderId(order.id)} aria-label="更多操作" className="flex h-10 w-10 items-center justify-center rounded-full bg-[#f3ede4] text-[#6b6156] hover:bg-[#ece2d5]">
-                              <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.6" /><circle cx="12" cy="12" r="1.6" /><circle cx="19" cy="12" r="1.6" /></svg>
-                            </button>
-                          </div>
                         </div>
                       );
                     })}
