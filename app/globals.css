@@ -82,16 +82,38 @@ img {
 .font-script {
   font-family: 'Parisienne', 'Snell Roundhand', cursive;
 }
-/* 票券郵票鋸齒邊(左右各咬一排半圓) */
-.ticket-stamp {
-  -webkit-mask-image: radial-gradient(circle 5px at 0 5px, transparent 5px, #000 5.5px),
-    radial-gradient(circle 5px at 100% 5px, transparent 5px, #000 5.5px);
-  mask-image: radial-gradient(circle 5px at 0 5px, transparent 5px, #000 5.5px),
-    radial-gradient(circle 5px at 100% 5px, transparent 5px, #000 5.5px);
-  -webkit-mask-size: 100% 10px, 100% 10px;
-  mask-size: 100% 10px, 100% 10px;
-  -webkit-mask-repeat: repeat-y, repeat-y;
-  mask-repeat: repeat-y, repeat-y;
-  -webkit-mask-composite: source-in;
+/* 票券接縫:上下內圓角 + 一排「超過半圓」的窄頸缺口。
+   左票券右緣(.ticket-seam-l)與右票面左緣(.ticket-seam-r)同形狀對接,形成穿孔接縫。 */
+.ticket-seam-l,
+.ticket-seam-r {
+  --rc: 10px;  /* 上下內圓角 */
+  --r: 3.5px;  /* 缺口半徑 */
+  --o: 1.1px;  /* 圓心內移 → 窄頸(超過半圓) */
+  --p: 13px;   /* 缺口週期 */
+  -webkit-mask-size: 100% 100%, 100% 100%, 100% var(--p);
+  mask-size: 100% 100%, 100% 100%, 100% var(--p);
+  -webkit-mask-repeat: no-repeat, no-repeat, repeat-y;
+  mask-repeat: no-repeat, no-repeat, repeat-y;
+  -webkit-mask-composite: source-in, source-in;
   mask-composite: intersect;
+}
+.ticket-seam-l {
+  -webkit-mask-image:
+    radial-gradient(circle var(--rc) at 100% 0, #0000 var(--rc), #000 calc(var(--rc) + 0.5px)),
+    radial-gradient(circle var(--rc) at 100% 100%, #0000 var(--rc), #000 calc(var(--rc) + 0.5px)),
+    radial-gradient(circle var(--r) at calc(100% - var(--o)) var(--r), #0000 var(--r), #000 calc(var(--r) + 0.5px));
+  mask-image:
+    radial-gradient(circle var(--rc) at 100% 0, #0000 var(--rc), #000 calc(var(--rc) + 0.5px)),
+    radial-gradient(circle var(--rc) at 100% 100%, #0000 var(--rc), #000 calc(var(--rc) + 0.5px)),
+    radial-gradient(circle var(--r) at calc(100% - var(--o)) var(--r), #0000 var(--r), #000 calc(var(--r) + 0.5px));
+}
+.ticket-seam-r {
+  -webkit-mask-image:
+    radial-gradient(circle var(--rc) at 0 0, #0000 var(--rc), #000 calc(var(--rc) + 0.5px)),
+    radial-gradient(circle var(--rc) at 0 100%, #0000 var(--rc), #000 calc(var(--rc) + 0.5px)),
+    radial-gradient(circle var(--r) at var(--o) var(--r), #0000 var(--r), #000 calc(var(--r) + 0.5px));
+  mask-image:
+    radial-gradient(circle var(--rc) at 0 0, #0000 var(--rc), #000 calc(var(--rc) + 0.5px)),
+    radial-gradient(circle var(--rc) at 0 100%, #0000 var(--rc), #000 calc(var(--rc) + 0.5px)),
+    radial-gradient(circle var(--r) at var(--o) var(--r), #0000 var(--r), #000 calc(var(--r) + 0.5px));
 }

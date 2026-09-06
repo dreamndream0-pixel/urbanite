@@ -784,7 +784,7 @@ function CouponTicket({ code, image, desc, tags, action, dim = false, showScript
     <div className={`flex items-stretch ${dim ? 'opacity-70' : ''}`}>
       {/* 照片(郵票鋸齒邊,與右側票面相接) */}
       <div
-        className="ticket-stamp relative w-[26%] max-w-[210px] shrink-0 self-stretch bg-[#e5ded4] bg-cover bg-center"
+        className="ticket-seam-l relative w-[26%] max-w-[210px] shrink-0 self-stretch bg-[#e5ded4] bg-cover bg-center"
         style={couponImageStyle(image, code)}
       >
         <span className={`font-serif-tc absolute left-2.5 top-1/2 origin-center -translate-y-1/2 -rotate-90 whitespace-nowrap text-center text-[8px] leading-[1.5] tracking-[0.22em] sm:left-3.5 sm:text-[9px] ${dark ? 'text-white/80' : 'text-[#6b6156]/70'}`}>
@@ -793,7 +793,7 @@ function CouponTicket({ code, image, desc, tags, action, dim = false, showScript
         </span>
       </div>
       {/* 內容 */}
-      <div className="relative flex min-h-[80px] flex-1 items-stretch rounded-r-2xl bg-[#faf8f4] sm:min-h-[94px]">
+      <div className="ticket-seam-r relative flex min-h-[80px] flex-1 items-stretch rounded-r-2xl bg-[#faf8f4] sm:min-h-[94px]">
         <div className="flex min-w-0 flex-1 flex-col justify-center px-4 py-3 sm:px-6">
           <p className="text-base font-bold tracking-wide sm:text-xl">{code}</p>
           <p className="mt-0.5 text-xs text-[#6b6156] sm:mt-1 sm:text-sm">{desc}</p>
