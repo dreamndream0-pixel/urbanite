@@ -1040,14 +1040,17 @@ export default function AdminDashboard({
   async function uploadCouponImage(file: File) {
     setCouponImgBusy(true);
     try {
+      const prepared = await prepareProductImage(file, 0);
       const fd = new FormData();
-      fd.append('file', file);
+      fd.append('file', prepared.blob, prepared.filename);
       fd.append('folder', 'coupons');
       fd.append('productId', 'coupon');
       const up = await fetch('/api/products/image', { method: 'POST', body: fd });
       const data = await up.json().catch(() => null);
-      if (!up.ok || !data?.url) return void uiAlert(data?.error ?? '上傳失敗');
-      setNewDiscount((d) => ({ ...d, image: data.url }));
+      if (!up.ok || !data?.image_url) return void uiAlert(data?.error ?? '上傳失敗');
+      setNewDiscount((d) => ({ ...d, image: data.image_url }));
+    } catch (error) {
+      void uiAlert(error instanceof Error ? error.message : '上傳失敗');
     } finally { setCouponImgBusy(false); }
   }
 
@@ -1201,20 +1204,23 @@ export default function AdminDashboard({
   async function uploadCouponHero(file: File) {
     setHeroBusy(true);
     try {
+      const prepared = await prepareProductImage(file, 0);
       const fd = new FormData();
-      fd.append('file', file);
+      fd.append('file', prepared.blob, prepared.filename);
       fd.append('folder', 'coupons');
       fd.append('productId', 'hero');
       const up = await fetch('/api/products/image', { method: 'POST', body: fd });
       const data = await up.json().catch(() => null);
-      if (!up.ok || !data?.url) return void uiAlert(data?.error ?? '上傳失敗');
+      if (!up.ok || !data?.image_url) return void uiAlert(data?.error ?? '上傳失敗');
       const res = await fetch('/api/settings', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ coupon_hero_image: data.url }),
+        body: JSON.stringify({ coupon_hero_image: data.image_url }),
       });
       if (!res.ok) return void uiAlert((await res.json()).error ?? '儲存失敗');
-      setCouponHero(data.url);
+      setCouponHero(data.image_url);
+    } catch (error) {
+      void uiAlert(error instanceof Error ? error.message : '上傳失敗');
     } finally { setHeroBusy(false); }
   }
 
