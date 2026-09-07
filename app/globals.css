@@ -137,6 +137,17 @@ img {
   -webkit-mask-composite: source-in, source-in, source-in, source-in, source-in, source-in, source-in, source-in, source-in, source-in, source-in, source-in, source-in, source-in, source-in, source-in, source-in, source-in, source-in;
   mask-composite: intersect, intersect, intersect, intersect, intersect, intersect, intersect, intersect, intersect, intersect, intersect, intersect, intersect, intersect, intersect, intersect, intersect, intersect, intersect;
 }
+.coupon-ticket-shell::after {
+  content: '';
+  position: absolute;
+  bottom: var(--ticket-end-hole-r);
+  left: var(--ticket-action-x);
+  top: var(--ticket-end-hole-r);
+  z-index: 1;
+  border-left: 1px dashed #ded5c8;
+  transform: translateX(-0.5px);
+  pointer-events: none;
+}
 
 @media (min-width: 640px) {
   .coupon-ticket-shell {

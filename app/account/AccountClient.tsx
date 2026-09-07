@@ -7,7 +7,7 @@ import type { Customer, Discount, Order, OrderStatusHistory, Product, Recipient,
 import { TW_CITIES, TW_REGIONS } from '@/lib/tw-regions';
 import { isOnlinePayment, paymentDeadline } from '@/lib/payment';
 import { OrderStatusBadge, orderNeedsAttention, AttentionDot } from '@/app/components/OrderStatusBadge';
-import { couponImageStyle, couponImageIsDark, couponScript } from '@/lib/coupon-presets';
+import { couponImageStyle, couponScript } from '@/lib/coupon-presets';
 import { uiAlert } from '@/lib/ui-dialog';
 import {
   buildProgress,
@@ -767,7 +767,6 @@ function CouponTicket({ code, image, desc, tags, action, dim = false, showScript
   showScript?: boolean;
   divided?: boolean;
 }) {
-  const dark = couponImageIsDark(image, code);
   return (
     <div className={`coupon-ticket-shell relative flex items-stretch drop-shadow-[0_8px_18px_rgba(64,52,43,0.08)] ${dim ? 'opacity-65' : ''}`}>
       {/* 照片票根 */}
@@ -776,10 +775,6 @@ function CouponTicket({ code, image, desc, tags, action, dim = false, showScript
         style={couponImageStyle(image, code)}
       >
         <div className="absolute inset-0 bg-black/[0.03]" />
-        <span className={`font-serif-tc absolute left-3 top-1/2 origin-center -translate-y-1/2 -rotate-90 whitespace-nowrap text-center text-[8px] leading-[1.5] tracking-[0.25em] sm:left-4 sm:text-[9px] ${dark ? 'text-white/85 drop-shadow' : 'text-[#6b6156]/70'}`}>
-          <span className="block">SPECIAL</span>
-          <span className="block">FOR YOU.</span>
-        </span>
       </div>
       <div className="relative flex min-h-[120px] flex-1 items-stretch rounded-r-2xl border border-l-0 border-[#eadfd4] bg-[#fffaf5] sm:min-h-[132px]">
         <div className="flex min-w-0 flex-1 flex-col justify-center px-4 py-4 sm:px-6">
@@ -792,11 +787,11 @@ function CouponTicket({ code, image, desc, tags, action, dim = false, showScript
           </div>
         </div>
         {divided ? (
-          <div className="relative flex w-[29%] min-w-[96px] shrink-0 items-center justify-center self-stretch border-l border-dashed border-[#ded5c8] px-3 sm:w-[28%] sm:min-w-[126px] sm:px-6">
+          <div className="relative flex w-[29%] min-w-[96px] shrink-0 items-center justify-center self-stretch px-3 sm:w-[28%] sm:min-w-[126px] sm:px-6">
             {action}
           </div>
         ) : (
-          <div className="relative flex w-[29%] min-w-[96px] shrink-0 flex-col items-center justify-center gap-2 border-l border-dashed border-[#ded5c8] px-3 py-3 sm:w-[28%] sm:min-w-[126px] sm:px-6">
+          <div className="relative flex w-[29%] min-w-[96px] shrink-0 flex-col items-center justify-center gap-2 px-3 py-3 sm:w-[28%] sm:min-w-[126px] sm:px-6">
             {action}
             {showScript ? (
               <p className="font-script hidden text-center text-[15px] leading-[1.15] text-[#c2b3a0] sm:block">{couponScript(code)}</p>
