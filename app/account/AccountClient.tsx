@@ -352,6 +352,11 @@ function ProfileTab({
   });
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
+  const displayName = (name || fallbackName || email.split('@')[0] || '會員').trim();
+  const shortName = displayName.slice(-2);
+  const maskedPhone = phone
+    ? phone.replace(/^(\d{4})\d+(\d{3})$/, '$1•••$2')
+    : '尚未填寫';
 
   function updateRecipient(i: number, patch: Partial<Recipient>) {
     setRecipients((list) => list.map((r, idx) => (idx === i ? { ...r, ...patch } : r)));
@@ -388,14 +393,14 @@ function ProfileTab({
     }
   }
 
-  const field = 'w-full rounded-lg border border-[#e5ded4] px-3 py-2.5';
-  const labelText = 'mb-1 block text-sm text-[#8a7f72]';
+  const field = 'h-11 w-full rounded-lg border border-[#e5ded4] bg-white px-3 text-sm text-[#2c2826] outline-none transition focus:border-[#8f1f31]';
+  const labelText = 'mb-1.5 block text-xs font-medium text-[#6f665d]';
 
   const homeRecipients = recipients.map((r, i) => ({ r, i })).filter(({ r }) => r.type !== 'store');
   const storeRecipients = recipients.map((r, i) => ({ r, i })).filter(({ r }) => r.type === 'store');
 
   const renderRecipientCard = (r: Recipient, i: number) => (
-    <div key={i} className="rounded-xl border border-[#e5ded4] p-4">
+    <div key={i} className="rounded-lg border border-[#eadfd4] bg-[#f7e8e8] p-3">
       {expandedRecipient === i ? (
         <>
           <div className="grid gap-3 sm:grid-cols-2">
@@ -448,7 +453,7 @@ function ProfileTab({
             </label>
           )}
           <div className="mt-4 flex items-center gap-4">
-            <button type="button" onClick={() => setExpandedRecipient(null)} className="rounded-full bg-[#1f1b19] px-5 py-1.5 text-sm font-semibold text-white">
+            <button type="button" onClick={() => setExpandedRecipient(null)} className="rounded-full bg-[#8f1f31] px-5 py-1.5 text-sm font-semibold text-white">
               完成
             </button>
             <button type="button" onClick={() => removeRecipient(i)} className="text-sm font-semibold text-[#c0392b]">
@@ -458,23 +463,29 @@ function ProfileTab({
         </>
       ) : (
         <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
+          <div className="flex min-w-0 flex-1 items-center gap-3">
+            <div className="font-serif-tc flex h-12 w-12 shrink-0 flex-col items-center justify-center border-r border-[#dccaca] pr-3 text-[#8f1f31]">
+              <span className="text-[9px] tracking-[0.25em]">HOME</span>
+              <span className="text-xl leading-none">{String(i + 1).padStart(2, '0')}</span>
+            </div>
+            <div className="min-w-0">
             <p className="font-semibold">
               {r.name || '(未填姓名)'}
-              {r.phone ? <span className="ml-2 text-sm font-normal text-[#8a7f72]">{r.phone}</span> : null}
+              {r.phone ? <span className="ml-2 text-sm font-normal text-[#6f665d]">{r.phone.replace(/^(\d{4})\d+(\d{3})$/, '$1•••$2')}</span> : null}
             </p>
-            <p className="mt-1 truncate text-sm text-[#8a7f72]">
+            <p className="mt-1 truncate text-sm text-[#6f665d]">
               {r.type === 'store'
                 ? `超商取貨 · ${r.store_name || r.store_id || '(未設門市)'}`
                 : [r.city, r.district, r.address].filter(Boolean).join(' ') || '(未填地址)'}
             </p>
+            </div>
           </div>
           <div className="flex shrink-0 gap-2">
-            <button type="button" onClick={() => setExpandedRecipient(i)} className="rounded-full border border-[#d7c9bd] px-3 py-1.5 text-sm font-semibold">
-              編輯
+            <button type="button" onClick={() => setExpandedRecipient(i)} aria-label="編輯收件人" className="rounded-full p-2 text-[#6f665d] hover:bg-white/60">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4 11.5-11.5z" /></svg>
             </button>
-            <button type="button" onClick={() => removeRecipient(i)} className="rounded-full border border-[#e0b4b4] px-3 py-1.5 text-sm font-semibold text-[#c0392b]">
-              刪除
+            <button type="button" onClick={() => removeRecipient(i)} aria-label="刪除收件人" className="rounded-full p-2 text-[#6f665d] hover:bg-white/60">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.7" /><circle cx="12" cy="12" r="1.7" /><circle cx="19" cy="12" r="1.7" /></svg>
             </button>
           </div>
         </div>
@@ -483,10 +494,30 @@ function ProfileTab({
   );
 
   return (
-    <div className="space-y-6">
-      <div className="rounded-2xl border border-[#e5ded4] bg-white p-6">
-        <h2 className="text-lg font-semibold">會員資料</h2>
-        <div className="mt-5 grid gap-4 sm:grid-cols-2">
+    <div className="space-y-8">
+      <section className="relative -mx-4 -mt-8 overflow-hidden border-b border-[#eadfd4] bg-[#fbf8f3] px-6 pb-7 pt-6 sm:-mx-6 sm:px-10">
+        <div className="absolute right-8 top-8 hidden h-32 w-32 items-center justify-center rounded-full border border-[#8f1f31]/45 text-[#8f1f31] sm:flex">
+          <div className="flex h-24 w-24 items-center justify-center rounded-full border border-[#8f1f31]/35">
+            <span className="font-serif-tc text-5xl leading-none">U</span>
+          </div>
+        </div>
+        <p className="text-[10px] font-semibold tracking-[0.34em] text-[#8f1f31]/70">MEMBER SPACE</p>
+        <h1 className="font-serif-tc mt-3 text-[58px] font-semibold leading-[0.92] tracking-normal text-[#1f1b19] sm:text-[76px]">
+          Hello,<br />{shortName}。
+        </h1>
+        <p className="mt-4 text-base font-semibold tracking-[0.08em] text-[#6f665d]">你的風格，從這裡開始。</p>
+        <p className="mt-2 text-xs text-[#8a7f72]">會員聯絡電話：{maskedPhone}</p>
+      </section>
+
+      <section className="relative border-l border-[#ded5c8] pl-5 sm:pl-7">
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <span className="font-serif-tc text-sm font-bold text-[#8f1f31]">01</span>
+            <h2 className="font-serif-tc text-2xl font-bold tracking-[0.08em]">關於你</h2>
+          </div>
+          <span className="hidden text-[10px] font-semibold tracking-[0.34em] text-[#6f665d] sm:inline">PROFILE</span>
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2">
           <label className="block">
             <span className={labelText}>姓名</span>
             <input value={name} onChange={(e) => setName(e.target.value)} className={field} />
@@ -514,78 +545,117 @@ function ProfileTab({
           </label>
           <label className="block">
             <span className={labelText}>Email</span>
-            <input value={email} disabled className={field + ' bg-[#f6f2ec] text-[#8a7f72]'} />
+            <input value={email} disabled className={field + ' bg-[#f0ece6] text-[#8a7f72]'} />
           </label>
         </div>
-        <p className="mt-3 text-xs text-[#a99e8f]">註冊方式:{provider}</p>
-      </div>
+        <p className="mt-3 text-xs text-[#8a7f72]">{provider} 帳號登入</p>
+      </section>
 
-      <div className="rounded-2xl border border-[#e5ded4] bg-white p-6">
-        <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold">常用收件人</h2>
-          <button type="button" onClick={addRecipient} className="rounded-full border border-[#d7c9bd] px-4 py-1.5 text-sm font-semibold">
-            新增收件人
+      <section className="relative border-l border-[#ded5c8] pl-5 sm:pl-7">
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <span className="font-serif-tc text-sm font-bold text-[#8f1f31]">02</span>
+            <h2 className="font-serif-tc text-2xl font-bold tracking-[0.08em]">收件日常</h2>
+          </div>
+          <span className="hidden text-[10px] font-semibold tracking-[0.34em] text-[#6f665d] sm:inline">ADDRESS BOOK</span>
+        </div>
+        <div className="mb-4 flex items-center gap-2">
+          <span className="flex h-9 flex-1 items-center justify-center rounded-full bg-[#8f1f31] px-3 text-sm font-semibold text-white">宅配到府 {homeRecipients.length}</span>
+          <span className="flex h-9 flex-1 items-center justify-center rounded-full bg-white px-3 text-sm font-semibold text-[#6f665d]">超商取貨 {storeRecipients.length}</span>
+          <button type="button" onClick={addRecipient} className="inline-flex h-9 shrink-0 items-center gap-1 rounded-full border border-[#b79ba0] px-4 text-sm font-semibold text-[#8f1f31]">
+            <span className="text-lg leading-none">+</span>新增
           </button>
         </div>
-        <div className="mt-4 grid gap-6 md:grid-cols-2">
-          <div>
-            <h3 className="mb-2 text-sm font-semibold text-[#6b6156]">宅配到府</h3>
+        <div className="grid gap-4 md:grid-cols-2">
+          <div className="space-y-3">
             {homeRecipients.length === 0 ? (
-              <p className="text-sm text-[#a99e8f]">尚未設定,點「新增收件人」加入宅配地址。</p>
+              <p className="rounded-lg bg-white p-4 text-sm text-[#a99e8f]">尚未設定宅配地址。</p>
             ) : (
-              <div className="space-y-3">{homeRecipients.map(({ r, i }) => renderRecipientCard(r, i))}</div>
+              homeRecipients.map(({ r, i }) => renderRecipientCard(r, i))
             )}
           </div>
-          <div>
-            <h3 className="mb-2 text-sm font-semibold text-[#6b6156]">超商取貨</h3>
+          <div className="space-y-3">
             {storeRecipients.length === 0 ? (
-              <p className="text-sm text-[#a99e8f]">結帳選門市後按「加入常用取貨人」即可存到這裡。</p>
+              <p className="rounded-lg bg-white p-4 text-sm text-[#a99e8f]">結帳選門市後即可存到這裡。</p>
             ) : (
-              <div className="space-y-3">{storeRecipients.map(({ r, i }) => renderRecipientCard(r, i))}</div>
+              storeRecipients.map(({ r, i }) => renderRecipientCard(r, i))
             )}
           </div>
         </div>
-      </div>
+      </section>
 
-      <div className="rounded-2xl border border-[#e5ded4] bg-white p-6">
-        <h2 className="text-lg font-semibold">行銷訊息訂閱</h2>
-        <div className="mt-4 space-y-3">
-          <ToggleRow label="訂閱 Email 電子報" checked={marketing.email} onChange={(v) => setMarketing((m) => ({ ...m, email: v }))} />
-          <ToggleRow label="接收簡訊優惠通知" checked={marketing.sms} onChange={(v) => setMarketing((m) => ({ ...m, sms: v }))} />
+      <section className="relative -mx-4 bg-[#f4e4e4] px-9 py-7 sm:-mx-6 sm:px-12">
+        <div className="mb-5 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <span className="font-serif-tc text-sm font-bold text-[#8f1f31]">03</span>
+            <h2 className="font-serif-tc text-2xl font-bold tracking-[0.08em]">你的偏好</h2>
+          </div>
+          <span className="hidden text-[10px] font-semibold tracking-[0.34em] text-[#6f665d] sm:inline">PREFERENCES</span>
         </div>
-        <h2 className="mt-6 text-lg font-semibold">隱私權設定</h2>
-        <div className="mt-4 space-y-3">
-          <ToggleRow label="允許依購物紀錄提供個人化推薦" checked={privacy.personalization} onChange={(v) => setPrivacy((p) => ({ ...p, personalization: v }))} />
-          <ToggleRow label="公開我的追蹤清單活動" checked={privacy.show_activity} onChange={(v) => setPrivacy((p) => ({ ...p, show_activity: v }))} />
+        <div className="space-y-5">
+          <div>
+            <p className="mb-3 text-sm font-semibold text-[#6f665d]">訊息訂閱</p>
+            <div className="space-y-3">
+              <ToggleRow label="訂閱 Email 電子報" icon="mail" checked={marketing.email} onChange={(v) => setMarketing((m) => ({ ...m, email: v }))} />
+              <ToggleRow label="接收簡訊優惠通知" icon="chat" checked={marketing.sms} onChange={(v) => setMarketing((m) => ({ ...m, sms: v }))} />
+            </div>
+          </div>
+          <div className="border-t border-[#decaca] pt-5">
+            <p className="mb-3 text-sm font-semibold text-[#6f665d]">隱私設定</p>
+            <div className="space-y-3">
+              <ToggleRow label="允許依購物紀錄提供個人化推薦" desc="依購物紀錄推薦適合你的單品" icon="star" checked={privacy.personalization} onChange={(v) => setPrivacy((p) => ({ ...p, personalization: v }))} />
+              <ToggleRow label="公開我的追蹤清單活動" icon="eye" checked={privacy.show_activity} onChange={(v) => setPrivacy((p) => ({ ...p, show_activity: v }))} />
+            </div>
+          </div>
         </div>
-      </div>
+      </section>
 
       {msg && (
         <p className={'rounded-lg px-4 py-2 text-sm ' + (msg.type === 'ok' ? 'bg-[#e9f7ee] text-[#1f7a44]' : 'bg-[#fdecec] text-[#c0392b]')}>
           {msg.text}
         </p>
       )}
-      <button onClick={save} disabled={saving} className="rounded-full bg-[#1f1b19] px-6 py-2.5 text-sm font-semibold text-white disabled:opacity-40">
+      <button onClick={save} disabled={saving} className="flex h-12 w-full items-center justify-center gap-3 rounded-lg bg-[#8f1f31] px-6 text-sm font-semibold tracking-[0.18em] text-white disabled:opacity-40">
         {saving ? '儲存中…' : '儲存變更'}
+        <span aria-hidden>→</span>
       </button>
+      <div className="flex items-center gap-4 pb-2 text-center text-[#b3a48d]">
+        <span className="h-px flex-1 bg-[#ded5c8]" />
+        <span className="text-xs font-semibold tracking-[0.22em]">讓每一次造訪，都更貼近你。</span>
+        <span className="h-px flex-1 bg-[#ded5c8]" />
+      </div>
     </div>
   );
 }
 
-function ToggleRow({ label, checked, onChange }: { label: string; checked: boolean; onChange: (v: boolean) => void }) {
+function ToggleRow({ label, desc, icon, checked, onChange }: { label: string; desc?: string; icon?: 'mail' | 'chat' | 'star' | 'eye'; checked: boolean; onChange: (v: boolean) => void }) {
   return (
     <label className="flex items-center justify-between gap-4">
-      <span className="text-sm text-[#3d3935]">{label}</span>
+      <span className="flex min-w-0 items-start gap-3 text-sm text-[#3d3935]">
+        <PreferenceIcon type={icon} />
+        <span className="min-w-0">
+          <span className="block font-medium">{label}</span>
+          {desc ? <span className="mt-0.5 block text-xs text-[#8a7f72]">{desc}</span> : null}
+        </span>
+      </span>
       <button
         type="button"
         onClick={() => onChange(!checked)}
         aria-pressed={checked}
-        className={'relative h-6 w-11 shrink-0 rounded-full transition ' + (checked ? 'bg-[#1f7a44]' : 'bg-[#d7c9bd]')}
+        className={'relative h-7 w-12 shrink-0 rounded-full transition ' + (checked ? 'bg-[#8f1f31]' : 'bg-[#cfc2b8]')}
       >
-        <span className={'absolute top-0.5 h-5 w-5 rounded-full bg-white transition ' + (checked ? 'left-[22px]' : 'left-0.5')} />
+        <span className={'absolute top-0.5 h-6 w-6 rounded-full bg-white shadow-sm transition ' + (checked ? 'left-[22px]' : 'left-0.5')} />
       </button>
     </label>
   );
+}
+
+function PreferenceIcon({ type }: { type?: 'mail' | 'chat' | 'star' | 'eye' }) {
+  if (type === 'mail') return <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#8f1f31" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2" /><path d="M3 7l9 6 9-6" /></svg>;
+  if (type === 'chat') return <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#8f1f31" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 0 1-8 8H8l-5 2 1.8-4A8 8 0 1 1 21 12z" /></svg>;
+  if (type === 'star') return <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#8f1f31" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 3l2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17.3 6.4 20.2 7.5 14 3 9.6l6.2-.9L12 3z" /></svg>;
+  if (type === 'eye') return <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#8f1f31" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12z" /><circle cx="12" cy="12" r="3" /></svg>;
+  return null;
 }
 
 /* ---------- 優惠券及購物金 ---------- */
@@ -695,7 +765,7 @@ function CouponsTab({ coupons, heroImage = '' }: { coupons: Discount[]; heroImag
                   tags={[couponScope(c), c.end_at ? `到 ${new Date(c.end_at).toLocaleDateString('zh-TW')}` : '無期限']}
                   dim={item.status !== 'available'}
                   action={
-                    <span className={`inline-block whitespace-nowrap rounded-full px-3.5 py-1.5 text-xs font-semibold sm:px-5 sm:py-2 sm:text-sm ${item.status === 'available' ? 'bg-[#2b2723] text-white' : 'bg-[#f0e9dd] text-[#8a7f72]'}`}>
+                    <span className={`inline-flex max-w-full items-center justify-center whitespace-nowrap rounded-full px-2.5 py-1.5 text-center text-xs font-semibold leading-none sm:px-4 sm:py-2 sm:text-sm ${item.status === 'available' ? 'bg-[#2b2723] text-white' : 'bg-[#f0e9dd] text-[#8a7f72]'}`}>
                       {item.status === 'used' ? '已使用' : item.status === 'revoked' ? '已撤回' : item.status === 'expired' ? '已過期' : '結帳可用'}
                     </span>
                   }
@@ -732,10 +802,10 @@ function CouponsTab({ coupons, heroImage = '' }: { coupons: Discount[]; heroImag
                     type="button"
                     onClick={() => claimCoupon(c.id)}
                     disabled={!ready}
-                    className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full bg-[#2b2723] px-4 py-2 text-xs font-semibold text-white transition hover:bg-black disabled:opacity-40 sm:px-5 sm:py-2.5 sm:text-sm"
+                    className="inline-flex max-w-full shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded-full bg-[#2b2723] px-3 py-2 text-xs font-semibold text-white transition hover:bg-black disabled:opacity-40 sm:gap-1.5 sm:px-5 sm:py-2.5 sm:text-sm"
                   >
                     領取
-                    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 4v12M6 12l6 6 6-6M5 20h14" /></svg>
+                    <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="shrink-0 sm:h-[15px] sm:w-[15px]"><path d="M12 4v12M6 12l6 6 6-6M5 20h14" /></svg>
                   </button>
                 }
               />
@@ -776,8 +846,8 @@ function CouponTicket({ code, image, desc, tags, action, dim = false, showScript
       >
         <div className="absolute inset-0 bg-black/[0.03]" />
       </div>
-      <div className="relative flex min-h-[120px] flex-1 items-stretch rounded-r-2xl border border-l-0 border-[#eadfd4] bg-[#fffaf5] sm:min-h-[132px]">
-        <div className="flex min-w-0 flex-1 flex-col justify-center px-4 py-4 sm:px-6">
+      <div className="relative flex min-w-0 flex-1 items-stretch rounded-r-2xl border border-l-0 border-[#eadfd4] bg-[#fffaf5] sm:min-h-[132px]">
+        <div className="flex min-w-0 flex-1 flex-col justify-center px-3 py-4 sm:px-6">
           <p className="font-serif-tc text-[19px] font-bold tracking-[0.08em] text-[#2c2826] sm:text-[23px]">{code}</p>
           <p className="mt-1 text-[13px] font-medium text-[#6b6156] sm:text-sm">{desc}</p>
           <div className="mt-2 flex flex-wrap gap-1.5 sm:mt-3 sm:gap-2">
@@ -787,11 +857,11 @@ function CouponTicket({ code, image, desc, tags, action, dim = false, showScript
           </div>
         </div>
         {divided ? (
-          <div className="relative flex w-[29%] min-w-[96px] shrink-0 items-center justify-center self-stretch px-3 sm:w-[28%] sm:min-w-[126px] sm:px-6">
+          <div className="relative flex w-[26%] min-w-[76px] shrink-0 items-center justify-center self-stretch overflow-hidden px-2 sm:w-[28%] sm:min-w-[112px] sm:px-4">
             {action}
           </div>
         ) : (
-          <div className="relative flex w-[29%] min-w-[96px] shrink-0 flex-col items-center justify-center gap-2 px-3 py-3 sm:w-[28%] sm:min-w-[126px] sm:px-6">
+          <div className="relative flex w-[26%] min-w-[76px] shrink-0 flex-col items-center justify-center gap-2 overflow-hidden px-2 py-3 sm:w-[28%] sm:min-w-[112px] sm:px-4">
             {action}
             {showScript ? (
               <p className="font-script hidden text-center text-[15px] leading-[1.15] text-[#c2b3a0] sm:block">{couponScript(code)}</p>

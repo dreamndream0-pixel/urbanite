@@ -87,7 +87,7 @@ img {
   --ticket-hole-r: 5.5px;
   --ticket-end-hole-r: 9px;
   --ticket-photo-x: 26%;
-  --ticket-action-x: 78.5%;
+  --ticket-action-x: 80.75%;
   -webkit-mask-repeat: no-repeat;
   mask-repeat: no-repeat;
   -webkit-mask-size: 100% 100%;
@@ -153,6 +153,6 @@ img {
   .coupon-ticket-shell {
     --ticket-hole-r: 6px;
     --ticket-end-hole-r: 10px;
-    --ticket-action-x: 79.3%;
+    --ticket-action-x: 79.25%;
   }
 }
