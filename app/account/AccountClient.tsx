@@ -9,7 +9,6 @@ import { isOnlinePayment, paymentDeadline } from '@/lib/payment';
 import { OrderStatusBadge, orderNeedsAttention, AttentionDot } from '@/app/components/OrderStatusBadge';
 import { couponImageStyle, couponImageIsDark, couponScript } from '@/lib/coupon-presets';
 import { uiAlert } from '@/lib/ui-dialog';
-import AccountMenu from '@/app/components/AccountMenu';
 import {
   buildProgress,
   orderTabOf,
@@ -198,13 +197,9 @@ export default function AccountClient({
     <main className="min-h-screen bg-[#f6f2ec] text-[#1f1b19]">
       <header className="sticky top-0 z-30 bg-[#faf7f2]/95 backdrop-blur">
         <nav className="mx-auto grid max-w-6xl grid-cols-[1fr_auto_1fr] items-center px-4 py-4 sm:px-6 sm:py-5">
-          {/* 左:回首頁 */}
           <div className="flex items-center">
-            <Link
-              href="/"
-              className="rounded-full border border-[#e5ded4] bg-white px-4 py-2 text-sm font-medium text-[#6b6156] hover:bg-[#efe8dd]"
-            >
-              ← 回首頁
+            <Link href="/" aria-label="回首頁" className="rounded-md p-1 text-[#1f1b19] hover:bg-[#efe8dd]">
+              <IconMenu />
             </Link>
           </div>
 
@@ -217,20 +212,7 @@ export default function AccountClient({
             )}
           </Link>
 
-          {/* 右:追蹤清單、購物車(中)、我的帳號(最右) */}
-          <div className="flex items-center justify-end gap-1 sm:gap-2">
-            <button
-              onClick={() => changeTab('favorites')}
-              aria-label="追蹤清單"
-              className="relative rounded-md p-2 hover:bg-[#efe8dd]"
-            >
-              <IconStar filled={favoriteIds.length > 0} />
-              {favoriteIds.length > 0 && (
-                <span className="absolute -right-0.5 -top-0.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-[#c84767] px-1 text-[10px] font-semibold text-white">
-                  {favoriteIds.length}
-                </span>
-              )}
-            </button>
+          <div className="flex items-center justify-end">
             <Link href="/checkout" aria-label="購物車" className="relative rounded-md p-2 hover:bg-[#efe8dd]">
               <IconBag />
               {cartCount > 0 && (
@@ -239,22 +221,21 @@ export default function AccountClient({
                 </span>
               )}
             </Link>
-            <AccountMenu />
           </div>
         </nav>
       </header>
 
       {/* 分頁列 */}
       <div className="border-b border-[#e5ded4] bg-[#faf7f2]">
-        <div className="mx-auto flex max-w-4xl gap-1 overflow-x-auto overflow-y-hidden px-4 sm:px-6">
+        <div className="mx-auto grid max-w-4xl grid-cols-4 overflow-x-auto overflow-y-hidden px-4 sm:px-6">
           {TABS.map((t) => (
             <button
               key={t.key}
               onClick={() => changeTab(t.key)}
-              className={`-mb-px whitespace-nowrap border-b-2 px-4 py-3 text-sm font-semibold transition ${
+              className={`-mb-px whitespace-nowrap border-b-2 border-l border-l-[#e5ded4] px-2 py-3 text-center text-xs font-semibold transition first:border-l-0 sm:px-4 sm:text-sm ${
                 tab === t.key
-                  ? 'border-[#1f1b19] text-[#1f1b19]'
-                  : 'border-transparent text-[#8a7f72] hover:text-[#1f1b19]'
+                  ? 'border-b-[#1f1b19] text-[#1f1b19]'
+                  : 'border-b-transparent text-[#8a7f72] hover:text-[#1f1b19]'
               }`}
             >
               {t.label}
@@ -656,18 +637,20 @@ function CouponsTab({ coupons, heroImage = '' }: { coupons: Discount[]; heroImag
       <section className="relative -mx-4 -mt-8 overflow-hidden bg-[#e9dfd0] sm:-mx-6">
         <div
           className="pointer-events-none absolute inset-y-0 right-0 w-[52%] bg-[#e4d9c8] bg-cover bg-center"
-          style={heroImage ? { backgroundImage: `url("${heroImage}")` } : undefined}
+          style={heroImage ? { backgroundImage: `url("${heroImage}")` } : {
+            backgroundImage: 'radial-gradient(circle at 60% 15%, rgba(255,255,255,.55), transparent 34%), linear-gradient(135deg, #d8cab9, #efe6d9 52%, #cdbba9)',
+          }}
         >
           <p className={`font-script absolute right-6 top-8 text-right text-[34px] leading-[1.15] sm:text-[42px] ${heroImage ? 'text-white/90 drop-shadow' : 'text-[#b0a08a]'}`}>
             Good<br />Outfit<br />Brighter<br />Days.
           </p>
         </div>
-        <div className="relative px-5 pb-5 pt-9 sm:px-8 sm:pb-6 sm:pt-11">
+        <div className="relative px-5 pb-5 pt-9 sm:px-8 sm:pb-7 sm:pt-11">
           <h2 className="font-serif-tc text-[34px] font-semibold leading-none tracking-[0.22em] text-[#2c2826] sm:text-[40px]">我的優惠</h2>
           <p className="mt-3 text-[11px] tracking-[0.4em] text-[#a2957f] sm:text-xs">MY COUPONS</p>
           <p className="mt-3.5 text-sm text-[#6b6156] sm:text-base">收藏喜歡的優惠，享受更好的購物體驗。</p>
 
-          <div className="mt-7 flex items-center gap-4 rounded-2xl bg-white/50 p-4 backdrop-blur-[2px] sm:p-5">
+          <div className="mt-7 flex items-center gap-4 rounded-[22px] bg-white/55 p-4 shadow-[0_8px_24px_rgba(64,52,43,0.06)] backdrop-blur-[2px] sm:p-5">
             <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-white/60 text-[#6b6156]">
               <svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M20 12v9H4v-9M2 7h20v5H2zM12 22V7M12 7S9 3 6.5 4.5 8 9 12 7zM12 7s3-4 5.5-2.5S16 9 12 7z" /></svg>
             </span>
@@ -687,9 +670,9 @@ function CouponsTab({ coupons, heroImage = '' }: { coupons: Discount[]; heroImag
       <section>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h3 className="font-serif-tc text-[24px] font-bold tracking-[0.06em] sm:text-[26px]">我的優惠券</h3>
-          <div className="flex rounded-full bg-[#eae1d4] p-1 text-sm font-medium">
+          <div className="flex rounded-full bg-[#eae1d4] p-1 text-xs font-medium sm:text-sm">
             {([['available', `可使用 (${availableCount})`], ['used', '已使用'], ['expired', '已過期']] as const).map(([key, label]) => (
-              <button key={key} type="button" onClick={() => setCouponTab(key)} className={`rounded-full px-5 py-1.5 transition ${couponTab === key ? 'bg-[#2b2723] font-semibold text-white' : 'text-[#8a7f72]'}`}>{label}</button>
+              <button key={key} type="button" onClick={() => setCouponTab(key)} className={`rounded-full px-4 py-1.5 transition sm:px-5 ${couponTab === key ? 'bg-[#2b2723] font-semibold text-white' : 'text-[#8a7f72]'}`}>{label}</button>
             ))}
           </div>
         </div>
@@ -809,11 +792,15 @@ function CouponTicket({ code, image, desc, tags, action, dim = false, showScript
           </div>
         </div>
         {divided ? (
-          <div className="flex w-[29%] min-w-[96px] shrink-0 items-center justify-center self-stretch border-l border-dashed border-[#ded5c8] px-3 sm:w-[28%] sm:min-w-[126px] sm:px-6">
+          <div className="relative flex w-[29%] min-w-[96px] shrink-0 items-center justify-center self-stretch border-l border-dashed border-[#ded5c8] px-3 sm:w-[28%] sm:min-w-[126px] sm:px-6">
+            <span className="absolute -left-2 -top-2 h-4 w-4 rounded-full bg-[#f6f2ec]" aria-hidden />
+            <span className="absolute -bottom-2 -left-2 h-4 w-4 rounded-full bg-[#f6f2ec]" aria-hidden />
             {action}
           </div>
         ) : (
-          <div className="flex w-[29%] min-w-[96px] shrink-0 flex-col items-center justify-center gap-2 border-l border-dashed border-[#ded5c8] px-3 py-3 sm:w-[28%] sm:min-w-[126px] sm:px-6">
+          <div className="relative flex w-[29%] min-w-[96px] shrink-0 flex-col items-center justify-center gap-2 border-l border-dashed border-[#ded5c8] px-3 py-3 sm:w-[28%] sm:min-w-[126px] sm:px-6">
+            <span className="absolute -left-2 -top-2 h-4 w-4 rounded-full bg-[#f6f2ec]" aria-hidden />
+            <span className="absolute -bottom-2 -left-2 h-4 w-4 rounded-full bg-[#f6f2ec]" aria-hidden />
             {action}
             {showScript ? (
               <p className="font-script hidden text-center text-[15px] leading-[1.15] text-[#c2b3a0] sm:block">{couponScript(code)}</p>
@@ -1682,10 +1669,10 @@ function FavoritesTab({ products }: { products: Product[] }) {
 }
 
 /* ---------- 表頭圖示(與首頁一致) ---------- */
-function IconStar({ filled = false }: { filled?: boolean }) {
+function IconMenu() {
   return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill={filled ? '#f5c542' : 'none'} stroke={filled ? '#d89a00' : 'currentColor'} strokeWidth="1.8" strokeLinejoin="round">
-      <path d="m12 2 3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21 7 14.2l-5-4.9 6.9-1L12 2Z" />
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
+      <path d="M4 7h16M4 12h16M4 17h16" strokeLinecap="round" />
     </svg>
   );
 }
