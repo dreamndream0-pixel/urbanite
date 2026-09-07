@@ -789,7 +789,7 @@ function CouponTicket({ code, image, desc, tags, action, dim = false, showScript
     <div className={`relative flex items-stretch drop-shadow-[0_8px_18px_rgba(64,52,43,0.08)] ${dim ? 'opacity-65' : ''}`}>
       {/* 照片票根 */}
       <div
-        className="ticket-seam-l relative w-[25%] min-w-[112px] max-w-[190px] shrink-0 self-stretch rounded-l-2xl bg-[#e5ded4] bg-cover bg-center"
+        className="ticket-seam-l relative w-[26%] min-w-[104px] max-w-[178px] shrink-0 self-stretch rounded-l-2xl bg-[#e5ded4] bg-cover bg-center"
         style={couponImageStyle(image, code)}
       >
         <div className="absolute inset-0 bg-black/[0.03]" />
@@ -798,10 +798,10 @@ function CouponTicket({ code, image, desc, tags, action, dim = false, showScript
           <span className="block">FOR YOU.</span>
         </span>
       </div>
-      <div className="ticket-seam-r relative flex min-h-[112px] flex-1 items-stretch rounded-r-2xl border border-l-0 border-[#eadfd4] bg-[#fffaf5] sm:min-h-[124px]">
+      <div className="ticket-seam-r relative flex min-h-[120px] flex-1 items-stretch rounded-r-2xl border border-l-0 border-[#eadfd4] bg-[#fffaf5] sm:min-h-[132px]">
         <div className="flex min-w-0 flex-1 flex-col justify-center px-4 py-4 sm:px-6">
-          <p className="font-serif-tc text-lg font-bold tracking-[0.08em] text-[#2c2826] sm:text-[22px]">{code}</p>
-          <p className="mt-1 text-xs font-medium text-[#6b6156] sm:text-sm">{desc}</p>
+          <p className="font-serif-tc text-[19px] font-bold tracking-[0.08em] text-[#2c2826] sm:text-[23px]">{code}</p>
+          <p className="mt-1 text-[13px] font-medium text-[#6b6156] sm:text-sm">{desc}</p>
           <div className="mt-2 flex flex-wrap gap-1.5 sm:mt-3 sm:gap-2">
             {tags.map((t) => (
               <span key={t} className="rounded-md bg-[#f3ede6] px-2 py-0.5 text-[10px] text-[#8a7f72] sm:px-3 sm:py-1 sm:text-xs">{t}</span>
@@ -809,11 +809,11 @@ function CouponTicket({ code, image, desc, tags, action, dim = false, showScript
           </div>
         </div>
         {divided ? (
-          <div className="flex w-[31%] min-w-[112px] shrink-0 items-center justify-center self-stretch border-l border-dashed border-[#ded5c8] px-3 sm:w-[28%] sm:px-6">
+          <div className="flex w-[29%] min-w-[96px] shrink-0 items-center justify-center self-stretch border-l border-dashed border-[#ded5c8] px-3 sm:w-[28%] sm:min-w-[126px] sm:px-6">
             {action}
           </div>
         ) : (
-          <div className="flex w-[31%] min-w-[112px] shrink-0 flex-col items-center justify-center gap-2 border-l border-dashed border-[#ded5c8] px-3 py-3 sm:w-[28%] sm:px-6">
+          <div className="flex w-[29%] min-w-[96px] shrink-0 flex-col items-center justify-center gap-2 border-l border-dashed border-[#ded5c8] px-3 py-3 sm:w-[28%] sm:min-w-[126px] sm:px-6">
             {action}
             {showScript ? (
               <p className="font-script hidden text-center text-[15px] leading-[1.15] text-[#c2b3a0] sm:block">{couponScript(code)}</p>
