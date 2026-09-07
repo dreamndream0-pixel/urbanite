@@ -1153,8 +1153,9 @@ function OrderRecordCard({
   const needsAttention = orderNeedsAttention(order, 'customer');
 
   return (
-    <article className="order-ticket-card relative rounded-xl border border-[#eee5da] bg-white shadow-[0_5px_18px_rgba(64,52,43,0.07)]">
-      <div className={`border-l-4 ${needsAttention ? 'border-[#c84767]' : 'border-transparent'} px-5 pb-4 pt-4`}>
+    <article className="order-ticket-card relative overflow-hidden rounded-xl border border-[#eee5da] bg-white shadow-[0_5px_18px_rgba(64,52,43,0.07)]">
+      {needsAttention ? <span className="pointer-events-none absolute left-0 top-0 z-10 h-[calc(100%-64px)] w-1 rounded-tl-xl bg-[#c84767]" aria-hidden /> : null}
+      <div className="px-5 pb-4 pt-4">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <p className="font-serif-tc text-xl font-semibold tracking-[0.08em] text-[#1f1b19]">{dateText}</p>
