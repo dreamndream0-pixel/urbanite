@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import type { Customer, Discount, Order, OrderStatusHistory, Product, Recipient, ReturnRequest, SiteSettings, UserCoupon } from '@/lib/types';
 import { TW_CITIES, TW_REGIONS } from '@/lib/tw-regions';
 import { isOnlinePayment, paymentDeadline } from '@/lib/payment';
-import { OrderStatusBadge, orderNeedsAttention, AttentionDot } from '@/app/components/OrderStatusBadge';
+import { orderNeedsAttention } from '@/app/components/OrderStatusBadge';
 import ShopHeader from '@/app/components/ShopHeader';
 import { couponImageStyle, couponScript } from '@/lib/coupon-presets';
 import { uiAlert } from '@/lib/ui-dialog';
@@ -15,7 +15,6 @@ import {
   orderTabOf,
   canRequestCancel,
   canRequestReturn,
-  ORDER_TABS,
   CANCEL_STATUS_LABEL,
   RETURN_STATUS_LABEL,
   type OrderTab,
@@ -985,6 +984,9 @@ function OrdersTab({
   onPay: (o: Order) => void;
 }) {
   const [tab, setTab] = useState<OrderTab>('all');
+  const [showMoreFilters, setShowMoreFilters] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   if (orders.length === 0) {
     return (
       <p className="rounded-2xl border border-[#e5ded4] bg-white p-8 text-center text-[#6b6156]">
@@ -995,124 +997,307 @@ function OrdersTab({
       </p>
     );
   }
-  const shown = tab === 'all' ? orders : orders.filter((o) => orderTabOf(o) === tab);
-  const actionBtn = 'inline-flex h-8 items-center rounded-full border border-[#d7c9bd] px-4 text-xs font-semibold text-[#6b6156] hover:bg-[#efe8dd]';
-  const payBtn = 'inline-flex h-8 items-center rounded-full bg-[#ada265] px-4 text-xs font-semibold text-white hover:bg-[#9a9059]';
+  const countOf = (key: OrderTab) => key === 'all' ? orders.length : orders.filter((o) => orderTabOf(o) === key).length;
+  const baseShown = tab === 'all' ? orders : orders.filter((o) => orderTabOf(o) === tab);
+  const query = searchQuery.trim().toLowerCase();
+  const shown = baseShown
+    .filter((order) => {
+      if (!query) return true;
+      return (
+        order.order_no.toLowerCase().includes(query) ||
+        order.items.some((item) => item.name.toLowerCase().includes(query) || item.variant.toLowerCase().includes(query))
+      );
+    })
+    .slice()
+    .sort((a, b) => new Date(b.created_at ?? '').getTime() - new Date(a.created_at ?? '').getTime());
+  const primaryTabs: { key: OrderTab; label: string }[] = [
+    { key: 'all', label: '全部' },
+    { key: 'unpaid', label: '待付款' },
+    { key: 'to_ship', label: '待出貨' },
+    { key: 'shipping', label: '配送中' },
+  ];
+  const moreTabs: { key: OrderTab; label: string }[] = [
+    { key: 'done', label: '已完成' },
+    { key: 'returning', label: '退貨中' },
+    { key: 'cancelled', label: '取消/退貨' },
+  ];
+  const unpaidCount = countOf('unpaid');
+  const toShipCount = countOf('to_ship');
+  const monthGroups = shown.reduce<{ key: string; label: string; orders: Order[] }[]>((groups, order) => {
+    const date = order.created_at ? new Date(order.created_at) : new Date(0);
+    const key = `${date.getFullYear()}-${date.getMonth() + 1}`;
+    const label = order.created_at ? `${date.getFullYear()} 年 ${date.getMonth() + 1} 月` : '未記錄日期';
+    const group = groups.find((g) => g.key === key);
+    if (group) group.orders.push(order);
+    else groups.push({ key, label, orders: [order] });
+    return groups;
+  }, []);
+
   return (
-    <div className="space-y-4">
-      {/* 分頁(底線式,可左右滑動) */}
-      <div className="-mx-4 overflow-x-auto overflow-y-hidden border-b border-[#e5ded4] px-4 sm:mx-0 sm:px-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        <div className="flex min-w-max gap-6">
-          {ORDER_TABS.map((t) => {
-            const inTab = t.key === 'all' ? orders : orders.filter((o) => orderTabOf(o) === t.key);
-            const n = inTab.length;
-            const attention = inTab.some((o) => orderNeedsAttention(o, 'customer'));
-            const active = tab === t.key;
-            return (
-              <button
-                key={t.key}
-                onClick={() => setTab(t.key)}
-                className={`relative -mb-px shrink-0 border-b-2 pb-2 pt-1 text-center transition ${
-                  active ? 'border-[#1f1b19]' : 'border-transparent'
-                }`}
-              >
-                {attention ? <AttentionDot className="absolute right-0 top-0" /> : null}
-                <span className={`block text-sm font-semibold ${active ? 'text-[#1f1b19]' : 'text-[#8a7f72]'}`}>{t.label}</span>
-                <span className={`block text-sm ${active ? 'font-semibold text-[#1f1b19]' : 'text-[#a99e8f]'}`}>{n}</span>
-              </button>
-            );
-          })}
+    <div className="space-y-5">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="font-serif-tc text-4xl font-semibold tracking-[0.08em] text-[#1f1b19] sm:text-5xl">訂單紀錄</h1>
+          <p className="font-serif-tc mt-1 text-base tracking-[0.12em] text-[#8a7f72]">Your orders.</p>
+        </div>
+        <button type="button" onClick={() => setSearchOpen((v) => !v)} aria-label="搜尋訂單" className="mt-2 rounded-full p-2 text-[#1f1b19] hover:bg-white/70">
+          <IconSearch />
+        </button>
+      </div>
+
+      {searchOpen ? (
+        <input
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          placeholder="搜尋訂單編號、商品名稱"
+          className="h-11 w-full rounded-full border border-[#e5ded4] bg-white px-5 text-sm outline-none transition focus:border-[#8f1f31]"
+        />
+      ) : null}
+
+      <div className="flex items-center justify-center gap-6 text-[#1f1b19]">
+        <div className="text-center">
+          <span className="font-serif-tc text-3xl font-semibold text-[#8f1f31]">{unpaidCount}</span>
+          <span className="ml-2 text-sm font-semibold">筆待付款</span>
+        </div>
+        <span className="h-6 w-px bg-[#d8cfc3]" />
+        <div className="text-center">
+          <span className="font-serif-tc text-3xl font-semibold">{toShipCount}</span>
+          <span className="ml-2 text-sm font-semibold">筆待出貨</span>
         </div>
       </div>
+
+      <div className="-mx-4 overflow-x-auto px-4 [scrollbar-width:none] sm:mx-0 sm:px-0 [&::-webkit-scrollbar]:hidden">
+        <div className="flex min-w-max items-center gap-2.5">
+          {primaryTabs.map((t) => (
+            <OrderFilterPill key={t.key} active={tab === t.key} label={t.label} count={countOf(t.key)} onClick={() => setTab(t.key)} />
+          ))}
+          <button
+            type="button"
+            onClick={() => setShowMoreFilters((v) => !v)}
+            aria-label="更多訂單篩選"
+            className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-white text-[#1f1b19] shadow-[0_5px_18px_rgba(64,52,43,0.12)] transition hover:-translate-y-0.5"
+          >
+            <IconSliders />
+          </button>
+        </div>
+      </div>
+
+      {showMoreFilters ? (
+        <div className="flex flex-wrap gap-2">
+          {moreTabs.map((t) => (
+            <OrderFilterPill key={t.key} active={tab === t.key} label={t.label} count={countOf(t.key)} onClick={() => setTab(t.key)} compact />
+          ))}
+        </div>
+      ) : null}
 
       {shown.length === 0 ? (
         <p className="rounded-2xl border border-[#e5ded4] bg-white p-8 text-center text-[#6b6156]">此分類目前沒有訂單。</p>
       ) : (
-        <div className="space-y-3">
-          {shown.map((order) => {
-            const shipped = ['SHIPPED', 'IN_TRANSIT', 'DELIVERED'].includes(order.fulfillment_status ?? '');
-            return (
-              <div
-                key={order.id}
-                className="block w-full rounded-xl border border-[#e5ded4] bg-white p-5 text-left transition hover:border-[#c9b8a8] hover:shadow-sm"
-              >
-                <button onClick={() => onOpen(order)} className="block w-full text-left">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div>
-                      <p className="flex items-center gap-1.5 font-semibold">
-                        {orderNeedsAttention(order, 'customer') ? <AttentionDot /> : null}
-                        {order.order_no}
-                      </p>
-                      <p className="text-sm text-[#8a7f72]">
-                        {order.created_at ? new Date(order.created_at).toLocaleString('zh-TW') : ''} ·{' '}
-                        {order.items.reduce((n, it) => n + it.quantity, 0)} 件
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <OrderStatusBadge order={order} />
-                      <span className="font-semibold">{formatter.format(order.total)}</span>
-                      <span className="text-[#c9b8a8]">›</span>
-                    </div>
-                  </div>
-
-                  {order.cancel_status && order.cancel_status !== '' ? (
-                    <p className="mt-2 text-xs font-semibold text-[#c0392b]">
-                      {CANCEL_STATUS_LABEL[order.cancel_status] ?? ''}
-                    </p>
-                  ) : null}
-
-                  {/* 所有商品縮圖 */}
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {order.items.map((it, i) => (
-                      <div
-                        key={i}
-                        className="relative h-14 w-14 shrink-0 overflow-hidden rounded-md border border-[#eee5da] bg-[#e9e1d6]"
-                      >
-                        {it.image || imageByName.get(it.name) ? (
-                          <img
-                            src={it.image || imageByName.get(it.name)}
-                            alt={it.name}
-                            className="h-full w-full object-cover"
-                          />
-                        ) : null}
-                        {it.quantity > 1 && (
-                          <span className="absolute bottom-0 right-0 rounded-tl-md bg-black/60 px-1 text-[10px] font-semibold text-white">
-                            ×{it.quantity}
-                          </span>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </button>
-
-                {/* 依狀態顯示操作 */}
-                <div className="mt-3 flex flex-wrap gap-2 border-t border-[#f1ebe1] pt-3">
-                  {canPayNow(order) ? (
-                    isOnlinePayment(order.payment_method ?? '') ? (
-                      <a href={`/api/payment/newebpay/checkout?order=${encodeURIComponent(order.order_no)}`} className={payBtn}>
-                        立即付款
-                      </a>
-                    ) : (
-                      <button onClick={() => onPay(order)} className={payBtn}>
-                        立即付款
-                      </button>
-                    )
-                  ) : null}
-                  {shipped ? (
-                    <button onClick={() => onOpen(order)} className={actionBtn}>查看物流</button>
-                  ) : null}
-                  {canRequestCancel(order) ? (
-                    <button onClick={() => onCancel(order)} className={actionBtn}>申請取消</button>
-                  ) : null}
-                  <button onClick={() => onOpen(order)} className={actionBtn}>訂單詳情</button>
-                </div>
+        <div className="space-y-5">
+          {monthGroups.map((group, idx) => (
+            <section key={group.key} className="space-y-3">
+              <div className="flex items-center gap-4">
+                <h2 className="font-serif-tc shrink-0 text-2xl font-semibold tracking-[0.08em]">{group.label}</h2>
+                <span className="h-px flex-1 bg-[#d8cfc3]" />
+                <span className="text-xs font-medium text-[#8a7f72]">{idx === 0 ? '最近訂單' : `${group.orders.length} 筆`}</span>
               </div>
-            );
-          })}
+              <div className="space-y-3">
+                {group.orders.map((order) => (
+                  <OrderRecordCard
+                    key={order.id}
+                    order={order}
+                    imageByName={imageByName}
+                    onOpen={onOpen}
+                    onCancel={onCancel}
+                    onPay={onPay}
+                  />
+                ))}
+              </div>
+            </section>
+          ))}
         </div>
       )}
     </div>
   );
+}
+
+function OrderFilterPill({
+  active,
+  label,
+  count,
+  compact = false,
+  onClick,
+}: {
+  active: boolean;
+  label: string;
+  count: number;
+  compact?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`inline-flex h-10 items-center justify-center gap-2 whitespace-nowrap rounded-full px-5 text-sm font-semibold transition ${
+        active
+          ? 'bg-[#9f1735] text-white shadow-[0_7px_18px_rgba(159,23,53,0.22)]'
+          : 'bg-[#f0ebe3] text-[#6f665d] hover:bg-white'
+      } ${compact ? 'h-9 px-4 text-xs' : ''}`}
+    >
+      <span>{label}</span>
+      <span>{count}</span>
+    </button>
+  );
+}
+
+function OrderRecordCard({
+  order,
+  imageByName,
+  onOpen,
+  onCancel,
+  onPay,
+}: {
+  order: Order;
+  imageByName: Map<string, string>;
+  onOpen: (o: Order) => void;
+  onCancel: (o: Order) => void;
+  onPay: (o: Order) => void;
+}) {
+  const firstItem = order.items[0];
+  const img = firstItem ? firstItem.image || imageByName.get(firstItem.name) || '' : '';
+  const itemCount = order.items.reduce((n, it) => n + it.quantity, 0);
+  const date = order.created_at ? new Date(order.created_at) : null;
+  const dateText = date
+    ? date.toLocaleDateString('zh-TW', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, '.')
+    : '未記錄日期';
+  const shipped = ['SHIPPED', 'IN_TRANSIT', 'AT_STORE', 'DELIVERED', 'PICKED_UP'].includes(order.fulfillment_status ?? '') || order.status === '已出貨';
+  const needsAttention = orderNeedsAttention(order, 'customer');
+
+  return (
+    <article className="relative overflow-visible rounded-xl border border-[#eee5da] bg-white shadow-[0_5px_18px_rgba(64,52,43,0.07)]">
+      <span className="absolute -left-2 top-[62%] h-4 w-4 rounded-full border border-l-0 border-[#eee5da] bg-[#f6f2ec]" aria-hidden />
+      <span className="absolute -right-2 top-[62%] h-4 w-4 rounded-full border border-r-0 border-[#eee5da] bg-[#f6f2ec]" aria-hidden />
+      <div className={`border-l-4 ${needsAttention ? 'border-[#c84767]' : 'border-transparent'} px-5 pb-4 pt-4`}>
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="font-serif-tc text-xl font-semibold tracking-[0.08em] text-[#1f1b19]">{dateText}</p>
+            <p className="mt-0.5 truncate text-xs text-[#8a7f72]">訂單編號　{order.order_no}</p>
+          </div>
+          <OrderListStatusBadge order={order} />
+        </div>
+
+        <div className="mt-4 grid grid-cols-[76px_minmax(0,1fr)_auto] items-center gap-4">
+          <div className="h-[76px] w-[76px] overflow-hidden rounded-lg bg-[#eee7df]">
+            {img ? <img src={img} alt={firstItem?.name ?? '商品'} className="h-full w-full object-cover" /> : null}
+          </div>
+          <div className="min-w-0">
+            <p className="truncate text-base font-semibold text-[#1f1b19]">{firstItem?.name ?? '訂單商品'}</p>
+            <p className="mt-2 text-sm text-[#6f665d]">{itemCount} 件商品</p>
+            {order.cancel_status && order.cancel_status !== '' ? (
+              <p className="mt-1 text-xs font-semibold text-[#c0392b]">{CANCEL_STATUS_LABEL[order.cancel_status] ?? ''}</p>
+            ) : null}
+          </div>
+          <div className="text-right">
+            <p className="text-xs font-medium tracking-[0.08em] text-[#8a7f72]">訂單金額</p>
+            <p className="font-serif-tc mt-1 whitespace-nowrap text-3xl font-semibold tracking-normal text-[#1f1b19]">
+              NT$ {new Intl.NumberFormat('zh-TW').format(order.total)}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex items-center gap-3 border-t border-dashed border-[#e6ded4] px-5 py-3">
+        <button
+          type="button"
+          onClick={() => onOpen(order)}
+          className="inline-flex h-10 items-center gap-2 rounded-full px-1 text-sm font-semibold text-[#6f665d] hover:text-[#1f1b19]"
+        >
+          訂單詳情 <span aria-hidden>↗</span>
+        </button>
+        <div className="ml-auto flex items-center gap-2">
+          {canPayNow(order) ? (
+            isOnlinePayment(order.payment_method ?? '') ? (
+              <a href={`/api/payment/newebpay/checkout?order=${encodeURIComponent(order.order_no)}`} className="inline-flex h-10 items-center gap-2 rounded-full bg-[#9f1735] px-6 text-sm font-semibold text-white shadow-[0_6px_16px_rgba(159,23,53,0.18)]">
+                前往付款 <span aria-hidden>→</span>
+              </a>
+            ) : (
+              <button onClick={() => onPay(order)} className="inline-flex h-10 items-center gap-2 rounded-full bg-[#9f1735] px-6 text-sm font-semibold text-white shadow-[0_6px_16px_rgba(159,23,53,0.18)]">
+                前往付款 <span aria-hidden>→</span>
+              </button>
+            )
+          ) : shipped ? (
+            <button onClick={() => onOpen(order)} className="inline-flex h-10 items-center gap-2 rounded-full border border-[#8d7568] px-6 text-sm font-semibold text-[#3d302a]">
+              查看物流 <span aria-hidden>⌄</span>
+            </button>
+          ) : null}
+          {canRequestCancel(order) ? (
+            <button type="button" onClick={() => onCancel(order)} aria-label="申請取消訂單" className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-[#f7f3ee] text-[#6f665d]">
+              <IconDots />
+            </button>
+          ) : null}
+        </div>
+      </div>
+    </article>
+  );
+}
+
+function OrderListStatusBadge({ order }: { order: Order }) {
+  const tab = orderTabOf(order);
+  const config =
+    tab === 'unpaid'
+      ? { label: '尚未付款', className: 'bg-[#fbf1e6] text-[#9b6b25]', icon: 'clock' as const }
+      : tab === 'to_ship'
+        ? { label: '待出貨', className: 'bg-[#f4efe7] text-[#6f665d]', icon: 'box' as const }
+        : tab === 'shipping'
+          ? { label: '配送中', className: 'bg-[#eaf1f7] text-[#38617d]', icon: 'truck' as const }
+          : tab === 'done'
+            ? { label: '已完成', className: 'bg-[#e8f6ed] text-[#247447]', icon: 'check' as const }
+            : tab === 'returning'
+              ? { label: '退貨中', className: 'bg-[#fff3dc] text-[#91620d]', icon: 'clock' as const }
+              : { label: '已取消', className: 'bg-[#f4ece9] text-[#9a4d42]', icon: 'x' as const };
+  return (
+    <span className={`inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full px-3 text-xs font-semibold ${config.className}`}>
+      <OrderStatusIcon type={config.icon} />
+      {config.label}
+    </span>
+  );
+}
+
+function IconSearch() {
+  return (
+    <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+      <circle cx="11" cy="11" r="7" />
+      <path d="m16.5 16.5 4 4" />
+    </svg>
+  );
+}
+
+function IconSliders() {
+  return (
+    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+      <path d="M4 7h16M4 17h16" />
+      <circle cx="9" cy="7" r="2" />
+      <circle cx="15" cy="17" r="2" />
+    </svg>
+  );
+}
+
+function IconDots() {
+  return (
+    <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true">
+      <circle cx="5" cy="12" r="1.7" />
+      <circle cx="12" cy="12" r="1.7" />
+      <circle cx="19" cy="12" r="1.7" />
+    </svg>
+  );
+}
+
+function OrderStatusIcon({ type }: { type: 'clock' | 'box' | 'truck' | 'check' | 'x' }) {
+  if (type === 'check') return <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12.5l4 4L19 6" /></svg>;
+  if (type === 'x') return <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M7 7l10 10M17 7 7 17" /></svg>;
+  if (type === 'truck') return <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 7h11v9H3z" /><path d="M14 10h4l3 3v3h-7z" /><circle cx="7" cy="18" r="1.7" /><circle cx="18" cy="18" r="1.7" /></svg>;
+  if (type === 'box') return <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round"><path d="M4 8l8-4 8 4-8 4z" /><path d="M4 8v8l8 4 8-4V8" /><path d="M12 12v8" /></svg>;
+  return <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="8" /><path d="M12 7v5l3 2" /></svg>;
 }
 
 /* ---------- 訂單完整資訊(懸浮視窗) ---------- */
