@@ -772,7 +772,7 @@ function CouponTicket({ code, image, desc, tags, action, dim = false, showScript
     <div className={`relative flex items-stretch drop-shadow-[0_8px_18px_rgba(64,52,43,0.08)] ${dim ? 'opacity-65' : ''}`}>
       {/* 照片票根 */}
       <div
-        className="ticket-seam-l relative w-[26%] min-w-[104px] max-w-[178px] shrink-0 self-stretch rounded-l-2xl bg-[#e5ded4] bg-cover bg-center"
+        className="relative w-[26%] min-w-[104px] shrink-0 self-stretch rounded-l-2xl bg-[#e5ded4] bg-cover bg-center"
         style={couponImageStyle(image, code)}
       >
         <div className="absolute inset-0 bg-black/[0.03]" />
@@ -781,7 +781,7 @@ function CouponTicket({ code, image, desc, tags, action, dim = false, showScript
           <span className="block">FOR YOU.</span>
         </span>
       </div>
-      <div className="ticket-seam-r relative flex min-h-[120px] flex-1 items-stretch rounded-r-2xl border border-l-0 border-[#eadfd4] bg-[#fffaf5] sm:min-h-[132px]">
+      <div className="relative flex min-h-[120px] flex-1 items-stretch rounded-r-2xl border border-l-0 border-[#eadfd4] bg-[#fffaf5] sm:min-h-[132px]">
         <div className="flex min-w-0 flex-1 flex-col justify-center px-4 py-4 sm:px-6">
           <p className="font-serif-tc text-[19px] font-bold tracking-[0.08em] text-[#2c2826] sm:text-[23px]">{code}</p>
           <p className="mt-1 text-[13px] font-medium text-[#6b6156] sm:text-sm">{desc}</p>
@@ -808,6 +808,24 @@ function CouponTicket({ code, image, desc, tags, action, dim = false, showScript
           </div>
         )}
       </div>
+      <TicketPerforation side="left" />
+      <TicketPerforation side="middle" />
+    </div>
+  );
+}
+
+function TicketPerforation({ side }: { side: 'left' | 'middle' }) {
+  const middleHoles = Array.from({ length: 8 });
+  const x = side === 'left' ? 'left-0' : 'left-[26%]';
+  return (
+    <div className={`pointer-events-none absolute inset-y-0 z-20 ${x}`} aria-hidden>
+      <span className="ticket-hole absolute left-0 top-0 h-5 w-5 -translate-x-1/2 -translate-y-1/2" />
+      <div className="absolute bottom-[18px] left-0 top-[18px] flex w-3 -translate-x-1/2 flex-col justify-between">
+        {middleHoles.map((_, index) => (
+          <span key={index} className="ticket-hole h-3 w-3" />
+        ))}
+      </div>
+      <span className="ticket-hole absolute bottom-0 left-0 h-5 w-5 -translate-x-1/2 translate-y-1/2" />
     </div>
   );
 }
