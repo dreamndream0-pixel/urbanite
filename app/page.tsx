@@ -1038,11 +1038,7 @@ function ProductCard({
             </div>
           )}
         </Link>
-        {soldOut ? (
-          <div className="absolute left-2 top-2 flex h-12 w-12 items-center justify-center rounded-full bg-[#1f1b19]/90 text-center text-[10px] font-bold leading-[1.05] tracking-[0.08em] text-white shadow-sm">
-            <span>SOLD<br />OUT</span>
-          </div>
-        ) : product.status !== '上架中' && (
+        {!soldOut && product.status !== '上架中' && (
           <span className="absolute left-2 top-2 rounded bg-[#1f1b19] px-2 py-1 text-xs font-medium text-white">
             {product.status}
           </span>
@@ -1385,14 +1381,17 @@ function HeroCarousel({ banners }: { banners: Banner[] }) {
           if (e.pointerType === 'mouse') onUp();
         }}
       >
-        {banners.map((banner) => {
+        {banners.map((banner, i) => {
+          const active = i === safeIndex;
           const img = (
             <img
               src={banner.image}
               alt={banner.title || '輪播圖'}
               draggable={false}
               // 固定框架,圖片放大縮小填滿整個輪播框(適配版面大小)
-              className="pointer-events-none h-full w-full object-cover"
+              className={`pointer-events-none h-full w-full object-cover transition-[opacity,transform,filter] duration-700 ease-out ${
+                active ? 'scale-100 opacity-100 blur-0' : 'scale-[1.035] opacity-75 blur-[1px]'
+              }`}
             />
           );
           return (
@@ -1713,9 +1712,11 @@ function IconStar({ filled = false, small = false }: { filled?: boolean; small?:
 }
 function IconBag() {
   return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
-      <path d="M6 8h12l-1 12H7L6 8z" strokeLinejoin="round" />
-      <path d="M9 8V6a3 3 0 016 0v2" strokeLinecap="round" />
+    <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="9" cy="20" r="1.7" />
+      <circle cx="18" cy="20" r="1.7" />
+      <path d="M3 4h2l2.4 11.2a2 2 0 0 0 2 1.6h7.8a2 2 0 0 0 1.9-1.4L21 8H7" />
+      <path d="M8 8h13" />
     </svg>
   );
 }
