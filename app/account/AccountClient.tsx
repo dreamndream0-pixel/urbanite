@@ -772,7 +772,7 @@ function CouponTicket({ code, image, desc, tags, action, dim = false, showScript
     <div className={`relative flex items-stretch drop-shadow-[0_8px_18px_rgba(64,52,43,0.08)] ${dim ? 'opacity-65' : ''}`}>
       {/* 照片票根 */}
       <div
-        className="relative w-[26%] min-w-[104px] shrink-0 self-stretch rounded-l-2xl bg-[#e5ded4] bg-cover bg-center"
+        className="ticket-cut-both relative w-[26%] min-w-[104px] shrink-0 self-stretch bg-[#e5ded4] bg-cover bg-center"
         style={couponImageStyle(image, code)}
       >
         <div className="absolute inset-0 bg-black/[0.03]" />
@@ -781,7 +781,7 @@ function CouponTicket({ code, image, desc, tags, action, dim = false, showScript
           <span className="block">FOR YOU.</span>
         </span>
       </div>
-      <div className="relative flex min-h-[120px] flex-1 items-stretch rounded-r-2xl border border-l-0 border-[#eadfd4] bg-[#fffaf5] sm:min-h-[132px]">
+      <div className="ticket-cut-left relative flex min-h-[120px] flex-1 items-stretch rounded-r-2xl border border-l-0 border-[#eadfd4] bg-[#fffaf5] sm:min-h-[132px]">
         <div className="flex min-w-0 flex-1 flex-col justify-center px-4 py-4 sm:px-6">
           <p className="font-serif-tc text-[19px] font-bold tracking-[0.08em] text-[#2c2826] sm:text-[23px]">{code}</p>
           <p className="mt-1 text-[13px] font-medium text-[#6b6156] sm:text-sm">{desc}</p>
@@ -793,14 +793,10 @@ function CouponTicket({ code, image, desc, tags, action, dim = false, showScript
         </div>
         {divided ? (
           <div className="relative flex w-[29%] min-w-[96px] shrink-0 items-center justify-center self-stretch border-l border-dashed border-[#ded5c8] px-3 sm:w-[28%] sm:min-w-[126px] sm:px-6">
-            <span className="absolute -left-2 -top-2 h-4 w-4 rounded-full bg-[#f6f2ec]" aria-hidden />
-            <span className="absolute -bottom-2 -left-2 h-4 w-4 rounded-full bg-[#f6f2ec]" aria-hidden />
             {action}
           </div>
         ) : (
           <div className="relative flex w-[29%] min-w-[96px] shrink-0 flex-col items-center justify-center gap-2 border-l border-dashed border-[#ded5c8] px-3 py-3 sm:w-[28%] sm:min-w-[126px] sm:px-6">
-            <span className="absolute -left-2 -top-2 h-4 w-4 rounded-full bg-[#f6f2ec]" aria-hidden />
-            <span className="absolute -bottom-2 -left-2 h-4 w-4 rounded-full bg-[#f6f2ec]" aria-hidden />
             {action}
             {showScript ? (
               <p className="font-script hidden text-center text-[15px] leading-[1.15] text-[#c2b3a0] sm:block">{couponScript(code)}</p>
@@ -808,24 +804,6 @@ function CouponTicket({ code, image, desc, tags, action, dim = false, showScript
           </div>
         )}
       </div>
-      <TicketPerforation side="left" />
-      <TicketPerforation side="middle" />
-    </div>
-  );
-}
-
-function TicketPerforation({ side }: { side: 'left' | 'middle' }) {
-  const middleHoles = Array.from({ length: 8 });
-  const x = side === 'left' ? 'left-0' : 'left-[26%]';
-  return (
-    <div className={`pointer-events-none absolute inset-y-0 z-20 ${x}`} aria-hidden>
-      <span className="ticket-hole absolute left-0 top-0 h-5 w-5 -translate-x-1/2 -translate-y-1/2" />
-      <div className="absolute bottom-[18px] left-0 top-[18px] flex w-3 -translate-x-1/2 flex-col justify-between">
-        {middleHoles.map((_, index) => (
-          <span key={index} className="ticket-hole h-3 w-3" />
-        ))}
-      </div>
-      <span className="ticket-hole absolute bottom-0 left-0 h-5 w-5 -translate-x-1/2 translate-y-1/2" />
     </div>
   );
 }
