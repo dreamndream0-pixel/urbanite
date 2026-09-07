@@ -1478,7 +1478,17 @@ function QuickAddModal({
   const imgRef = useRef<HTMLImageElement>(null);
   const [color, setColor] = useState(product.colors[0] ?? '');
   const [size, setSize] = useState(product.sizes[0] ?? '');
-  const [specSel, setSpecSel] = useState<string[]>(() => specs.map((d) => d.options[0] ?? ''));
+  // 預設規格:第一組合沒貨時,自動改選「第一個還有庫存」的組合,
+  // 避免商品明明還有貨,卻因為預設卡在售完組合而整個顯示已售完。
+  const [specSel, setSpecSel] = useState<string[]>(() => {
+    const first = specs.map((d) => d.options[0] ?? '');
+    if (!specs.length || (product.sale_mode || '').includes('預購')) return first;
+    const variants = product.variants ?? [];
+    const firstVariant = variants.find((v) => v.options.join(' / ') === first.join(' / '));
+    if ((firstVariant?.inventory ?? 0) > 0) return first;
+    const inStock = variants.find((v) => (v.inventory ?? 0) > 0);
+    return inStock ? [...inStock.options] : first;
+  });
   const [quantity, setQuantity] = useState(1);
 
   const variantLabel = hasSpecs

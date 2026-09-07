@@ -449,6 +449,8 @@ export default function AdminDashboard({
   const [logoUrl, setLogoUrl] = useState(initialLogoUrl);
   const [couponHero, setCouponHero] = useState(initialSettings?.coupon_hero_image ?? '');
   const [heroBusy, setHeroBusy] = useState(false);
+  const [memberStamp, setMemberStamp] = useState(initialSettings?.member_stamp_image ?? '');
+  const [stampBusy, setStampBusy] = useState(false);
   const [footerDraft, setFooterDraft] = useState({
     sections: JSON.stringify(initialSettings?.footer_sections ?? [], null, 2),
     about: (initialSettings?.footer_about_links ?? [
@@ -1235,6 +1237,43 @@ export default function AdminDashboard({
       if (!res.ok) return void uiAlert((await res.json()).error ?? '移除失敗');
       setCouponHero('');
     } finally { setHeroBusy(false); }
+  }
+
+  // 會員中心右上角的會員印章圖片:上傳後存進 site_settings.member_stamp_image
+  async function uploadMemberStamp(file: File) {
+    setStampBusy(true);
+    try {
+      const prepared = await prepareProductImage(file, 0);
+      const fd = new FormData();
+      fd.append('file', prepared.blob, prepared.filename);
+      fd.append('folder', 'member');
+      fd.append('productId', 'stamp');
+      const up = await fetch('/api/products/image', { method: 'POST', body: fd });
+      const data = await up.json().catch(() => null);
+      if (!up.ok || !data?.image_url) return void uiAlert(data?.error ?? '上傳失敗');
+      const res = await fetch('/api/settings', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ member_stamp_image: data.image_url }),
+      });
+      if (!res.ok) return void uiAlert((await res.json()).error ?? '儲存失敗');
+      setMemberStamp(data.image_url);
+    } catch (error) {
+      void uiAlert(error instanceof Error ? error.message : '上傳失敗');
+    } finally { setStampBusy(false); }
+  }
+
+  async function clearMemberStamp() {
+    setStampBusy(true);
+    try {
+      const res = await fetch('/api/settings', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ member_stamp_image: '' }),
+      });
+      if (!res.ok) return void uiAlert((await res.json()).error ?? '移除失敗');
+      setMemberStamp('');
+    } finally { setStampBusy(false); }
   }
 
   async function uploadLogo(file: File) {
@@ -2713,6 +2752,37 @@ export default function AdminDashboard({
                     </div>
                     <p className="mt-2 max-w-xs text-xs text-[#8a7f72]">
                       顯示在會員「優惠券及購物金」頁最上方的右側背景。建議直式或方形的情境照(布料、吊牌、衣架等)。
+                    </p>
+                  </div>
+                </div>
+              </Card>
+              )}
+
+              {settingsTab === 'general' && (
+              <Card title="會員印章圖片">
+                <div className="flex flex-wrap items-center gap-5">
+                  <div className="flex h-20 w-40 items-center justify-center overflow-hidden rounded-lg border border-[#e5ded4] bg-[#fbf8f3] bg-contain bg-center bg-no-repeat"
+                       style={memberStamp ? { backgroundImage: `url("${memberStamp}")` } : undefined}>
+                    {memberStamp ? null : <span className="text-sm text-[#8a7f72]">尚未設定</span>}
+                  </div>
+                  <div>
+                    <div className="flex flex-wrap gap-2">
+                      <label className={`inline-block cursor-pointer rounded-full bg-[#1f1b19] px-4 py-2 text-sm font-semibold text-white ${stampBusy ? 'opacity-50' : ''}`}>
+                        {stampBusy ? '處理中…' : '上傳印章圖片'}
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          disabled={stampBusy}
+                          onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadMemberStamp(f); e.target.value = ''; }}
+                        />
+                      </label>
+                      {memberStamp ? (
+                        <button onClick={clearMemberStamp} disabled={stampBusy} className="rounded-full border border-[#e0b4b4] px-4 py-2 text-sm font-semibold text-[#c0392b] disabled:opacity-50">移除</button>
+                      ) : null}
+                    </div>
+                    <p className="mt-2 max-w-xs text-xs text-[#8a7f72]">
+                      顯示在會員中心右上角的印章。建議透明背景 PNG,方形構圖;左側會自動淡出融入背景。
                     </p>
                   </div>
                 </div>

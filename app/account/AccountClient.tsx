@@ -105,6 +105,7 @@ export default function AccountClient({
   const [logoUrl, setLogoUrl] = useState('');
   const [returnInfo, setReturnInfo] = useState('');
   const [couponHero, setCouponHero] = useState('');
+  const [memberStamp, setMemberStamp] = useState('');
   const [toast, setToast] = useState('');
   const [cartCount, setCartCount] = useState(0);
 
@@ -123,6 +124,7 @@ export default function AccountClient({
         setPaymentAccounts(data?.payment_accounts ?? []);
         setReturnInfo(data?.return_info ?? '');
         setCouponHero(data?.coupon_hero_image ?? '');
+        setMemberStamp(data?.member_stamp_image ?? '');
         if (data?.logo_url) setLogoUrl(data.logo_url);
       })
       .catch(() => {});
@@ -234,6 +236,7 @@ export default function AccountClient({
             fallbackPhone={userPhone}
             fallbackAddress={userAddress}
             provider={provider}
+            stampImage={memberStamp}
             onSaved={() => router.refresh()}
           />
         )}
@@ -293,6 +296,10 @@ export default function AccountClient({
 }
 
 /* ---------- 個人資訊 ---------- */
+// 尚未於系統設定上傳自訂印章時的預設圖(舊有的寫死版本)
+const DEFAULT_STAMP_IMAGE =
+  'https://mffhznxcqjlwquqyrgth.supabase.co/storage/v1/object/public/assets/member/urbanite-member-stamp-1788771080926.png';
+
 function ProfileTab({
   customer,
   fallbackName,
@@ -300,6 +307,7 @@ function ProfileTab({
   fallbackPhone,
   fallbackAddress,
   provider,
+  stampImage,
   onSaved,
 }: {
   customer: Customer | null;
@@ -308,6 +316,7 @@ function ProfileTab({
   fallbackPhone: string;
   fallbackAddress: string;
   provider: string;
+  stampImage?: string;
   onSaved: () => void;
 }) {
   const [name, setName] = useState(customer?.name || fallbackName || '');
@@ -552,9 +561,13 @@ function ProfileTab({
     <div className="space-y-8 pb-24">
       <section className="relative -mx-4 -mt-8 overflow-hidden border-b border-[#eadfd4] bg-[#fbf8f3] px-6 pb-7 pt-6 sm:-mx-6 sm:px-10">
         <img
-          src="https://mffhznxcqjlwquqyrgth.supabase.co/storage/v1/object/public/assets/member/urbanite-member-stamp-1788771080926.png"
+          src={stampImage || DEFAULT_STAMP_IMAGE}
           alt="URBANITE MEMBER"
           className="absolute right-5 top-8 h-32 w-32 object-contain opacity-85 sm:right-8 sm:h-40 sm:w-40"
+          style={{
+            WebkitMaskImage: 'linear-gradient(to right, transparent, #000 30%)',
+            maskImage: 'linear-gradient(to right, transparent, #000 30%)',
+          }}
         />
         <p className="text-[10px] font-semibold tracking-[0.34em] text-[#8f1f31]/70">MEMBER SPACE</p>
         <h1 className="font-serif-tc mt-3 text-[58px] font-semibold leading-[0.92] tracking-normal text-[#1f1b19] sm:text-[76px]">

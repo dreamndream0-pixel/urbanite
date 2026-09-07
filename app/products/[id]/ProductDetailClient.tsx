@@ -32,7 +32,18 @@ export default function ProductDetailClient({ product }: { product: Product }) {
   const [activeImage, setActiveImage] = useState(gallery[0] ?? '');
   const [selectedColor, setSelectedColor] = useState(product.colors[0] ?? '');
   const [selectedSize, setSelectedSize] = useState(product.sizes[0] ?? '');
-  const [specSel, setSpecSel] = useState<string[]>(() => specs.map((d) => d.options[0] ?? ''));
+  // 預設規格:優先選每個維度的第一個選項;但若那個組合剛好沒庫存,
+  // 會讓商品一開頁就整個顯示「已售完」,即使其他組合明明還有貨。
+  // 改成:第一組合沒貨時,自動改選「第一個還有庫存」的組合。
+  const [specSel, setSpecSel] = useState<string[]>(() => {
+    const first = specs.map((d) => d.options[0] ?? '');
+    if (!specs.length || (product.sale_mode || '').includes('預購')) return first;
+    const variants = product.variants ?? [];
+    const firstVariant = variants.find((v) => v.options.join(' / ') === first.join(' / '));
+    if ((firstVariant?.inventory ?? 0) > 0) return first;
+    const inStock = variants.find((v) => (v.inventory ?? 0) > 0);
+    return inStock ? [...inStock.options] : first;
+  });
   const [quantity, setQuantity] = useState(1);
   const [tab, setTab] = useState<'description' | 'shipping'>('shipping');
   const [message, setMessage] = useState('');
@@ -410,7 +421,7 @@ export default function ProductDetailClient({ product }: { product: Product }) {
               disabled={soldOut}
               className="bg-[#ff761a] px-4 py-3 font-semibold text-white disabled:opacity-50"
             >
-              ♧ 立即購買
+              立即購買
             </button>
           </div>
 

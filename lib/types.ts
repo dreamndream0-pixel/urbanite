@@ -76,6 +76,8 @@ export type SiteSettings = {
   return_info?: string;
   // 會員「優惠券及購物金」頁 hero 右側背景圖
   coupon_hero_image?: string;
+  // 會員中心右上角的會員印章圖片
+  member_stamp_image?: string;
   updated_at?: string;
 };
 

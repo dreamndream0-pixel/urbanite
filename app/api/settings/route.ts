@@ -30,6 +30,7 @@ const DEFAULT_SETTINGS: SiteSettings = {
   shipping_fees: [],
   return_info: '',
   coupon_hero_image: '',
+  member_stamp_image: '',
 };
 
 // GET /api/settings — 取得網站設定(前台與後台共用,公開)
@@ -75,6 +76,7 @@ export async function PATCH(request: Request) {
     'shipping_fees',
     'return_info',
     'coupon_hero_image',
+    'member_stamp_image',
   ] as const;
 
   for (const key of keys) {
