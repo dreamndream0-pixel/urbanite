@@ -175,6 +175,16 @@ img {
   mask-composite: intersect;
 }
 
+@keyframes order-card-tap {
+  0% { transform: translateX(0) scale(1); }
+  30% { transform: translateX(-2px) rotate(-0.15deg) scale(0.997); }
+  65% { transform: translateX(2px) rotate(0.15deg) scale(1.002); }
+  100% { transform: translateX(0) scale(1); }
+}
+.order-card-tap:active {
+  animation: order-card-tap 0.28s ease;
+}
+
 /* 畫面置中彈出通知(例:已儲存):停留後於第 3 秒淡出消失,不佔版面空間。 */
 @keyframes center-toast-fade {
   0% { opacity: 0; transform: translateY(6px) scale(0.98); }

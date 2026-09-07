@@ -1153,7 +1153,18 @@ function OrderRecordCard({
   const needsAttention = orderNeedsAttention(order, 'customer');
 
   return (
-    <article className="order-ticket-card relative overflow-hidden rounded-xl border border-[#eee5da] bg-white shadow-[0_5px_18px_rgba(64,52,43,0.07)]">
+    <article
+      role="button"
+      tabIndex={0}
+      onClick={() => onOpen(order)}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onOpen(order);
+        }
+      }}
+      className="order-card-tap order-ticket-card relative cursor-pointer overflow-hidden rounded-xl border border-[#eee5da] bg-white shadow-[0_5px_18px_rgba(64,52,43,0.07)] outline-none transition hover:-translate-y-0.5 hover:shadow-[0_10px_24px_rgba(64,52,43,0.1)] focus-visible:ring-2 focus-visible:ring-[#9f1735]/35"
+    >
       {needsAttention ? <span className="pointer-events-none absolute left-0 top-0 z-10 h-[calc(100%-64px)] w-1 rounded-tl-xl bg-[#c84767]" aria-hidden /> : null}
       <div className="px-5 pb-4 pt-4">
         <div className="flex items-start justify-between gap-3">
@@ -1161,7 +1172,9 @@ function OrderRecordCard({
             <p className="font-serif-tc text-xl font-semibold tracking-[0.08em] text-[#1f1b19]">{dateText}</p>
             <p className="mt-0.5 truncate text-xs text-[#8a7f72]">訂單編號　{order.order_no}</p>
           </div>
-          <OrderListStatusBadge order={order} />
+          <span className="inline-flex h-9 shrink-0 items-center gap-2 rounded-full px-1 text-sm font-semibold text-[#6f665d]">
+            訂單詳情 <span aria-hidden>↗</span>
+          </span>
         </div>
 
         <div className="mt-4 grid grid-cols-[76px_minmax(0,1fr)_auto] items-center gap-4">
@@ -1185,31 +1198,52 @@ function OrderRecordCard({
       </div>
 
       <div className="relative flex min-h-16 items-center gap-3 border-t border-dashed border-[#e6ded4] px-5 py-3">
-        <button
-          type="button"
-          onClick={() => onOpen(order)}
-          className="inline-flex h-10 items-center gap-2 rounded-full px-1 text-sm font-semibold text-[#6f665d] hover:text-[#1f1b19]"
-        >
-          訂單詳情 <span aria-hidden>↗</span>
-        </button>
+        <div className="min-w-0 flex-1">
+          <OrderListStatusBadge order={order} />
+          <p className="mt-1 truncate text-[11px] font-medium text-[#8a7f72]">{order.payment_method || '未設定付款方式'}</p>
+        </div>
         <div className="ml-auto flex items-center gap-2">
           {canPayNow(order) ? (
             isOnlinePayment(order.payment_method ?? '') ? (
-              <a href={`/api/payment/newebpay/checkout?order=${encodeURIComponent(order.order_no)}`} className="inline-flex h-10 items-center gap-2 rounded-full bg-[#9f1735] px-6 text-sm font-semibold text-white shadow-[0_6px_16px_rgba(159,23,53,0.18)]">
+              <a
+                href={`/api/payment/newebpay/checkout?order=${encodeURIComponent(order.order_no)}`}
+                onClick={(e) => e.stopPropagation()}
+                className="inline-flex h-10 items-center gap-2 rounded-full bg-[#9f1735] px-6 text-sm font-semibold text-white shadow-[0_6px_16px_rgba(159,23,53,0.18)]"
+              >
                 前往付款 <span aria-hidden>→</span>
               </a>
             ) : (
-              <button onClick={() => onPay(order)} className="inline-flex h-10 items-center gap-2 rounded-full bg-[#9f1735] px-6 text-sm font-semibold text-white shadow-[0_6px_16px_rgba(159,23,53,0.18)]">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onPay(order);
+                }}
+                className="inline-flex h-10 items-center gap-2 rounded-full bg-[#9f1735] px-6 text-sm font-semibold text-white shadow-[0_6px_16px_rgba(159,23,53,0.18)]"
+              >
                 前往付款 <span aria-hidden>→</span>
               </button>
             )
           ) : shipped ? (
-            <button onClick={() => onOpen(order)} className="inline-flex h-10 items-center gap-2 rounded-full border border-[#8d7568] px-6 text-sm font-semibold text-[#3d302a]">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onOpen(order);
+              }}
+              className="inline-flex h-10 items-center gap-2 rounded-full border border-[#8d7568] px-6 text-sm font-semibold text-[#3d302a]"
+            >
               查看物流 <span aria-hidden>⌄</span>
             </button>
           ) : null}
           {canRequestCancel(order) ? (
-            <button type="button" onClick={() => onCancel(order)} aria-label="申請取消訂單" className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-[#f7f3ee] text-[#6f665d]">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onCancel(order);
+              }}
+              aria-label="申請取消訂單"
+              className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-[#f7f3ee] text-[#6f665d]"
+            >
               <IconDots />
             </button>
           ) : null}

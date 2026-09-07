@@ -124,6 +124,8 @@ type TabOrder = {
   paid: boolean;
   fulfillment_status?: string;
   cancel_status?: string;
+  shipping_method?: string;
+  payment_method?: string;
 };
 
 export function orderTabOf(order: TabOrder): Exclude<OrderTab, 'all'> {
@@ -132,6 +134,7 @@ export function orderTabOf(order: TabOrder): Exclude<OrderTab, 'all'> {
   if (order.status === '取消' || order.status === '退貨' || order.cancel_status === 'APPROVED' || f === 'RETURNED') return 'cancelled';
   if (order.status === '已完成' || f === 'DELIVERED' || f === 'PICKED_UP') return 'done';
   if (['SHIPPED', 'IN_TRANSIT', 'AT_STORE'].includes(f) || order.status === '已出貨') return 'shipping';
+  if (isCollectOnDelivery(order.shipping_method ?? '', order.payment_method ?? '')) return 'to_ship';
   if (!order.paid) return 'unpaid';
   return 'to_ship';
 }
