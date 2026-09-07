@@ -235,7 +235,7 @@ export default function AccountClient({
               onClick={() => changeTab(t.key)}
               className={`relative -mb-px shrink-0 whitespace-nowrap border-b-2 px-5 py-3 text-center text-sm font-semibold transition-all duration-200 ${
                 tab === t.key
-                  ? '-translate-y-1 rounded-t-2xl border-b-[#8f1f31] bg-white text-[#1f1b19] shadow-[0_-6px_18px_rgba(64,52,43,0.08)]'
+                  ? 'rounded-t-2xl border-b-[#8f1f31] bg-white text-[#1f1b19] shadow-[0_-6px_18px_rgba(64,52,43,0.08)]'
                   : 'border-b-transparent text-[#8a7f72] hover:-translate-y-0.5 hover:bg-white/55 hover:text-[#1f1b19]'
               }`}
             >
@@ -499,12 +499,13 @@ function ProfileTab({
   );
 
   return (
-    <div className="space-y-8 pb-28">
+    <div className="space-y-8 pb-36">
       <section className="relative -mx-4 -mt-8 overflow-hidden border-b border-[#eadfd4] bg-[#fbf8f3] px-6 pb-7 pt-6 sm:-mx-6 sm:px-10">
-        <div className="absolute right-8 top-8 hidden h-32 w-32 items-center justify-center rounded-full border border-[#8f1f31]/45 text-[#8f1f31] sm:flex">
-          <div className="flex h-24 w-24 items-center justify-center rounded-full border border-[#8f1f31]/35">
-            <span className="font-serif-tc text-5xl leading-none">U</span>
+        <div className="absolute right-5 top-8 flex h-24 w-24 items-center justify-center rounded-full border border-[#8f1f31]/45 text-[#8f1f31] opacity-80 sm:right-8 sm:h-32 sm:w-32">
+          <div className="flex h-[72px] w-[72px] items-center justify-center rounded-full border border-[#8f1f31]/35 sm:h-24 sm:w-24">
+            <span className="font-serif-tc text-4xl leading-none sm:text-5xl">U</span>
           </div>
+          <span className="absolute -bottom-5 whitespace-nowrap text-[8px] font-semibold tracking-[0.28em] text-[#8f1f31]/55 sm:text-[9px]">YOUR PERSONAL EDIT.</span>
         </div>
         <p className="text-[10px] font-semibold tracking-[0.34em] text-[#8f1f31]/70">MEMBER SPACE</p>
         <h1 className="font-serif-tc mt-3 text-[58px] font-semibold leading-[0.92] tracking-normal text-[#1f1b19] sm:text-[76px]">
@@ -522,7 +523,7 @@ function ProfileTab({
           </div>
           <span className="hidden text-[10px] font-semibold tracking-[0.34em] text-[#6f665d] sm:inline">PROFILE</span>
         </div>
-        <div className="grid grid-cols-2 gap-3 sm:gap-4">
+        <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-3 sm:gap-4">
           <label className="block min-w-0">
             <span className={labelText}>姓名</span>
             <input value={name} onChange={(e) => setName(e.target.value)} className={field} />
@@ -542,7 +543,7 @@ function ProfileTab({
           </label>
           <label className="block min-w-0">
             <span className={labelText}>生日</span>
-            <input type="date" value={birthday ?? ''} onChange={(e) => setBirthday(e.target.value)} className={field} />
+            <input value={birthday ?? ''} onChange={(e) => setBirthday(e.target.value)} inputMode="numeric" placeholder="年 / 月 / 日" className={field} />
           </label>
           <label className="col-span-2 block min-w-0">
             <span className={labelText}>手機號碼</span>
@@ -598,25 +599,25 @@ function ProfileTab({
         </div>
       </section>
 
-      <section className="relative -mx-4 bg-[#f4e4e4] px-7 py-5 sm:-mx-6 sm:px-10 sm:py-6">
-        <div className="mb-4 flex items-center justify-between gap-3">
+      <section className="relative -mx-4 bg-[#f4e4e4] px-6 py-3 sm:-mx-6 sm:px-10 sm:py-4">
+        <div className="mb-3 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <span className="font-serif-tc text-sm font-bold text-[#8f1f31]">03</span>
             <h2 className="font-serif-tc text-2xl font-bold tracking-[0.08em]">你的偏好</h2>
           </div>
           <span className="hidden text-[10px] font-semibold tracking-[0.34em] text-[#6f665d] sm:inline">PREFERENCES</span>
         </div>
-        <div className="space-y-4">
+        <div className="space-y-2.5">
           <div>
-            <p className="mb-2 text-sm font-semibold text-[#6f665d]">訊息訂閱</p>
-            <div className="space-y-2.5">
+            <p className="mb-1.5 text-sm font-semibold text-[#6f665d]">訊息訂閱</p>
+            <div className="space-y-1.5">
               <ToggleRow label="訂閱 Email 電子報" icon="mail" checked={marketing.email} onChange={(v) => setMarketing((m) => ({ ...m, email: v }))} />
               <ToggleRow label="接收簡訊優惠通知" icon="chat" checked={marketing.sms} onChange={(v) => setMarketing((m) => ({ ...m, sms: v }))} />
             </div>
           </div>
-          <div className="border-t border-[#decaca] pt-4">
-            <p className="mb-2 text-sm font-semibold text-[#6f665d]">隱私設定</p>
-            <div className="space-y-2.5">
+          <div className="border-t border-[#decaca] pt-2.5">
+            <p className="mb-1.5 text-sm font-semibold text-[#6f665d]">隱私設定</p>
+            <div className="space-y-1.5">
               <ToggleRow label="允許依購物紀錄提供個人化推薦" desc="依購物紀錄推薦適合你的單品" icon="star" checked={privacy.personalization} onChange={(v) => setPrivacy((p) => ({ ...p, personalization: v }))} />
               <ToggleRow label="公開我的追蹤清單活動" icon="eye" checked={privacy.show_activity} onChange={(v) => setPrivacy((p) => ({ ...p, show_activity: v }))} />
             </div>
@@ -629,16 +630,16 @@ function ProfileTab({
           {msg.text}
         </p>
       )}
-      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-[#eadfd4] bg-[#fbf8f3]/95 px-4 pb-[calc(env(safe-area-inset-bottom)+12px)] pt-3 backdrop-blur">
+      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-[#eadfd4] bg-[#fbf8f3]/95 px-4 pb-[calc(env(safe-area-inset-bottom)+10px)] pt-3 shadow-[0_-10px_24px_rgba(64,52,43,0.08)] backdrop-blur">
         <button onClick={save} disabled={saving} className="mx-auto flex h-12 w-full max-w-4xl items-center justify-center gap-3 rounded-lg bg-[#8f1f31] px-6 text-sm font-semibold tracking-[0.18em] text-white shadow-[0_10px_24px_rgba(143,31,49,0.22)] disabled:opacity-40">
           {saving ? '儲存中…' : '儲存變更'}
           <span aria-hidden>→</span>
         </button>
-      </div>
-      <div className="flex items-center gap-4 pb-2 text-center text-[#b3a48d]">
-        <span className="h-px flex-1 bg-[#ded5c8]" />
-        <span className="text-xs font-semibold tracking-[0.22em]">讓每一次造訪，都更貼近你。</span>
-        <span className="h-px flex-1 bg-[#ded5c8]" />
+        <div className="mx-auto mt-2 flex max-w-4xl items-center gap-4 text-center text-[#b3a48d]">
+          <span className="h-px flex-1 bg-[#ded5c8]" />
+          <span className="text-[11px] font-semibold tracking-[0.18em]">讓每一次造訪，都更貼近你。</span>
+          <span className="h-px flex-1 bg-[#ded5c8]" />
+        </div>
       </div>
     </div>
   );
@@ -646,21 +647,21 @@ function ProfileTab({
 
 function ToggleRow({ label, desc, icon, checked, onChange }: { label: string; desc?: string; icon?: 'mail' | 'chat' | 'star' | 'eye'; checked: boolean; onChange: (v: boolean) => void }) {
   return (
-    <label className="flex min-h-9 items-center justify-between gap-3">
-      <span className="flex min-w-0 items-start gap-2.5 text-sm text-[#3d3935]">
+    <label className="flex min-h-7 items-center justify-between gap-2">
+      <span className="flex min-w-0 items-start gap-2 text-[13px] text-[#3d3935]">
         <PreferenceIcon type={icon} />
         <span className="min-w-0">
           <span className="block whitespace-nowrap font-medium">{label}</span>
-          {desc ? <span className="mt-0.5 block text-xs leading-snug text-[#8a7f72]">{desc}</span> : null}
+          {desc ? <span className="mt-0.5 block text-[11px] leading-tight text-[#8a7f72]">{desc}</span> : null}
         </span>
       </span>
       <button
         type="button"
         onClick={() => onChange(!checked)}
         aria-pressed={checked}
-        className={'relative h-7 w-12 shrink-0 rounded-full transition ' + (checked ? 'bg-[#8f1f31]' : 'bg-[#cfc2b8]')}
+        className={'relative h-6 w-10 shrink-0 rounded-full transition ' + (checked ? 'bg-[#8f1f31]' : 'bg-[#cfc2b8]')}
       >
-        <span className={'absolute top-0.5 h-6 w-6 rounded-full bg-white shadow-sm transition ' + (checked ? 'left-[22px]' : 'left-0.5')} />
+        <span className={'absolute top-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition ' + (checked ? 'left-[18px]' : 'left-0.5')} />
       </button>
     </label>
   );
