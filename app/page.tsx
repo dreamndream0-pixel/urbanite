@@ -423,8 +423,9 @@ export default function Home() {
                 <IconUser />
               </button>
               {accountOpen && user && (
-                <div className="absolute right-0 top-full z-50 mt-2 w-52 rounded-lg border border-[#e5ded4] bg-white p-2 shadow-lg">
-                  <>
+                <>
+                  <button aria-hidden tabIndex={-1} onClick={() => setAccountOpen(false)} className="fixed inset-0 z-[64] cursor-default" />
+                  <div className="absolute right-0 top-full z-[65] mt-2 w-52 rounded-lg border border-[#e5ded4] bg-white p-2 shadow-lg">
                     <div className="px-3 py-2">
                       <p className="truncate text-xs text-[#8a7f72]">{user.email}</p>
                       {user.isAdmin && (
@@ -462,8 +463,8 @@ export default function Home() {
                     >
                       登出
                     </button>
-                  </>
-                </div>
+                  </div>
+                </>
               )}
             </div>
           </div>

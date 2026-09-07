@@ -352,6 +352,68 @@ function ProfileTab({
     setExpandedRecipient(null);
   }
 
+  // ---- 超商常用收件人:直接在帳戶頁選門市(全家 / 7-11),不用等結帳 ----
+  const [pendingStoreIndex, setPendingStoreIndex] = useState<number | null>(null);
+
+  function openStoreMap(shipType: string) {
+    const url = `/api/logistics/newebpay/store-map?ship_type=${encodeURIComponent(shipType)}&lgs_type=C2C`;
+    const width = Math.min(1040, window.screen.availWidth || 1040);
+    const height = Math.min(820, window.screen.availHeight || 820);
+    const left = Math.max(0, ((window.screen.availWidth || width) - width) / 2);
+    const top = Math.max(0, ((window.screen.availHeight || height) - height) / 2);
+    const w = window.open(
+      url,
+      'newebpay-storemap',
+      `width=${width},height=${height},left=${left},top=${top},scrollbars=yes,resizable=yes`,
+    );
+    if (!w) void uiAlert('彈跳視窗被瀏覽器擋住,請允許彈跳視窗後再試一次。');
+  }
+
+  // 新增一筆超商常用收件人(全家 shipType '2' / 7-11 shipType '1'),建立空白列後立即開門市地圖
+  function addStoreRecipient(shipType: string) {
+    setRecipientView('store');
+    setRecipients((list) => {
+      const next: Recipient[] = [...list, { name: '', phone: '', city: '', district: '', address: '', type: 'store', store_ship_type: shipType }];
+      const idx = next.length - 1;
+      setExpandedRecipient(idx);
+      setPendingStoreIndex(idx);
+      return next;
+    });
+    openStoreMap(shipType);
+  }
+
+  // 既有超商收件人改選門市(全家/7-11)
+  function reselectStore(i: number, shipType: string) {
+    setPendingStoreIndex(i);
+    openStoreMap(shipType);
+  }
+
+  useEffect(() => {
+    function onMessage(e: MessageEvent) {
+      if (e.origin !== window.location.origin) return;
+      if (!e.data || e.data.type !== 'newebpay-pickup-store') return;
+      try {
+        const store = JSON.parse(e.data.store) as {
+          store_id: string; store_name: string; store_phone: string; store_address: string; store_ship_type: string;
+        };
+        if (store?.store_id && pendingStoreIndex !== null) {
+          updateRecipient(pendingStoreIndex, {
+            type: 'store',
+            store_id: store.store_id,
+            store_name: store.store_name,
+            store_phone: store.store_phone,
+            store_address: store.store_address,
+            store_ship_type: store.store_ship_type,
+          });
+        }
+      } catch { /* 略過 */ } finally {
+        setPendingStoreIndex(null);
+      }
+    }
+    window.addEventListener('message', onMessage);
+    return () => window.removeEventListener('message', onMessage);
+  }, [pendingStoreIndex]);
+
   async function save() {
     setSaving(true);
     setMsg(null);
@@ -424,7 +486,14 @@ function ProfileTab({
             <div className="mt-3 rounded-lg bg-[#faf7f2] px-3 py-2 text-sm text-[#6b6156]">
               常用取貨門市：{r.store_name || '(未設)'}{r.store_id ? `（${r.store_id}）` : ''}
               {r.store_address ? <span className="block text-xs">{r.store_address}</span> : null}
-              <span className="mt-1 block text-xs text-[#a99e8f]">門市請於結帳時重新選擇後「加入常用取貨人」更新。</span>
+              <div className="mt-2 flex gap-2">
+                <button type="button" onClick={() => reselectStore(i, '2')} className="rounded-full border border-[#b79ba0] px-3 py-1 text-xs font-semibold text-[#8f1f31]">
+                  改選全家門市
+                </button>
+                <button type="button" onClick={() => reselectStore(i, '1')} className="rounded-full border border-[#b79ba0] px-3 py-1 text-xs font-semibold text-[#8f1f31]">
+                  改選7-11門市
+                </button>
+              </div>
             </div>
           ) : (
             <label className="mt-3 block">
@@ -475,12 +544,11 @@ function ProfileTab({
   return (
     <div className="space-y-8 pb-24">
       <section className="relative -mx-4 -mt-8 overflow-hidden border-b border-[#eadfd4] bg-[#fbf8f3] px-6 pb-7 pt-6 sm:-mx-6 sm:px-10">
-        <div className="absolute right-5 top-8 flex h-24 w-24 items-center justify-center rounded-full border border-[#8f1f31]/45 text-[#8f1f31] opacity-80 sm:right-8 sm:h-32 sm:w-32">
-          <div className="flex h-[72px] w-[72px] items-center justify-center rounded-full border border-[#8f1f31]/35 sm:h-24 sm:w-24">
-            <span className="font-serif-tc text-4xl leading-none sm:text-5xl">U</span>
-          </div>
-          <span className="absolute -bottom-5 whitespace-nowrap text-[8px] font-semibold tracking-[0.28em] text-[#8f1f31]/55 sm:text-[9px]">YOUR PERSONAL EDIT.</span>
-        </div>
+        <img
+          src="https://mffhznxcqjlwquqyrgth.supabase.co/storage/v1/object/public/assets/member/urbanite-member-stamp-1788771080926.png"
+          alt="URBANITE MEMBER"
+          className="absolute right-5 top-8 h-20 w-20 object-contain opacity-85 sm:right-8 sm:h-28 sm:w-28"
+        />
         <p className="text-[10px] font-semibold tracking-[0.34em] text-[#8f1f31]/70">MEMBER SPACE</p>
         <h1 className="font-serif-tc mt-3 text-[58px] font-semibold leading-[0.92] tracking-normal text-[#1f1b19] sm:text-[76px]">
           Hello,<br />{shortName}。
@@ -546,7 +614,7 @@ function ProfileTab({
               recipientView === 'home' ? 'bg-[#8f1f31] text-white shadow-sm' : 'bg-white text-[#6f665d]'
             }`}
           >
-            宅配到府{homeRecipients.length}
+            宅配到府
           </button>
           <button
             type="button"
@@ -555,16 +623,27 @@ function ProfileTab({
               recipientView === 'store' ? 'bg-[#8f1f31] text-white shadow-sm' : 'bg-white text-[#6f665d]'
             }`}
           >
-            超商取貨{storeRecipients.length}
+            超商取貨
           </button>
-          <button type="button" onClick={addRecipient} className="inline-flex h-9 shrink-0 items-center gap-1 rounded-full border border-[#b79ba0] px-4 text-sm font-semibold text-[#8f1f31]">
-            <span className="text-lg leading-none">+</span>新增
-          </button>
+          {recipientView === 'home' ? (
+            <button type="button" onClick={addRecipient} className="inline-flex h-9 shrink-0 items-center gap-1 rounded-full border border-[#b79ba0] px-4 text-sm font-semibold text-[#8f1f31]">
+              <span className="text-lg leading-none">+</span>新增
+            </button>
+          ) : (
+            <>
+              <button type="button" onClick={() => addStoreRecipient('2')} className="inline-flex h-9 shrink-0 items-center gap-1 rounded-full border border-[#b79ba0] px-3 text-sm font-semibold text-[#8f1f31]">
+                <span className="text-lg leading-none">+</span>全家
+              </button>
+              <button type="button" onClick={() => addStoreRecipient('1')} className="inline-flex h-9 shrink-0 items-center gap-1 rounded-full border border-[#b79ba0] px-3 text-sm font-semibold text-[#8f1f31]">
+                <span className="text-lg leading-none">+</span>7-11
+              </button>
+            </>
+          )}
         </div>
         <div className="space-y-3">
           {shownRecipients.length === 0 ? (
             <p className="rounded-lg bg-white p-4 text-sm text-[#a99e8f]">
-              {recipientView === 'home' ? '尚未設定宅配地址。' : '結帳選門市後即可存到這裡。'}
+              {recipientView === 'home' ? '尚未設定宅配地址。' : '點選上方「全家」或「7-11」新增常用取貨門市。'}
             </p>
           ) : (
             shownRecipients.map(({ r, i }) => renderRecipientCard(r, i))

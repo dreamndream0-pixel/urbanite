@@ -42,8 +42,8 @@ export default function AccountMenu({ nextPath = '/account' }: { nextPath?: stri
       </button>
       {open && me && (
         <>
-          <button aria-hidden tabIndex={-1} onClick={() => setOpen(false)} className="fixed inset-0 z-40 cursor-default" />
-          <div className="absolute right-0 top-full z-50 mt-2 w-52 rounded-lg border border-[#e5ded4] bg-white p-2 shadow-lg">
+          <button aria-hidden tabIndex={-1} onClick={() => setOpen(false)} className="fixed inset-0 z-[64] cursor-default" />
+          <div className="absolute right-0 top-full z-[65] mt-2 w-52 rounded-lg border border-[#e5ded4] bg-white p-2 shadow-lg">
             <div className="px-3 py-2">
               {me.name ? <p className="truncate text-sm font-medium">{me.name}</p> : null}
               <p className="truncate text-xs text-[#8a7f72]">{me.email}</p>

@@ -2343,8 +2343,8 @@ export default function AdminDashboard({
                               </button>
                               {couponMenuId === d.id ? (
                                 <>
-                                  <button aria-hidden tabIndex={-1} onClick={() => setCouponMenuId(null)} className="fixed inset-0 z-40 cursor-default" />
-                                  <div className="absolute right-0 top-full z-50 mt-1 w-28 overflow-hidden rounded-lg border border-[#e5ded4] bg-white shadow-lg">
+                                  <button aria-hidden tabIndex={-1} onClick={() => setCouponMenuId(null)} className="fixed inset-0 z-[64] cursor-default" />
+                                  <div className="absolute right-0 top-full z-[65] mt-1 w-28 overflow-hidden rounded-lg border border-[#e5ded4] bg-white shadow-lg">
                                     <button onClick={() => { setCouponMenuId(null); copyDiscount(d); }} className="block w-full px-3.5 py-2 text-left text-sm hover:bg-[#f6f2ec]">複製</button>
                                     <button onClick={() => { setCouponMenuId(null); deleteDiscount(d.id); }} className="block w-full px-3.5 py-2 text-left text-sm text-[#c0392b] hover:bg-[#fbf3f0]">刪除</button>
                                   </div>
