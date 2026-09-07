@@ -7,6 +7,7 @@ import type { Customer, Discount, Order, OrderStatusHistory, Product, Recipient,
 import { TW_CITIES, TW_REGIONS } from '@/lib/tw-regions';
 import { isOnlinePayment, paymentDeadline } from '@/lib/payment';
 import { OrderStatusBadge, orderNeedsAttention, AttentionDot } from '@/app/components/OrderStatusBadge';
+import ShopHeader from '@/app/components/ShopHeader';
 import { couponImageStyle, couponScript } from '@/lib/coupon-presets';
 import { uiAlert } from '@/lib/ui-dialog';
 import {
@@ -19,8 +20,6 @@ import {
   RETURN_STATUS_LABEL,
   type OrderTab,
 } from '@/lib/order-status';
-
-const STORE_NAME = process.env.NEXT_PUBLIC_STORE_NAME || 'URBANITE';
 
 const formatter = new Intl.NumberFormat('zh-TW', {
   style: 'currency',
@@ -195,35 +194,15 @@ export default function AccountClient({
 
   return (
     <main className="min-h-screen bg-[#f6f2ec] text-[#1f1b19]">
-      <header className="sticky top-0 z-30 bg-[#faf7f2]/95 backdrop-blur">
-        <nav className="mx-auto grid max-w-6xl grid-cols-[1fr_auto_1fr] items-center px-4 py-4 sm:px-6 sm:py-5">
-          <div className="flex items-center">
-            <Link href="/" aria-label="回首頁" className="rounded-md p-1 text-[#1f1b19] hover:bg-[#efe8dd]">
-              <IconMenu />
-            </Link>
-          </div>
-
-          {/* 中:Logo(與首頁一致) */}
-          <Link href="/" className="justify-self-center px-2 text-center">
-            {logoUrl ? (
-              <img src={logoUrl} alt={STORE_NAME} className="mx-auto h-8 w-auto object-contain sm:h-10" />
-            ) : (
-              <span className="inline-block h-8 w-28 sm:h-10 sm:w-36" aria-hidden />
-            )}
-          </Link>
-
-          <div className="flex items-center justify-end">
-            <Link href="/checkout" aria-label="購物車" className="relative rounded-md p-2 hover:bg-[#efe8dd]">
-              <IconBag />
-              {cartCount > 0 && (
-                <span className="absolute -right-0.5 -top-0.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-[#c84767] px-1 text-[10px] font-semibold text-white">
-                  {cartCount}
-                </span>
-              )}
-            </Link>
-          </div>
-        </nav>
-      </header>
+      <ShopHeader
+        logoUrl={logoUrl}
+        leftHref="/"
+        leftLabel="← 回商店"
+        cartCount={cartCount}
+        favoriteCount={favoriteIds.length}
+        favoriteActive={tab === 'favorites'}
+        onFavoriteClick={() => changeTab('favorites')}
+      />
 
       {/* 分頁列 */}
       <div className="border-b border-[#e5ded4] bg-[#faf7f2]">
@@ -357,10 +336,6 @@ function ProfileTab({
   const [msg, setMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
   const displayName = (name || fallbackName || email.split('@')[0] || '會員').trim();
   const shortName = displayName.slice(-2);
-  const maskedPhone = phone
-    ? phone.replace(/^(\d{4})\d+(\d{3})$/, '$1•••$2')
-    : '尚未填寫';
-
   function updateRecipient(i: number, patch: Partial<Recipient>) {
     setRecipients((list) => list.map((r, idx) => (idx === i ? { ...r, ...patch } : r)));
   }
@@ -469,9 +444,8 @@ function ProfileTab({
       ) : (
         <div className="flex items-start justify-between gap-3">
           <div className="flex min-w-0 flex-1 items-center gap-3">
-            <div className="font-serif-tc flex h-12 w-12 shrink-0 flex-col items-center justify-center border-r border-[#dccaca] pr-3 text-[#8f1f31]">
-              <span className="text-[9px] tracking-[0.25em]">HOME</span>
-              <span className="text-xl leading-none">{String(i + 1).padStart(2, '0')}</span>
+            <div className="font-serif-tc flex h-12 w-12 shrink-0 items-center justify-center border-r border-[#dccaca] pr-3 text-[#8f1f31]">
+              <span className="text-xs font-semibold tracking-[0.16em]">{r.type === 'store' ? '超取' : '宅配'}</span>
             </div>
             <div className="min-w-0">
             <p className="font-semibold">
@@ -499,7 +473,7 @@ function ProfileTab({
   );
 
   return (
-    <div className="space-y-8 pb-36">
+    <div className="space-y-8 pb-24">
       <section className="relative -mx-4 -mt-8 overflow-hidden border-b border-[#eadfd4] bg-[#fbf8f3] px-6 pb-7 pt-6 sm:-mx-6 sm:px-10">
         <div className="absolute right-5 top-8 flex h-24 w-24 items-center justify-center rounded-full border border-[#8f1f31]/45 text-[#8f1f31] opacity-80 sm:right-8 sm:h-32 sm:w-32">
           <div className="flex h-[72px] w-[72px] items-center justify-center rounded-full border border-[#8f1f31]/35 sm:h-24 sm:w-24">
@@ -512,7 +486,6 @@ function ProfileTab({
           Hello,<br />{shortName}。
         </h1>
         <p className="mt-4 text-base font-semibold tracking-[0.08em] text-[#6f665d]">你的風格，從這裡開始。</p>
-        <p className="mt-2 text-xs text-[#8a7f72]">會員聯絡電話：{maskedPhone}</p>
       </section>
 
       <section className="relative border-l border-[#ded5c8] pl-5 sm:pl-7">
@@ -543,7 +516,7 @@ function ProfileTab({
           </label>
           <label className="block min-w-0">
             <span className={labelText}>生日</span>
-            <input value={birthday ?? ''} onChange={(e) => setBirthday(e.target.value)} inputMode="numeric" placeholder="年 / 月 / 日" className={field} />
+            <input type="date" value={birthday ?? ''} onChange={(e) => setBirthday(e.target.value)} className={field + ' appearance-none text-[13px] [color-scheme:light]'} />
           </label>
           <label className="col-span-2 block min-w-0">
             <span className={labelText}>手機號碼</span>
@@ -573,7 +546,7 @@ function ProfileTab({
               recipientView === 'home' ? 'bg-[#8f1f31] text-white shadow-sm' : 'bg-white text-[#6f665d]'
             }`}
           >
-            宅配到府 {homeRecipients.length}
+            宅配到府{homeRecipients.length}
           </button>
           <button
             type="button"
@@ -582,7 +555,7 @@ function ProfileTab({
               recipientView === 'store' ? 'bg-[#8f1f31] text-white shadow-sm' : 'bg-white text-[#6f665d]'
             }`}
           >
-            超商取貨 {storeRecipients.length}
+            超商取貨{storeRecipients.length}
           </button>
           <button type="button" onClick={addRecipient} className="inline-flex h-9 shrink-0 items-center gap-1 rounded-full border border-[#b79ba0] px-4 text-sm font-semibold text-[#8f1f31]">
             <span className="text-lg leading-none">+</span>新增
@@ -1743,22 +1716,5 @@ function FavoritesTab({ products }: { products: Product[] }) {
         </Link>
       ))}
     </div>
-  );
-}
-
-/* ---------- 表頭圖示(與首頁一致) ---------- */
-function IconMenu() {
-  return (
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
-      <path d="M4 7h16M4 12h16M4 17h16" strokeLinecap="round" />
-    </svg>
-  );
-}
-function IconBag() {
-  return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
-      <path d="M6 8h12l-1 12H7L6 8z" strokeLinejoin="round" />
-      <path d="M9 8V6a3 3 0 016 0v2" strokeLinecap="round" />
-    </svg>
   );
 }
