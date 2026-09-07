@@ -156,3 +156,14 @@ img {
     --ticket-action-x: 79.25%;
   }
 }
+
+/* 畫面置中彈出通知(例:已儲存):停留後於第 3 秒淡出消失,不佔版面空間。 */
+@keyframes center-toast-fade {
+  0% { opacity: 0; transform: translateY(6px) scale(0.98); }
+  12% { opacity: 1; transform: translateY(0) scale(1); }
+  78% { opacity: 1; }
+  100% { opacity: 0; }
+}
+.center-toast {
+  animation: center-toast-fade 3s ease forwards;
+}

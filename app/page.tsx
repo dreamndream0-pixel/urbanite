@@ -7,6 +7,7 @@ import { createBrowserSupabase } from '@/lib/supabase/client';
 import type { Product, Category, SiteSettings, Banner } from '@/lib/types';
 import { uiAlert } from '@/lib/ui-dialog';
 import { computeShipping } from '@/lib/shipping';
+import AccountMenu from '@/app/components/AccountMenu';
 
 // 購物車存在瀏覽器本機的 key(結帳頁會讀同一份)
 const CART_KEY = 'cart';
@@ -90,7 +91,6 @@ export default function Home() {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [cartHydrated, setCartHydrated] = useState(false);
   const [user, setUser] = useState<{ email: string; name: string; isAdmin: boolean } | null>(null);
-  const [accountOpen, setAccountOpen] = useState(false);
   const [quickAdd, setQuickAdd] = useState<Product | null>(null);
   const cartIconRef = useRef<HTMLButtonElement>(null);
   const [cartToast, setCartToast] = useState(false);
@@ -200,12 +200,6 @@ export default function Home() {
     const { data: sub } = supabase.auth.onAuthStateChange(() => refresh());
     return () => sub.subscription.unsubscribe();
   }, []);
-
-  async function signOut() {
-    await createBrowserSupabase().auth.signOut();
-    setUser(null);
-    setAccountOpen(false);
-  }
 
   const visibleCats = dbCategories.filter((c) => c.sort_order >= 0);
   const childrenOf = (pid: string): CategoryTab[] =>
@@ -408,65 +402,7 @@ export default function Home() {
                 </span>
               )}
             </button>
-            <div className="relative">
-              <button
-                onClick={() => {
-                  if (!user) {
-                    router.push('/login?next=/account');
-                    return;
-                  }
-                  setAccountOpen((v) => !v);
-                }}
-                aria-label="我的帳號"
-                className="rounded-md p-2 hover:bg-[#efe8dd]"
-              >
-                <IconUser />
-              </button>
-              {accountOpen && user && (
-                <>
-                  <button aria-hidden tabIndex={-1} onClick={() => setAccountOpen(false)} className="fixed inset-0 z-[64] cursor-default" />
-                  <div className="absolute right-0 top-full z-[65] mt-2 w-52 rounded-lg border border-[#e5ded4] bg-white p-2 shadow-lg">
-                    <div className="px-3 py-2">
-                      <p className="truncate text-xs text-[#8a7f72]">{user.email}</p>
-                      {user.isAdmin && (
-                        <span className="mt-1 inline-block rounded-full bg-[#1f1b19] px-2 py-0.5 text-[10px] font-semibold tracking-wide text-white">
-                          主管理員
-                        </span>
-                      )}
-                    </div>
-                    {user.isAdmin && (
-                      <Link
-                        href="/admin"
-                        onClick={() => setAccountOpen(false)}
-                        className="mb-1 block rounded bg-[#f3ede4] px-3 py-2 text-sm font-semibold hover:bg-[#ece2d5]"
-                      >
-                        進入管理後台
-                      </Link>
-                    )}
-                    <Link
-                      href="/account?tab=profile"
-                      onClick={() => setAccountOpen(false)}
-                      className="block rounded px-3 py-2 text-sm hover:bg-[#f6f2ec]"
-                    >
-                      我的帳戶
-                    </Link>
-                    <Link
-                      href="/account?tab=orders"
-                      onClick={() => setAccountOpen(false)}
-                      className="block rounded px-3 py-2 text-sm hover:bg-[#f6f2ec]"
-                    >
-                      我的訂單
-                    </Link>
-                    <button
-                      onClick={signOut}
-                      className="block w-full rounded px-3 py-2 text-left text-sm hover:bg-[#f6f2ec]"
-                    >
-                      登出
-                    </button>
-                  </div>
-                </>
-              )}
-            </div>
+            <AccountMenu nextPath="/account" />
           </div>
         </nav>
 
@@ -534,7 +470,7 @@ export default function Home() {
         </div>
 
         {/* 商品格狀排列 */}
-        <section className="mt-6 rounded-3xl border border-[#e5ded4] bg-[#faf7f2]/80 p-4 shadow-sm sm:p-6">
+        <section className="mt-6">
           <div className="mb-5">
             <h1 className="text-2xl font-semibold tracking-wide sm:text-3xl">
               {activeCategory.slug === 'all' ? '全部商品' : activeCategory.name}
@@ -1762,14 +1698,6 @@ function IconStar({ filled = false, small = false }: { filled?: boolean; small?:
   return (
     <svg width={s} height={s} viewBox="0 0 24 24" fill={filled ? '#f5c542' : 'none'} stroke={filled ? '#d89a00' : 'currentColor'} strokeWidth="1.8" strokeLinejoin="round">
       <path d="m12 2 3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21 7 14.2l-5-4.9 6.9-1L12 2Z" />
-    </svg>
-  );
-}
-function IconUser() {
-  return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
-      <circle cx="12" cy="8" r="4" />
-      <path d="M4 21c0-4 3.5-6 8-6s8 2 8 6" strokeLinecap="round" />
     </svg>
   );
 }

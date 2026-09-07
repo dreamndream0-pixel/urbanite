@@ -414,6 +414,13 @@ function ProfileTab({
     return () => window.removeEventListener('message', onMessage);
   }, [pendingStoreIndex]);
 
+  // 置中彈出通知(已儲存 / 錯誤訊息):3 秒後自動清除,配合 CSS 動畫淡出
+  useEffect(() => {
+    if (!msg) return;
+    const t = setTimeout(() => setMsg(null), 3000);
+    return () => clearTimeout(t);
+  }, [msg]);
+
   async function save() {
     setSaving(true);
     setMsg(null);
@@ -547,7 +554,7 @@ function ProfileTab({
         <img
           src="https://mffhznxcqjlwquqyrgth.supabase.co/storage/v1/object/public/assets/member/urbanite-member-stamp-1788771080926.png"
           alt="URBANITE MEMBER"
-          className="absolute right-5 top-8 h-20 w-20 object-contain opacity-85 sm:right-8 sm:h-28 sm:w-28"
+          className="absolute right-5 top-8 h-32 w-32 object-contain opacity-85 sm:right-8 sm:h-40 sm:w-40"
         />
         <p className="text-[10px] font-semibold tracking-[0.34em] text-[#8f1f31]/70">MEMBER SPACE</p>
         <h1 className="font-serif-tc mt-3 text-[58px] font-semibold leading-[0.92] tracking-normal text-[#1f1b19] sm:text-[76px]">
@@ -678,9 +685,11 @@ function ProfileTab({
       </section>
 
       {msg && (
-        <p className={'rounded-lg px-4 py-2 text-sm ' + (msg.type === 'ok' ? 'bg-[#e9f7ee] text-[#1f7a44]' : 'bg-[#fdecec] text-[#c0392b]')}>
-          {msg.text}
-        </p>
+        <div className="pointer-events-none fixed inset-0 z-[9999] flex items-center justify-center px-4">
+          <div className={`center-toast rounded-full px-5 py-3 text-sm font-semibold text-white shadow-lg ${msg.type === 'ok' ? 'bg-[#1f7a44]' : 'bg-[#c0392b]'}`}>
+            {msg.text}
+          </div>
+        </div>
       )}
       <div className="fixed inset-x-0 bottom-0 z-40 border-t border-[#eadfd4] bg-[#fbf8f3]/95 px-4 pb-[calc(env(safe-area-inset-bottom)+10px)] pt-3 shadow-[0_-10px_24px_rgba(64,52,43,0.08)] backdrop-blur">
         <button onClick={save} disabled={saving} className="mx-auto flex h-12 w-full max-w-4xl items-center justify-center gap-3 rounded-lg bg-[#8f1f31] px-6 text-sm font-semibold tracking-[0.18em] text-white shadow-[0_10px_24px_rgba(143,31,49,0.22)] disabled:opacity-40">
@@ -776,13 +785,19 @@ function CouponsTab({ coupons, heroImage = '' }: { coupons: Discount[]; heroImag
       <section className="relative -mx-4 -mt-8 overflow-hidden bg-[#e9dfd0] sm:-mx-6">
         <div
           className="pointer-events-none absolute inset-y-0 right-0 w-[52%] bg-[#e4d9c8] bg-cover bg-center"
-          style={heroImage ? { backgroundImage: `url("${heroImage}")` } : {
+          style={heroImage ? {
+            backgroundImage: `url("${heroImage}")`,
+            WebkitMaskImage: 'linear-gradient(to right, transparent, #000 42%)',
+            maskImage: 'linear-gradient(to right, transparent, #000 42%)',
+          } : {
             backgroundImage: 'radial-gradient(circle at 60% 15%, rgba(255,255,255,.55), transparent 34%), linear-gradient(135deg, #d8cab9, #efe6d9 52%, #cdbba9)',
           }}
         >
-          <p className={`font-script absolute right-6 top-8 text-right text-[34px] leading-[1.15] sm:text-[42px] ${heroImage ? 'text-white/90 drop-shadow' : 'text-[#b0a08a]'}`}>
-            Good<br />Outfit<br />Brighter<br />Days.
-          </p>
+          {heroImage ? null : (
+            <p className="font-script absolute right-6 top-8 text-right text-[34px] leading-[1.15] text-[#b0a08a] sm:text-[42px]">
+              Good<br />Outfit<br />Brighter<br />Days.
+            </p>
+          )}
         </div>
         <div className="relative px-5 pb-5 pt-9 sm:px-8 sm:pb-7 sm:pt-11">
           <h2 className="font-serif-tc text-[34px] font-semibold leading-none tracking-[0.22em] text-[#2c2826] sm:text-[40px]">我的優惠</h2>
