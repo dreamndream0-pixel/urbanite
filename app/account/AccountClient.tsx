@@ -227,20 +227,22 @@ export default function AccountClient({
 
       {/* 分頁列 */}
       <div className="border-b border-[#e5ded4] bg-[#faf7f2]">
-        <div className="mx-auto grid max-w-4xl grid-cols-4 overflow-x-auto overflow-y-hidden px-4 sm:px-6">
+        <div className="mx-auto max-w-4xl overflow-x-auto overflow-y-hidden px-4 pt-2 sm:px-6 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <div className="flex min-w-max items-end gap-2">
           {TABS.map((t) => (
             <button
               key={t.key}
               onClick={() => changeTab(t.key)}
-              className={`-mb-px whitespace-nowrap border-b-2 border-l border-l-[#e5ded4] px-2 py-3 text-center text-xs font-semibold transition first:border-l-0 sm:px-4 sm:text-sm ${
+              className={`relative -mb-px shrink-0 whitespace-nowrap border-b-2 px-5 py-3 text-center text-sm font-semibold transition-all duration-200 ${
                 tab === t.key
-                  ? 'border-b-[#1f1b19] text-[#1f1b19]'
-                  : 'border-b-transparent text-[#8a7f72] hover:text-[#1f1b19]'
+                  ? '-translate-y-1 rounded-t-2xl border-b-[#8f1f31] bg-white text-[#1f1b19] shadow-[0_-6px_18px_rgba(64,52,43,0.08)]'
+                  : 'border-b-transparent text-[#8a7f72] hover:-translate-y-0.5 hover:bg-white/55 hover:text-[#1f1b19]'
               }`}
             >
               {t.label}
             </button>
           ))}
+          </div>
         </div>
       </div>
 
@@ -350,6 +352,7 @@ function ProfileTab({
     personalization: customer?.privacy?.personalization ?? true,
     show_activity: customer?.privacy?.show_activity ?? false,
   });
+  const [recipientView, setRecipientView] = useState<'home' | 'store'>('home');
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
   const displayName = (name || fallbackName || email.split('@')[0] || '會員').trim();
@@ -362,6 +365,7 @@ function ProfileTab({
     setRecipients((list) => list.map((r, idx) => (idx === i ? { ...r, ...patch } : r)));
   }
   function addRecipient() {
+    setRecipientView('home');
     setRecipients((list) => {
       const next: Recipient[] = [...list, { name: '', phone: '', city: '', district: '', address: '', type: 'home' }];
       setExpandedRecipient(next.length - 1);
@@ -393,11 +397,12 @@ function ProfileTab({
     }
   }
 
-  const field = 'h-11 w-full rounded-lg border border-[#e5ded4] bg-white px-3 text-sm text-[#2c2826] outline-none transition focus:border-[#8f1f31]';
+  const field = 'h-10 w-full min-w-0 rounded-lg border border-[#e5ded4] bg-white px-3 text-sm text-[#2c2826] outline-none transition focus:border-[#8f1f31] sm:h-11';
   const labelText = 'mb-1.5 block text-xs font-medium text-[#6f665d]';
 
   const homeRecipients = recipients.map((r, i) => ({ r, i })).filter(({ r }) => r.type !== 'store');
   const storeRecipients = recipients.map((r, i) => ({ r, i })).filter(({ r }) => r.type === 'store');
+  const shownRecipients = recipientView === 'home' ? homeRecipients : storeRecipients;
 
   const renderRecipientCard = (r: Recipient, i: number) => (
     <div key={i} className="rounded-lg border border-[#eadfd4] bg-[#f7e8e8] p-3">
@@ -494,7 +499,7 @@ function ProfileTab({
   );
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 pb-28">
       <section className="relative -mx-4 -mt-8 overflow-hidden border-b border-[#eadfd4] bg-[#fbf8f3] px-6 pb-7 pt-6 sm:-mx-6 sm:px-10">
         <div className="absolute right-8 top-8 hidden h-32 w-32 items-center justify-center rounded-full border border-[#8f1f31]/45 text-[#8f1f31] sm:flex">
           <div className="flex h-24 w-24 items-center justify-center rounded-full border border-[#8f1f31]/35">
@@ -517,16 +522,16 @@ function ProfileTab({
           </div>
           <span className="hidden text-[10px] font-semibold tracking-[0.34em] text-[#6f665d] sm:inline">PROFILE</span>
         </div>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <label className="block">
+        <div className="grid grid-cols-2 gap-3 sm:gap-4">
+          <label className="block min-w-0">
             <span className={labelText}>姓名</span>
             <input value={name} onChange={(e) => setName(e.target.value)} className={field} />
           </label>
-          <label className="block">
+          <label className="block min-w-0">
             <span className={labelText}>暱稱</span>
             <input value={nickname} onChange={(e) => setNickname(e.target.value)} className={field} />
           </label>
-          <label className="block">
+          <label className="block min-w-0">
             <span className={labelText}>性別</span>
             <select value={gender} onChange={(e) => setGender(e.target.value)} className={field}>
               <option value="">不透露</option>
@@ -535,15 +540,15 @@ function ProfileTab({
               <option value="other">其他</option>
             </select>
           </label>
-          <label className="block">
+          <label className="block min-w-0">
             <span className={labelText}>生日</span>
             <input type="date" value={birthday ?? ''} onChange={(e) => setBirthday(e.target.value)} className={field} />
           </label>
-          <label className="block">
+          <label className="col-span-2 block min-w-0">
             <span className={labelText}>手機號碼</span>
             <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="09xxxxxxxx" className={field} />
           </label>
-          <label className="block">
+          <label className="col-span-2 block min-w-0">
             <span className={labelText}>Email</span>
             <input value={email} disabled className={field + ' bg-[#f0ece6] text-[#8a7f72]'} />
           </label>
@@ -560,49 +565,58 @@ function ProfileTab({
           <span className="hidden text-[10px] font-semibold tracking-[0.34em] text-[#6f665d] sm:inline">ADDRESS BOOK</span>
         </div>
         <div className="mb-4 flex items-center gap-2">
-          <span className="flex h-9 flex-1 items-center justify-center rounded-full bg-[#8f1f31] px-3 text-sm font-semibold text-white">宅配到府 {homeRecipients.length}</span>
-          <span className="flex h-9 flex-1 items-center justify-center rounded-full bg-white px-3 text-sm font-semibold text-[#6f665d]">超商取貨 {storeRecipients.length}</span>
+          <button
+            type="button"
+            onClick={() => setRecipientView('home')}
+            className={`flex h-9 flex-1 items-center justify-center whitespace-nowrap rounded-full px-3 text-sm font-semibold transition ${
+              recipientView === 'home' ? 'bg-[#8f1f31] text-white shadow-sm' : 'bg-white text-[#6f665d]'
+            }`}
+          >
+            宅配到府 {homeRecipients.length}
+          </button>
+          <button
+            type="button"
+            onClick={() => setRecipientView('store')}
+            className={`flex h-9 flex-1 items-center justify-center whitespace-nowrap rounded-full px-3 text-sm font-semibold transition ${
+              recipientView === 'store' ? 'bg-[#8f1f31] text-white shadow-sm' : 'bg-white text-[#6f665d]'
+            }`}
+          >
+            超商取貨 {storeRecipients.length}
+          </button>
           <button type="button" onClick={addRecipient} className="inline-flex h-9 shrink-0 items-center gap-1 rounded-full border border-[#b79ba0] px-4 text-sm font-semibold text-[#8f1f31]">
             <span className="text-lg leading-none">+</span>新增
           </button>
         </div>
-        <div className="grid gap-4 md:grid-cols-2">
-          <div className="space-y-3">
-            {homeRecipients.length === 0 ? (
-              <p className="rounded-lg bg-white p-4 text-sm text-[#a99e8f]">尚未設定宅配地址。</p>
-            ) : (
-              homeRecipients.map(({ r, i }) => renderRecipientCard(r, i))
-            )}
-          </div>
-          <div className="space-y-3">
-            {storeRecipients.length === 0 ? (
-              <p className="rounded-lg bg-white p-4 text-sm text-[#a99e8f]">結帳選門市後即可存到這裡。</p>
-            ) : (
-              storeRecipients.map(({ r, i }) => renderRecipientCard(r, i))
-            )}
-          </div>
+        <div className="space-y-3">
+          {shownRecipients.length === 0 ? (
+            <p className="rounded-lg bg-white p-4 text-sm text-[#a99e8f]">
+              {recipientView === 'home' ? '尚未設定宅配地址。' : '結帳選門市後即可存到這裡。'}
+            </p>
+          ) : (
+            shownRecipients.map(({ r, i }) => renderRecipientCard(r, i))
+          )}
         </div>
       </section>
 
-      <section className="relative -mx-4 bg-[#f4e4e4] px-9 py-7 sm:-mx-6 sm:px-12">
-        <div className="mb-5 flex items-center justify-between gap-3">
+      <section className="relative -mx-4 bg-[#f4e4e4] px-7 py-5 sm:-mx-6 sm:px-10 sm:py-6">
+        <div className="mb-4 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <span className="font-serif-tc text-sm font-bold text-[#8f1f31]">03</span>
             <h2 className="font-serif-tc text-2xl font-bold tracking-[0.08em]">你的偏好</h2>
           </div>
           <span className="hidden text-[10px] font-semibold tracking-[0.34em] text-[#6f665d] sm:inline">PREFERENCES</span>
         </div>
-        <div className="space-y-5">
+        <div className="space-y-4">
           <div>
-            <p className="mb-3 text-sm font-semibold text-[#6f665d]">訊息訂閱</p>
-            <div className="space-y-3">
+            <p className="mb-2 text-sm font-semibold text-[#6f665d]">訊息訂閱</p>
+            <div className="space-y-2.5">
               <ToggleRow label="訂閱 Email 電子報" icon="mail" checked={marketing.email} onChange={(v) => setMarketing((m) => ({ ...m, email: v }))} />
               <ToggleRow label="接收簡訊優惠通知" icon="chat" checked={marketing.sms} onChange={(v) => setMarketing((m) => ({ ...m, sms: v }))} />
             </div>
           </div>
-          <div className="border-t border-[#decaca] pt-5">
-            <p className="mb-3 text-sm font-semibold text-[#6f665d]">隱私設定</p>
-            <div className="space-y-3">
+          <div className="border-t border-[#decaca] pt-4">
+            <p className="mb-2 text-sm font-semibold text-[#6f665d]">隱私設定</p>
+            <div className="space-y-2.5">
               <ToggleRow label="允許依購物紀錄提供個人化推薦" desc="依購物紀錄推薦適合你的單品" icon="star" checked={privacy.personalization} onChange={(v) => setPrivacy((p) => ({ ...p, personalization: v }))} />
               <ToggleRow label="公開我的追蹤清單活動" icon="eye" checked={privacy.show_activity} onChange={(v) => setPrivacy((p) => ({ ...p, show_activity: v }))} />
             </div>
@@ -615,10 +629,12 @@ function ProfileTab({
           {msg.text}
         </p>
       )}
-      <button onClick={save} disabled={saving} className="flex h-12 w-full items-center justify-center gap-3 rounded-lg bg-[#8f1f31] px-6 text-sm font-semibold tracking-[0.18em] text-white disabled:opacity-40">
-        {saving ? '儲存中…' : '儲存變更'}
-        <span aria-hidden>→</span>
-      </button>
+      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-[#eadfd4] bg-[#fbf8f3]/95 px-4 pb-[calc(env(safe-area-inset-bottom)+12px)] pt-3 backdrop-blur">
+        <button onClick={save} disabled={saving} className="mx-auto flex h-12 w-full max-w-4xl items-center justify-center gap-3 rounded-lg bg-[#8f1f31] px-6 text-sm font-semibold tracking-[0.18em] text-white shadow-[0_10px_24px_rgba(143,31,49,0.22)] disabled:opacity-40">
+          {saving ? '儲存中…' : '儲存變更'}
+          <span aria-hidden>→</span>
+        </button>
+      </div>
       <div className="flex items-center gap-4 pb-2 text-center text-[#b3a48d]">
         <span className="h-px flex-1 bg-[#ded5c8]" />
         <span className="text-xs font-semibold tracking-[0.22em]">讓每一次造訪，都更貼近你。</span>
@@ -630,12 +646,12 @@ function ProfileTab({
 
 function ToggleRow({ label, desc, icon, checked, onChange }: { label: string; desc?: string; icon?: 'mail' | 'chat' | 'star' | 'eye'; checked: boolean; onChange: (v: boolean) => void }) {
   return (
-    <label className="flex items-center justify-between gap-4">
-      <span className="flex min-w-0 items-start gap-3 text-sm text-[#3d3935]">
+    <label className="flex min-h-9 items-center justify-between gap-3">
+      <span className="flex min-w-0 items-start gap-2.5 text-sm text-[#3d3935]">
         <PreferenceIcon type={icon} />
         <span className="min-w-0">
-          <span className="block font-medium">{label}</span>
-          {desc ? <span className="mt-0.5 block text-xs text-[#8a7f72]">{desc}</span> : null}
+          <span className="block whitespace-nowrap font-medium">{label}</span>
+          {desc ? <span className="mt-0.5 block text-xs leading-snug text-[#8a7f72]">{desc}</span> : null}
         </span>
       </span>
       <button
