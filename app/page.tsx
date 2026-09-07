@@ -23,6 +23,16 @@ function stockOf(product: Product | undefined, variant: string): number {
   return Math.max(0, product.inventory ?? 0);
 }
 
+function isProductSoldOut(product: Product): boolean {
+  if (/售完|完售|sold\s*out/i.test(product.status || '')) return true;
+  if ((product.sale_mode || '').includes('預購')) return false;
+  const variants = product.variants ?? [];
+  if (variants.length > 0) {
+    return variants.every((variant) => (variant.inventory ?? 0) <= 0);
+  }
+  return (product.inventory ?? 0) <= 0;
+}
+
 type CartItem = {
   id: string;
   productId: string;
@@ -1073,8 +1083,7 @@ function ProductCard({
   onAdd: () => void;
 }) {
   const productHref = `/products/${encodeURIComponent(product.id)}`;
-  const soldOut =
-    (product.inventory ?? 0) <= 0 && !(product.sale_mode || '').includes('預購');
+  const soldOut = isProductSoldOut(product);
 
   return (
     <div className="product-card group flex flex-col overflow-hidden rounded-2xl bg-[#f9f8f6] p-3 shadow-sm hover:shadow-md">
@@ -1092,7 +1101,11 @@ function ProductCard({
             </div>
           )}
         </Link>
-        {product.status !== '上架中' && (
+        {soldOut ? (
+          <div className="absolute left-2 top-2 flex h-12 w-12 items-center justify-center rounded-full bg-[#1f1b19]/90 text-center text-[10px] font-bold leading-[1.05] tracking-[0.08em] text-white shadow-sm">
+            <span>SOLD<br />OUT</span>
+          </div>
+        ) : product.status !== '上架中' && (
           <span className="absolute left-2 top-2 rounded bg-[#1f1b19] px-2 py-1 text-xs font-medium text-white">
             {product.status}
           </span>
@@ -1120,8 +1133,8 @@ function ProductCard({
             ) : null}
           </div>
           {soldOut ? (
-            <span className="flex h-10 items-center justify-center rounded-full bg-[#b5a9a0] px-4 text-xs font-semibold text-white">
-              已售完
+            <span className="flex h-10 min-w-10 items-center justify-center rounded-full bg-[#b5a9a0] px-3 text-center text-[10px] font-bold leading-[1.05] tracking-[0.08em] text-white">
+              SOLD<br />OUT
             </span>
           ) : (
             <button
@@ -1539,8 +1552,8 @@ function QuickAddModal({
     ? (product.variants ?? []).find((v) => v.options.join(' / ') === specSel.join(' / '))
     : null;
   const inv = hasSpecs ? variant?.inventory ?? 0 : product.inventory;
-  const soldOut = hasSpecs && allChosen && inv <= 0;
   const preorder = (product.sale_mode || '').includes('預購');
+  const soldOut = /售完|完售|sold\s*out/i.test(product.status || '') || (!preorder && allChosen && inv <= 0);
   const maxQty = preorder ? Number.POSITIVE_INFINITY : Math.max(0, hasSpecs ? (allChosen ? inv : 0) : product.inventory ?? 0);
 
   // 某規格選項在「其他維度目前選擇」下有沒有庫存;沒有就反白
@@ -1698,7 +1711,7 @@ function QuickAddModal({
             disabled={!allChosen || soldOut}
             className="rounded-full bg-[#c84767] px-4 py-3 font-semibold text-white disabled:opacity-50"
           >
-            {soldOut ? '已售完' : '加入購物車'}
+            {soldOut ? 'SOLD OUT' : '加入購物車'}
           </button>
           <button
             onClick={() => onAdd(variantLabel, quantity, true)}

@@ -76,8 +76,10 @@ export default function ProductDetailClient({ product }: { product: Product }) {
 
   const allSpecsChosen = !hasSpecs || specSel.every(Boolean);
   const variantInventory = hasSpecs ? selectedVariant?.inventory ?? 0 : product.inventory;
-  const soldOut = hasSpecs && allSpecsChosen && variantInventory <= 0;
   const preorder = (product.sale_mode || '').includes('預購');
+  const soldOut =
+    /售完|完售|sold\s*out/i.test(product.status || '') ||
+    (!preorder && allSpecsChosen && variantInventory <= 0);
   const maxQty = preorder
     ? Number.POSITIVE_INFINITY
     : Math.max(0, hasSpecs ? (allSpecsChosen ? variantInventory : 0) : product.inventory ?? 0);
@@ -401,7 +403,7 @@ export default function ProductDetailClient({ product }: { product: Product }) {
               disabled={soldOut}
               className="bg-[#c84767] px-4 py-3 font-semibold text-white disabled:opacity-50"
             >
-              {soldOut ? '已售完' : '加入購物車'}
+              {soldOut ? 'SOLD OUT' : '加入購物車'}
             </button>
             <button
               onClick={() => addToCart('buy')}
