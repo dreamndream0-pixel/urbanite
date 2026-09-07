@@ -984,7 +984,6 @@ function OrdersTab({
   onPay: (o: Order) => void;
 }) {
   const [tab, setTab] = useState<OrderTab>('all');
-  const [showMoreFilters, setShowMoreFilters] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   if (orders.length === 0) {
@@ -1010,13 +1009,11 @@ function OrdersTab({
     })
     .slice()
     .sort((a, b) => new Date(b.created_at ?? '').getTime() - new Date(a.created_at ?? '').getTime());
-  const primaryTabs: { key: OrderTab; label: string }[] = [
+  const orderTabs: { key: OrderTab; label: string }[] = [
     { key: 'all', label: '全部' },
     { key: 'unpaid', label: '待付款' },
     { key: 'to_ship', label: '待出貨' },
     { key: 'shipping', label: '配送中' },
-  ];
-  const moreTabs: { key: OrderTab; label: string }[] = [
     { key: 'done', label: '已完成' },
     { key: 'returning', label: '退貨中' },
     { key: 'cancelled', label: '取消/退貨' },
@@ -1068,27 +1065,11 @@ function OrdersTab({
 
       <div className="-mx-4 overflow-x-auto px-4 [scrollbar-width:none] sm:mx-0 sm:px-0 [&::-webkit-scrollbar]:hidden">
         <div className="flex min-w-max items-center gap-2.5">
-          {primaryTabs.map((t) => (
+          {orderTabs.map((t) => (
             <OrderFilterPill key={t.key} active={tab === t.key} label={t.label} count={countOf(t.key)} onClick={() => setTab(t.key)} />
           ))}
-          <button
-            type="button"
-            onClick={() => setShowMoreFilters((v) => !v)}
-            aria-label="更多訂單篩選"
-            className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-white text-[#1f1b19] shadow-[0_5px_18px_rgba(64,52,43,0.12)] transition hover:-translate-y-0.5"
-          >
-            <IconSliders />
-          </button>
         </div>
       </div>
-
-      {showMoreFilters ? (
-        <div className="flex flex-wrap gap-2">
-          {moreTabs.map((t) => (
-            <OrderFilterPill key={t.key} active={tab === t.key} label={t.label} count={countOf(t.key)} onClick={() => setTab(t.key)} compact />
-          ))}
-        </div>
-      ) : null}
 
       {shown.length === 0 ? (
         <p className="rounded-2xl border border-[#e5ded4] bg-white p-8 text-center text-[#6b6156]">此分類目前沒有訂單。</p>
@@ -1125,13 +1106,11 @@ function OrderFilterPill({
   active,
   label,
   count,
-  compact = false,
   onClick,
 }: {
   active: boolean;
   label: string;
   count: number;
-  compact?: boolean;
   onClick: () => void;
 }) {
   return (
@@ -1142,7 +1121,7 @@ function OrderFilterPill({
         active
           ? 'bg-[#9f1735] text-white shadow-[0_7px_18px_rgba(159,23,53,0.22)]'
           : 'bg-[#f0ebe3] text-[#6f665d] hover:bg-white'
-      } ${compact ? 'h-9 px-4 text-xs' : ''}`}
+      }`}
     >
       <span>{label}</span>
       <span>{count}</span>
@@ -1174,9 +1153,7 @@ function OrderRecordCard({
   const needsAttention = orderNeedsAttention(order, 'customer');
 
   return (
-    <article className="relative overflow-visible rounded-xl border border-[#eee5da] bg-white shadow-[0_5px_18px_rgba(64,52,43,0.07)]">
-      <span className="absolute -left-2 top-[62%] h-4 w-4 rounded-full border border-l-0 border-[#eee5da] bg-[#f6f2ec]" aria-hidden />
-      <span className="absolute -right-2 top-[62%] h-4 w-4 rounded-full border border-r-0 border-[#eee5da] bg-[#f6f2ec]" aria-hidden />
+    <article className="order-ticket-card relative rounded-xl border border-[#eee5da] bg-white shadow-[0_5px_18px_rgba(64,52,43,0.07)]">
       <div className={`border-l-4 ${needsAttention ? 'border-[#c84767]' : 'border-transparent'} px-5 pb-4 pt-4`}>
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
@@ -1206,7 +1183,7 @@ function OrderRecordCard({
         </div>
       </div>
 
-      <div className="flex items-center gap-3 border-t border-dashed border-[#e6ded4] px-5 py-3">
+      <div className="relative flex min-h-16 items-center gap-3 border-t border-dashed border-[#e6ded4] px-5 py-3">
         <button
           type="button"
           onClick={() => onOpen(order)}
@@ -1268,16 +1245,6 @@ function IconSearch() {
     <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
       <circle cx="11" cy="11" r="7" />
       <path d="m16.5 16.5 4 4" />
-    </svg>
-  );
-}
-
-function IconSliders() {
-  return (
-    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
-      <path d="M4 7h16M4 17h16" />
-      <circle cx="9" cy="7" r="2" />
-      <circle cx="15" cy="17" r="2" />
     </svg>
   );
 }

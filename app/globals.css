@@ -157,6 +157,24 @@ img {
   }
 }
 
+/* 訂單卡票券缺口:缺口與底部操作分隔線同高,用 mask 裁切卡片本身。 */
+.order-ticket-card {
+  --order-notch-r: 8px;
+  --order-notch-y: calc(100% - 64px);
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
+  -webkit-mask-image:
+    radial-gradient(circle var(--order-notch-r) at 0 var(--order-notch-y), transparent calc(var(--order-notch-r) - 0.2px), #000 var(--order-notch-r)),
+    radial-gradient(circle var(--order-notch-r) at 100% var(--order-notch-y), transparent calc(var(--order-notch-r) - 0.2px), #000 var(--order-notch-r));
+  mask-image:
+    radial-gradient(circle var(--order-notch-r) at 0 var(--order-notch-y), transparent calc(var(--order-notch-r) - 0.2px), #000 var(--order-notch-r)),
+    radial-gradient(circle var(--order-notch-r) at 100% var(--order-notch-y), transparent calc(var(--order-notch-r) - 0.2px), #000 var(--order-notch-r));
+  -webkit-mask-composite: source-in;
+  mask-composite: intersect;
+}
+
 /* 畫面置中彈出通知(例:已儲存):停留後於第 3 秒淡出消失,不佔版面空間。 */
 @keyframes center-toast-fade {
   0% { opacity: 0; transform: translateY(6px) scale(0.98); }
