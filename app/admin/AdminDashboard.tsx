@@ -37,6 +37,11 @@ const formatter = new Intl.NumberFormat('zh-TW', {
   currency: 'TWD',
   maximumFractionDigits: 0,
 });
+const numberFormatter = new Intl.NumberFormat('zh-TW');
+
+function formatOverviewCurrency(value: number) {
+  return `NT$ ${numberFormatter.format(value)}`;
+}
 
 const ORDER_STATUSES = ['尚未付款', '待出貨', '已出貨', '已完成', '取消', '退貨'];
 const CANCEL_REVIEW_TAB = '待審核取消';
@@ -414,6 +419,8 @@ export default function AdminDashboard({
   const [orderFilter, setOrderFilter] = useState<string>('全部');
   const [orderSearch, setOrderSearch] = useState('');
   const [orderPaidFilter, setOrderPaidFilter] = useState<'全部' | '已付款' | '未付款'>('全部');
+  const [overviewOrderFilter, setOverviewOrderFilter] = useState<'全部' | '待出貨' | '尚未付款' | '已完成'>('全部');
+  const [overviewOrderSearch, setOverviewOrderSearch] = useState('');
   const [openOrderId, setOpenOrderId] = useState<string | null>(null);
   const [productsTab, setProductsTab] = useState<'items' | 'categories'>('items');
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
@@ -565,6 +572,26 @@ export default function AdminDashboard({
 
   const pendingCount = orders.filter((o) => o.status === '待出貨').length;
   const lowStock = products.filter((p) => p.inventory <= 10).length;
+  const activeDiscountCount = discounts.filter((d) => d.active).length;
+  const overviewRecentOrders = useMemo(() => {
+    const q = overviewOrderSearch.trim().toLowerCase();
+    return orders
+      .filter((o) => {
+        if (overviewOrderFilter !== '全部' && o.status !== overviewOrderFilter) return false;
+        if (!q) return true;
+        const hay = [
+          o.order_no,
+          o.customer_name,
+          o.email,
+          o.phone ?? '',
+          ...o.items.flatMap((it) => [it.name, it.variant, it.sku ?? '']),
+        ].join(' ').toLowerCase();
+        return hay.includes(q);
+      })
+      .slice()
+      .sort((a, b) => new Date(b.created_at ?? '').getTime() - new Date(a.created_at ?? '').getTime())
+      .slice(0, 6);
+  }, [orders, overviewOrderFilter, overviewOrderSearch]);
   const paymentMethods = useMemo(
     () =>
       footerDraft.payments
@@ -1561,39 +1588,155 @@ export default function AdminDashboard({
         <main className="mx-auto max-w-5xl px-4 py-6 sm:px-6">
           {/* ===== 總覽 ===== */}
           {section === 'overview' && (
-            <div className="space-y-6">
-              <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-                <StatCard label="今日營收" value={formatter.format(todayRevenue)} />
-                <StatCard label="待出貨訂單" value={String(pendingCount)} />
-                <StatCard label="總訂單" value={String(orders.length)} />
-                <StatCard label="會員數" value={String(customers.length)} />
-                <StatCard label="商品數" value={String(products.length)} />
-                <StatCard label="低庫存(≤10)" value={String(lowStock)} />
-                <StatCard label="折扣碼" value={String(discounts.filter((d) => d.active).length)} />
-                <StatCard label="總營收" value={formatter.format(report.totalRevenue)} />
+            <div className="space-y-5">
+              <section>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.38em] text-[#8a7f72]">Store Overview</p>
+                <h2 className="font-serif-tc mt-2 text-3xl font-bold tracking-[0.06em] text-[#1f1b19]">營運總覽</h2>
+                <p className="mt-1 text-sm font-medium text-[#6f665d]">商店大小事，一目了然。</p>
+              </section>
+
+              <section className="overflow-hidden rounded-xl bg-[#7d1f34] bg-[linear-gradient(135deg,rgba(255,255,255,0.12),transparent_34%),linear-gradient(90deg,#6f1b2d,#8f243c_58%,#64192a)] p-6 text-white shadow-[0_14px_34px_rgba(86,31,41,0.18)]">
+                <div className="flex items-start gap-3">
+                  <h3 className="text-xl font-bold tracking-[0.08em]">總營收</h3>
+                  <span className="mt-1 text-sm text-white/70">累計</span>
+                </div>
+                <p className="font-serif-tc mt-5 text-[44px] font-semibold leading-none tracking-normal sm:text-[58px]">
+                  {formatOverviewCurrency(report.totalRevenue)}
+                </p>
+                <div className="mt-7 grid grid-cols-2 border-t border-white/55 pt-4">
+                  <div>
+                    <p className="text-sm text-white/70">今日營收</p>
+                    <p className="font-serif-tc mt-1 text-2xl font-semibold">{formatOverviewCurrency(todayRevenue)}</p>
+                  </div>
+                  <div className="border-l border-white/45 pl-7">
+                    <p className="text-sm text-white/70">總訂單</p>
+                    <p className="font-serif-tc mt-1 text-2xl font-semibold">{orders.length}</p>
+                  </div>
+                </div>
+              </section>
+
+              <div className="grid grid-cols-2 gap-3">
+                <OverviewActionCard
+                  tone="plain"
+                  icon={<IconBox />}
+                  title="待出貨訂單"
+                  value={String(pendingCount)}
+                  caption=""
+                  action="處理訂單"
+                  onClick={() => {
+                    setOrderFilter('待出貨');
+                    setOrderPaidFilter('全部');
+                    setOrderSearch('');
+                    changeSection('orders');
+                  }}
+                />
+                <OverviewActionCard
+                  tone="soft"
+                  icon={<IconBox />}
+                  title="低庫存"
+                  value={String(lowStock)}
+                  caption="庫存 ≤ 10"
+                  action="查看"
+                  onClick={() => changeSection('inventory')}
+                />
               </div>
-              <Card title="最近訂單">
-                {orders.length === 0 ? (
-                  <Empty>目前還沒有訂單。</Empty>
+
+              <section className="grid grid-cols-3 rounded-xl border border-[#e5ded4] bg-white py-4 shadow-sm">
+                <OverviewMiniStat label="商品" value={products.length} />
+                <OverviewMiniStat label="會員" value={customers.length} bordered />
+                <OverviewMiniStat label="折扣碼" value={activeDiscountCount} bordered />
+              </section>
+
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setProductsTab('items');
+                    changeSection('products');
+                    setEditing(blankDraft());
+                    setIsNew(true);
+                  }}
+                  className="inline-flex h-14 items-center justify-center gap-3 rounded-xl bg-[#7d1f34] px-4 text-sm font-bold tracking-[0.08em] text-white shadow-[0_8px_20px_rgba(125,31,52,0.18)]"
+                >
+                  <span className="text-2xl leading-none">＋</span>
+                  新增商品
+                </button>
+                <button
+                  type="button"
+                  onClick={() => changeSection('promotions')}
+                  className="inline-flex h-14 items-center justify-center gap-2 rounded-xl border border-[#8f6f76] bg-white px-4 text-sm font-bold tracking-[0.08em] text-[#7d1f34]"
+                >
+                  管理優惠券 <span aria-hidden>↗</span>
+                </button>
+              </div>
+
+              <section className="space-y-3">
+                <div className="flex items-end justify-between gap-3">
+                  <h3 className="font-serif-tc text-2xl font-bold tracking-[0.08em]">最近訂單</h3>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setOrderFilter('全部');
+                      setOrderPaidFilter('全部');
+                      setOrderSearch('');
+                      changeSection('orders');
+                    }}
+                    className="inline-flex items-center gap-1 text-sm font-bold text-[#7d1f34]"
+                  >
+                    查看全部 <span aria-hidden>→</span>
+                  </button>
+                </div>
+
+                <div className="flex h-12 items-center gap-2 rounded-xl border border-[#e5ded4] bg-white px-4 shadow-sm">
+                  <IconSearchCompact />
+                  <input
+                    value={overviewOrderSearch}
+                    onChange={(e) => setOverviewOrderSearch(e.target.value)}
+                    placeholder="搜尋訂單編號或會員"
+                    className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-[#a99e8f]"
+                  />
+                </div>
+
+                <div className="grid grid-cols-4 border-b border-[#ded5c8]">
+                  {(['全部', '待出貨', '尚未付款', '已完成'] as const).map((s) => (
+                    <button
+                      key={s}
+                      type="button"
+                      onClick={() => setOverviewOrderFilter(s)}
+                      className={`-mb-px border-b-2 px-2 py-3 text-sm font-semibold transition ${
+                        overviewOrderFilter === s ? 'border-[#7d1f34] text-[#7d1f34]' : 'border-transparent text-[#8a7f72]'
+                      }`}
+                    >
+                      {s}
+                    </button>
+                  ))}
+                </div>
+
+                {overviewRecentOrders.length === 0 ? (
+                  <Empty>沒有符合條件的訂單。</Empty>
                 ) : (
-                  <div className="divide-y divide-[#efe8dd]">
-                    {orders.slice(0, 6).map((o) => (
-                      <div key={o.id} className="flex items-center justify-between py-3">
-                        <div>
-                          <p className="font-semibold">{o.order_no}</p>
-                          <p className="text-sm text-[#8a7f72]">{o.customer_name}</p>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <span className="rounded-full bg-[#f3ede4] px-3 py-1 text-xs font-semibold text-[#6b6156]">
-                            {o.status}
-                          </span>
-                          <span className="font-semibold">{formatter.format(o.total)}</span>
-                        </div>
-                      </div>
+                  <div className="overflow-hidden rounded-xl border border-[#e5ded4] bg-white shadow-sm">
+                    {overviewRecentOrders.map((o) => (
+                      <button
+                        key={o.id}
+                        type="button"
+                        onClick={() => setOpenOrderId(o.id)}
+                        className="grid w-full grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-3 border-b border-[#efe8dd] px-4 py-3 text-left last:border-b-0 hover:bg-[#fbf8f3]"
+                      >
+                        <span className="min-w-0">
+                          <span className="block truncate text-sm font-bold tracking-[0.04em] text-[#1f1b19]">{o.order_no}</span>
+                          <span className="mt-0.5 block truncate text-xs text-[#8a7f72]">{o.customer_name || o.email}</span>
+                        </span>
+                        <AdminOverviewStatus status={o.status} />
+                        <span className="flex items-center gap-2 whitespace-nowrap text-sm font-bold text-[#1f1b19]">
+                          {formatOverviewCurrency(o.total)}
+                          <IconChevronRight />
+                        </span>
+                      </button>
                     ))}
                   </div>
                 )}
-              </Card>
+              </section>
             </div>
           )}
 
@@ -6041,6 +6184,84 @@ function StatCard({ label, value }: { label: string; value: string }) {
       <p className="text-sm text-[#8a7f72]">{label}</p>
       <p className="mt-1 text-2xl font-semibold">{value}</p>
     </div>
+  );
+}
+
+function OverviewActionCard({
+  icon,
+  title,
+  value,
+  caption,
+  action,
+  tone,
+  onClick,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  value: string;
+  caption: string;
+  action: string;
+  tone: 'plain' | 'soft';
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`rounded-xl border p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${
+        tone === 'soft'
+          ? 'border-[#ead7d8] bg-[#f5e8e8]'
+          : 'border-[#e5ded4] bg-white'
+      }`}
+    >
+      <div className="flex items-start gap-3">
+        <span className="mt-0.5 text-[#7d1f34]">{icon}</span>
+        <div className="min-w-0 flex-1">
+          <p className="text-base font-bold tracking-[0.04em] text-[#1f1b19]">{title}</p>
+          <div className="mt-1 flex items-end justify-between gap-2">
+            <div>
+              <p className="font-serif-tc text-[48px] font-semibold leading-none tracking-normal text-[#1f1b19]">{value}</p>
+              {caption ? <p className="mt-1 text-xs font-medium text-[#8a7f72]">{caption}</p> : null}
+            </div>
+            <span className="mb-1 inline-flex shrink-0 items-center gap-1 text-sm font-bold text-[#7d1f34]">
+              {action} <span aria-hidden>→</span>
+            </span>
+          </div>
+        </div>
+      </div>
+    </button>
+  );
+}
+
+function OverviewMiniStat({ label, value, bordered = false }: { label: string; value: number; bordered?: boolean }) {
+  return (
+    <div className={`text-center ${bordered ? 'border-l border-[#ded5c8]' : ''}`}>
+      <p className="text-sm font-semibold text-[#8a7f72]">{label}</p>
+      <p className="font-serif-tc mt-1 text-3xl font-semibold leading-none tracking-normal text-[#1f1b19]">{value}</p>
+    </div>
+  );
+}
+
+function AdminOverviewStatus({ status }: { status: string }) {
+  const tone =
+    status === '待出貨'
+      ? 'bg-[#ece8f2] text-[#6a5b75]'
+      : status === '尚未付款'
+        ? 'bg-[#fbf0dc] text-[#8a641f]'
+        : status === '已完成'
+          ? 'bg-[#e6f2ea] text-[#386b4b]'
+          : status === '已出貨'
+            ? 'bg-[#e7eff5] text-[#3c6175]'
+            : 'bg-[#f1ece7] text-[#6f665d]';
+  return <span className={`whitespace-nowrap rounded-full px-3 py-1 text-xs font-bold ${tone}`}>{status}</span>;
+}
+
+function IconSearchCompact() {
+  return (
+    <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="#8a7f72" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
+      <circle cx="11" cy="11" r="7" />
+      <path d="m16.5 16.5 4 4" />
+    </svg>
   );
 }
 
