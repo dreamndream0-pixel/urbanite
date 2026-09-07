@@ -769,10 +769,10 @@ function CouponTicket({ code, image, desc, tags, action, dim = false, showScript
 }) {
   const dark = couponImageIsDark(image, code);
   return (
-    <div className={`relative flex items-stretch drop-shadow-[0_8px_18px_rgba(64,52,43,0.08)] ${dim ? 'opacity-65' : ''}`}>
+    <div className={`coupon-ticket-shell relative flex items-stretch drop-shadow-[0_8px_18px_rgba(64,52,43,0.08)] ${dim ? 'opacity-65' : ''}`}>
       {/* 照片票根 */}
       <div
-        className="ticket-cut-both relative w-[26%] min-w-[104px] shrink-0 self-stretch bg-[#e5ded4] bg-cover bg-center"
+        className="relative w-[26%] min-w-[104px] shrink-0 self-stretch bg-[#e5ded4] bg-cover bg-center"
         style={couponImageStyle(image, code)}
       >
         <div className="absolute inset-0 bg-black/[0.03]" />
@@ -781,7 +781,7 @@ function CouponTicket({ code, image, desc, tags, action, dim = false, showScript
           <span className="block">FOR YOU.</span>
         </span>
       </div>
-      <div className="ticket-cut-left relative flex min-h-[120px] flex-1 items-stretch rounded-r-2xl border border-l-0 border-[#eadfd4] bg-[#fffaf5] sm:min-h-[132px]">
+      <div className="relative flex min-h-[120px] flex-1 items-stretch rounded-r-2xl border border-l-0 border-[#eadfd4] bg-[#fffaf5] sm:min-h-[132px]">
         <div className="flex min-w-0 flex-1 flex-col justify-center px-4 py-4 sm:px-6">
           <p className="font-serif-tc text-[19px] font-bold tracking-[0.08em] text-[#2c2826] sm:text-[23px]">{code}</p>
           <p className="mt-1 text-[13px] font-medium text-[#6b6156] sm:text-sm">{desc}</p>

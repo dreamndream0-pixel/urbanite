@@ -82,19 +82,23 @@ img {
 .font-script {
   font-family: 'Parisienne', 'Snell Roundhand', cursive;
 }
-/* 票券挖孔:7 個正圓孔,用 mask 真正挖空,不是蓋底色圓。 */
-.ticket-cut-both,
-.ticket-cut-left {
+/* 票券挖孔:整張票券統一 mask,孔位是真挖空,不是蓋底色圓。 */
+.coupon-ticket-shell {
   --ticket-hole-r: 5.5px;
+  --ticket-end-hole-r: 9px;
+  --ticket-photo-x: 26%;
+  --ticket-action-x: 78.5%;
   -webkit-mask-repeat: no-repeat;
   mask-repeat: no-repeat;
   -webkit-mask-size: 100% 100%;
   mask-size: 100% 100%;
-  -webkit-mask-composite: source-in, source-in, source-in, source-in, source-in, source-in, source-in, source-in, source-in, source-in, source-in, source-in, source-in;
-  mask-composite: intersect, intersect, intersect, intersect, intersect, intersect, intersect, intersect, intersect, intersect, intersect, intersect, intersect;
-}
-.ticket-cut-both {
   -webkit-mask-image:
+    radial-gradient(circle var(--ticket-end-hole-r) at 0 0, transparent calc(var(--ticket-end-hole-r) - 0.2px), #000 var(--ticket-end-hole-r)),
+    radial-gradient(circle var(--ticket-end-hole-r) at 0 100%, transparent calc(var(--ticket-end-hole-r) - 0.2px), #000 var(--ticket-end-hole-r)),
+    radial-gradient(circle var(--ticket-end-hole-r) at var(--ticket-photo-x) 0, transparent calc(var(--ticket-end-hole-r) - 0.2px), #000 var(--ticket-end-hole-r)),
+    radial-gradient(circle var(--ticket-end-hole-r) at var(--ticket-photo-x) 100%, transparent calc(var(--ticket-end-hole-r) - 0.2px), #000 var(--ticket-end-hole-r)),
+    radial-gradient(circle var(--ticket-end-hole-r) at var(--ticket-action-x) 0, transparent calc(var(--ticket-end-hole-r) - 0.2px), #000 var(--ticket-end-hole-r)),
+    radial-gradient(circle var(--ticket-end-hole-r) at var(--ticket-action-x) 100%, transparent calc(var(--ticket-end-hole-r) - 0.2px), #000 var(--ticket-end-hole-r)),
     radial-gradient(circle var(--ticket-hole-r) at 0 17%, transparent calc(var(--ticket-hole-r) - 0.2px), #000 var(--ticket-hole-r)),
     radial-gradient(circle var(--ticket-hole-r) at 0 28%, transparent calc(var(--ticket-hole-r) - 0.2px), #000 var(--ticket-hole-r)),
     radial-gradient(circle var(--ticket-hole-r) at 0 39%, transparent calc(var(--ticket-hole-r) - 0.2px), #000 var(--ticket-hole-r)),
@@ -102,14 +106,20 @@ img {
     radial-gradient(circle var(--ticket-hole-r) at 0 61%, transparent calc(var(--ticket-hole-r) - 0.2px), #000 var(--ticket-hole-r)),
     radial-gradient(circle var(--ticket-hole-r) at 0 72%, transparent calc(var(--ticket-hole-r) - 0.2px), #000 var(--ticket-hole-r)),
     radial-gradient(circle var(--ticket-hole-r) at 0 83%, transparent calc(var(--ticket-hole-r) - 0.2px), #000 var(--ticket-hole-r)),
-    radial-gradient(circle var(--ticket-hole-r) at 100% 17%, transparent calc(var(--ticket-hole-r) - 0.2px), #000 var(--ticket-hole-r)),
-    radial-gradient(circle var(--ticket-hole-r) at 100% 28%, transparent calc(var(--ticket-hole-r) - 0.2px), #000 var(--ticket-hole-r)),
-    radial-gradient(circle var(--ticket-hole-r) at 100% 39%, transparent calc(var(--ticket-hole-r) - 0.2px), #000 var(--ticket-hole-r)),
-    radial-gradient(circle var(--ticket-hole-r) at 100% 50%, transparent calc(var(--ticket-hole-r) - 0.2px), #000 var(--ticket-hole-r)),
-    radial-gradient(circle var(--ticket-hole-r) at 100% 61%, transparent calc(var(--ticket-hole-r) - 0.2px), #000 var(--ticket-hole-r)),
-    radial-gradient(circle var(--ticket-hole-r) at 100% 72%, transparent calc(var(--ticket-hole-r) - 0.2px), #000 var(--ticket-hole-r)),
-    radial-gradient(circle var(--ticket-hole-r) at 100% 83%, transparent calc(var(--ticket-hole-r) - 0.2px), #000 var(--ticket-hole-r));
+    radial-gradient(circle var(--ticket-hole-r) at var(--ticket-photo-x) 17%, transparent calc(var(--ticket-hole-r) - 0.2px), #000 var(--ticket-hole-r)),
+    radial-gradient(circle var(--ticket-hole-r) at var(--ticket-photo-x) 28%, transparent calc(var(--ticket-hole-r) - 0.2px), #000 var(--ticket-hole-r)),
+    radial-gradient(circle var(--ticket-hole-r) at var(--ticket-photo-x) 39%, transparent calc(var(--ticket-hole-r) - 0.2px), #000 var(--ticket-hole-r)),
+    radial-gradient(circle var(--ticket-hole-r) at var(--ticket-photo-x) 50%, transparent calc(var(--ticket-hole-r) - 0.2px), #000 var(--ticket-hole-r)),
+    radial-gradient(circle var(--ticket-hole-r) at var(--ticket-photo-x) 61%, transparent calc(var(--ticket-hole-r) - 0.2px), #000 var(--ticket-hole-r)),
+    radial-gradient(circle var(--ticket-hole-r) at var(--ticket-photo-x) 72%, transparent calc(var(--ticket-hole-r) - 0.2px), #000 var(--ticket-hole-r)),
+    radial-gradient(circle var(--ticket-hole-r) at var(--ticket-photo-x) 83%, transparent calc(var(--ticket-hole-r) - 0.2px), #000 var(--ticket-hole-r));
   mask-image:
+    radial-gradient(circle var(--ticket-end-hole-r) at 0 0, transparent calc(var(--ticket-end-hole-r) - 0.2px), #000 var(--ticket-end-hole-r)),
+    radial-gradient(circle var(--ticket-end-hole-r) at 0 100%, transparent calc(var(--ticket-end-hole-r) - 0.2px), #000 var(--ticket-end-hole-r)),
+    radial-gradient(circle var(--ticket-end-hole-r) at var(--ticket-photo-x) 0, transparent calc(var(--ticket-end-hole-r) - 0.2px), #000 var(--ticket-end-hole-r)),
+    radial-gradient(circle var(--ticket-end-hole-r) at var(--ticket-photo-x) 100%, transparent calc(var(--ticket-end-hole-r) - 0.2px), #000 var(--ticket-end-hole-r)),
+    radial-gradient(circle var(--ticket-end-hole-r) at var(--ticket-action-x) 0, transparent calc(var(--ticket-end-hole-r) - 0.2px), #000 var(--ticket-end-hole-r)),
+    radial-gradient(circle var(--ticket-end-hole-r) at var(--ticket-action-x) 100%, transparent calc(var(--ticket-end-hole-r) - 0.2px), #000 var(--ticket-end-hole-r)),
     radial-gradient(circle var(--ticket-hole-r) at 0 17%, transparent calc(var(--ticket-hole-r) - 0.2px), #000 var(--ticket-hole-r)),
     radial-gradient(circle var(--ticket-hole-r) at 0 28%, transparent calc(var(--ticket-hole-r) - 0.2px), #000 var(--ticket-hole-r)),
     radial-gradient(circle var(--ticket-hole-r) at 0 39%, transparent calc(var(--ticket-hole-r) - 0.2px), #000 var(--ticket-hole-r)),
@@ -117,36 +127,21 @@ img {
     radial-gradient(circle var(--ticket-hole-r) at 0 61%, transparent calc(var(--ticket-hole-r) - 0.2px), #000 var(--ticket-hole-r)),
     radial-gradient(circle var(--ticket-hole-r) at 0 72%, transparent calc(var(--ticket-hole-r) - 0.2px), #000 var(--ticket-hole-r)),
     radial-gradient(circle var(--ticket-hole-r) at 0 83%, transparent calc(var(--ticket-hole-r) - 0.2px), #000 var(--ticket-hole-r)),
-    radial-gradient(circle var(--ticket-hole-r) at 100% 17%, transparent calc(var(--ticket-hole-r) - 0.2px), #000 var(--ticket-hole-r)),
-    radial-gradient(circle var(--ticket-hole-r) at 100% 28%, transparent calc(var(--ticket-hole-r) - 0.2px), #000 var(--ticket-hole-r)),
-    radial-gradient(circle var(--ticket-hole-r) at 100% 39%, transparent calc(var(--ticket-hole-r) - 0.2px), #000 var(--ticket-hole-r)),
-    radial-gradient(circle var(--ticket-hole-r) at 100% 50%, transparent calc(var(--ticket-hole-r) - 0.2px), #000 var(--ticket-hole-r)),
-    radial-gradient(circle var(--ticket-hole-r) at 100% 61%, transparent calc(var(--ticket-hole-r) - 0.2px), #000 var(--ticket-hole-r)),
-    radial-gradient(circle var(--ticket-hole-r) at 100% 72%, transparent calc(var(--ticket-hole-r) - 0.2px), #000 var(--ticket-hole-r)),
-    radial-gradient(circle var(--ticket-hole-r) at 100% 83%, transparent calc(var(--ticket-hole-r) - 0.2px), #000 var(--ticket-hole-r));
-}
-.ticket-cut-left {
-  -webkit-mask-image:
-    radial-gradient(circle var(--ticket-hole-r) at 0 17%, transparent calc(var(--ticket-hole-r) - 0.2px), #000 var(--ticket-hole-r)),
-    radial-gradient(circle var(--ticket-hole-r) at 0 28%, transparent calc(var(--ticket-hole-r) - 0.2px), #000 var(--ticket-hole-r)),
-    radial-gradient(circle var(--ticket-hole-r) at 0 39%, transparent calc(var(--ticket-hole-r) - 0.2px), #000 var(--ticket-hole-r)),
-    radial-gradient(circle var(--ticket-hole-r) at 0 50%, transparent calc(var(--ticket-hole-r) - 0.2px), #000 var(--ticket-hole-r)),
-    radial-gradient(circle var(--ticket-hole-r) at 0 61%, transparent calc(var(--ticket-hole-r) - 0.2px), #000 var(--ticket-hole-r)),
-    radial-gradient(circle var(--ticket-hole-r) at 0 72%, transparent calc(var(--ticket-hole-r) - 0.2px), #000 var(--ticket-hole-r)),
-    radial-gradient(circle var(--ticket-hole-r) at 0 83%, transparent calc(var(--ticket-hole-r) - 0.2px), #000 var(--ticket-hole-r));
-  mask-image:
-    radial-gradient(circle var(--ticket-hole-r) at 0 17%, transparent calc(var(--ticket-hole-r) - 0.2px), #000 var(--ticket-hole-r)),
-    radial-gradient(circle var(--ticket-hole-r) at 0 28%, transparent calc(var(--ticket-hole-r) - 0.2px), #000 var(--ticket-hole-r)),
-    radial-gradient(circle var(--ticket-hole-r) at 0 39%, transparent calc(var(--ticket-hole-r) - 0.2px), #000 var(--ticket-hole-r)),
-    radial-gradient(circle var(--ticket-hole-r) at 0 50%, transparent calc(var(--ticket-hole-r) - 0.2px), #000 var(--ticket-hole-r)),
-    radial-gradient(circle var(--ticket-hole-r) at 0 61%, transparent calc(var(--ticket-hole-r) - 0.2px), #000 var(--ticket-hole-r)),
-    radial-gradient(circle var(--ticket-hole-r) at 0 72%, transparent calc(var(--ticket-hole-r) - 0.2px), #000 var(--ticket-hole-r)),
-    radial-gradient(circle var(--ticket-hole-r) at 0 83%, transparent calc(var(--ticket-hole-r) - 0.2px), #000 var(--ticket-hole-r));
+    radial-gradient(circle var(--ticket-hole-r) at var(--ticket-photo-x) 17%, transparent calc(var(--ticket-hole-r) - 0.2px), #000 var(--ticket-hole-r)),
+    radial-gradient(circle var(--ticket-hole-r) at var(--ticket-photo-x) 28%, transparent calc(var(--ticket-hole-r) - 0.2px), #000 var(--ticket-hole-r)),
+    radial-gradient(circle var(--ticket-hole-r) at var(--ticket-photo-x) 39%, transparent calc(var(--ticket-hole-r) - 0.2px), #000 var(--ticket-hole-r)),
+    radial-gradient(circle var(--ticket-hole-r) at var(--ticket-photo-x) 50%, transparent calc(var(--ticket-hole-r) - 0.2px), #000 var(--ticket-hole-r)),
+    radial-gradient(circle var(--ticket-hole-r) at var(--ticket-photo-x) 61%, transparent calc(var(--ticket-hole-r) - 0.2px), #000 var(--ticket-hole-r)),
+    radial-gradient(circle var(--ticket-hole-r) at var(--ticket-photo-x) 72%, transparent calc(var(--ticket-hole-r) - 0.2px), #000 var(--ticket-hole-r)),
+    radial-gradient(circle var(--ticket-hole-r) at var(--ticket-photo-x) 83%, transparent calc(var(--ticket-hole-r) - 0.2px), #000 var(--ticket-hole-r));
+  -webkit-mask-composite: source-in, source-in, source-in, source-in, source-in, source-in, source-in, source-in, source-in, source-in, source-in, source-in, source-in, source-in, source-in, source-in, source-in, source-in, source-in;
+  mask-composite: intersect, intersect, intersect, intersect, intersect, intersect, intersect, intersect, intersect, intersect, intersect, intersect, intersect, intersect, intersect, intersect, intersect, intersect, intersect;
 }
 
 @media (min-width: 640px) {
-  .ticket-cut-both,
-  .ticket-cut-left {
+  .coupon-ticket-shell {
     --ticket-hole-r: 6px;
+    --ticket-end-hole-r: 10px;
+    --ticket-action-x: 79.3%;
   }
 }
