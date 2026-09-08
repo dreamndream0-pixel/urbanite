@@ -3,6 +3,13 @@
 :root {
   --background: #fff8f4;
   --foreground: #251b1f;
+  --fold-paper: #F6F2EB;
+  --fold-paper-back: #E7DFD5;
+  --fold-active: #702838;
+  --fold-active-back: #551D2A;
+  --fold-ink: #242321;
+  --fold-light: #FFFFFF;
+  --fold-shadow: rgba(32, 24, 21, .14);
 }
 
 @theme inline {
@@ -73,6 +80,94 @@ img {
 }
 .product-card:active {
   animation: card-wiggle 0.4s ease-in-out;
+}
+
+.favorite-fold {
+  --fold-size: 36px;
+  --fold-front: var(--fold-paper);
+  --fold-back: var(--fold-paper-back);
+  --fold-heart-fill: transparent;
+  --fold-heart-stroke: var(--fold-ink);
+}
+.favorite-fold[aria-pressed='true'] {
+  --fold-size: 44px;
+  --fold-front: var(--fold-active);
+  --fold-back: var(--fold-active-back);
+  --fold-heart-fill: var(--fold-light);
+  --fold-heart-stroke: var(--fold-light);
+}
+.favorite-fold__svg {
+  height: var(--fold-size);
+  width: var(--fold-size);
+  filter: drop-shadow(0 6px 12px var(--fold-shadow));
+  transform-origin: 100% 0;
+  transition:
+    height 240ms cubic-bezier(.22, 1, .36, 1),
+    width 240ms cubic-bezier(.22, 1, .36, 1),
+    filter 240ms ease,
+    transform 140ms ease;
+}
+.favorite-fold:hover .favorite-fold__svg {
+  transform: translateY(-2px);
+}
+.favorite-fold__back {
+  fill: var(--fold-back);
+  transition: fill 240ms ease;
+}
+.favorite-fold__front {
+  fill: var(--fold-front);
+  transition: fill 240ms ease;
+}
+.favorite-fold__shadow {
+  fill: none;
+  stroke: rgba(32, 24, 21, .16);
+  stroke-width: 1.1;
+}
+.favorite-fold__heart {
+  fill: var(--fold-heart-fill);
+  stroke: var(--fold-heart-stroke);
+  stroke-width: 2;
+  stroke-linejoin: round;
+  transform-origin: 30px 18px;
+  transition: fill 180ms ease, stroke 180ms ease, transform 240ms cubic-bezier(.22, 1, .36, 1);
+}
+.favorite-fold[aria-pressed='true'] .favorite-fold__heart {
+  transform: scale(1.04);
+}
+.favorite-fold__svg--pending {
+  animation: favorite-fold-in 320ms cubic-bezier(.22, 1, .36, 1);
+}
+.favorite-fold[aria-pressed='false'] .favorite-fold__svg--pending {
+  animation-duration: 240ms;
+}
+.favorite-fold__busy {
+  position: absolute;
+  right: 11px;
+  top: 11px;
+  height: 5px;
+  width: 5px;
+  border-radius: 999px;
+  background: currentColor;
+  opacity: .45;
+}
+
+@keyframes favorite-fold-in {
+  0% { transform: scale(.94) rotateX(0deg); filter: drop-shadow(0 3px 8px rgba(32, 24, 21, .1)); }
+  45% { transform: scale(1.04) rotateX(14deg); filter: drop-shadow(0 10px 18px rgba(32, 24, 21, .18)); }
+  100% { transform: scale(1) rotateX(0deg); filter: drop-shadow(0 6px 12px var(--fold-shadow)); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .favorite-fold__svg,
+  .favorite-fold__heart {
+    transition-duration: 80ms;
+  }
+  .favorite-fold:hover .favorite-fold__svg {
+    transform: none;
+  }
+  .favorite-fold__svg--pending {
+    animation: none;
+  }
 }
 
 /* 優惠券頁字體:中文襯線標題 + 手寫花體 */

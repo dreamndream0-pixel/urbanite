@@ -84,6 +84,10 @@ export default function Home() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
+  const [confirmedFavorites, setConfirmedFavorites] = useState<Set<string>>(new Set());
+  const [favoritesLoaded, setFavoritesLoaded] = useState(false);
+  const [favoritePending, setFavoritePending] = useState<Set<string>>(new Set());
+  const [favoriteNotice, setFavoriteNotice] = useState('');
   const [favoritesOpen, setFavoritesOpen] = useState(false);
   const [cartOpen, setCartOpen] = useState(false);
   // 購物車一律先以空陣列渲染,掛載後再從 localStorage 載入,
@@ -95,6 +99,7 @@ export default function Home() {
   const cartIconRef = useRef<HTMLButtonElement>(null);
   const [cartToast, setCartToast] = useState(false);
   const cartToastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const favoriteNoticeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   function notifyAdded() {
     setCartToast(true);
@@ -172,13 +177,27 @@ export default function Home() {
   // 收藏清單紀錄在帳號裡:登入後從後端讀取,未登入則清空。
   useEffect(() => {
     if (!user) {
-      Promise.resolve().then(() => setFavorites(new Set()));
+      Promise.resolve().then(() => {
+        setFavorites(new Set());
+        setConfirmedFavorites(new Set());
+        setFavoritePending(new Set());
+        setFavoritesLoaded(true);
+      });
       return;
     }
+    setFavoritesLoaded(false);
     fetch('/api/favorites')
       .then((res) => (res.ok ? res.json() : { productIds: [] }))
-      .then((data: { productIds?: string[] }) => setFavorites(new Set(data.productIds ?? [])))
-      .catch(() => {});
+      .then((data: { productIds?: string[] }) => {
+        const next = new Set(data.productIds ?? []);
+        setFavorites(next);
+        setConfirmedFavorites(next);
+      })
+      .catch(() => {
+        setFavorites(new Set());
+        setConfirmedFavorites(new Set());
+      })
+      .finally(() => setFavoritesLoaded(true));
   }, [user]);
 
   useEffect(() => {
@@ -315,27 +334,58 @@ export default function Home() {
     );
   }
 
-  function toggleFavorite(id: string) {
+  function showFavoriteNotice(message: string) {
+    setFavoriteNotice(message);
+    if (favoriteNoticeTimer.current) clearTimeout(favoriteNoticeTimer.current);
+    favoriteNoticeTimer.current = setTimeout(() => setFavoriteNotice(''), 2200);
+  }
+
+  async function setFavoriteSaved(id: string, nextSaved: boolean) {
     if (!user) {
-      router.push('/login?next=/account');
+      const nextPath = typeof window === 'undefined' ? '/' : `${window.location.pathname}${window.location.search}`;
+      router.push(`/login?next=${encodeURIComponent(nextPath)}`);
       return;
     }
-    const isFav = favorites.has(id);
-    // 先樂觀更新畫面,再同步到後端
+    if (!favoritesLoaded || favoritePending.has(id)) return;
+    const confirmed = confirmedFavorites.has(id);
+    if (confirmed === nextSaved) return;
+    setFavoritePending((prev) => new Set(prev).add(id));
     setFavorites((prev) => {
       const next = new Set(prev);
-      if (isFav) next.delete(id);
-      else next.add(id);
+      if (nextSaved) next.add(id);
+      else next.delete(id);
       return next;
     });
-    if (isFav) {
-      fetch(`/api/favorites?productId=${encodeURIComponent(id)}`, { method: 'DELETE' }).catch(() => {});
-    } else {
-      fetch('/api/favorites', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ productId: id }),
-      }).catch(() => {});
+    try {
+      const res = nextSaved
+        ? await fetch('/api/favorites', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ productId: id }),
+          })
+        : await fetch(`/api/favorites?productId=${encodeURIComponent(id)}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error('favorite failed');
+      setConfirmedFavorites((prev) => {
+        const next = new Set(prev);
+        if (nextSaved) next.add(id);
+        else next.delete(id);
+        return next;
+      });
+      showFavoriteNotice(nextSaved ? '已加入收藏' : '已取消收藏');
+    } catch {
+      setFavorites((prev) => {
+        const next = new Set(prev);
+        if (confirmed) next.add(id);
+        else next.delete(id);
+        return next;
+      });
+      showFavoriteNotice(nextSaved ? '收藏未儲存，請再試一次' : '取消收藏失敗，請再試一次');
+    } finally {
+      setFavoritePending((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
     }
   }
 
@@ -382,10 +432,10 @@ export default function Home() {
               aria-label="收藏清單"
               className="relative rounded-md p-2 hover:bg-[#efe8dd]"
             >
-              <IconStar filled={favorites.size > 0} />
-              {favorites.size > 0 && (
-                <span className="absolute -right-0.5 -top-0.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-[#c84767] px-1 text-[10px] font-semibold text-white">
-                  {favorites.size}
+              <IconStar filled={confirmedFavorites.size > 0} />
+              {confirmedFavorites.size > 0 && (
+                <span className="absolute -right-0.5 -top-0.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-[#c84767] px-1 text-[10px] font-semibold text-white transition-opacity duration-150">
+                  {confirmedFavorites.size}
                 </span>
               )}
             </button>
@@ -488,7 +538,9 @@ export default function Home() {
                     key={product.id}
                     product={product}
                     favorited={favorites.has(product.id)}
-                    onFavorite={() => toggleFavorite(product.id)}
+                    favoritePending={favoritePending.has(product.id)}
+                    favoritesLoaded={favoritesLoaded}
+                    onFavoriteChange={(next) => setFavoriteSaved(product.id, next)}
                     onAdd={() => setQuickAdd(product)}
                   />
                 ))}
@@ -538,9 +590,9 @@ export default function Home() {
       {/* 收藏清單 */}
       <FavoritesDrawer
         open={favoritesOpen}
-        items={liveProducts.filter((p) => favorites.has(p.id))}
+        items={liveProducts.filter((p) => confirmedFavorites.has(p.id))}
         onClose={() => setFavoritesOpen(false)}
-        onRemove={(id) => toggleFavorite(id)}
+        onRemove={(id) => setFavoriteSaved(id, false)}
         onAdd={(product) => {
           addToCart(product);
           setFavoritesOpen(false);
@@ -552,7 +604,9 @@ export default function Home() {
         <QuickAddModal
           product={quickAdd}
           favorited={favorites.has(quickAdd.id)}
-          onFavorite={() => toggleFavorite(quickAdd.id)}
+          favoritePending={favoritePending.has(quickAdd.id)}
+          favoritesLoaded={favoritesLoaded}
+          onFavoriteChange={(next) => setFavoriteSaved(quickAdd.id, next)}
           onClose={() => setQuickAdd(null)}
           onFly={flyToCart}
           onAdd={(variant, quantity, buyNow) => {
@@ -571,6 +625,14 @@ export default function Home() {
       >
         <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#1f7a44] text-white"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M5 13l4 4L19 7" /></svg></span>
         已加入購物車
+      </div>
+      <div
+        aria-live="polite"
+        className={`pointer-events-none fixed left-1/2 top-20 z-[70] -translate-x-1/2 rounded-full bg-[#1f1b19] px-4 py-2.5 text-sm font-semibold text-white shadow-lg transition-all duration-300 ${
+          favoriteNotice ? 'translate-y-0 opacity-100' : '-translate-y-2 opacity-0'
+        }`}
+      >
+        {favoriteNotice}
       </div>
     </main>
   );
@@ -614,7 +676,7 @@ function FavoritesDrawer({
         <div className="flex-1 space-y-4 overflow-auto p-5">
           {items.length === 0 ? (
             <p className="rounded-lg bg-[#f6f2ec] p-5 text-[#6b6156]">
-              還沒有收藏商品。點商品右上角的星號即可加入收藏。
+              還沒有收藏商品。點商品右上角的折角即可加入收藏。
             </p>
           ) : (
             items.map((product) => (
@@ -1011,12 +1073,16 @@ function SocialLink({ href, label, image, children }: { href?: string; label: st
 function ProductCard({
   product,
   favorited,
-  onFavorite,
+  favoritePending,
+  favoritesLoaded,
+  onFavoriteChange,
   onAdd,
 }: {
   product: Product;
   favorited: boolean;
-  onFavorite: () => void;
+  favoritePending: boolean;
+  favoritesLoaded: boolean;
+  onFavoriteChange: (next: boolean) => void;
   onAdd: () => void;
 }) {
   const productHref = `/products/${encodeURIComponent(product.id)}`;
@@ -1043,13 +1109,13 @@ function ProductCard({
             {product.status}
           </span>
         )}
-        <button
-          onClick={onFavorite}
-          aria-label="加入收藏"
-          className="absolute right-2 top-2 flex h-9 w-9 items-center justify-center rounded-full bg-white/65 shadow-sm backdrop-blur-sm transition hover:bg-white/85"
-        >
-          <IconStar filled={favorited} small />
-        </button>
+        <FavoriteFoldButton
+          productName={product.name}
+          isSaved={favorited}
+          isLoading={!favoritesLoaded}
+          pending={favoritePending}
+          onSavedChange={onFavoriteChange}
+        />
       </div>
       <div className="mt-3 flex flex-1 flex-col px-1">
         <Link href={productHref} className="hover:text-[#c84767]">
@@ -1081,6 +1147,59 @@ function ProductCard({
         </div>
       </div>
     </div>
+  );
+}
+
+function FavoriteFoldButton({
+  productName,
+  isSaved,
+  isLoading,
+  pending,
+  onSavedChange,
+}: {
+  productName: string;
+  isSaved: boolean;
+  isLoading: boolean;
+  pending: boolean;
+  onSavedChange: (next: boolean) => void;
+}) {
+  const disabled = isLoading || pending;
+  const label = isSaved ? `取消收藏：${productName}` : `收藏：${productName}`;
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      aria-pressed={isSaved}
+      aria-disabled={disabled}
+      aria-busy={pending}
+      title={isSaved ? '取消收藏' : '加入收藏'}
+      onClick={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (!disabled) onSavedChange(!isSaved);
+      }}
+      onKeyDown={(e) => {
+        if ((e.key === 'Enter' || e.key === ' ') && disabled) e.preventDefault();
+      }}
+      className="favorite-fold group absolute right-0 top-0 z-10 flex h-12 w-12 items-start justify-end rounded-tr-xl outline-none focus-visible:ring-2 focus-visible:ring-[#702838]/45"
+    >
+      <svg
+        viewBox="0 0 48 48"
+        aria-hidden="true"
+        className={`favorite-fold__svg pointer-events-none transition-transform duration-200 ${
+          pending ? 'favorite-fold__svg--pending' : ''
+        } ${disabled ? 'opacity-70' : ''}`}
+      >
+        <path className="favorite-fold__back" d="M48 0H4L48 44Z" />
+        <path className="favorite-fold__shadow" d="M12 0 48 36" />
+        <path className="favorite-fold__front" d="M48 0H12L48 36Z" />
+        <path
+          className="favorite-fold__heart"
+          d="M31.5 13.8c1.2-1.5 3.7-1.5 5.1-.2 1.6 1.5 1.5 4-.1 5.6L30 25.6l-6.5-6.4c-1.6-1.6-1.7-4.1-.1-5.6 1.4-1.3 3.9-1.3 5.1.2L30 15.5l1.5-1.7Z"
+        />
+      </svg>
+      {pending ? <span className="favorite-fold__busy" aria-hidden /> : null}
+    </button>
   );
 }
 
@@ -1460,14 +1579,18 @@ function IconChevron({ dir }: { dir: 'left' | 'right' }) {
 function QuickAddModal({
   product,
   favorited,
-  onFavorite,
+  favoritePending,
+  favoritesLoaded,
+  onFavoriteChange,
   onClose,
   onAdd,
   onFly,
 }: {
   product: Product;
   favorited: boolean;
-  onFavorite: () => void;
+  favoritePending: boolean;
+  favoritesLoaded: boolean;
+  onFavoriteChange: (next: boolean) => void;
   onClose: () => void;
   onAdd: (variant: string, quantity: number, buyNow: boolean) => void;
   onFly?: (imgUrl: string, rect: DOMRect | null) => void;
@@ -1669,10 +1792,20 @@ function QuickAddModal({
         </div>
 
         <button
-          onClick={onFavorite}
-          className="mx-auto mt-4 flex items-center justify-center gap-2 text-sm font-semibold text-[#5d5652]"
+          type="button"
+          aria-pressed={favorited}
+          aria-disabled={!favoritesLoaded || favoritePending}
+          aria-busy={favoritePending}
+          disabled={!favoritesLoaded || favoritePending}
+          onClick={() => {
+            if (favoritesLoaded && !favoritePending) onFavoriteChange(!favorited);
+          }}
+          className="mx-auto mt-4 flex min-h-12 items-center justify-center gap-2 rounded-full px-4 text-sm font-semibold text-[#5d5652] transition hover:bg-[#f6f2ec] disabled:opacity-50"
         >
-          <IconStar filled={favorited} small /> {favorited ? '已收藏' : '加入收藏'}
+          <span className={`inline-flex h-7 w-7 items-center justify-center rounded-tr-lg ${favorited ? 'bg-[#702838] text-white' : 'bg-[#F6F2EB] text-[#242321]'}`}>
+            <IconHeart filled={favorited} />
+          </span>
+          {favorited ? '已收藏' : '加入收藏'}
         </button>
       </div>
     </div>
@@ -1707,6 +1840,13 @@ function IconStar({ filled = false, small = false }: { filled?: boolean; small?:
   return (
     <svg width={s} height={s} viewBox="0 0 24 24" fill={filled ? '#f5c542' : 'none'} stroke={filled ? '#d89a00' : 'currentColor'} strokeWidth="1.8" strokeLinejoin="round">
       <path d="m12 2 3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21 7 14.2l-5-4.9 6.9-1L12 2Z" />
+    </svg>
+  );
+}
+function IconHeart({ filled = false }: { filled?: boolean }) {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill={filled ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinejoin="round" aria-hidden="true">
+      <path d="M12 21s-7.2-4.5-9.2-9.1C1.3 8.5 3.4 5 7 5c2 0 3.6 1.1 5 3 1.4-1.9 3-3 5-3 3.6 0 5.7 3.5 4.2 6.9C19.2 16.5 12 21 12 21z" />
     </svg>
   );
 }
