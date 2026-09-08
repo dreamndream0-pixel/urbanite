@@ -431,9 +431,9 @@ export default function Home() {
             <button
               onClick={() => setFavoritesOpen(true)}
               aria-label="收藏清單"
-              className="relative rounded-md p-2 hover:bg-[#efe8dd]"
+              className={`relative rounded-md p-2 hover:bg-[#efe8dd] ${confirmedFavorites.size > 0 ? 'text-[#c84767]' : ''}`}
             >
-              <IconStar filled={confirmedFavorites.size > 0} />
+              <IconHeart filled={confirmedFavorites.size > 0} size={20} />
               {confirmedFavorites.size > 0 && (
                 <span className="absolute -right-0.5 -top-0.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-[#c84767] px-1 text-[10px] font-semibold text-white transition-opacity duration-150">
                   {confirmedFavorites.size}
@@ -666,8 +666,8 @@ function FavoritesDrawer({
         }`}
       >
         <div className="flex items-center justify-between border-b border-[#e5ded4] px-5 py-4">
-          <h2 className="flex items-center gap-2 text-xl font-semibold">
-            <IconStar filled small /> 收藏清單
+          <h2 className="flex items-center gap-2 text-xl font-semibold text-[#c84767]">
+            <IconHeart filled /> <span className="text-[#1f1b19]">收藏清單</span>
           </h2>
           <button className="rounded-md p-1 hover:bg-[#efe8dd]" onClick={onClose} aria-label="關閉">
             <IconClose />
@@ -1783,17 +1783,9 @@ function IconSearch() {
     </svg>
   );
 }
-function IconStar({ filled = false, small = false }: { filled?: boolean; small?: boolean }) {
-  const s = small ? 16 : 20;
+function IconHeart({ filled = false, size = 16 }: { filled?: boolean; size?: number }) {
   return (
-    <svg width={s} height={s} viewBox="0 0 24 24" fill={filled ? '#f5c542' : 'none'} stroke={filled ? '#d89a00' : 'currentColor'} strokeWidth="1.8" strokeLinejoin="round">
-      <path d="m12 2 3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21 7 14.2l-5-4.9 6.9-1L12 2Z" />
-    </svg>
-  );
-}
-function IconHeart({ filled = false }: { filled?: boolean }) {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill={filled ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinejoin="round" aria-hidden="true">
+    <svg width={size} height={size} viewBox="0 0 24 24" fill={filled ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinejoin="round" aria-hidden="true">
       <path d="M12 21s-7.2-4.5-9.2-9.1C1.3 8.5 3.4 5 7 5c2 0 3.6 1.1 5 3 1.4-1.9 3-3 5-3 3.6 0 5.7 3.5 4.2 6.9C19.2 16.5 12 21 12 21z" />
     </svg>
   );
