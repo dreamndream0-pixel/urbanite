@@ -8,6 +8,7 @@ import type { Product, Category, SiteSettings, Banner } from '@/lib/types';
 import { uiAlert } from '@/lib/ui-dialog';
 import { computeShipping } from '@/lib/shipping';
 import AccountMenu from '@/app/components/AccountMenu';
+import FavoriteFoldButton from '@/app/components/FavoriteFoldButton';
 
 // 購物車存在瀏覽器本機的 key(結帳頁會讀同一份)
 const CART_KEY = 'cart';
@@ -1147,62 +1148,6 @@ function ProductCard({
         </div>
       </div>
     </div>
-  );
-}
-
-function FavoriteFoldButton({
-  productName,
-  isSaved,
-  isLoading,
-  pending,
-  onSavedChange,
-}: {
-  productName: string;
-  isSaved: boolean;
-  isLoading: boolean;
-  pending: boolean;
-  onSavedChange: (next: boolean) => void;
-}) {
-  const disabled = isLoading || pending;
-  const label = isSaved ? `取消收藏：${productName}` : `收藏：${productName}`;
-  const [peeling, setPeeling] = useState(false);
-
-  useEffect(() => {
-    if (!peeling) return;
-    const timer = window.setTimeout(() => setPeeling(false), 1000);
-    return () => window.clearTimeout(timer);
-  }, [peeling]);
-
-  return (
-    <button
-      type="button"
-      aria-label={label}
-      aria-pressed={isSaved}
-      aria-disabled={disabled}
-      aria-busy={pending}
-      title={isSaved ? '取消收藏' : '加入收藏'}
-      onClick={(e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        if (!disabled) {
-          setPeeling(true);
-          onSavedChange(!isSaved);
-        }
-      }}
-      onKeyDown={(e) => {
-        if ((e.key === 'Enter' || e.key === ' ') && disabled) e.preventDefault();
-      }}
-      className="favorite-fold group absolute right-0 top-0 z-10 flex h-14 w-14 items-start justify-end rounded-tr-xl outline-none focus-visible:ring-2 focus-visible:ring-[#702838]/45"
-    >
-      <span className={`favorite-fold__stage pointer-events-none ${pending || peeling ? 'favorite-fold__stage--peeling' : ''}`}>
-        <span className="favorite-fold__curl" aria-hidden />
-        <span className="favorite-fold__page" aria-hidden />
-        <span className="favorite-fold__heart" aria-hidden>
-          <IconHeart filled={isSaved} />
-        </span>
-        {pending ? <span className="favorite-fold__busy" aria-hidden /> : null}
-      </span>
-    </button>
   );
 }
 

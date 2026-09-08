@@ -83,213 +83,56 @@ img {
 }
 
 .favorite-fold {
-  --fold-size: 56px;
-  --fold-front: transparent;
-  --fold-back: #fffdf9;
-  --fold-heart-color: var(--fold-ink);
+  width: 56px;
+  height: 56px;
+  padding: 0;
+  border: 0;
+  border-top-right-radius: 12px;
+  background: transparent;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
 }
-.favorite-fold[aria-pressed='true'] {
-  --fold-size: 56px;
-  --fold-front: var(--fold-active);
-  --fold-back: #fffdf9;
-  --fold-heart-color: var(--fold-light);
+.favorite-fold:focus-visible {
+  outline: 2px solid var(--fold-active);
+  outline-offset: -3px;
 }
 .favorite-fold__stage {
-  position: relative;
   display: block;
-  height: var(--fold-size);
-  width: var(--fold-size);
-  color: var(--fold-heart-color);
-  filter: none;
-  perspective: 150px;
-  transform-origin: 100% 0;
-  backface-visibility: hidden;
-  transition:
-    height 240ms cubic-bezier(.22, 1, .36, 1),
-    width 240ms cubic-bezier(.22, 1, .36, 1),
-    color 180ms ease,
-    filter 240ms ease,
-    transform 140ms ease;
+  width: 56px;
+  height: 56px;
+  pointer-events: none;
 }
-.favorite-fold__stage--peeling,
-.favorite-fold__stage--peeling .favorite-fold__curl {
-  will-change: transform, opacity, filter;
-}
-.favorite-fold[aria-pressed='true'] .favorite-fold__stage {
-  filter: drop-shadow(-4px 6px 10px rgba(32, 24, 21, .16));
-}
-.favorite-fold:hover .favorite-fold__stage {
-  transform: translateY(-2px);
-}
-.favorite-fold__curl,
-.favorite-fold__page {
-  position: absolute;
-  inset: 0;
-}
-.favorite-fold__curl {
-  clip-path: path('M 0 0 C 18 13 38 34 56 56 L 38 56 C 31 40 15 18 0 0 Z');
-  background:
-    radial-gradient(90% 80% at 24% 15%, rgba(255, 255, 255, .96), transparent 52%),
-    radial-gradient(92% 105% at 78% 82%, rgba(73, 51, 43, .24), transparent 58%),
-    linear-gradient(135deg, #fffefa 0%, #fbf7f0 42%, #e8ded1 73%, #d1c5b7 100%);
-  border-bottom-left-radius: 28px;
-  box-shadow:
-    5px 10px 18px rgba(32, 24, 21, .2),
-    inset -10px 7px 16px rgba(255, 255, 255, .64),
-    inset 12px -14px 18px rgba(86, 65, 54, .18);
-  transform: translate(0, 0) scale(1) rotate(0deg) rotateX(0deg) rotateY(0deg) skew(0deg);
-  transform-origin: 50% 50%;
-  backface-visibility: hidden;
-  opacity: 0;
-  transition: transform 260ms cubic-bezier(.22, 1, .36, 1), opacity 220ms ease;
-}
-.favorite-fold__curl::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  clip-path: path('M 0 0 C 18 13 38 34 56 56 L 38 56 C 31 40 15 18 0 0 Z');
-  background:
-    linear-gradient(135deg, transparent 0 47%, rgba(32, 24, 21, .2) 54%, rgba(255, 255, 255, .6) 61%, transparent 75%),
-    radial-gradient(80% 72% at 84% 82%, rgba(32, 24, 21, .14), transparent 60%);
-  opacity: .72;
-}
-.favorite-fold[aria-pressed='true'] .favorite-fold__curl {
-  opacity: .92;
-}
-.favorite-fold__page {
-  clip-path: polygon(100% 0, 0 0, 100% 100%);
-  border-bottom-left-radius: 5px;
-  transform-origin: 100% 0;
-  transition:
-    background-color 220ms ease,
-    transform 260ms cubic-bezier(.22, 1, .36, 1);
-}
-.favorite-fold__page {
-  background: var(--fold-front);
-  box-shadow:
-    inset -1px 1px 0 rgba(255, 255, 255, .18),
-    inset 7px -7px 10px rgba(32, 24, 21, .08);
-  transform: rotateX(0deg) rotateY(0deg) translateZ(1px);
-  transform-style: preserve-3d;
-}
-.favorite-fold[aria-pressed='false'] .favorite-fold__page {
-  box-shadow: none;
-}
-.favorite-fold__heart {
-  position: absolute;
-  right: 8px;
-  top: 8px;
-  display: flex;
-  height: 19px;
-  width: 19px;
-  align-items: center;
-  justify-content: center;
-  transform-origin: 50% 50%;
-  transition: color 180ms ease, transform 240ms cubic-bezier(.22, 1, .36, 1);
-}
-.favorite-fold[aria-pressed='true'] .favorite-fold__heart {
-  transform: scale(1.04);
-}
-.favorite-fold__stage--peeling {
-  animation: favorite-fold-lift 1000ms linear;
-}
-.favorite-fold__stage--peeling .favorite-fold__curl {
-  animation: favorite-page-peel 1000ms linear;
+.favorite-fold[aria-disabled='true'] {
+  cursor: default;
 }
 .favorite-fold__busy {
   position: absolute;
-  right: 11px;
-  top: 11px;
-  height: 5px;
-  width: 5px;
-  border-radius: 999px;
-  background: currentColor;
-  opacity: .45;
+  right: 5px;
+  top: 5px;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--fold-ink);
+  box-shadow: 0 0 0 1px var(--fold-light);
+  pointer-events: none;
+  opacity: 0;
+  animation: favorite-fold-pending 120ms 500ms forwards;
 }
-
-@keyframes favorite-fold-lift {
-  0% { filter: drop-shadow(-2px 3px 7px rgba(32, 24, 21, .08)); transform: scale(.985) translate(0, 0); }
-  8% { filter: drop-shadow(-3px 4px 8px rgba(32, 24, 21, .1)); transform: scale(.99) translate(-.1px, .1px); }
-  16% { filter: drop-shadow(-4px 6px 10px rgba(32, 24, 21, .13)); transform: scale(1) translate(-.3px, .3px); }
-  24% { filter: drop-shadow(-6px 8px 13px rgba(32, 24, 21, .17)); transform: scale(1.012) translate(-.5px, .5px); }
-  32% { filter: drop-shadow(-8px 11px 16px rgba(32, 24, 21, .22)); transform: scale(1.026) translate(-.8px, .8px); }
-  40% { filter: drop-shadow(-10px 14px 20px rgba(32, 24, 21, .26)); transform: scale(1.036) translate(-1px, 1px); }
-  50% { filter: drop-shadow(-10px 14px 20px rgba(32, 24, 21, .25)); transform: scale(1.034) translate(-1px, 1px); }
-  60% { filter: drop-shadow(-9px 13px 18px rgba(32, 24, 21, .23)); transform: scale(1.026) translate(-.9px, .9px); }
-  70% { filter: drop-shadow(-8px 11px 16px rgba(32, 24, 21, .2)); transform: scale(1.018) translate(-.7px, .7px); }
-  80% { filter: drop-shadow(-6px 9px 14px rgba(32, 24, 21, .18)); transform: scale(1.01) translate(-.4px, .4px); }
-  90% { filter: drop-shadow(-5px 7px 12px rgba(32, 24, 21, .17)); transform: scale(1.004) translate(-.2px, .2px); }
-  100% { filter: drop-shadow(-4px 6px 10px rgba(32, 24, 21, .16)); transform: scale(1) translate(0, 0); }
+@keyframes favorite-fold-pending {
+  to { opacity: .7; }
 }
-
-@keyframes favorite-page-peel {
-  0% {
-    opacity: 0;
-    transform: translate(0, 0) scale(.74, .08) rotate(0deg) rotateX(82deg) rotateY(-18deg) skew(0deg);
-  }
-  7% {
-    opacity: .3;
-    transform: translate(0, 0) scale(.8, .18) rotate(-.2deg) rotateX(72deg) rotateY(-20deg) skew(-.2deg);
-  }
-  14% {
-    opacity: .55;
-    transform: translate(0, 0) scale(.86, .3) rotate(-.5deg) rotateX(60deg) rotateY(-23deg) skew(-.5deg);
-  }
-  21% {
-    opacity: .72;
-    transform: translate(0, 0) scale(.9, .44) rotate(-.9deg) rotateX(48deg) rotateY(-25deg) skew(-.8deg);
-  }
-  29% {
-    opacity: .86;
-    transform: translate(0, 0) scale(.94, .6) rotate(-1.3deg) rotateX(36deg) rotateY(-24deg) skew(-1.1deg);
-  }
-  37% {
-    opacity: .96;
-    transform: translate(0, 0) scale(.98, .76) rotate(-1.6deg) rotateX(24deg) rotateY(-20deg) skew(-1.2deg);
-  }
-  46% {
-    opacity: 1;
-    transform: translate(0, 0) scale(1.02, .94) rotate(-1.4deg) rotateX(14deg) rotateY(-15deg) skew(-1deg);
-  }
-  55% {
-    opacity: .99;
-    transform: translate(0, 0) scale(1.03, 1.05) rotate(-.9deg) rotateX(8deg) rotateY(-9deg) skew(-.6deg);
-  }
-  64% {
-    opacity: .98;
-    transform: translate(0, 0) scale(1.02, 1.08) rotate(-.5deg) rotateX(4deg) rotateY(-5deg) skew(-.4deg);
-  }
-  73% {
-    opacity: .96;
-    transform: translate(0, 0) scale(1.01, 1.04) rotate(-.2deg) rotateX(2deg) rotateY(-3deg) skew(-.2deg);
-  }
-  82% {
-    opacity: .94;
-    transform: translate(0, 0) scale(1.004, 1.02) rotate(-.1deg) rotateX(1deg) rotateY(-1deg) skew(-.1deg);
-  }
-  91% {
-    opacity: .93;
-    transform: translate(0, 0) scale(1, 1.008) rotate(0deg) rotateX(.5deg) rotateY(-.5deg) skew(0deg);
-  }
-  100% {
-    opacity: .92;
-    transform: translate(0, 0) scale(1) rotate(0deg) rotateX(0deg) rotateY(0deg) skew(0deg);
-  }
+.product-card:has(.favorite-fold:hover),
+.product-card:has(.favorite-fold:focus) {
+  transform: none;
+  animation: none;
 }
-
 @media (prefers-reduced-motion: reduce) {
-  .favorite-fold__stage,
-  .favorite-fold__heart,
-  .favorite-fold__curl,
-  .favorite-fold__page {
-    transition-duration: 80ms;
-  }
-  .favorite-fold:hover .favorite-fold__stage {
-    transform: none;
-  }
-  .favorite-fold__stage--peeling,
-  .favorite-fold__stage--peeling .favorite-fold__curl {
+  .product-card,
+  .product-card:hover,
+  .product-card:focus-within,
+  .product-card:active {
     animation: none;
+    transform: none;
   }
 }
 
