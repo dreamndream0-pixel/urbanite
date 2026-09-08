@@ -1183,22 +1183,15 @@ function FavoriteFoldButton({
       }}
       className="favorite-fold group absolute right-0 top-0 z-10 flex h-12 w-12 items-start justify-end rounded-tr-xl outline-none focus-visible:ring-2 focus-visible:ring-[#702838]/45"
     >
-      <svg
-        viewBox="0 0 48 48"
-        aria-hidden="true"
-        className={`favorite-fold__svg pointer-events-none transition-transform duration-200 ${
-          pending ? 'favorite-fold__svg--pending' : ''
-        } ${disabled ? 'opacity-70' : ''}`}
-      >
-        <path className="favorite-fold__back" d="M48 0H4L48 44Z" />
-        <path className="favorite-fold__shadow" d="M12 0 48 36" />
-        <path className="favorite-fold__front" d="M48 0H12L48 36Z" />
-        <path
-          className="favorite-fold__heart"
-          d="M31.5 13.8c1.2-1.5 3.7-1.5 5.1-.2 1.6 1.5 1.5 4-.1 5.6L30 25.6l-6.5-6.4c-1.6-1.6-1.7-4.1-.1-5.6 1.4-1.3 3.9-1.3 5.1.2L30 15.5l1.5-1.7Z"
-        />
-      </svg>
-      {pending ? <span className="favorite-fold__busy" aria-hidden /> : null}
+      <span className={`favorite-fold__stage pointer-events-none ${pending ? 'favorite-fold__stage--pending' : ''}`}>
+        <span className="favorite-fold__back" aria-hidden />
+        <span className="favorite-fold__page" aria-hidden />
+        <span className="favorite-fold__crease" aria-hidden />
+        <span className="favorite-fold__heart" aria-hidden>
+          <IconHeart filled={isSaved} />
+        </span>
+        {pending ? <span className="favorite-fold__busy" aria-hidden /> : null}
+      </span>
     </button>
   );
 }
