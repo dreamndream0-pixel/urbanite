@@ -83,11 +83,11 @@ img {
 }
 
 .favorite-fold {
-  width: 56px;
-  height: 56px;
+  width: 47.6px;
+  height: 47.6px;
   padding: 0;
   border: 0;
-  border-top-right-radius: 12px;
+  border-top-right-radius: 10.2px;
   background: transparent;
   touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
@@ -98,8 +98,8 @@ img {
 }
 .favorite-fold__stage {
   display: block;
-  width: 56px;
-  height: 56px;
+  width: 47.6px;
+  height: 47.6px;
   pointer-events: none;
 }
 .favorite-fold[aria-disabled='true'] {
