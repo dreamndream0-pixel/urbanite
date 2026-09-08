@@ -1165,6 +1165,14 @@ function FavoriteFoldButton({
 }) {
   const disabled = isLoading || pending;
   const label = isSaved ? `取消收藏：${productName}` : `收藏：${productName}`;
+  const [peeling, setPeeling] = useState(false);
+
+  useEffect(() => {
+    if (!peeling) return;
+    const timer = window.setTimeout(() => setPeeling(false), 1000);
+    return () => window.clearTimeout(timer);
+  }, [peeling]);
+
   return (
     <button
       type="button"
@@ -1176,14 +1184,17 @@ function FavoriteFoldButton({
       onClick={(e) => {
         e.preventDefault();
         e.stopPropagation();
-        if (!disabled) onSavedChange(!isSaved);
+        if (!disabled) {
+          setPeeling(true);
+          onSavedChange(!isSaved);
+        }
       }}
       onKeyDown={(e) => {
         if ((e.key === 'Enter' || e.key === ' ') && disabled) e.preventDefault();
       }}
       className="favorite-fold group absolute right-0 top-0 z-10 flex h-14 w-14 items-start justify-end rounded-tr-xl outline-none focus-visible:ring-2 focus-visible:ring-[#702838]/45"
     >
-      <span className={`favorite-fold__stage pointer-events-none ${pending ? 'favorite-fold__stage--pending' : ''}`}>
+      <span className={`favorite-fold__stage pointer-events-none ${pending || peeling ? 'favorite-fold__stage--peeling' : ''}`}>
         <span className="favorite-fold__curl" aria-hidden />
         <span className="favorite-fold__page" aria-hidden />
         <span className="favorite-fold__heart" aria-hidden>

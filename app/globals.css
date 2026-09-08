@@ -168,15 +168,11 @@ img {
 .favorite-fold[aria-pressed='true'] .favorite-fold__heart {
   transform: scale(1.04);
 }
-.favorite-fold__stage--pending {
-  animation: favorite-fold-lift 320ms cubic-bezier(.22, 1, .36, 1);
+.favorite-fold__stage--peeling {
+  animation: favorite-fold-lift 1000ms cubic-bezier(.22, 1, .36, 1);
 }
-.favorite-fold__stage--pending .favorite-fold__curl {
-  animation: favorite-page-peel 360ms cubic-bezier(.22, 1, .36, 1);
-}
-.favorite-fold[aria-pressed='false'] .favorite-fold__stage--pending,
-.favorite-fold[aria-pressed='false'] .favorite-fold__stage--pending .favorite-fold__curl {
-  animation-duration: 240ms;
+.favorite-fold__stage--peeling .favorite-fold__curl {
+  animation: favorite-page-peel 1000ms cubic-bezier(.22, 1, .36, 1);
 }
 .favorite-fold__busy {
   position: absolute;
@@ -191,22 +187,27 @@ img {
 
 @keyframes favorite-fold-lift {
   0% { filter: drop-shadow(-2px 3px 7px rgba(32, 24, 21, .1)); transform: scale(.98); }
-  48% { filter: drop-shadow(-8px 12px 18px rgba(32, 24, 21, .24)); transform: scale(1.03) translate(-1px, 1px); }
+  38% { filter: drop-shadow(-10px 14px 20px rgba(32, 24, 21, .26)); transform: scale(1.035) translate(-1px, 1px); }
+  68% { filter: drop-shadow(-9px 12px 18px rgba(32, 24, 21, .22)); transform: scale(1.02) translate(-1px, 1px); }
   100% { filter: drop-shadow(-4px 6px 10px rgba(32, 24, 21, .16)); transform: scale(1); }
 }
 
 @keyframes favorite-page-peel {
   0% {
-    opacity: .95;
+    opacity: .98;
     transform: translate(0, 0) scale(1) rotate(0deg) rotateX(0deg) rotateY(0deg);
   }
-  46% {
-    opacity: .98;
-    transform: translate(-13px, 13px) scale(.88) rotate(-7deg) rotateX(38deg) rotateY(-34deg);
+  18% {
+    opacity: 1;
+    transform: translate(-5px, 5px) scale(.97) rotate(-2deg) rotateX(18deg) rotateY(-16deg);
   }
-  74% {
-    opacity: .88;
-    transform: translate(-8px, 8px) scale(.82) rotate(-3deg) rotateX(12deg) rotateY(-12deg);
+  46% {
+    opacity: 1;
+    transform: translate(-16px, 16px) scale(.9) rotate(-8deg) rotateX(48deg) rotateY(-42deg);
+  }
+  72% {
+    opacity: .92;
+    transform: translate(-11px, 11px) scale(.84) rotate(-4deg) rotateX(18deg) rotateY(-18deg);
   }
   100% {
     opacity: .82;
@@ -224,8 +225,8 @@ img {
   .favorite-fold:hover .favorite-fold__stage {
     transform: none;
   }
-  .favorite-fold__stage--pending,
-  .favorite-fold__stage--pending .favorite-fold__curl {
+  .favorite-fold__stage--peeling,
+  .favorite-fold__stage--peeling .favorite-fold__curl {
     animation: none;
   }
 }
