@@ -1185,9 +1185,7 @@ function FavoriteFoldButton({
     >
       <span className={`favorite-fold__stage pointer-events-none ${pending ? 'favorite-fold__stage--pending' : ''}`}>
         <span className="favorite-fold__curl" aria-hidden />
-        <span className="favorite-fold__back" aria-hidden />
         <span className="favorite-fold__page" aria-hidden />
-        <span className="favorite-fold__crease" aria-hidden />
         <span className="favorite-fold__heart" aria-hidden>
           <IconHeart filled={isSaved} />
         </span>

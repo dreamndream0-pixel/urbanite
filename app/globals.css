@@ -83,13 +83,13 @@ img {
 }
 
 .favorite-fold {
-  --fold-size: 46px;
+  --fold-size: 44px;
   --fold-front: var(--fold-paper);
   --fold-back: #fffdf9;
   --fold-heart-color: var(--fold-ink);
 }
 .favorite-fold[aria-pressed='true'] {
-  --fold-size: 56px;
+  --fold-size: 54px;
   --fold-front: var(--fold-active);
   --fold-back: #fffdf9;
   --fold-heart-color: var(--fold-light);
@@ -100,7 +100,7 @@ img {
   height: var(--fold-size);
   width: var(--fold-size);
   color: var(--fold-heart-color);
-  filter: drop-shadow(-5px 7px 12px rgba(32, 24, 21, .18));
+  filter: drop-shadow(-4px 6px 10px rgba(32, 24, 21, .16));
   perspective: 150px;
   transform-origin: 100% 0;
   transition:
@@ -114,25 +114,20 @@ img {
   transform: translateY(-2px);
 }
 .favorite-fold__curl,
-.favorite-fold__back,
-.favorite-fold__page,
-.favorite-fold__crease {
+.favorite-fold__page {
   position: absolute;
   inset: 0;
 }
 .favorite-fold__curl {
   clip-path: polygon(100% 0, 0 0, 100% 100%);
-  background:
-    radial-gradient(120% 120% at 20% 86%, rgba(32, 24, 21, .16), transparent 42%),
-    linear-gradient(135deg, #fffdf9 0%, #f1ece3 58%, #d9d0c5 100%);
-  border-bottom-left-radius: 13px;
-  box-shadow: -8px 9px 12px rgba(32, 24, 21, .13);
-  transform: translate(-8px, 8px) scale(.78) rotate(-1deg);
+  background: linear-gradient(135deg, #fffdf9 0%, #f6f2eb 64%, #ded5ca 100%);
+  border-bottom-left-radius: 12px;
+  box-shadow: -7px 8px 13px rgba(32, 24, 21, .13);
+  transform: translate(-5px, 5px) scale(.82);
   transform-origin: 100% 0;
-  opacity: .86;
+  opacity: .78;
   transition: transform 260ms cubic-bezier(.22, 1, .36, 1), opacity 220ms ease;
 }
-.favorite-fold__back,
 .favorite-fold__page {
   clip-path: polygon(100% 0, 0 0, 100% 100%);
   border-bottom-left-radius: 5px;
@@ -141,29 +136,18 @@ img {
     background-color 220ms ease,
     transform 260ms cubic-bezier(.22, 1, .36, 1);
 }
-.favorite-fold__back {
-  background: var(--fold-back);
-  box-shadow: inset 3px -4px 8px rgba(32, 24, 21, .1);
-  transform: translate(-5px, 5px) scale(.88) rotateX(0deg) rotateY(0deg);
-}
 .favorite-fold__page {
   background: var(--fold-front);
-  box-shadow: inset -1px 1px 0 rgba(255, 255, 255, .28);
-  transform: rotateX(0deg) rotateY(0deg);
+  box-shadow:
+    inset -1px 1px 0 rgba(255, 255, 255, .24),
+    inset 7px -7px 10px rgba(32, 24, 21, .08);
+  transform: rotateX(0deg) rotateY(0deg) translateZ(1px);
   transform-style: preserve-3d;
-}
-.favorite-fold__crease {
-  background:
-    linear-gradient(135deg, transparent 47%, rgba(32, 24, 21, .24) 49%, rgba(255, 255, 255, .25) 51%, transparent 54%),
-    linear-gradient(135deg, transparent 57%, rgba(32, 24, 21, .1) 60%, transparent 66%);
-  clip-path: polygon(100% 0, 0 0, 100% 100%);
-  opacity: .72;
-  transition: opacity 220ms ease;
 }
 .favorite-fold__heart {
   position: absolute;
-  right: 7px;
-  top: 7px;
+  right: 8px;
+  top: 8px;
   display: flex;
   height: 19px;
   width: 19px;
@@ -184,13 +168,9 @@ img {
 .favorite-fold__stage--pending .favorite-fold__page {
   animation: favorite-page-open 320ms cubic-bezier(.22, 1, .36, 1);
 }
-.favorite-fold__stage--pending .favorite-fold__back {
-  animation: favorite-page-back 320ms cubic-bezier(.22, 1, .36, 1);
-}
 .favorite-fold[aria-pressed='false'] .favorite-fold__stage--pending,
 .favorite-fold[aria-pressed='false'] .favorite-fold__stage--pending .favorite-fold__curl,
-.favorite-fold[aria-pressed='false'] .favorite-fold__stage--pending .favorite-fold__page,
-.favorite-fold[aria-pressed='false'] .favorite-fold__stage--pending .favorite-fold__back {
+.favorite-fold[aria-pressed='false'] .favorite-fold__stage--pending .favorite-fold__page {
   animation-duration: 240ms;
 }
 .favorite-fold__busy {
@@ -205,35 +185,28 @@ img {
 }
 
 @keyframes favorite-fold-lift {
-  0% { filter: drop-shadow(-2px 3px 7px rgba(32, 24, 21, .1)); transform: scale(.97); }
-  46% { filter: drop-shadow(-9px 13px 18px rgba(32, 24, 21, .25)); transform: scale(1.035) translate(-1px, 1px); }
-  100% { filter: drop-shadow(-5px 7px 12px rgba(32, 24, 21, .18)); transform: scale(1); }
+  0% { filter: drop-shadow(-2px 3px 7px rgba(32, 24, 21, .1)); transform: scale(.98); }
+  48% { filter: drop-shadow(-8px 12px 18px rgba(32, 24, 21, .24)); transform: scale(1.03) translate(-1px, 1px); }
+  100% { filter: drop-shadow(-4px 6px 10px rgba(32, 24, 21, .16)); transform: scale(1); }
 }
 
 @keyframes favorite-page-curl {
-  0% { opacity: .58; transform: translate(-4px, 4px) scale(.7) rotate(-1deg); }
-  46% { opacity: 1; transform: translate(-14px, 14px) scale(.9) rotate(-7deg); }
-  100% { opacity: .86; transform: translate(-8px, 8px) scale(.78) rotate(-1deg); }
+  0% { opacity: .38; transform: translate(-2px, 2px) scale(.72); }
+  48% { opacity: .9; transform: translate(-11px, 11px) scale(.9) rotate(-5deg); }
+  100% { opacity: .78; transform: translate(-5px, 5px) scale(.82); }
 }
 
 @keyframes favorite-page-open {
-  0% { transform: rotateX(0deg) rotateY(0deg) skew(0deg); }
-  46% { transform: rotateX(34deg) rotateY(-48deg) skew(-5deg); }
-  72% { transform: rotateX(10deg) rotateY(-14deg) skew(-1deg); }
-  100% { transform: rotateX(0deg) rotateY(0deg) skew(0deg); }
-}
-
-@keyframes favorite-page-back {
-  0% { opacity: .52; transform: translate(-3px, 3px) scale(.82) rotateX(0deg) rotateY(0deg); }
-  46% { opacity: 1; transform: translate(-11px, 11px) scale(.98) rotateX(18deg) rotateY(-24deg); }
-  100% { opacity: .9; transform: translate(-5px, 5px) scale(.88) rotateX(0deg) rotateY(0deg); }
+  0% { transform: rotateX(0deg) rotateY(0deg) translateZ(1px); }
+  48% { transform: rotateX(38deg) rotateY(-52deg) translate(-2px, 2px) translateZ(8px); }
+  74% { transform: rotateX(12deg) rotateY(-16deg) translate(-1px, 1px) translateZ(4px); }
+  100% { transform: rotateX(0deg) rotateY(0deg) translateZ(1px); }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .favorite-fold__stage,
   .favorite-fold__heart,
   .favorite-fold__curl,
-  .favorite-fold__back,
   .favorite-fold__page {
     transition-duration: 80ms;
   }
@@ -242,8 +215,7 @@ img {
   }
   .favorite-fold__stage--pending,
   .favorite-fold__stage--pending .favorite-fold__curl,
-  .favorite-fold__stage--pending .favorite-fold__page,
-  .favorite-fold__stage--pending .favorite-fold__back {
+  .favorite-fold__stage--pending .favorite-fold__page {
     animation: none;
   }
 }
