@@ -127,17 +127,17 @@ img {
   inset: 0;
 }
 .favorite-fold__curl {
-  clip-path: path('M 0 0 C 19 3 38 19 56 56 L 37 56 C 31 39 15 18 0 0 Z');
+  clip-path: path('M 0 0 L 56 0 L 56 56 C 49 46 39 35 25 24 C 13 15 5 7 0 0 Z');
   background:
-    radial-gradient(95% 70% at 27% 9%, rgba(255, 255, 255, .9), transparent 48%),
-    radial-gradient(90% 110% at 84% 88%, rgba(79, 52, 42, .18), transparent 55%),
-    linear-gradient(135deg, #fffefa 0%, #f8f3eb 50%, #ded4c8 100%);
-  border-bottom-left-radius: 20px;
+    radial-gradient(95% 70% at 28% 8%, rgba(255, 255, 255, .95), transparent 48%),
+    radial-gradient(82% 92% at 78% 82%, rgba(73, 51, 43, .22), transparent 58%),
+    linear-gradient(135deg, #fffefa 0%, #fbf7f0 44%, #e9dfd2 76%, #d5cabc 100%);
+  border-bottom-left-radius: 24px;
   box-shadow:
-    4px 7px 14px rgba(32, 24, 21, .16),
-    inset -8px 7px 14px rgba(255, 255, 255, .62),
-    inset 9px -10px 14px rgba(86, 65, 54, .14);
-  transform: translate(0, 0) scale(1) rotate(0deg) rotateX(8deg) rotateY(-8deg) skew(-1deg);
+    4px 9px 16px rgba(32, 24, 21, .18),
+    inset -10px 7px 16px rgba(255, 255, 255, .64),
+    inset 10px -12px 16px rgba(86, 65, 54, .16);
+  transform: translate(0, 0) scale(1) rotate(0deg) rotateX(10deg) rotateY(-10deg) skew(-1deg);
   transform-origin: 100% 0;
   backface-visibility: hidden;
   opacity: 0;
@@ -147,11 +147,11 @@ img {
   content: '';
   position: absolute;
   inset: 0;
-  clip-path: path('M 1 0 C 19 4 38 20 55 55 L 38 56 C 31 39 15 18 1 0 Z');
+  clip-path: path('M 0 0 L 56 0 L 56 56 C 49 46 39 35 25 24 C 13 15 5 7 0 0 Z');
   background:
-    linear-gradient(135deg, transparent 0 44%, rgba(32, 24, 21, .14) 51%, rgba(255, 255, 255, .58) 58%, transparent 72%),
-    radial-gradient(70% 80% at 78% 78%, rgba(32, 24, 21, .12), transparent 60%);
-  opacity: .68;
+    linear-gradient(135deg, transparent 0 47%, rgba(32, 24, 21, .2) 54%, rgba(255, 255, 255, .6) 61%, transparent 75%),
+    radial-gradient(80% 72% at 84% 82%, rgba(32, 24, 21, .14), transparent 60%);
+  opacity: .72;
 }
 .favorite-fold[aria-pressed='true'] .favorite-fold__curl {
   opacity: .82;
@@ -237,43 +237,43 @@ img {
   }
   21% {
     opacity: 1;
-    transform: translate(-5.6px, 5.5px) scale(.982) rotate(-2deg) rotateX(20deg) rotateY(-17deg) skew(-1.8deg);
+    transform: translate(-2.4px, 2.4px) scale(.99) rotate(-1deg) rotateX(20deg) rotateY(-15deg) skew(-1.4deg);
   }
   29% {
     opacity: 1;
-    transform: translate(-9px, 8.8px) scale(.967) rotate(-3.6deg) rotateX(31deg) rotateY(-26deg) skew(-3deg);
+    transform: translate(-3.8px, 3.8px) scale(.984) rotate(-1.8deg) rotateX(30deg) rotateY(-23deg) skew(-2.2deg);
   }
   37% {
     opacity: 1;
-    transform: translate(-8px, 8px) scale(.96) rotate(-5deg) rotateX(42deg) rotateY(-34deg) skew(-4deg);
+    transform: translate(-5px, 5px) scale(.978) rotate(-2.8deg) rotateX(40deg) rotateY(-31deg) skew(-3deg);
   }
   46% {
     opacity: 1;
-    transform: translate(-10px, 10px) scale(.94) rotate(-7deg) rotateX(52deg) rotateY(-42deg) skew(-5deg);
+    transform: translate(-6px, 6px) scale(.972) rotate(-3.8deg) rotateX(50deg) rotateY(-38deg) skew(-3.8deg);
   }
   55% {
     opacity: .98;
-    transform: translate(-8px, 8px) scale(.955) rotate(-5.6deg) rotateX(42deg) rotateY(-36deg) skew(-4deg);
+    transform: translate(-5px, 5px) scale(.978) rotate(-3deg) rotateX(42deg) rotateY(-33deg) skew(-3.1deg);
   }
   64% {
     opacity: .95;
-    transform: translate(-5.5px, 5.5px) scale(.972) rotate(-4deg) rotateX(32deg) rotateY(-28deg) skew(-3deg);
+    transform: translate(-3.4px, 3.4px) scale(.988) rotate(-2.2deg) rotateX(32deg) rotateY(-26deg) skew(-2.3deg);
   }
   73% {
     opacity: .92;
-    transform: translate(-3.2px, 3.2px) scale(.988) rotate(-2.4deg) rotateX(22deg) rotateY(-20deg) skew(-2deg);
+    transform: translate(-2px, 2px) scale(.996) rotate(-1.4deg) rotateX(23deg) rotateY(-19deg) skew(-1.6deg);
   }
   82% {
     opacity: .86;
-    transform: translate(-1.5px, 1.5px) scale(.997) rotate(-1.4deg) rotateX(14deg) rotateY(-13deg) skew(-1.4deg);
+    transform: translate(-.9px, .9px) scale(1) rotate(-.8deg) rotateX(16deg) rotateY(-14deg) skew(-1.2deg);
   }
   91% {
     opacity: .84;
-    transform: translate(-.4px, .4px) scale(1) rotate(-.5deg) rotateX(10deg) rotateY(-9deg) skew(-1deg);
+    transform: translate(-.2px, .2px) scale(1) rotate(-.3deg) rotateX(12deg) rotateY(-11deg) skew(-1deg);
   }
   100% {
     opacity: .82;
-    transform: translate(0, 0) scale(1) rotate(0deg) rotateX(8deg) rotateY(-8deg) skew(-1deg);
+    transform: translate(0, 0) scale(1) rotate(0deg) rotateX(10deg) rotateY(-10deg) skew(-1deg);
   }
 }
 
