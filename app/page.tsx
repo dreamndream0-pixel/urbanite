@@ -1181,9 +1181,10 @@ function FavoriteFoldButton({
       onKeyDown={(e) => {
         if ((e.key === 'Enter' || e.key === ' ') && disabled) e.preventDefault();
       }}
-      className="favorite-fold group absolute right-0 top-0 z-10 flex h-12 w-12 items-start justify-end rounded-tr-xl outline-none focus-visible:ring-2 focus-visible:ring-[#702838]/45"
+      className="favorite-fold group absolute right-0 top-0 z-10 flex h-14 w-14 items-start justify-end rounded-tr-xl outline-none focus-visible:ring-2 focus-visible:ring-[#702838]/45"
     >
       <span className={`favorite-fold__stage pointer-events-none ${pending ? 'favorite-fold__stage--pending' : ''}`}>
+        <span className="favorite-fold__curl" aria-hidden />
         <span className="favorite-fold__back" aria-hidden />
         <span className="favorite-fold__page" aria-hidden />
         <span className="favorite-fold__crease" aria-hidden />
