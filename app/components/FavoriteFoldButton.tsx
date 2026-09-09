@@ -130,7 +130,6 @@ export default function FavoriteFoldButton({
           </g>
         </g>
       </svg>
-      {pending ? <span className="favorite-fold__busy" aria-hidden="true" /> : null}
     </button>
   );
 }

@@ -7,7 +7,7 @@
   --fold-paper-back: #E7DFD5;
   --fold-active: #702838;
   --fold-active-back: #551D2A;
-  --fold-ink: #242321;
+  --fold-ink: #C4BFB6;
   --fold-light: #FFFFFF;
   --fold-shadow: rgba(32, 24, 21, .14);
 }
@@ -104,22 +104,6 @@ img {
 }
 .favorite-fold[aria-disabled='true'] {
   cursor: default;
-}
-.favorite-fold__busy {
-  position: absolute;
-  right: 5px;
-  top: 5px;
-  width: 4px;
-  height: 4px;
-  border-radius: 50%;
-  background: var(--fold-ink);
-  box-shadow: 0 0 0 1px var(--fold-light);
-  pointer-events: none;
-  opacity: 0;
-  animation: favorite-fold-pending 120ms 500ms forwards;
-}
-@keyframes favorite-fold-pending {
-  to { opacity: .7; }
 }
 .product-card:has(.favorite-fold:hover),
 .product-card:has(.favorite-fold:focus) {

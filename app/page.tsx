@@ -629,8 +629,8 @@ export default function Home() {
       </div>
       <div
         aria-live="polite"
-        className={`pointer-events-none fixed left-1/2 top-20 z-[70] -translate-x-1/2 rounded-full bg-[#1f1b19] px-4 py-2.5 text-sm font-semibold text-white shadow-lg transition-all duration-300 ${
-          favoriteNotice ? 'translate-y-0 opacity-100' : '-translate-y-2 opacity-0'
+        className={`pointer-events-none fixed bottom-8 left-1/2 z-[70] -translate-x-1/2 rounded-full bg-[#1f1b19] px-4 py-2.5 text-sm font-semibold text-white shadow-lg transition-all duration-300 ${
+          favoriteNotice ? 'translate-y-0 opacity-100' : 'translate-y-2 opacity-0'
         }`}
       >
         {favoriteNotice}
