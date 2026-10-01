@@ -97,7 +97,7 @@ export default function FavoriteFoldButton({
       <svg className="favorite-fold__stage" viewBox="0 0 56 56" aria-hidden="true" focusable="false">
         <defs>
           <clipPath id={`${id}-corner`}>
-            <path d="M0 0H44Q56 0 56 12V56H0Z" />
+            <path d="M0 0H50Q56 0 56 6V56H0Z" />
           </clipPath>
           <clipPath id={`${id}-sheet`}>
             <path d={paper} />

@@ -9,6 +9,7 @@ import { uiAlert } from '@/lib/ui-dialog';
 import { computeShipping } from '@/lib/shipping';
 import AccountMenu from '@/app/components/AccountMenu';
 import FavoriteFoldButton from '@/app/components/FavoriteFoldButton';
+import CategoryNavigation from '@/app/components/CategoryNavigation';
 
 // 購物車存在瀏覽器本機的 key(結帳頁會讀同一份)
 const CART_KEY = 'cart';
@@ -242,7 +243,14 @@ export default function Home() {
 
   const visibleProducts = useMemo(() => {
     let list = liveProducts;
-    if (category !== 'all') list = list.filter((p) => p.category === category);
+    if (category !== 'all') {
+      const parent = visibleCats.find((c) => c.slug === category);
+      const selectedSlugs = new Set([
+        category,
+        ...(parent ? visibleCats.filter((c) => c.parent_id === parent.id).map((c) => c.slug) : []),
+      ]);
+      list = list.filter((p) => selectedSlugs.has(p.category));
+    }
     if (query.trim()) {
       const q = query.trim().toLowerCase();
       list = list.filter(
@@ -250,7 +258,7 @@ export default function Home() {
       );
     }
     return list;
-  }, [liveProducts, category, query]);
+  }, [liveProducts, category, query, visibleCats]);
 
   const shown = visibleProducts.slice(0, displayCount);
   const hasMore = displayCount < visibleProducts.length;
@@ -277,7 +285,7 @@ export default function Home() {
   const shipping = computeShipping(subtotal, cart, products);
   const total = subtotal + shipping;
 
-  const activeCategory = categoryTabs.find((c) => c.slug === category) ?? ALL_TAB;
+  const activeCategory = categoryTabs.flatMap((c) => [c, ...(c.children ?? [])]).find((c) => c.slug === category) ?? ALL_TAB;
 
   function addToCart(
     product: Product,
@@ -473,53 +481,10 @@ export default function Home() {
         )}
       </header>
 
-      <div className="mx-auto max-w-6xl px-4 pb-8 pt-5 sm:px-6 sm:pt-8">
-        {/* 首頁輪播圖 */}
-        <HeroCarousel banners={banners.filter((b) => b.active)} />
+      <HeroCarousel banners={banners.filter((b) => b.active)} />
+      <CategoryNavigation categories={categoryTabs} value={category} onSelect={setCategory} />
 
-        {/* 分類篩選列 */}
-        <div className="-mx-4 mt-5 overflow-x-auto px-4 sm:mx-0 sm:overflow-visible sm:px-0">
-          <div className="flex w-max min-w-full items-center gap-3 whitespace-nowrap sm:justify-center">
-            {categoryTabs.map((c) => {
-              const activeHere =
-                category === c.slug || (c.children?.some((s) => s.slug === category) ?? false);
-              return (
-                <div key={c.slug} className="group relative shrink-0">
-                  <button
-                    onClick={() => setCategory(c.slug)}
-                    className={`shrink-0 rounded-full border px-5 py-3 text-sm font-semibold tracking-wide transition sm:px-7 ${
-                      activeHere
-                        ? 'border-[#1f1b19] bg-[#1f1b19] text-white shadow-sm'
-                        : 'border-[#e0d7cc] bg-[#faf7f2] text-[#8a7f72] hover:border-[#cfc1b3] hover:text-[#1f1b19]'
-                    }`}
-                  >
-                    {c.slug === 'all' ? '全部商品' : c.name}
-                  </button>
-                  {c.children && c.children.length > 0 && (
-                    <div className="absolute left-1/2 top-full z-30 hidden -translate-x-1/2 pt-2 group-hover:block">
-                      <div className="min-w-[9rem] rounded-xl border border-[#e5ded4] bg-white p-1.5 shadow-lg">
-                        {c.children.map((s) => (
-                          <button
-                            key={s.slug}
-                            onClick={() => setCategory(s.slug)}
-                            className={`block w-full whitespace-nowrap rounded-lg px-4 py-2 text-left text-sm transition ${
-                              category === s.slug
-                                ? 'bg-[#1f1b19] text-white'
-                                : 'text-[#3d3935] hover:bg-[#f3ede4]'
-                            }`}
-                          >
-                            {s.name}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
+      <div className="mx-auto max-w-6xl px-4 pb-8 sm:px-6">
         {/* 商品格狀排列 */}
         <section className="mt-6">
           <div className="mb-5">
@@ -1090,8 +1055,8 @@ function ProductCard({
   const soldOut = isProductSoldOut(product);
 
   return (
-    <div className="product-card group flex flex-col overflow-hidden rounded-2xl bg-[#f9f8f6] p-3 shadow-sm hover:shadow-md">
-      <div className="relative aspect-[3/4] overflow-hidden rounded-xl bg-white">
+    <div className="product-card group flex flex-col overflow-hidden rounded-lg bg-[#f9f8f6] p-3 shadow-sm hover:shadow-md">
+      <div className="relative aspect-[3/4] overflow-hidden rounded-[6px] bg-white">
         <Link href={productHref} aria-label={`查看 ${product.name}`}>
           {product.image ? (
             <img
@@ -1428,7 +1393,7 @@ function HeroCarousel({ banners }: { banners: Banner[] }) {
   const dragPercent = widthPx ? (dragX / widthPx) * 100 : 0;
 
   return (
-    <section className="group relative w-full select-none overflow-hidden rounded-3xl bg-[#e9e1d6] shadow-sm">
+    <section aria-label="首頁輪播" className="group relative w-full select-none overflow-hidden bg-[#e9e1d6]">
       <div
         className={`flex ${dragging ? '' : 'transition-transform duration-500 ease-out'}`}
         style={{ transform: `translateX(calc(-${safeIndex * 100}% + ${dragPercent}%))` }}
@@ -1464,7 +1429,7 @@ function HeroCarousel({ banners }: { banners: Banner[] }) {
           return (
             <div
               key={banner.id}
-              className="relative aspect-[16/13] w-full shrink-0 bg-[#e9e1d6]"
+              className="relative aspect-[16/13] w-full shrink-0 bg-[#e9e1d6] sm:aspect-[16/7] lg:aspect-[16/5]"
             >
               {banner.link ? (
                 <a href={banner.link} target="_blank" rel="noreferrer" className="block h-full w-full">
