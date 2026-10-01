@@ -16,6 +16,7 @@ import type {
   Product,
   ReturnRequest,
   SiteSettings,
+  Shipment,
   StockMovement,
   UserCoupon,
   Variant,
@@ -43,9 +44,18 @@ function formatOverviewCurrency(value: number) {
   return `NT$ ${numberFormatter.format(value)}`;
 }
 
-const ORDER_STATUSES = ['尚未付款', '待出貨', '已出貨', '已完成', '取消', '退貨'];
 const CANCEL_REVIEW_TAB = '待審核取消';
-const ORDER_TAB_KEYS = ['全部', CANCEL_REVIEW_TAB, '尚未付款', '待出貨', '已出貨', '已完成', '取消', '退貨'];
+const PROCESSED_TAB = '已處理';
+const ORDER_TAB_KEYS = ['全部', CANCEL_REVIEW_TAB, '尚未付款', '待出貨', PROCESSED_TAB, '已出貨', '已完成', '取消', '退貨'];
+
+function orderMatchesTab(order: Order, tab: string) {
+  if (tab === '全部') return true;
+  if (tab === CANCEL_REVIEW_TAB) return order.cancel_status === 'REQUESTED';
+  if (tab === '尚未付款') return order.status === '尚未付款' && !order.paid;
+  if (tab === '待出貨') return order.status === '待出貨' && order.fulfillment_status !== 'READY_TO_SHIP';
+  if (tab === PROCESSED_TAB) return order.status === '待出貨' && order.fulfillment_status === 'READY_TO_SHIP';
+  return order.status === tab;
+}
 const PRODUCT_STATUSES = ['上架中', '加購品', '已下架'];
 const DEFAULT_PAYMENT_METHODS = ['信用卡付款', 'Apple Pay', '轉帳匯款'];
 const DEFAULT_SHIPPING_METHODS = ['全家取貨付款', '全家取貨不付款', '7-11取貨付款', '7-11取貨不付款', '宅配到府'];
@@ -570,7 +580,7 @@ export default function AdminDashboard({
       .reduce((s, o) => s + o.total, 0);
   }, [orders]);
 
-  const pendingCount = orders.filter((o) => o.status === '待出貨').length;
+  const pendingCount = orders.filter((o) => orderMatchesTab(o, '待出貨')).length;
   const lowStock = products.filter((p) => p.inventory <= 10).length;
   const activeDiscountCount = discounts.filter((d) => d.active).length;
   const overviewRecentOrders = useMemo(() => {
@@ -661,7 +671,7 @@ export default function AdminDashboard({
     });
     if (res.ok) {
       const updated = (await res.json()) as Order;
-      setOrders((list) => list.map((o) => (o.id === id ? updated : o)));
+      setOrders((list) => list.map((o) => (o.id === id ? { ...o, ...updated } : o)));
     } else void uiAlert('更新失敗');
   }
 
@@ -1767,13 +1777,7 @@ export default function AdminDashboard({
               <div className="mb-4 -mx-4 overflow-x-auto overflow-y-hidden border-b border-[#e5ded4] px-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                 <div className="flex min-w-max gap-6">
                   {ORDER_TAB_KEYS.map((s) => {
-                    const tabOrders = s === '全部'
-                      ? orders
-                      : s === CANCEL_REVIEW_TAB
-                        ? orders.filter((o) => o.cancel_status === 'REQUESTED')
-                        : s === '尚未付款'
-                          ? orders.filter((o) => o.status === '尚未付款' && !o.paid)
-                          : orders.filter((o) => o.status === s);
+                    const tabOrders = orders.filter((o) => orderMatchesTab(o, s));
                     const n = tabOrders.length;
                     const attention = s === CANCEL_REVIEW_TAB
                       ? n > 0
@@ -1799,11 +1803,7 @@ export default function AdminDashboard({
               {(() => {
                 const q = orderSearch.trim().toLowerCase();
                 const shown = orders.filter((o) => {
-                  if (orderFilter === CANCEL_REVIEW_TAB) {
-                    if (o.cancel_status !== 'REQUESTED') return false;
-                  } else if (orderFilter === '尚未付款') {
-                    if (o.status !== '尚未付款' || o.paid) return false;
-                  } else if (orderFilter !== '全部' && o.status !== orderFilter) return false;
+                  if (!orderMatchesTab(o, orderFilter)) return false;
                   if (orderPaidFilter === '已付款' && !o.paid) return false;
                   if (orderPaidFilter === '未付款' && o.paid) return false;
                   if (q) {
@@ -1841,6 +1841,14 @@ export default function AdminDashboard({
                           <div className="mt-3">
                             <OrderCardBadges order={order} />
                           </div>
+
+                          {(order.store_id || order.shipment_provider || order.shipment_code) ? (
+                            <div className="mt-3 grid gap-1 rounded-lg bg-[#faf7f2] px-3 py-2 text-xs text-[#6b6156] sm:grid-cols-2">
+                              <p><span className="text-[#a99e8f]">超商／物流：</span>{order.shipment_provider || order.shipping_method || '-'}</p>
+                              <p><span className="text-[#a99e8f]">取貨門市：</span>{order.shipment_store_name || order.store_name || '-'}{(order.shipment_store_id || order.store_id) ? `（${order.shipment_store_id || order.store_id}）` : ''}</p>
+                              {order.shipment_code ? <p className="font-semibold text-[#1f1b19] sm:col-span-2"><span className="font-normal text-[#a99e8f]">寄件代碼：</span>{order.shipment_code}</p> : null}
+                            </div>
+                          ) : null}
 
                           {/* 商品列 */}
                           <div className="mt-3 space-y-2 border-t border-[#f1ebe1] pt-3">
@@ -3067,7 +3075,22 @@ export default function AdminDashboard({
           onClose={() => setOpenOrderId(null)}
           onUpdate={(patch) => updateOrder(openOrderId, patch)}
           onReviewCancel={(action, response) => reviewCancel(openOrderId, action, response)}
-          onOrderChange={(o) => setOrders((list) => list.map((x) => (x.id === o.id ? o : x)))}
+          onOrderChange={(o) => setOrders((list) => list.map((x) => (x.id === o.id ? { ...x, ...o } : x)))}
+          onShipmentCreated={(shipment) => {
+            setOrders((list) => list.map((item) => item.id === openOrderId ? {
+              ...item,
+              status: '待出貨',
+              order_status: 'PROCESSING',
+              fulfillment_status: 'READY_TO_SHIP',
+              shipment_id: shipment.id,
+              shipment_provider: shipment.provider ?? '',
+              shipment_code: shipment.store_print_no || shipment.tracking_number || '',
+              shipment_store_name: shipment.store_name ?? '',
+              shipment_store_id: shipment.store_id ?? '',
+            } : item));
+            setOrderFilter(PROCESSED_TAB);
+            setOpenOrderId(null);
+          }}
         />
       )}
     </div>
@@ -4224,7 +4247,7 @@ function AdminOrderProgress({ order, createdAt, paidAt }: { order: Order; create
   );
 }
 
-// 後台專用的訂單完整資訊(含出貨狀態 / 付款管理;與客人端的訂單明細分開)
+// 後台專用的訂單完整資訊，與客人端的訂單明細分開。
 function AdminOrderModal({
   order,
   imageByName,
@@ -4232,6 +4255,7 @@ function AdminOrderModal({
   onUpdate,
   onReviewCancel,
   onOrderChange,
+  onShipmentCreated,
 }: {
   order: Order;
   imageByName: Map<string, string>;
@@ -4239,6 +4263,7 @@ function AdminOrderModal({
   onUpdate: (patch: Partial<Order>) => void;
   onReviewCancel: (action: 'approve' | 'reject', response: string) => void;
   onOrderChange?: (o: Order) => void;
+  onShipmentCreated: (shipment: Shipment) => void;
 }) {
   const dateStr = order.created_at ? new Date(order.created_at).toLocaleString('zh-TW') : '';
   const [cancelReply, setCancelReply] = useState('');
@@ -4257,8 +4282,6 @@ function AdminOrderModal({
     ?? detail?.payments?.find((p) => p.status === 'PAID')?.paid_at
     ?? undefined;
   const hasShipment = (detail?.shipments?.length ?? 0) > 0;
-  const [shipForm, setShipForm] = useState({ provider: '', tracking_number: '' });
-  const [eventForm, setEventForm] = useState({ status: '', description: '', location: '' });
   const [busy, setBusy] = useState(false);
 
   const loadDetail = useCallback(async () => {
@@ -4296,12 +4319,11 @@ function AdminOrderModal({
       const res = await fetch(`/api/orders/${order.id}/shipment`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(useNewebpay ? { use_newebpay: true } : shipForm),
+        body: JSON.stringify(useNewebpay ? { use_newebpay: true } : {}),
       });
       if (!res.ok) { void uiAlert((await res.json()).error ?? '建立出貨失敗'); return; }
-      onUpdate(useNewebpay ? { status: '待出貨', fulfillment_status: 'READY_TO_SHIP' } : { status: '已出貨', fulfillment_status: 'SHIPPED' });
-      setShipForm({ provider: '', tracking_number: '' });
-      await loadDetail();
+      const shipment = (await res.json()) as Shipment;
+      onShipmentCreated(shipment);
     } finally { setBusy(false); }
   }
 
@@ -4319,91 +4341,12 @@ function AdminOrderModal({
     } finally { setBusy(false); }
   }
 
-  async function reGetShipmentNo(shipmentId: string) {
-    if (busy) return;
-    setBusy(true);
-    try {
-      const res = await fetch(`/api/orders/${order.id}/shipment`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ shipment_id: shipmentId, action: 'getno' }),
-      });
-      const data = await res.json();
-      if (!res.ok) { void uiAlert(data.error ?? '取號失敗'); return; }
-      void uiAlert(data.lgs_no ? `取號成功:${data.lgs_no}` : '已重新取號');
-      await loadDetail();
-    } finally { setBusy(false); }
-  }
-
-  async function queryShipment(shipmentId: string) {
-    if (busy) return;
-    setBusy(true);
-    try {
-      const res = await fetch(`/api/orders/${order.id}/shipment`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ shipment_id: shipmentId, action: 'query' }),
-      });
-      const data = await res.json();
-      if (!res.ok) { void uiAlert(data.error ?? '查詢配送單失敗'); return; }
-      void uiAlert('已查詢配送單並更新資料。');
-      await loadDetail();
-    } finally { setBusy(false); }
-  }
-
-  async function modifyShipment(shipmentId: string) {
-    if (busy) return;
-    const name = await uiPrompt('修改收件人姓名(留空不改):');
-    if (name === null) return;
-    const phone = await uiPrompt('修改收件人電話(留空不改):');
-    if (phone === null) return;
-    setBusy(true);
-    try {
-      const res = await fetch(`/api/orders/${order.id}/shipment`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ shipment_id: shipmentId, action: 'modify', recipient_name: name.trim(), recipient_phone: phone.trim() }),
-      });
-      const data = await res.json();
-      if (!res.ok) { void uiAlert(data.error ?? '修改配送單失敗'); return; }
-      void uiAlert('已送出修改配送單。');
-      await loadDetail();
-    } finally { setBusy(false); }
-  }
-
-  async function markPickup(shipmentId: string, action: 'at_store' | 'picked_up') {
-    if (busy) return;
-    if (action === 'picked_up' && !(await uiConfirm('標記為「已取貨」?\n若為門市取貨付款,將同時完成收款。'))) return;
-    setBusy(true);
-    try {
-      const res = await fetch(`/api/orders/${order.id}/shipment`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ shipment_id: shipmentId, action }),
-      });
-      const data = await res.json();
-      if (!res.ok) { void uiAlert(data.error ?? '更新失敗'); return; }
-      onUpdate({ fulfillment_status: data.fulfillment_status, ...(data.paid ? { paid: true } : {}), ...(data.status ? { status: data.status } : {}) });
-      await loadDetail();
-    } finally { setBusy(false); }
-  }
-
-  async function addEvent(shipmentId: string) {
-    if (busy || (!eventForm.status && !eventForm.description)) return;
-    setBusy(true);
-    try {
-      const res = await fetch(`/api/orders/${order.id}/shipment`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ shipment_id: shipmentId, ...eventForm }),
-      });
-      if (!res.ok) { void uiAlert((await res.json()).error ?? '新增失敗'); return; }
-      setEventForm({ status: '', description: '', location: '' });
-      await loadDetail();
-    } finally { setBusy(false); }
-  }
-
-  function printOrder() {
+  function printShippingDocument() {
+    const shipment = detail?.shipments?.[detail.shipments.length - 1];
+    if (shipment?.lgs_type && shipment.ship_type) {
+      window.open(`/api/orders/${order.id}/shipment/label?shipment_id=${shipment.id}`, '_blank', 'noopener,noreferrer');
+      return;
+    }
     const rows = order.items
       .map((it) => `<tr><td>${escapeHtml(it.name)}</td><td>${escapeHtml(it.variant)}</td><td style="text-align:center">${it.quantity}</td><td style="text-align:right">${formatter.format(it.price * it.quantity)}</td></tr>`)
       .join('');
@@ -4413,7 +4356,7 @@ h1{font-size:20px;margin:0 0 4px}table{width:100%;border-collapse:collapse;margi
 th,td{border-bottom:1px solid #e5ded4;padding:8px;font-size:14px;text-align:left}
 .muted{color:#6b6156;font-size:13px}.tot{text-align:right;font-weight:700;font-size:16px;margin-top:8px}
 .sec{margin-top:20px}.sec h2{font-size:14px;margin:0 0 6px}</style></head><body>
-<h1>訂單 ${escapeHtml(order.order_no)}</h1>
+<h1>出貨單 ${escapeHtml(order.order_no)}</h1>
 <p class="muted">${dateStr} · ${order.status} · ${order.paid ? '已付款' : '未付款'}</p>
 <table><thead><tr><th>商品</th><th>規格</th><th style="text-align:center">數量</th><th style="text-align:right">小計</th></tr></thead><tbody>${rows}</tbody></table>
 <p class="muted">小計 ${formatter.format(order.subtotal)}｜運費 ${order.shipping === 0 ? '免運' : formatter.format(order.shipping)}${order.discount > 0 ? `｜折扣 -${formatter.format(order.discount)}` : ''}</p>
@@ -4457,6 +4400,17 @@ ${order.note ? `<div class="sec"><h2>備註</h2><p class="muted">${escapeHtml(or
         </div>
 
         <div className="flex-1 space-y-5 overflow-y-auto overscroll-contain p-5">
+          {/* 主要操作固定在內容最上方 */}
+          <div className="flex flex-wrap gap-2">
+            <button onClick={printShippingDocument} className="inline-flex h-10 items-center rounded-full bg-[#1f1b19] px-6 text-sm font-semibold text-white hover:bg-black">列印出貨單</button>
+            {order.status !== '待出貨' ? (
+              <button onClick={markRefund} className="inline-flex h-10 items-center rounded-full border border-[#d7c9bd] px-6 text-sm font-semibold text-[#6b6156] hover:bg-[#efe8dd]">標記退款</button>
+            ) : null}
+            {order.status !== '取消' && order.status !== '退貨' ? (
+              <button onClick={async () => { if (await uiConfirm('直接取消訂單?將回補庫存。', { danger: true })) onUpdate({ status: '取消' }); }} className="inline-flex h-10 items-center rounded-full border border-[#e0b4b4] px-6 text-sm font-semibold text-[#c0392b] hover:bg-[#fbf3f0]">取消訂單</button>
+            ) : null}
+          </div>
+
           {/* 進度(含圖示) */}
           <AdminOrderProgress order={order} createdAt={order.created_at} paidAt={paidAt} />
 
@@ -4477,15 +4431,6 @@ ${order.note ? `<div class="sec"><h2>備註</h2><p class="muted">${escapeHtml(or
               <p className="mt-1 text-sm font-bold">{FULFILLMENT_STATUS_LABEL[order.fulfillment_status ?? ''] ?? '未出貨'}</p>
               <p className="mt-1 flex items-center gap-1 text-[11px] text-[#8a7f72]"><span className="h-1.5 w-1.5 rounded-full bg-[#c9b8a8]" />{hasShipment ? '已建立物流單' : '尚未建立物流單'}</p>
             </div>
-          </div>
-
-          {/* 操作 */}
-          <div className="flex flex-wrap gap-2">
-            <button onClick={printOrder} className="inline-flex h-10 items-center rounded-full bg-[#1f1b19] px-6 text-sm font-semibold text-white hover:bg-black">列印訂單</button>
-            <button onClick={markRefund} className="inline-flex h-10 items-center rounded-full border border-[#d7c9bd] px-6 text-sm font-semibold text-[#6b6156] hover:bg-[#efe8dd]">標記退款</button>
-            {order.status !== '取消' && order.status !== '退貨' ? (
-              <button onClick={async () => { if (await uiConfirm('直接取消訂單?將回補庫存。', { danger: true })) onUpdate({ status: '取消' }); }} className="inline-flex h-10 items-center rounded-full border border-[#e0b4b4] px-6 text-sm font-semibold text-[#c0392b] hover:bg-[#fbf3f0]">取消訂單</button>
-            ) : null}
           </div>
 
           {/* 客人取消申請審核 */}
@@ -4523,32 +4468,6 @@ ${order.note ? `<div class="sec"><h2>備註</h2><p class="muted">${escapeHtml(or
             </div>
           ) : null}
 
-          {/* 出貨狀態 / 付款(管理操作) */}
-          <div className="rounded-xl bg-[#faf7f2] p-4">
-            <p className="mb-2 text-sm font-semibold text-[#6b6156]">出貨狀態</p>
-            <div className="flex flex-wrap items-center gap-2">
-              <select
-                value={order.status}
-                onChange={(e) => onUpdate({ status: e.target.value })}
-                className="rounded-full border border-[#d7c9bd] bg-white px-3 py-1.5 text-sm"
-              >
-                {ORDER_STATUSES.map((s) => (
-                  <option key={s} value={s}>
-                    {s}
-                  </option>
-                ))}
-              </select>
-              <button
-                onClick={() => onUpdate({ paid: !order.paid })}
-                className={`rounded-full px-3 py-1.5 text-sm font-semibold ${
-                  order.paid ? 'bg-[#e9f7ee] text-[#1f7a44]' : 'border border-[#d7c9bd] text-[#6b6156]'
-                }`}
-              >
-                {order.paid ? '已付款' : '未付款'}
-              </button>
-            </div>
-          </div>
-
           {/* 物流 */}
           <div className="rounded-xl border border-[#efe8dd] p-4">
             <div className="mb-3 flex items-center gap-2.5">
@@ -4557,7 +4476,7 @@ ${order.note ? `<div class="sec"><h2>備註</h2><p class="muted">${escapeHtml(or
               </span>
               <div>
                 <p className="text-sm font-semibold text-[#2c2826]">物流資訊</p>
-                <p className="text-xs text-[#8a7f72]">建立物流單號後,系統將自動更新物流進度</p>
+                <p className="text-xs text-[#8a7f72]">建立出貨單後，系統將自動更新物流進度</p>
               </div>
             </div>
             {order.store_id ? (
@@ -4590,120 +4509,26 @@ ${order.note ? `<div class="sec"><h2>備註</h2><p class="muted">${escapeHtml(or
                         ))}
                       </ul>
                     ) : null}
-                    <div className="mt-2 flex flex-wrap items-center gap-2">
-                      {s.lgs_type && s.ship_type ? (
-                        <>
-                          <button
-                            onClick={() => traceShipment(s.id)}
-                            disabled={busy}
-                            className="rounded-full border border-[#d7c9bd] px-3 py-1 text-xs font-semibold text-[#6b6156] disabled:opacity-50"
-                          >
-                            更新藍新貨態
-                          </button>
-                          <a
-                            href={`/api/orders/${order.id}/shipment/label?shipment_id=${s.id}`}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="rounded-full border border-[#d7c9bd] px-3 py-1 text-xs font-semibold text-[#6b6156]"
-                          >
-                            列印寄件單
-                          </a>
-                          <button
-                            onClick={() => reGetShipmentNo(s.id)}
-                            disabled={busy}
-                            className="rounded-full border border-[#d7c9bd] px-3 py-1 text-xs font-semibold text-[#6b6156] disabled:opacity-50"
-                          >
-                            重新取號
-                          </button>
-                          <button
-                            onClick={() => queryShipment(s.id)}
-                            disabled={busy}
-                            className="rounded-full border border-[#d7c9bd] px-3 py-1 text-xs font-semibold text-[#6b6156] disabled:opacity-50"
-                          >
-                            查詢配送單
-                          </button>
-                          <button
-                            onClick={() => modifyShipment(s.id)}
-                            disabled={busy}
-                            className="rounded-full border border-[#d7c9bd] px-3 py-1 text-xs font-semibold text-[#6b6156] disabled:opacity-50"
-                          >
-                            修改配送單
-                          </button>
-                        </>
-                      ) : null}
-                      {order.store_id ? (
-                        <>
-                          <button
-                            onClick={() => markPickup(s.id, 'at_store')}
-                            disabled={busy || ['AT_STORE', 'PICKED_UP'].includes(s.status)}
-                            className="rounded-full border border-[#c6b8e0] px-3 py-1 text-xs font-semibold text-[#6f5b9c] disabled:opacity-40"
-                          >
-                            標記到店(待取貨)
-                          </button>
-                          <button
-                            onClick={() => markPickup(s.id, 'picked_up')}
-                            disabled={busy || s.status === 'PICKED_UP'}
-                            className="rounded-full border border-[#a9cbb4] px-3 py-1 text-xs font-semibold text-[#2f8f5b] disabled:opacity-40"
-                          >
-                            標記已取貨
-                          </button>
-                        </>
-                      ) : null}
-                      <select
-                        value={eventForm.status}
-                        onChange={(e) => setEventForm({ ...eventForm, status: e.target.value })}
-                        className="rounded-lg border border-[#d7c9bd] bg-white px-2 py-1 text-xs"
-                      >
-                        <option value="">狀態…</option>
-                        <option value="IN_TRANSIT">配送中</option>
-                        <option value="DELIVERED">已送達</option>
-                      </select>
-                      <input
-                        value={eventForm.description}
-                        onChange={(e) => setEventForm({ ...eventForm, description: e.target.value })}
-                        placeholder="說明(例:已抵達門市)"
-                        className="min-w-0 flex-1 rounded-lg border border-[#d7c9bd] px-2 py-1 text-xs"
-                      />
+                    {s.lgs_type && s.ship_type ? (
                       <button
-                        onClick={() => addEvent(s.id)}
+                        onClick={() => traceShipment(s.id)}
                         disabled={busy}
-                        className="rounded-full bg-[#1f1b19] px-3 py-1 text-xs font-semibold text-white disabled:opacity-50"
+                        className="mt-2 rounded-full border border-[#d7c9bd] px-3 py-1 text-xs font-semibold text-[#6b6156] disabled:opacity-50"
                       >
-                        新增
+                        更新藍新貨態
                       </button>
-                    </div>
+                    ) : null}
                   </div>
                 ))}
               </div>
             ) : (
-              <div className="flex flex-wrap items-center gap-2">
-                {order.store_id ? (
-                  <button
-                    onClick={() => createShipment(true)}
-                    disabled={busy}
-                    className="rounded-full bg-[#1f1b19] px-4 py-1.5 text-sm font-semibold text-white disabled:opacity-50"
-                  >
-                    建立藍新物流單
-                  </button>
-                ) : null}
-                <input
-                  value={shipForm.provider}
-                  onChange={(e) => setShipForm({ ...shipForm, provider: e.target.value })}
-                  placeholder="物流商(例:黑貓)"
-                  className="min-w-0 flex-1 rounded-lg border border-[#d7c9bd] px-2.5 py-1.5 text-sm"
-                />
-                <input
-                  value={shipForm.tracking_number}
-                  onChange={(e) => setShipForm({ ...shipForm, tracking_number: e.target.value })}
-                  placeholder="物流單號"
-                  className="min-w-0 flex-1 rounded-lg border border-[#d7c9bd] px-2.5 py-1.5 text-sm"
-                />
+              <div>
                 <button
-                  onClick={() => createShipment(false)}
+                  onClick={() => createShipment(Boolean(order.store_id))}
                   disabled={busy}
-                  className="rounded-full bg-[#ada265] px-4 py-1.5 text-sm font-semibold text-white disabled:opacity-50"
+                  className="rounded-full bg-[#1f1b19] px-4 py-1.5 text-sm font-semibold text-white disabled:opacity-50"
                 >
-                  建立出貨
+                  建立出貨單
                 </button>
               </div>
             )}

@@ -156,8 +156,7 @@ export async function POST(
       tracking_number: trackingNumber,
       recipient_name: order.customer_name ?? '',
       recipient_phone: order.phone ?? '',
-      status: 'SHIPPED',
-      shipped_at: nowIso,
+      status: 'READY_TO_SHIP',
     })
     .select()
     .single();
@@ -165,22 +164,22 @@ export async function POST(
 
   await supabase.from('shipment_events').insert({
     shipment_id: shipment.id,
-    status: 'SHIPPED',
-    description: trackingNumber ? `已建立出貨,物流單號 ${trackingNumber}` : '已建立出貨',
+    status: 'READY_TO_SHIP',
+    description: trackingNumber ? `已建立出貨單,物流單號 ${trackingNumber}` : '已建立出貨單',
     event_at: nowIso,
   });
 
-  // 訂單標記為已出貨 + 歷程
+  // 建立出貨單後進入已處理，實際交寄後再由物流貨態推進。
   await supabase
     .from('orders')
-    .update({ status: '已出貨', fulfillment_status: 'SHIPPED', order_status: 'PROCESSING' })
+    .update({ status: '待出貨', fulfillment_status: 'READY_TO_SHIP', order_status: 'PROCESSING' })
     .eq('id', id);
   await supabase.from('order_status_history').insert({
     order_id: id,
     type: 'fulfillment',
     from_status: order.fulfillment_status ?? 'UNFULFILLED',
-    to_status: 'SHIPPED',
-    note: provider ? `${provider} 出貨` : '已出貨',
+    to_status: 'READY_TO_SHIP',
+    note: provider ? `${provider} 已建立出貨單` : '已建立出貨單',
     created_by: admin.email || '後台管理員',
   });
 

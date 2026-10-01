@@ -213,6 +213,12 @@ export type Order = {
   store_ship_type?: string;
   store_lgs_type?: string;
   store_extra?: Record<string, unknown> | null;
+  // 後台訂單清單使用的最新物流摘要（由查詢時組合，不寫回 orders）。
+  shipment_id?: string;
+  shipment_provider?: string;
+  shipment_code?: string;
+  shipment_store_name?: string;
+  shipment_store_id?: string;
   discount: number;
   discount_code: string;
   coupon_id?: string | null;

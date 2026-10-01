@@ -6,7 +6,7 @@ import { isStorePickup, shipTypeFromMethod } from '@/lib/newebpay-logistics';
 import { deriveStatuses } from '@/lib/order-status';
 import { initialOrderStatus } from '@/lib/payment';
 import { computeShipping, resolveMethodFee } from '@/lib/shipping';
-import type { Discount, Order, OrderItem, Product } from '@/lib/types';
+import type { Discount, Order, OrderItem, Product, Shipment } from '@/lib/types';
 
 // GET /api/orders — 取得所有訂單(限管理員)
 export async function GET() {
@@ -14,13 +14,28 @@ export async function GET() {
   if (!admin) return NextResponse.json({ error: '未授權' }, { status: 401 });
 
   const supabase = createAdminClient();
-  const { data, error } = await supabase
-    .from('orders')
-    .select('*')
-    .order('created_at', { ascending: false });
+  const [{ data, error }, { data: shipments }] = await Promise.all([
+    supabase.from('orders').select('*').order('created_at', { ascending: false }),
+    supabase.from('shipments').select('*').order('created_at', { ascending: false }),
+  ]);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json(data as Order[]);
+  const latest = new Map<string, Shipment>();
+  for (const shipment of (shipments ?? []) as Shipment[]) {
+    if (!latest.has(shipment.order_id)) latest.set(shipment.order_id, shipment);
+  }
+  const orders = ((data ?? []) as Order[]).map((order) => {
+    const shipment = latest.get(order.id);
+    return shipment ? {
+      ...order,
+      shipment_id: shipment.id,
+      shipment_provider: shipment.provider ?? '',
+      shipment_code: shipment.store_print_no || shipment.tracking_number || '',
+      shipment_store_name: shipment.store_name ?? '',
+      shipment_store_id: shipment.store_id ?? '',
+    } : order;
+  });
+  return NextResponse.json(orders);
 }
 
 // POST /api/orders — 前台下單(公開)

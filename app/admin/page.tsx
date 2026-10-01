@@ -13,6 +13,7 @@ import type {
   SiteSettings,
   StockMovement,
   UserCoupon,
+  Shipment,
 } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
@@ -40,6 +41,7 @@ export default async function AdminPage() {
   const [
     { data: products },
     { data: orders },
+    { data: shipments },
     { data: categories },
     { data: settings },
     { data: discounts },
@@ -51,6 +53,7 @@ export default async function AdminPage() {
   ] = await Promise.all([
     supabase.from('products').select('*').order('sort_order', { ascending: true }),
     supabase.from('orders').select('*').order('created_at', { ascending: false }),
+    supabase.from('shipments').select('*').order('created_at', { ascending: false }),
     supabase.from('categories').select('*').order('sort_order', { ascending: true }),
     supabase.from('site_settings').select('*').eq('id', 1).maybeSingle(),
     supabase.from('discounts').select('*').order('created_at', { ascending: false }),
@@ -64,7 +67,7 @@ export default async function AdminPage() {
   return (
     <AdminDashboard
       initialProducts={(products ?? []) as Product[]}
-      initialOrders={(orders ?? []) as Order[]}
+      initialOrders={withShipmentSummaries((orders ?? []) as Order[], (shipments ?? []) as Shipment[])}
       initialCategories={(categories ?? []) as Category[]}
       initialDiscounts={(discounts ?? []) as Discount[]}
       initialCustomers={(customers ?? []) as Customer[]}
@@ -77,4 +80,23 @@ export default async function AdminPage() {
       userEmail={user.email ?? ''}
     />
   );
+}
+
+function withShipmentSummaries(orders: Order[], shipments: Shipment[]) {
+  const latest = new Map<string, Shipment>();
+  for (const shipment of shipments) {
+    if (!latest.has(shipment.order_id)) latest.set(shipment.order_id, shipment);
+  }
+  return orders.map((order) => {
+    const shipment = latest.get(order.id);
+    if (!shipment) return order;
+    return {
+      ...order,
+      shipment_id: shipment.id,
+      shipment_provider: shipment.provider ?? '',
+      shipment_code: shipment.store_print_no || shipment.tracking_number || '',
+      shipment_store_name: shipment.store_name ?? '',
+      shipment_store_id: shipment.store_id ?? '',
+    };
+  });
 }
