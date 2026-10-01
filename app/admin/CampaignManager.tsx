@@ -19,6 +19,9 @@ type ProductDraft = {
   images: string[];
   unit: string;
   sale_mode: string;
+  available_payment_methods: string[];
+  available_shipping_methods: string[];
+  shipping_fee_overrides: Record<string, number>;
   specs: { name: string; optionsText: string }[]; // 規格維度(選項以逗號分隔)
   variantStock: Record<string, number>; // 各規格組合庫存,key = options.join(' / ')
   sort_order: number;
@@ -32,10 +35,12 @@ const blankCampaign: CampaignDraft = {
 const blankProduct: ProductDraft = {
   sku: '', name: '', tagline: '', price: 0, original_price: 0, inventory: 0,
   status: '上架中', category: '', image: '', images: [], unit: '', sale_mode: '現貨',
+  available_payment_methods: [], available_shipping_methods: [], shipping_fee_overrides: {},
   specs: [], variantStock: {}, sort_order: 0,
 };
 
 const SALE_MODES = ['現貨', '預購', '預購+現貨'];
+const MAX_IMAGES = 10;
 
 function dateInput(value?: string | null) {
   return value ? new Date(value).toISOString().slice(0, 16) : '';
@@ -74,9 +79,15 @@ function buildVariants(draft: ProductDraft) {
 export default function CampaignManager({
   initialCampaigns,
   initialProducts,
+  paymentMethods = [],
+  shippingMethods = [],
+  shippingFees = [],
 }: {
   initialCampaigns: Campaign[];
   initialProducts: CampaignProduct[];
+  paymentMethods?: string[];
+  shippingMethods?: string[];
+  shippingFees?: { name: string; fee: number }[];
 }) {
   const [campaigns, setCampaigns] = useState(initialCampaigns);
   const [products, setProducts] = useState(initialProducts);
@@ -151,11 +162,13 @@ export default function CampaignManager({
     setBusy(true);
     const { specs, variants, inventory } = buildVariants(productDraft);
     const { variantStock: _variantStock, specs: _specs, ...rest } = productDraft;
+    const images = productDraft.images.length ? productDraft.images : productDraft.image ? [productDraft.image] : [];
     const payload = {
       campaign_id: selected.id,
       ...rest,
       original_price: productDraft.original_price || null,
-      images: productDraft.images.length ? productDraft.images : productDraft.image ? [productDraft.image] : [],
+      image: images[0] ?? '',
+      images,
       specs,
       variants,
       inventory,
@@ -185,6 +198,9 @@ export default function CampaignManager({
       price: product.price, original_price: product.original_price ?? 0, inventory: product.inventory,
       status: product.status, category: product.category, image: product.image, images: product.images ?? [],
       unit: product.unit ?? '', sale_mode: product.sale_mode ?? '現貨',
+      available_payment_methods: product.available_payment_methods ?? [],
+      available_shipping_methods: product.available_shipping_methods ?? [],
+      shipping_fee_overrides: product.shipping_fee_overrides ?? {},
       specs: (product.specs ?? []).map((spec) => ({ name: spec.name, optionsText: spec.options.join(', ') })),
       variantStock,
       sort_order: product.sort_order,
@@ -272,12 +288,7 @@ export default function CampaignManager({
       </div>
 
       {newOpen ? <CampaignCreateModal draft={campaignDraft} busy={busy} onChange={setCampaignDraft} onClose={() => campaigns.length ? setNewOpen(false) : null} onCreate={createCampaign} /> : null}
-      {productDraft ? <ProductModal draft={productDraft} busy={busy} onChange={setProductDraft} onClose={() => setProductDraft(null)} onSave={saveProduct} onUpload={async (file) => {
-        setBusy(true);
-        try { const url = await upload(file, 'campaign-products'); setProductDraft((draft) => draft ? { ...draft, image: url, images: [url, ...draft.images.filter((image) => image !== url)] } : draft); }
-        catch (error) { flash(error instanceof Error ? error.message : '上傳失敗'); }
-        finally { setBusy(false); }
-      }} /> : null}
+      {productDraft ? <ProductModal draft={productDraft} busy={busy} paymentMethods={paymentMethods} shippingMethods={shippingMethods} shippingFees={shippingFees} onChange={setProductDraft} onClose={() => setProductDraft(null)} onSave={saveProduct} uploadImage={(file) => upload(file, 'campaign-products')} /> : null}
     </div>
   );
 }
@@ -305,7 +316,9 @@ function CampaignCreateModal({ draft, busy, onChange, onClose, onCreate }: { dra
   return <Modal title="新增一頁式促銷專頁" onClose={onClose}><div className="grid gap-4"><Field label="活動名稱"><input value={draft.name} onChange={(e) => onChange({ ...draft, name: e.target.value, title: draft.title || e.target.value })} placeholder="例如：秋季限定優惠" /></Field><Field label="網址代稱"><input value={draft.slug} onChange={(e) => onChange({ ...draft, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '') })} placeholder="autumn-sale" /></Field><p className="text-xs text-[#8a7f72]">建立後網址為 /promo/{draft.slug || '活動網址'}，商品將在下一步新增。</p><button type="button" disabled={busy} onClick={onCreate} className="h-11 bg-[#702838] font-semibold text-white disabled:opacity-50">建立並開始編輯</button></div></Modal>;
 }
 
-function ProductModal({ draft, busy, onChange, onClose, onSave, onUpload }: { draft: ProductDraft; busy: boolean; onChange: (draft: ProductDraft | null) => void; onClose: () => void; onSave: () => void; onUpload: (file: File) => void }) {
+function ProductModal({ draft, busy, paymentMethods, shippingMethods, shippingFees, onChange, onClose, onSave, uploadImage }: { draft: ProductDraft; busy: boolean; paymentMethods: string[]; shippingMethods: string[]; shippingFees: { name: string; fee: number }[]; onChange: (draft: ProductDraft | null) => void; onClose: () => void; onSave: () => void; uploadImage: (file: File) => Promise<string> }) {
+  const [uploading, setUploading] = useState(false);
+  const [imageUrlInput, setImageUrlInput] = useState('');
   const specsForCombo: SpecDim[] = draft.specs
     .map((spec) => ({ name: spec.name.trim(), options: parseOptions(spec.optionsText) }))
     .filter((spec) => spec.name && spec.options.length > 0);
@@ -325,6 +338,51 @@ function ProductModal({ draft, busy, onChange, onClose, onSave, onUpload }: { dr
   }
   function setStock(key: string, value: number) {
     onChange({ ...draft, variantStock: { ...draft.variantStock, [key]: Math.max(0, value) } });
+  }
+
+  async function uploadImages(files: FileList) {
+    const room = MAX_IMAGES - draft.images.length;
+    if (room <= 0) return;
+    setUploading(true);
+    try {
+      const urls: string[] = [];
+      for (const file of Array.from(files).slice(0, room)) {
+        const url = await uploadImage(file);
+        if (url) urls.push(url);
+      }
+      onChange({ ...draft, images: [...draft.images, ...urls].slice(0, MAX_IMAGES) });
+    } finally {
+      setUploading(false);
+    }
+  }
+  function removeImage(index: number) {
+    onChange({ ...draft, images: draft.images.filter((_, i) => i !== index) });
+  }
+  function makeCover(index: number) {
+    if (index === 0) return;
+    const imgs = [...draft.images];
+    const [pick] = imgs.splice(index, 1);
+    onChange({ ...draft, images: [pick, ...imgs] });
+  }
+  function addImageUrl() {
+    const url = imageUrlInput.trim();
+    if (!url || draft.images.length >= MAX_IMAGES) return;
+    onChange({ ...draft, images: [...draft.images, url] });
+    setImageUrlInput('');
+  }
+  function togglePayment(method: string, checked: boolean) {
+    const current = draft.available_payment_methods.filter((m) => m !== method);
+    onChange({ ...draft, available_payment_methods: checked ? [...current, method] : current });
+  }
+  function toggleShipping(method: string, checked: boolean) {
+    const current = draft.available_shipping_methods.filter((m) => m !== method);
+    onChange({ ...draft, available_shipping_methods: checked ? [...current, method] : current });
+  }
+  function setFeeOverride(method: string, value: string) {
+    const next = { ...draft.shipping_fee_overrides };
+    if (value.trim() === '') delete next[method];
+    else next[method] = Math.max(0, Number(value) || 0);
+    onChange({ ...draft, shipping_fee_overrides: next });
   }
 
   return <Modal title={draft.id ? '編輯活動商品' : '新增活動商品'} onClose={onClose}>
@@ -376,7 +434,71 @@ function ProductModal({ draft, busy, onChange, onClose, onSave, onUpload }: { dr
         )}
       </div>
 
-      <Field label="商品圖片" className="sm:col-span-2"><div className="flex items-center gap-3">{draft.image ? <img src={draft.image} alt="" className="h-24 w-24 bg-[#f5f1eb] object-contain" /> : null}<label className="cursor-pointer border border-[#d8d0c6] px-4 py-2 text-sm font-semibold">上傳圖片<input type="file" accept="image/*" className="hidden" onChange={(e) => { const file = e.target.files?.[0]; if (file) onUpload(file); e.target.value = ''; }} /></label></div></Field>
+      <div className="sm:col-span-2">
+        <div className="mb-1.5 flex items-center justify-between">
+          <span className="text-sm font-semibold text-[#6b6156]">商品圖片（最多 {MAX_IMAGES} 張,第一張為封面）</span>
+          <span className="text-xs text-[#8a7f72]">{draft.images.length}/{MAX_IMAGES}</span>
+        </div>
+        {draft.images.length > 0 && (
+          <div className="mb-2 grid grid-cols-4 gap-2 sm:grid-cols-6">
+            {draft.images.map((url, index) => (
+              <div key={`${url}-${index}`} className="group relative aspect-square border border-[#e5ded4] bg-[#f5f1eb]">
+                <img src={url} alt="" className="h-full w-full object-contain" />
+                {index === 0 ? <span className="absolute left-1 top-1 bg-[#702838] px-1.5 py-0.5 text-[10px] font-semibold text-white">封面</span> : null}
+                <div className="absolute inset-x-0 bottom-0 flex justify-between bg-black/45 px-1 py-0.5 opacity-0 transition group-hover:opacity-100">
+                  {index !== 0 ? <button type="button" onClick={() => makeCover(index)} className="text-[10px] font-semibold text-white">設封面</button> : <span />}
+                  <button type="button" onClick={() => removeImage(index)} className="text-[10px] font-semibold text-white">刪除</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+        <div className="flex flex-wrap items-center gap-2">
+          <label className={`cursor-pointer border border-[#d8d0c6] px-4 py-2 text-sm font-semibold ${draft.images.length >= MAX_IMAGES ? 'pointer-events-none opacity-40' : ''}`}>
+            {uploading ? '上傳中...' : '上傳圖片'}
+            <input type="file" accept="image/*" multiple className="hidden" disabled={uploading || draft.images.length >= MAX_IMAGES} onChange={(e) => { if (e.target.files?.length) uploadImages(e.target.files); e.target.value = ''; }} />
+          </label>
+          <input value={imageUrlInput} onChange={(e) => setImageUrlInput(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addImageUrl(); } }} placeholder="或貼上圖片網址後按新增" className="h-11 flex-1 border border-[#d8d0c6] bg-white px-3 text-sm" />
+          <button type="button" onClick={addImageUrl} className="border border-[#1f1b19] px-4 py-2 text-sm font-semibold">新增</button>
+        </div>
+      </div>
+
+      <div className="sm:col-span-2">
+        <p className="mb-1.5 text-sm font-semibold text-[#6b6156]">可用金流（未勾選=全部）</p>
+        {paymentMethods.length ? (
+          <div className="flex flex-wrap gap-x-5 gap-y-2">
+            {paymentMethods.map((method) => (
+              <label key={method} className="flex items-center gap-2 text-sm">
+                <input type="checkbox" checked={draft.available_payment_methods.includes(method)} onChange={(e) => togglePayment(method, e.target.checked)} />
+                {method}
+              </label>
+            ))}
+          </div>
+        ) : <p className="text-sm text-[#8a7f72]">請先到系統設定新增金流方式。</p>}
+      </div>
+
+      <div className="sm:col-span-2">
+        <p className="mb-1.5 text-sm font-semibold text-[#6b6156]">可用物流與運費（未勾選=全部;運費留空=用後台預設）</p>
+        {shippingMethods.length ? (
+          <div className="space-y-2">
+            {shippingMethods.map((method) => {
+              const override = draft.shipping_fee_overrides[method];
+              const base = shippingFees.find((f) => f.name === method)?.fee;
+              return (
+                <div key={method} className="flex items-center gap-3">
+                  <label className="flex flex-1 items-center gap-2 text-sm">
+                    <input type="checkbox" checked={draft.available_shipping_methods.includes(method)} onChange={(e) => toggleShipping(method, e.target.checked)} />
+                    {method}
+                  </label>
+                  <span className="text-xs text-[#8a7f72]">運費 NT$</span>
+                  <input type="number" min="0" value={override ?? ''} placeholder={base != null ? String(base) : '預設'} onChange={(e) => setFeeOverride(method, e.target.value)} className="h-9 w-24 border border-[#d8d0c6] bg-white px-2 text-sm" />
+                </div>
+              );
+            })}
+          </div>
+        ) : <p className="text-sm text-[#8a7f72]">請先到系統設定新增物流方式。</p>}
+      </div>
+
       <div className="flex justify-end gap-2 sm:col-span-2"><button type="button" onClick={onClose} className="px-4 py-2 text-sm">取消</button><button type="button" disabled={busy} onClick={onSave} className="bg-[#702838] px-5 py-2 text-sm font-semibold text-white disabled:opacity-50">儲存商品</button></div>
     </div>
   </Modal>;
