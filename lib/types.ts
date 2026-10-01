@@ -181,6 +181,81 @@ export type Banner = {
   created_at?: string;
 };
 
+export type Campaign = {
+  id: string;
+  name: string;
+  slug: string;
+  eyebrow: string;
+  title: string;
+  description: string;
+  hero_image: string;
+  status: 'draft' | 'published' | 'archived';
+  start_at?: string | null;
+  end_at?: string | null;
+  theme_color: string;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type CampaignProduct = {
+  id: string;
+  campaign_id: string;
+  sku: string;
+  name: string;
+  tagline: string;
+  price: number;
+  original_price: number | null;
+  inventory: number;
+  status: string;
+  category: string;
+  image: string;
+  images: string[];
+  available_payment_methods?: string[];
+  available_shipping_methods?: string[];
+  shipping_fee_overrides?: Record<string, number>;
+  specs: SpecDim[];
+  variants: Variant[];
+  unit?: string;
+  sale_mode?: string;
+  sort_order: number;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export function campaignProductCartId(id: string) {
+  return `campaign:${id}`;
+}
+
+export function campaignProductAsProduct(product: CampaignProduct): Product {
+  const colors = product.specs.find((spec) => /顏色|color/i.test(spec.name))?.options ?? [];
+  const sizes = product.specs.find((spec) => /尺寸|size/i.test(spec.name))?.options ?? [];
+  return {
+    id: campaignProductCartId(product.id),
+    name: product.name,
+    tagline: product.tagline,
+    price: product.price,
+    original_price: product.original_price,
+    inventory: product.inventory,
+    status: product.status,
+    category: product.category,
+    image: product.image,
+    images: product.images,
+    available_payment_methods: product.available_payment_methods ?? [],
+    available_shipping_methods: product.available_shipping_methods ?? [],
+    shipping_fee_overrides: product.shipping_fee_overrides ?? {},
+    colors,
+    sizes,
+    specs: product.specs,
+    variants: product.variants,
+    unit: product.unit ?? '',
+    sale_mode: product.sale_mode ?? '現貨',
+    color_images: {},
+    is_featured: false,
+    sort_order: product.sort_order,
+    created_at: product.created_at,
+  };
+}
+
 export type OrderItem = {
   name: string;
   variant: string;

@@ -32,6 +32,7 @@ import { uiAlert, uiConfirm, uiPrompt } from '@/lib/ui-dialog';
 import { OrderCardBadges, orderNeedsAttention, AttentionDot, isPaymentReported } from '@/app/components/OrderStatusBadge';
 import { COUPON_PRESETS } from '@/lib/coupon-presets';
 import { isoToTaipeiInput } from '@/lib/taipei-time';
+import CampaignManager from './CampaignManager';
 
 const formatter = new Intl.NumberFormat('zh-TW', {
   style: 'currency',
@@ -73,6 +74,7 @@ const NAV = [
   { key: 'inventory', label: '庫存管理', Icon: IconBox },
   { key: 'customers', label: '顧客管理', Icon: IconUsers },
   { key: 'promotions', label: '促銷管理', Icon: IconGift },
+  { key: 'campaign-pages', label: '一頁式促銷頁', Icon: IconGrid },
   { key: 'reports', label: '報表及分析', Icon: IconChart },
   { key: 'settings', label: '系統設定', Icon: IconGear },
 ] as const;
@@ -384,6 +386,8 @@ export default function AdminDashboard({
   initialMovements,
   initialUserCoupons,
   initialCouponUsages,
+  initialCampaigns,
+  initialCampaignProducts,
   initialLogoUrl,
   initialSettings,
   userEmail,
@@ -397,6 +401,8 @@ export default function AdminDashboard({
   initialMovements: StockMovement[];
   initialUserCoupons: UserCoupon[];
   initialCouponUsages: CouponUsage[];
+  initialCampaigns: import('@/lib/types').Campaign[];
+  initialCampaignProducts: import('@/lib/types').CampaignProduct[];
   initialLogoUrl: string;
   initialSettings: SiteSettings | null;
   userEmail: string;
@@ -2664,6 +2670,11 @@ export default function AdminDashboard({
               </div>
               )}
             </div>
+          )}
+
+          {/* ===== 報表及分析 ===== */}
+          {section === 'campaign-pages' && (
+            <CampaignManager initialCampaigns={initialCampaigns} initialProducts={initialCampaignProducts} />
           )}
 
           {/* ===== 報表及分析 ===== */}

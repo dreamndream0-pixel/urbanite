@@ -136,7 +136,7 @@ export default function CheckoutPage() {
       })
       .catch(() => {});
 
-    fetch('/api/products')
+    fetch('/api/products?cart=1')
       .then((res) => (res.ok ? res.json() : []))
       .then((data: Product[]) => setProducts(data))
       .catch(() => setProducts([]));

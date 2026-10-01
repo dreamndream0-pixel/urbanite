@@ -1,10 +1,10 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getAdminUser } from '@/lib/supabase/server';
-import type { Product } from '@/lib/types';
+import { campaignProductAsProduct, type CampaignProduct, type Product } from '@/lib/types';
 
 // GET /api/products — 取得所有商品(前台與後台共用)
-export async function GET() {
+export async function GET(request: NextRequest) {
   const supabase = createAdminClient();
   const { data, error } = await supabase
     .from('products')
@@ -12,8 +12,22 @@ export async function GET() {
     .order('sort_order', { ascending: true });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  // 讓 Vercel CDN 暫存回應,同樣資料不必每個訪客都打一次 Supabase(降低流量)
-  return NextResponse.json(data as Product[], {
+  let result = (data ?? []) as Product[];
+  if (request.nextUrl.searchParams.get('cart') === '1') {
+    const { data: campaignProducts } = await supabase
+      .from('campaign_products')
+      .select('*, campaign:campaigns!inner(status,start_at,end_at)')
+      .eq('status', '上架中')
+      .eq('campaign.status', 'published');
+    const now = Date.now();
+    const active = ((campaignProducts ?? []) as (CampaignProduct & { campaign?: { start_at?: string | null; end_at?: string | null } })[])
+      .filter((product) => (!product.campaign?.start_at || new Date(product.campaign.start_at).getTime() <= now)
+        && (!product.campaign?.end_at || new Date(product.campaign.end_at).getTime() >= now))
+      .map(campaignProductAsProduct);
+    result = [...result, ...active];
+  }
+  // 結帳模式也會帶入仍在活動期間內的促銷商品；主站列表仍只回傳主站商品。
+  return NextResponse.json(result, {
     headers: { 'Cache-Control': 's-maxage=120, stale-while-revalidate=600' },
   });
 }
