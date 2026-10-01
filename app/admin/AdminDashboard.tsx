@@ -2674,7 +2674,7 @@ export default function AdminDashboard({
 
           {/* ===== 報表及分析 ===== */}
           {section === 'campaign-pages' && (
-            <CampaignManager initialCampaigns={initialCampaigns} initialProducts={initialCampaignProducts} />
+            <CampaignManager initialCampaigns={initialCampaigns} initialProducts={initialCampaignProducts} paymentMethods={enabledPaymentMethods} shippingMethods={enabledShippingMethods} shippingFees={shippingFees} />
           )}
 
           {/* ===== 報表及分析 ===== */}
