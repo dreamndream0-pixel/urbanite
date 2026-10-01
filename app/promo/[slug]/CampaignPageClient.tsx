@@ -48,6 +48,7 @@ export default function CampaignPageClient({ campaign, products, settings, previ
     else next.push({ id, productId, name: product.name, variant, price: product.price, quantity, source: 'campaign', campaignId: campaign.id });
     setCart(next);
     localStorage.setItem(CART_KEY, JSON.stringify(next));
+    try { localStorage.setItem('lastCampaignSlug', campaign.slug); } catch { /* 略過 */ }
     setSelected(null);
     setNotice('已加入購物車');
     window.setTimeout(() => setNotice(''), 2400);

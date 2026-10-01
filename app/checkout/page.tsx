@@ -112,11 +112,18 @@ export default function CheckoutPage() {
   const [orderNo, setOrderNo] = useState('');
   const [transferOpen, setTransferOpen] = useState(true);
   const [pickupStore, setPickupStore] = useState<PickupStore | null>(null);
+  const [campaignBackSlug, setCampaignBackSlug] = useState('');
 
   useEffect(() => {
     Promise.resolve().then(() => {
-      setCart(readCart());
+      const items = readCart();
+      setCart(items);
       try {
+        // 購物車含活動商品(productId 以 campaign: 開頭)時,回商店指向最後造訪的活動頁
+        if (items.some((it) => it.productId.startsWith('campaign:'))) {
+          const slug = localStorage.getItem('lastCampaignSlug');
+          if (slug) setCampaignBackSlug(slug);
+        }
         const rawStore = localStorage.getItem(PICKUP_STORE_KEY);
         if (rawStore) setPickupStore(JSON.parse(rawStore) as PickupStore);
       } catch {
@@ -473,7 +480,7 @@ export default function CheckoutPage() {
 
   return (
     <main className="min-h-screen bg-[#f6f2ec] text-[#1f1b19]">
-      <ShopHeader logoUrl={settings?.logo_url ?? ''} leftLabel="← 回商店" cartCount={cartCount} />
+      <ShopHeader logoUrl={settings?.logo_url ?? ''} leftHref={campaignBackSlug ? `/promo/${campaignBackSlug}` : '/'} leftLabel={campaignBackSlug ? '← 回活動' : '← 回商店'} cartCount={cartCount} />
 
       <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6">
         <h1 className="mb-6 text-2xl font-semibold tracking-wide">訂單結帳</h1>
