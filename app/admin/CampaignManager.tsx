@@ -12,13 +12,15 @@ type ProductDraft = {
   tagline: string;
   price: number;
   original_price: number;
-  inventory: number;
+  inventory: number; // 無規格時使用
   status: string;
   category: string;
   image: string;
   images: string[];
-  colors: string;
-  sizes: string;
+  unit: string;
+  sale_mode: string;
+  specs: { name: string; optionsText: string }[]; // 規格維度(選項以逗號分隔)
+  variantStock: Record<string, number>; // 各規格組合庫存,key = options.join(' / ')
   sort_order: number;
 };
 
@@ -29,32 +31,44 @@ const blankCampaign: CampaignDraft = {
 
 const blankProduct: ProductDraft = {
   sku: '', name: '', tagline: '', price: 0, original_price: 0, inventory: 0,
-  status: '上架中', category: '', image: '', images: [], colors: '', sizes: '', sort_order: 0,
+  status: '上架中', category: '', image: '', images: [], unit: '', sale_mode: '現貨',
+  specs: [], variantStock: {}, sort_order: 0,
 };
+
+const SALE_MODES = ['現貨', '預購', '預購+現貨'];
 
 function dateInput(value?: string | null) {
   return value ? new Date(value).toISOString().slice(0, 16) : '';
 }
 
-function list(value: string) {
+function parseOptions(value: string) {
   return value.split(/[,，、\n]+/).map((item) => item.trim()).filter(Boolean);
 }
 
-function variantData(colorsText: string, sizesText: string, inventory: number) {
-  const colors = list(colorsText);
-  const sizes = list(sizesText);
-  const specs: SpecDim[] = [];
-  if (colors.length) specs.push({ name: '顏色', options: colors });
-  if (sizes.length) specs.push({ name: '尺寸', options: sizes });
-  const combos = colors.length && sizes.length
-    ? colors.flatMap((color) => sizes.map((size) => [color, size]))
-    : colors.length ? colors.map((color) => [color]) : sizes.map((size) => [size]);
-  const each = combos.length ? Math.floor(inventory / combos.length) : inventory;
-  const variants: Variant[] = combos.map((options, index) => ({
+// 由規格維度算出所有組合(笛卡兒積)
+function comboList(specs: SpecDim[]): string[][] {
+  const valid = specs.filter((spec) => spec.options.length > 0);
+  if (!valid.length) return [];
+  return valid.reduce<string[][]>(
+    (acc, dim) => acc.flatMap((combo) => dim.options.map((option) => [...combo, option])),
+    [[]],
+  );
+}
+
+// 把表單草稿的規格維度 + 各組合庫存,整理成要存檔的 specs / variants / 總庫存
+function buildVariants(draft: ProductDraft) {
+  const specs: SpecDim[] = draft.specs
+    .map((spec) => ({ name: spec.name.trim(), options: parseOptions(spec.optionsText) }))
+    .filter((spec) => spec.name && spec.options.length > 0);
+  const combos = comboList(specs);
+  const variants: Variant[] = combos.map((options) => ({
     options,
-    inventory: each + (index < inventory - each * combos.length ? 1 : 0),
+    inventory: Math.max(0, Math.floor(Number(draft.variantStock[options.join(' / ')] ?? 0))),
   }));
-  return { specs, variants };
+  const inventory = variants.length
+    ? variants.reduce((sum, variant) => sum + variant.inventory, 0)
+    : Math.max(0, Math.floor(Number(draft.inventory) || 0));
+  return { specs, variants, inventory };
 }
 
 export default function CampaignManager({
@@ -135,14 +149,16 @@ export default function CampaignManager({
   async function saveProduct() {
     if (!selected || !productDraft?.name.trim()) return flash('請填寫商品名稱');
     setBusy(true);
-    const { specs, variants } = variantData(productDraft.colors, productDraft.sizes, productDraft.inventory);
+    const { specs, variants, inventory } = buildVariants(productDraft);
+    const { variantStock: _variantStock, specs: _specs, ...rest } = productDraft;
     const payload = {
       campaign_id: selected.id,
-      ...productDraft,
+      ...rest,
       original_price: productDraft.original_price || null,
       images: productDraft.images.length ? productDraft.images : productDraft.image ? [productDraft.image] : [],
       specs,
       variants,
+      inventory,
     };
     try {
       const response = await fetch(productDraft.id ? `/api/campaign-products/${productDraft.id}` : '/api/campaign-products', {
@@ -160,12 +176,17 @@ export default function CampaignManager({
   }
 
   function editProduct(product: CampaignProduct) {
+    const variantStock: Record<string, number> = {};
+    (product.variants ?? []).forEach((variant) => {
+      variantStock[variant.options.join(' / ')] = variant.inventory;
+    });
     setProductDraft({
       id: product.id, sku: product.sku, name: product.name, tagline: product.tagline,
       price: product.price, original_price: product.original_price ?? 0, inventory: product.inventory,
       status: product.status, category: product.category, image: product.image, images: product.images ?? [],
-      colors: product.specs.find((spec) => /顏色|color/i.test(spec.name))?.options.join(', ') ?? '',
-      sizes: product.specs.find((spec) => /尺寸|size/i.test(spec.name))?.options.join(', ') ?? '',
+      unit: product.unit ?? '', sale_mode: product.sale_mode ?? '現貨',
+      specs: (product.specs ?? []).map((spec) => ({ name: spec.name, optionsText: spec.options.join(', ') })),
+      variantStock,
       sort_order: product.sort_order,
     });
   }
@@ -285,7 +306,80 @@ function CampaignCreateModal({ draft, busy, onChange, onClose, onCreate }: { dra
 }
 
 function ProductModal({ draft, busy, onChange, onClose, onSave, onUpload }: { draft: ProductDraft; busy: boolean; onChange: (draft: ProductDraft | null) => void; onClose: () => void; onSave: () => void; onUpload: (file: File) => void }) {
-  return <Modal title={draft.id ? '編輯活動商品' : '新增活動商品'} onClose={onClose}><div className="grid gap-4 sm:grid-cols-2"><Field label="商品名稱" className="sm:col-span-2"><input value={draft.name} onChange={(e) => onChange({ ...draft, name: e.target.value })} /></Field><Field label="商品編號"><input value={draft.sku} onChange={(e) => onChange({ ...draft, sku: e.target.value })} /></Field><Field label="分類"><input value={draft.category} onChange={(e) => onChange({ ...draft, category: e.target.value })} placeholder="例如：外套" /></Field><Field label="售價"><input type="number" min="0" value={draft.price} onChange={(e) => onChange({ ...draft, price: Number(e.target.value) })} /></Field><Field label="原價"><input type="number" min="0" value={draft.original_price} onChange={(e) => onChange({ ...draft, original_price: Number(e.target.value) })} /></Field><Field label="總庫存"><input type="number" min="0" value={draft.inventory} onChange={(e) => onChange({ ...draft, inventory: Number(e.target.value) })} /></Field><Field label="排序"><input type="number" value={draft.sort_order} onChange={(e) => onChange({ ...draft, sort_order: Number(e.target.value) })} /></Field><Field label="顏色（逗號分隔）"><input value={draft.colors} onChange={(e) => onChange({ ...draft, colors: e.target.value })} /></Field><Field label="尺寸（逗號分隔）"><input value={draft.sizes} onChange={(e) => onChange({ ...draft, sizes: e.target.value })} /></Field><Field label="簡介" className="sm:col-span-2"><textarea rows={2} value={draft.tagline} onChange={(e) => onChange({ ...draft, tagline: e.target.value })} /></Field><Field label="商品圖片" className="sm:col-span-2"><div className="flex items-center gap-3">{draft.image ? <img src={draft.image} alt="" className="h-24 w-24 bg-[#f5f1eb] object-contain" /> : null}<label className="cursor-pointer border border-[#d8d0c6] px-4 py-2 text-sm font-semibold">上傳圖片<input type="file" accept="image/*" className="hidden" onChange={(e) => { const file = e.target.files?.[0]; if (file) onUpload(file); e.target.value = ''; }} /></label></div></Field><div className="flex justify-end gap-2 sm:col-span-2"><button type="button" onClick={onClose} className="px-4 py-2 text-sm">取消</button><button type="button" disabled={busy} onClick={onSave} className="bg-[#702838] px-5 py-2 text-sm font-semibold text-white disabled:opacity-50">儲存商品</button></div></div></Modal>;
+  const specsForCombo: SpecDim[] = draft.specs
+    .map((spec) => ({ name: spec.name.trim(), options: parseOptions(spec.optionsText) }))
+    .filter((spec) => spec.name && spec.options.length > 0);
+  const combos = comboList(specsForCombo);
+  const totalStock = combos.length
+    ? combos.reduce((sum, options) => sum + (Number(draft.variantStock[options.join(' / ')] ?? 0) || 0), 0)
+    : draft.inventory;
+
+  function setSpec(index: number, patch: Partial<{ name: string; optionsText: string }>) {
+    onChange({ ...draft, specs: draft.specs.map((spec, i) => (i === index ? { ...spec, ...patch } : spec)) });
+  }
+  function addSpec() {
+    onChange({ ...draft, specs: [...draft.specs, { name: '', optionsText: '' }] });
+  }
+  function removeSpec(index: number) {
+    onChange({ ...draft, specs: draft.specs.filter((_, i) => i !== index) });
+  }
+  function setStock(key: string, value: number) {
+    onChange({ ...draft, variantStock: { ...draft.variantStock, [key]: Math.max(0, value) } });
+  }
+
+  return <Modal title={draft.id ? '編輯活動商品' : '新增活動商品'} onClose={onClose}>
+    <div className="grid gap-4 sm:grid-cols-2">
+      <Field label="商品名稱" className="sm:col-span-2"><input value={draft.name} onChange={(e) => onChange({ ...draft, name: e.target.value })} /></Field>
+      <Field label="商品編號"><input value={draft.sku} onChange={(e) => onChange({ ...draft, sku: e.target.value })} /></Field>
+      <Field label="分類"><input value={draft.category} onChange={(e) => onChange({ ...draft, category: e.target.value })} placeholder="例如：外套" /></Field>
+      <Field label="售價"><input type="number" min="0" value={draft.price} onChange={(e) => onChange({ ...draft, price: Number(e.target.value) })} /></Field>
+      <Field label="原價"><input type="number" min="0" value={draft.original_price} onChange={(e) => onChange({ ...draft, original_price: Number(e.target.value) })} /></Field>
+      <Field label="單位"><input value={draft.unit} onChange={(e) => onChange({ ...draft, unit: e.target.value })} placeholder="例如：件" /></Field>
+      <Field label="銷售模式"><select value={draft.sale_mode} onChange={(e) => onChange({ ...draft, sale_mode: e.target.value })}>{SALE_MODES.map((mode) => <option key={mode} value={mode}>{mode}</option>)}</select></Field>
+      <Field label="排序"><input type="number" value={draft.sort_order} onChange={(e) => onChange({ ...draft, sort_order: Number(e.target.value) })} /></Field>
+      <Field label="簡介" className="sm:col-span-2"><textarea rows={2} value={draft.tagline} onChange={(e) => onChange({ ...draft, tagline: e.target.value })} /></Field>
+
+      <div className="sm:col-span-2">
+        <div className="mb-1.5 flex items-center justify-between">
+          <span className="text-sm font-semibold text-[#6b6156]">規格維度</span>
+          <button type="button" onClick={addSpec} className="text-xs font-semibold text-[#702838]">＋ 新增維度</button>
+        </div>
+        <div className="space-y-2">
+          {draft.specs.map((spec, index) => (
+            <div key={index} className="flex gap-2">
+              <input value={spec.name} onChange={(e) => setSpec(index, { name: e.target.value })} placeholder="維度名稱（如 顏色）" className="h-11 w-32 border border-[#d8d0c6] bg-white px-3 text-sm" />
+              <input value={spec.optionsText} onChange={(e) => setSpec(index, { optionsText: e.target.value })} placeholder="選項，逗號分隔（如 紅,綠,藍）" className="h-11 flex-1 border border-[#d8d0c6] bg-white px-3 text-sm" />
+              <button type="button" onClick={() => removeSpec(index)} aria-label="刪除維度" className="px-2 text-lg text-[#b23a3a]">×</button>
+            </div>
+          ))}
+          {!draft.specs.length ? <p className="text-xs text-[#a99e8f]">未設定規格維度時，下方填單一總庫存。</p> : null}
+        </div>
+      </div>
+
+      <div className="sm:col-span-2">
+        <div className="mb-1.5 flex items-center justify-between">
+          <span className="text-sm font-semibold text-[#6b6156]">庫存{combos.length ? `（各規格組合，共 ${combos.length} 組）` : ''}</span>
+          <span className="text-xs text-[#8a7f72]">合計 {totalStock}</span>
+        </div>
+        {combos.length ? (
+          <div className="max-h-56 divide-y divide-[#eee7de] overflow-y-auto border border-[#eee7de]">
+            {combos.map((options) => {
+              const key = options.join(' / ');
+              return <div key={key} className="flex items-center justify-between gap-3 px-3 py-2">
+                <span className="text-sm">{key}</span>
+                <input type="number" min="0" value={draft.variantStock[key] ?? 0} onChange={(e) => setStock(key, Number(e.target.value))} className="h-9 w-24 border border-[#d8d0c6] bg-white px-2 text-sm" />
+              </div>;
+            })}
+          </div>
+        ) : (
+          <input type="number" min="0" value={draft.inventory} onChange={(e) => onChange({ ...draft, inventory: Number(e.target.value) })} className="h-11 w-full border border-[#d8d0c6] bg-white px-3 text-sm" />
+        )}
+      </div>
+
+      <Field label="商品圖片" className="sm:col-span-2"><div className="flex items-center gap-3">{draft.image ? <img src={draft.image} alt="" className="h-24 w-24 bg-[#f5f1eb] object-contain" /> : null}<label className="cursor-pointer border border-[#d8d0c6] px-4 py-2 text-sm font-semibold">上傳圖片<input type="file" accept="image/*" className="hidden" onChange={(e) => { const file = e.target.files?.[0]; if (file) onUpload(file); e.target.value = ''; }} /></label></div></Field>
+      <div className="flex justify-end gap-2 sm:col-span-2"><button type="button" onClick={onClose} className="px-4 py-2 text-sm">取消</button><button type="button" disabled={busy} onClick={onSave} className="bg-[#702838] px-5 py-2 text-sm font-semibold text-white disabled:opacity-50">儲存商品</button></div>
+    </div>
+  </Modal>;
 }
 
 function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {

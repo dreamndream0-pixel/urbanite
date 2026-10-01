@@ -15,6 +15,8 @@ type ShopHeaderProps = {
   logoUrl?: string;
   leftHref?: string;
   leftLabel?: string;
+  showBack?: boolean;
+  logoLinked?: boolean;
   cartCount?: number;
   favoriteCount?: number;
   favoriteActive?: boolean;
@@ -25,6 +27,8 @@ export default function ShopHeader({
   logoUrl = '',
   leftHref = '/',
   leftLabel = '← 回商店',
+  showBack = true,
+  logoLinked = true,
   cartCount,
   favoriteCount = 0,
   favoriteActive = false,
@@ -89,18 +93,30 @@ export default function ShopHeader({
     <header className="sticky top-0 z-30 border-b border-[#e5ded4] bg-[#faf7f2]/95 backdrop-blur">
       <nav className="mx-auto grid max-w-6xl grid-cols-[1fr_auto_1fr] items-center px-4 py-4 sm:px-6 sm:py-5">
         <div className="flex min-w-0 items-center">
-          <Link href={leftHref} className="truncate text-sm text-[#6b6156] hover:text-[#1f1b19]">
-            {leftLabel}
-          </Link>
+          {showBack ? (
+            <Link href={leftHref} className="truncate text-sm text-[#6b6156] hover:text-[#1f1b19]">
+              {leftLabel}
+            </Link>
+          ) : null}
         </div>
 
-        <Link href="/" className="justify-self-center px-2 text-center">
-          {resolvedLogoUrl ? (
-            <img src={resolvedLogoUrl} alt={STORE_NAME} className="mx-auto h-8 w-auto object-contain sm:h-10" />
-          ) : (
-            <span className="inline-block h-8 w-28 sm:h-10 sm:w-36" aria-hidden />
-          )}
-        </Link>
+        {logoLinked ? (
+          <Link href="/" className="justify-self-center px-2 text-center">
+            {resolvedLogoUrl ? (
+              <img src={resolvedLogoUrl} alt={STORE_NAME} className="mx-auto h-8 w-auto object-contain sm:h-10" />
+            ) : (
+              <span className="inline-block h-8 w-28 sm:h-10 sm:w-36" aria-hidden />
+            )}
+          </Link>
+        ) : (
+          <div className="justify-self-center px-2 text-center">
+            {resolvedLogoUrl ? (
+              <img src={resolvedLogoUrl} alt={STORE_NAME} className="mx-auto h-8 w-auto object-contain sm:h-10" />
+            ) : (
+              <span className="inline-block h-8 w-28 sm:h-10 sm:w-36" aria-hidden />
+            )}
+          </div>
+        )}
 
         <div className="flex items-center justify-end gap-1 sm:gap-2">
           {favoriteButton}

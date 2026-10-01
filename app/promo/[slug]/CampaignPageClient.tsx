@@ -54,7 +54,7 @@ export default function CampaignPageClient({ campaign, products, settings, previ
   }
 
   return <main className="min-h-screen bg-[#f8f5ef] text-[#211d1a]" style={{ '--campaign-color': campaign.theme_color } as CSSProperties}>
-    <ShopHeader logoUrl={settings?.logo_url ?? ''} leftHref="/" leftLabel="← 回商店" cartCount={cartCount} />
+    <ShopHeader logoUrl={settings?.logo_url ?? ''} showBack={false} logoLinked={false} cartCount={cartCount} />
     {preview ? <div className="bg-[#221f1d] px-4 py-2 text-center text-xs font-semibold tracking-widest text-white">草稿預覽模式</div> : null}
 
     <section className="relative min-h-[440px] overflow-hidden bg-[#ded7ce] sm:min-h-[560px]">
@@ -84,16 +84,26 @@ export default function CampaignPageClient({ campaign, products, settings, previ
 
     <section className="mx-auto max-w-6xl px-4 py-10 sm:px-6 sm:py-14">
       <div className="mb-7 flex items-end justify-between gap-4"><div><p className="text-xs tracking-[.22em] text-[#8a7f72]">CAMPAIGN COLLECTION</p><h2 className="mt-2 text-2xl font-bold">{category === '全部' ? '活動商品' : category}</h2></div><p className="text-sm text-[#8a7f72]">{shown.length} 件商品</p></div>
-      {shown.length ? <div className="grid grid-cols-2 gap-x-3 gap-y-7 sm:grid-cols-3 sm:gap-x-5 lg:grid-cols-4">
-        {shown.map((product) => <button type="button" key={product.id} onClick={() => setSelected(product)} className="group text-left">
-          <div className="relative aspect-[4/5] overflow-hidden bg-white">
-            {product.image ? <img src={product.image} alt={product.name} className="h-full w-full object-contain p-3 transition duration-500 group-hover:scale-[1.03]" /> : <span className="flex h-full items-center justify-center text-xs text-[#a99e8f]">尚未上傳圖片</span>}
-            {soldOut(product) ? <span className="absolute bottom-3 right-3 bg-[#b8aaa0] px-3 py-1.5 text-[10px] font-bold tracking-widest text-white">SOLD OUT</span> : null}
-          </div>
-          <h3 className="mt-3 line-clamp-2 text-sm font-semibold leading-5 sm:text-base">{product.name}</h3>
-          {product.tagline ? <p className="mt-1 truncate text-xs text-[#8a7f72]">{product.tagline}</p> : null}
-          <div className="mt-2 flex items-center gap-2"><span className="font-semibold">{formatter.format(product.price)}</span>{product.original_price ? <span className="text-xs text-[#a99e8f] line-through">{formatter.format(product.original_price)}</span> : null}</div>
-        </button>)}
+      {shown.length ? <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+        {shown.map((product) => {
+          const out = soldOut(product);
+          return <div key={product.id} className="group flex flex-col overflow-hidden rounded-lg bg-[#f9f8f6] p-3 shadow-sm hover:shadow-md">
+            <button type="button" onClick={() => setSelected(product)} aria-label={`查看 ${product.name}`} className="relative aspect-[3/4] overflow-hidden rounded-[6px] bg-white">
+              {product.image ? <img src={product.image} alt={product.name} className={`h-full w-full object-contain drop-shadow-[0_14px_16px_rgba(31,27,25,0.22)] transition duration-500 group-hover:scale-[1.03] ${out ? 'opacity-60' : ''}`} /> : <span className="flex h-full items-center justify-center text-xs text-[#a99e8f]">尚未上傳圖片</span>}
+            </button>
+            <div className="mt-3 flex flex-1 flex-col px-1">
+              <button type="button" onClick={() => setSelected(product)} className="text-left hover:text-[#c84767]">
+                <h3 className="line-clamp-1 text-sm font-semibold leading-5">{product.name}</h3>
+                {product.tagline ? <p className="mt-1 line-clamp-1 text-xs text-[#8a7f72]">{product.tagline}</p> : null}
+              </button>
+              <div className="mt-3 flex items-center justify-between">
+                <div className="flex items-baseline gap-2"><span className="font-semibold tracking-wide">{formatter.format(product.price)}</span>{product.original_price ? <span className="text-xs text-[#b3a897] line-through">{formatter.format(product.original_price)}</span> : null}</div>
+                {out ? <span className="flex h-10 min-w-10 items-center justify-center rounded-full bg-[#b5a9a0] px-3 text-center text-[10px] font-bold leading-[1.05] tracking-[0.08em] text-white">SOLD<br />OUT</span>
+                  : <button type="button" onClick={() => setSelected(product)} aria-label={`將 ${product.name} 加入購物車`} className="flex h-10 w-10 items-center justify-center rounded-full bg-[#1f1b19] text-white transition hover:bg-[#3a322e]"><IconCart /></button>}
+              </div>
+            </div>
+          </div>;
+        })}
       </div> : <div className="border-y border-[#ddd5ca] py-20 text-center text-[#8a7f72]">找不到符合條件的活動商品。</div>}
     </section>
 
@@ -101,6 +111,16 @@ export default function CampaignPageClient({ campaign, products, settings, previ
     {selected ? <ProductPicker product={selected} color={campaign.theme_color} onClose={() => setSelected(null)} onAdd={add} /> : null}
     <div aria-live="polite" className={`fixed bottom-6 left-1/2 z-[70] -translate-x-1/2 bg-[#1f1b19] px-5 py-3 text-sm font-semibold text-white shadow-xl transition ${notice ? 'translate-y-0 opacity-100' : 'pointer-events-none translate-y-2 opacity-0'}`}>{notice}</div>
   </main>;
+}
+
+function IconCart() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+      <circle cx="9" cy="20" r="1.6" />
+      <circle cx="18" cy="20" r="1.6" />
+      <path d="M3 4h2l2.4 11.2a2 2 0 0 0 2 1.6h7.8a2 2 0 0 0 1.9-1.4L21 8H7" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
 }
 
 function ProductPicker({ product, color, onClose, onAdd }: { product: CampaignProduct; color: string; onClose: () => void; onAdd: (product: CampaignProduct, variant: string, quantity: number) => void }) {
