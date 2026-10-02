@@ -104,7 +104,8 @@ export default function AccountClient({
   const [logoUrl, setLogoUrl] = useState('');
   const [returnInfo, setReturnInfo] = useState('');
   const [couponHero, setCouponHero] = useState('');
-  const [memberStamp, setMemberStamp] = useState('');
+  // null = 系統設定尚未載入(先不顯示印章,避免閃出預設圖)
+  const [memberStamp, setMemberStamp] = useState<string | null>(null);
   const [toast, setToast] = useState('');
   const [cartCount, setCartCount] = useState(0);
 
@@ -126,7 +127,7 @@ export default function AccountClient({
         setMemberStamp(data?.member_stamp_image ?? '');
         if (data?.logo_url) setLogoUrl(data.logo_url);
       })
-      .catch(() => {});
+      .catch(() => setMemberStamp(''));
   }, []);
 
   function showToast(msg: string) {
@@ -294,9 +295,9 @@ export default function AccountClient({
 }
 
 /* ---------- 個人資訊 ---------- */
-// 尚未於系統設定上傳自訂印章時的預設圖(舊有的寫死版本)
+// 尚未於系統設定上傳自訂印章時的預設圖(透明背景 PNG;舊版預設圖內嵌灰色棋盤格底,不再使用)
 const DEFAULT_STAMP_IMAGE =
-  'https://mffhznxcqjlwquqyrgth.supabase.co/storage/v1/object/public/assets/member/urbanite-member-stamp-1788771080926.png';
+  'https://mffhznxcqjlwquqyrgth.supabase.co/storage/v1/object/public/assets/member/stamp-1788777088885-ai152h.png';
 
 function ProfileTab({
   customer,
@@ -314,9 +315,10 @@ function ProfileTab({
   fallbackPhone: string;
   fallbackAddress: string;
   provider: string;
-  stampImage?: string;
+  stampImage?: string | null;
   onSaved: () => void;
 }) {
+  const [stampReady, setStampReady] = useState(false);
   const [name, setName] = useState(customer?.name || fallbackName || '');
   const [nickname, setNickname] = useState(customer?.nickname || '');
   const [gender, setGender] = useState(customer?.gender || '');
@@ -558,15 +560,21 @@ function ProfileTab({
   return (
     <div className="space-y-8 pb-24">
       <section className="relative -mx-4 -mt-8 overflow-hidden border-b border-[#eadfd4] bg-[#fbf8f3] px-6 pb-7 pt-6 sm:-mx-6 sm:px-10">
-        <img
-          src={stampImage || DEFAULT_STAMP_IMAGE}
-          alt="URBANITE MEMBER"
-          className="absolute right-5 top-8 h-32 w-32 object-contain opacity-85 sm:right-8 sm:h-40 sm:w-40"
-          style={{
-            WebkitMaskImage: 'linear-gradient(to right, transparent, #000 30%)',
-            maskImage: 'linear-gradient(to right, transparent, #000 30%)',
-          }}
-        />
+        {/* 等系統設定載入、圖片下載完成後才淡入,不會先閃出其他圖 */}
+        {stampImage !== null && (
+          <img
+            src={stampImage || DEFAULT_STAMP_IMAGE}
+            alt="URBANITE MEMBER"
+            onLoad={() => setStampReady(true)}
+            className={`absolute right-5 top-8 h-32 w-32 object-contain transition-opacity duration-500 sm:right-8 sm:h-40 sm:w-40 ${
+              stampReady ? 'opacity-85' : 'opacity-0'
+            }`}
+            style={{
+              WebkitMaskImage: 'linear-gradient(to right, transparent, #000 30%)',
+              maskImage: 'linear-gradient(to right, transparent, #000 30%)',
+            }}
+          />
+        )}
         <p className="text-[10px] font-semibold tracking-[0.34em] text-[#8f1f31]/70">MEMBER SPACE</p>
         <h1 className="font-serif-tc mt-3 text-[58px] font-semibold leading-[0.92] tracking-normal text-[#1f1b19] sm:text-[76px]">
           Hello,<br />{shortName}。
