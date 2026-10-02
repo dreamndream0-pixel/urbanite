@@ -2780,9 +2780,9 @@ export default function AdminDashboard({
                         >
                           <label
                             title="點圖編輯 / 換圖"
-                            className="group relative aspect-[16/13] w-40 shrink-0 cursor-pointer overflow-hidden rounded-lg border border-[#eee5da] bg-[#e9e1d6]"
+                            className="group relative aspect-[4/5] w-32 shrink-0 cursor-pointer overflow-hidden rounded-lg border border-[#eee5da] bg-[#e9e1d6]"
                           >
-                            <img src={banner.image} alt="" className="h-full w-full object-contain" />
+                            <img src={banner.image} alt="" className="h-full w-full object-cover object-center" />
                             <span className="absolute inset-0 flex items-center justify-center bg-black/0 text-xs font-semibold text-white opacity-0 transition group-hover:bg-black/40 group-hover:opacity-100">
                               點圖編輯
                             </span>
