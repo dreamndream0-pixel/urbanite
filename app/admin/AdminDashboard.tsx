@@ -6491,7 +6491,7 @@ function ProductModal({
                   {draft.images.map((url, index) => (
                     <div
                       key={`${url}-${index}`}
-                      className="group relative aspect-[3/4] overflow-hidden rounded-lg border border-[#e5ded4] bg-[#f6f2ec]"
+                      className="group relative aspect-[4/5] overflow-hidden rounded-lg border border-[#e5ded4] bg-[#f6f2ec]"
                     >
                       <img src={url} alt="" className="h-full w-full object-contain drop-shadow-[0_10px_12px_rgba(31,27,25,0.2)]" />
                       {index === 0 ? (

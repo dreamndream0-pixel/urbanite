@@ -1029,7 +1029,7 @@ function ProductCard({
 
   return (
     <div className="product-card group flex flex-col overflow-hidden rounded-lg bg-[#f9f8f6] p-3 shadow-sm hover:shadow-md">
-      <div className="relative aspect-[3/4] overflow-hidden rounded-[6px] bg-white">
+      <div className="relative aspect-[4/5] overflow-hidden rounded-[6px] bg-white">
         <Link href={productHref} aria-label={`查看 ${product.name}`}>
           {product.image ? (
             <img

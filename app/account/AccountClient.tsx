@@ -1993,7 +1993,7 @@ function FavoritesTab({ products }: { products: Product[] }) {
           href={`/products/${encodeURIComponent(p.id)}`}
           className="group overflow-hidden rounded-xl border border-[#e5ded4] bg-white"
         >
-          <div className="aspect-square overflow-hidden bg-[#e9e1d6]">
+          <div className="aspect-[4/5] overflow-hidden bg-[#e9e1d6]">
             {p.image ? (
               <img
                 src={p.image}
