@@ -1446,7 +1446,7 @@ function HeroCarousel({ banners }: { banners: Banner[] }) {
               alt={banner.title || '輪播圖'}
               draggable={false}
               // 固定框架,圖片放大縮小填滿整個輪播框(適配版面大小)
-              className={`pointer-events-none h-full w-full object-cover transition-[opacity,transform,filter] duration-700 ease-out ${
+              className={`pointer-events-none h-full w-full object-cover object-center transition-[opacity,transform,filter] duration-700 ease-out ${
                 active ? 'scale-100 opacity-100 blur-0' : 'scale-[1.035] opacity-75 blur-[1px]'
               }`}
             />
@@ -1454,7 +1454,7 @@ function HeroCarousel({ banners }: { banners: Banner[] }) {
           return (
             <div
               key={banner.id}
-              className="relative aspect-[16/13] w-full shrink-0 bg-[#e9e1d6] sm:aspect-[16/7] lg:aspect-[16/5]"
+              className="relative aspect-[4/5] w-full shrink-0 bg-[#e9e1d6] sm:aspect-[16/7] lg:aspect-[16/5]"
             >
               {banner.link ? (
                 <a href={banner.link} target="_blank" rel="noreferrer" className="block h-full w-full">

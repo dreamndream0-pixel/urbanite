@@ -2746,7 +2746,7 @@ export default function AdminDashboard({
               {settingsTab === 'banners' && (
                 <Card title="首頁輪播圖">
                   <p className="mb-4 text-sm text-[#8a7f72]">
-                    顯示在首頁最上方,可放多張。第一張(排序小的)先顯示,前台每 4 秒自動切換,也可左右滑動。頁尾內文頁的背景圖也會使用第一張啟用輪播圖；要修改內文頁圖片,請在這裡替換或調整第一張啟用圖片。
+                    顯示在首頁最上方,可放多張。圖片尺寸統一 1080 × 1350 px(4:5):手機版完整顯示,電腦版同一張圖自動滿版、以中央裁切,不需另做電腦版圖片。第一張(排序小的)先顯示,前台每 4 秒自動切換,也可左右滑動。頁尾內文頁的背景圖也會使用第一張啟用輪播圖；要修改內文頁圖片,請在這裡替換或調整第一張啟用圖片。
                   </p>
                   <label className="mb-5 inline-flex cursor-pointer items-center rounded-full bg-[#1f1b19] px-5 py-2.5 text-sm font-semibold text-white">
                     {uploadingBanner ? '處理中…' : '+ 新增輪播圖'}
@@ -3216,8 +3216,8 @@ function FixedBannerCropModal({
     const g = geometry();
     if (!g || !loaded.w) return;
     const canvas = document.createElement('canvas');
-    canvas.width = 1600;
-    canvas.height = 1300;
+    canvas.width = 1080;
+    canvas.height = 1350;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     ctx.fillStyle = background;
@@ -3239,8 +3239,8 @@ function FixedBannerCropModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
       <div className="max-h-[92vh] w-full max-w-2xl overflow-auto rounded-2xl bg-white p-6">
         <h2 className="text-xl font-semibold">輪播圖 — 固定首頁比例取景</h2>
-        <p className="mt-1 text-sm text-[#6b6156]">白色框架固定為首頁 16:13；照片會先完整放進框內，再拖曳與縮放調整顯示位置。</p>
-        <div ref={frameRef} className="relative mx-auto mt-5 aspect-[16/13] w-full max-w-xl touch-none select-none overflow-hidden border-2 border-white shadow-[0_0_0_9999px_rgba(0,0,0,0.45)]" style={{ backgroundColor: background }} onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={stopDrag} onPointerCancel={stopDrag}>
+        <p className="mt-1 text-sm text-[#6b6156]">白色框架固定為 4:5（輸出 1080 × 1350 px）；手機版完整顯示此範圍，電腦版會以中央為基準自動裁切成滿版。拖曳與縮放調整顯示位置，模特兒與主要商品請放在畫面中央。</p>
+        <div ref={frameRef} className="relative mx-auto mt-5 aspect-[4/5] w-full max-w-sm touch-none select-none overflow-hidden border-2 border-white shadow-[0_0_0_9999px_rgba(0,0,0,0.45)]" style={{ backgroundColor: background }} onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={stopDrag} onPointerCancel={stopDrag}>
           {loaded.w > 0 && (
             <img
               src={url}
