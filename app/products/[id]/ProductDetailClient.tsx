@@ -273,7 +273,7 @@ export default function ProductDetailClient({ product, homeHref = '/' }: { produ
                 type="button"
                 onClick={() => carousel.step(-1)}
                 aria-label="上一張照片"
-                className="absolute left-2 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-white/75 text-[#1f1b19] shadow-sm backdrop-blur transition hover:bg-white"
+                className="absolute left-2 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-white/30 text-[#1f1b19] shadow-sm backdrop-blur transition hover:bg-white/50"
               >
                 <IconChevron dir="left" />
               </button>
@@ -281,7 +281,7 @@ export default function ProductDetailClient({ product, homeHref = '/' }: { produ
                 type="button"
                 onClick={() => carousel.step(1)}
                 aria-label="下一張照片"
-                className="absolute right-2 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-white/75 text-[#1f1b19] shadow-sm backdrop-blur transition hover:bg-white"
+                className="absolute right-2 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-white/30 text-[#1f1b19] shadow-sm backdrop-blur transition hover:bg-white/50"
               >
                 <IconChevron dir="right" />
               </button>
