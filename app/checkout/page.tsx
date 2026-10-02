@@ -341,6 +341,14 @@ export default function CheckoutPage() {
     }
   }
 
+  // 明細縮圖:有該顏色專屬圖就用顏色圖,否則用商品封面
+  function itemImage(item: CartItem) {
+    const product = products.find((p) => p.id === item.productId);
+    if (!product) return '';
+    const colorImage = item.variant.split(' / ').map((option) => product.color_images?.[option]).find(Boolean);
+    return colorImage || product.image || product.images?.[0] || '';
+  }
+
   function updateQty(id: string, change: number) {
     setCart((items) => {
       const next = items
@@ -517,28 +525,38 @@ export default function CheckoutPage() {
             <section className="rounded-2xl bg-white p-5 shadow-sm">
               <h2 className="mb-4 font-semibold">購買明細（{cart.length} 件）</h2>
               <div className="space-y-4">
-                {cart.map((item) => (
-                  <div key={item.id} className="flex items-center justify-between gap-3 border-b border-[#f0eae1] pb-4 last:border-0 last:pb-0">
-                    <div className="min-w-0">
-                      <h3 className="font-medium">{item.name}</h3>
-                      <p className="text-sm text-[#8a7f72]">{item.variant}</p>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <div className="inline-flex items-center rounded-full border border-[#e5ded4]">
-                        <button className="px-3 py-1" onClick={() => updateQty(item.id, -1)}>
-                          -
-                        </button>
-                        <span className="w-8 text-center text-sm">{item.quantity}</span>
-                        <button className="px-3 py-1" onClick={() => updateQty(item.id, 1)}>
-                          +
-                        </button>
+                {cart.map((item) => {
+                  const image = itemImage(item);
+                  return (
+                    <div key={item.id} className="flex gap-3 border-b border-[#f0eae1] pb-4 last:border-0 last:pb-0">
+                      <Link
+                        href={`/products/${encodeURIComponent(item.productId)}`}
+                        aria-label={`查看 ${item.name}`}
+                        className="aspect-[4/5] w-16 shrink-0 overflow-hidden rounded-md bg-[#f6f2ec]"
+                      >
+                        {image ? <img src={image} alt="" className="h-full w-full object-cover" /> : null}
+                      </Link>
+                      <div className="min-w-0 flex-1">
+                        <h3 className="font-medium">{item.name}</h3>
+                        <p className="text-sm text-[#8a7f72]">{item.variant}</p>
+                        <div className="mt-2 flex items-center justify-between gap-3">
+                          <div className="inline-flex items-center rounded-full border border-[#e5ded4]">
+                            <button className="px-3 py-1" onClick={() => updateQty(item.id, -1)}>
+                              -
+                            </button>
+                            <span className="w-8 text-center text-sm">{item.quantity}</span>
+                            <button className="px-3 py-1" onClick={() => updateQty(item.id, 1)}>
+                              +
+                            </button>
+                          </div>
+                          <span className="text-right font-semibold">
+                            {formatter.format(item.price * item.quantity)}
+                          </span>
+                        </div>
                       </div>
-                      <span className="w-20 text-right font-semibold">
-                        {formatter.format(item.price * item.quantity)}
-                      </span>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </section>
 
