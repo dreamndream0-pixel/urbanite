@@ -1050,6 +1050,7 @@ function ProductCard({
         )}
         <FavoriteFoldButton
           productName={product.name}
+          imageUrl={product.image}
           isSaved={favorited}
           isLoading={!favoritesLoaded}
           pending={favoritePending}

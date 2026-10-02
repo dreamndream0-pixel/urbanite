@@ -16,14 +16,21 @@ function sheetPath(progress: number) {
      ${56 - 12 * progress} ${37.333 + 4.667 * progress} 56 56 Z`;
 }
 
+// 按鈕實際尺寸(px)對應 SVG viewBox 的 56 單位
+const BUTTON_PX = 47.6;
+const UNIT = 56 / BUTTON_PX;
+
 export default function FavoriteFoldButton({
   productName,
+  imageUrl = '',
   isSaved,
   isLoading,
   pending,
   onSavedChange,
 }: {
   productName: string;
+  // 商品照:折角紙片印上同一張照片(與下方照片對齊),折回時與原圖無縫接合
+  imageUrl?: string;
   isSaved: boolean;
   isLoading: boolean;
   pending: boolean;
@@ -34,6 +41,19 @@ export default function FavoriteFoldButton({
   const current = useRef(progress);
   const loaded = useRef(!isLoading);
   const disabled = isLoading || pending;
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  // 照片框(按鈕的父層)尺寸,用來把紙片上的照片對齊到原圖位置
+  const [frame, setFrame] = useState({ w: 0, h: 0 });
+
+  useEffect(() => {
+    const box = buttonRef.current?.parentElement;
+    if (!box) return;
+    const update = () => setFrame({ w: box.clientWidth, h: box.clientHeight });
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(box);
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
     const target = isSaved ? 1 : 0;
@@ -91,6 +111,7 @@ export default function FavoriteFoldButton({
         event.stopPropagation();
         if (!disabled) onSavedChange(!isSaved);
       }}
+      ref={buttonRef}
       className="favorite-fold absolute right-0 top-0 z-10"
       data-turning={turning || undefined}
     >
@@ -123,9 +144,24 @@ export default function FavoriteFoldButton({
             <path d={HEART} transform="translate(32 5) scale(.75)" fill="var(--fold-light)" />
           </g>
           <path d={paper} transform={`translate(${-1.5 * progress} ${3 * progress})`} fill="var(--fold-shadow)" filter={`url(#${id}-shadow)`} opacity={progress} />
-          {/* 未收藏時不畫紙片底色,只顯示愛心;開始折角才出現 */}
-          <path d={paper} fill="white" opacity={Math.min(progress * 40, 1)} />
-          <path d={paper} fill={`url(#${id}-paper)`} opacity={progress} />
+          {/* 紙片:印上與下方對齊的同一張照片,折回原位時與原圖無縫接合(未收藏時不顯示) */}
+          <g opacity={Math.min(progress * 40, 1)}>
+            <path d={paper} fill="white" />
+            {imageUrl && frame.w > 0 && (
+              <g clipPath={`url(#${id}-sheet)`}>
+                <image
+                  href={imageUrl}
+                  x={56 - frame.w * UNIT}
+                  y={0}
+                  width={frame.w * UNIT}
+                  height={frame.h * UNIT}
+                  preserveAspectRatio="xMidYMid meet"
+                />
+              </g>
+            )}
+            {/* 紙張彎曲的光影,讓折起的部分看得出是翻起的紙 */}
+            <path d={paper} fill={`url(#${id}-paper)`} opacity={imageUrl ? progress * 0.4 : progress} />
+          </g>
           <g clipPath={`url(#${id}-sheet)`} opacity={1 - progress}>
             <path d={HEART} transform="translate(32 5) scale(.75)" fill="none" stroke="var(--fold-ink)" strokeWidth="2" strokeLinejoin="round" />
           </g>
