@@ -123,7 +123,8 @@ export default function FavoriteFoldButton({
             <path d={HEART} transform="translate(32 5) scale(.75)" fill="var(--fold-light)" />
           </g>
           <path d={paper} transform={`translate(${-1.5 * progress} ${3 * progress})`} fill="var(--fold-shadow)" filter={`url(#${id}-shadow)`} opacity={progress} />
-          <path d={paper} fill="white" />
+          {/* 未收藏時不畫紙片底色,只顯示愛心;開始折角才出現 */}
+          <path d={paper} fill="white" opacity={Math.min(progress * 40, 1)} />
           <path d={paper} fill={`url(#${id}-paper)`} opacity={progress} />
           <g clipPath={`url(#${id}-sheet)`} opacity={1 - progress}>
             <path d={HEART} transform="translate(32 5) scale(.75)" fill="none" stroke="var(--fold-ink)" strokeWidth="2" strokeLinejoin="round" />

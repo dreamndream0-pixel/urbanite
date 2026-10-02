@@ -11,6 +11,14 @@ const blankCampaign: CampaignDraft = {
   status: 'draft', start_at: null, end_at: null, theme_color: '#702838',
 };
 
+const STATUS_LABEL: Record<Campaign['status'], string> = { draft: '草稿', published: '已發布', archived: '已封存' };
+
+// 完整的活動頁網址(依目前網域,例如 https://urbanite.com.tw/promo/xxx)
+function campaignUrl(slug: string) {
+  const origin = typeof window === 'undefined' ? '' : window.location.origin;
+  return `${origin}/promo/${slug}`;
+}
+
 function dateInput(value?: string | null) {
   return value ? new Date(value).toISOString().slice(0, 16) : '';
 }
@@ -39,6 +47,7 @@ export default function CampaignManager({
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState('');
   const [query, setQuery] = useState('');
+  const [copiedSlug, setCopiedSlug] = useState('');
 
   const campaignProducts = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -47,6 +56,16 @@ export default function CampaignManager({
       .filter((product) => !q || [product.name, product.id, product.category].join(' ').toLowerCase().includes(q))
       .sort((a, b) => a.sort_order - b.sort_order);
   }, [products, query, selectedId]);
+
+  async function copyLink(slug: string) {
+    try {
+      await navigator.clipboard.writeText(campaignUrl(slug));
+      setCopiedSlug(slug);
+      window.setTimeout(() => setCopiedSlug((current) => (current === slug ? '' : current)), 2000);
+    } catch {
+      flash('無法複製，請長按連結手動複製');
+    }
+  }
 
   function flash(message: string) {
     setNotice(message);
@@ -126,10 +145,16 @@ export default function CampaignManager({
           <p className="px-2 pb-2 text-xs font-semibold text-[#8a7f72]">活動清單</p>
           <div className="space-y-1">
             {campaigns.map((campaign) => (
-              <button key={campaign.id} type="button" onClick={() => setSelectedId(campaign.id)} className={`w-full border-l-2 px-3 py-3 text-left transition ${selectedId === campaign.id ? 'border-[#8f1935] bg-[#faf3f4]' : 'border-transparent hover:bg-[#faf7f2]'}`}>
-                <span className="block truncate text-sm font-semibold">{campaign.name}</span>
-                <span className="mt-1 flex items-center justify-between text-xs text-[#8a7f72]"><span>/{campaign.slug}</span><span>{campaign.status === 'published' ? '已發布' : '草稿'}</span></span>
-              </button>
+              <div key={campaign.id} className={`border-l-2 px-3 py-3 transition ${selectedId === campaign.id ? 'border-[#8f1935] bg-[#faf3f4]' : 'border-transparent hover:bg-[#faf7f2]'}`}>
+                <button type="button" onClick={() => setSelectedId(campaign.id)} className="flex w-full items-center justify-between gap-2 text-left">
+                  <span className="truncate text-sm font-semibold">{campaign.name}</span>
+                  <span className="shrink-0 text-xs text-[#8a7f72]">{STATUS_LABEL[campaign.status]}</span>
+                </button>
+                <div className="mt-2 flex items-center gap-2">
+                  <a href={campaignUrl(campaign.slug)} target="_blank" rel="noreferrer" className="min-w-0 flex-1 truncate text-xs text-[#702838] underline underline-offset-2">{campaignUrl(campaign.slug)}</a>
+                  <button type="button" onClick={() => copyLink(campaign.slug)} className="shrink-0 rounded border border-[#d8d0c6] bg-white px-2 py-1 text-xs font-semibold text-[#6b6156] hover:border-[#702838] hover:text-[#702838]">{copiedSlug === campaign.slug ? '已複製' : '複製'}</button>
+                </div>
+              </div>
             ))}
             {!campaigns.length ? <p className="px-3 py-8 text-center text-sm text-[#a99e8f]">尚未建立活動</p> : null}
           </div>
@@ -177,15 +202,12 @@ export default function CampaignManager({
 function CampaignSettings({ campaign, busy, onSave, onUpload, onDelete }: { campaign: Campaign; busy: boolean; onSave: (patch: Partial<Campaign>) => void; onUpload: (file: File) => Promise<string>; onDelete: () => void }) {
   const [draft, setDraft] = useState(campaign);
   return <section className="border border-[#e5ded4] bg-white p-4 sm:p-5">
-    <div className="flex flex-wrap items-center justify-between gap-3"><div><h3 className="text-lg font-bold">頁面設定</h3><p className="text-xs text-[#8a7f72]">公開網址：/promo/{campaign.slug}</p></div><div className="flex gap-2"><button type="button" onClick={onDelete} className="px-3 text-sm text-[#b23a3a]">刪除</button><button type="button" disabled={busy} onClick={() => onSave(draft)} className="rounded-md bg-[#1f1b19] px-5 py-2 text-sm font-semibold text-white disabled:opacity-50">儲存設定</button></div></div>
+    <div className="flex flex-wrap items-center justify-between gap-3"><div className="flex flex-wrap items-center gap-3"><div><h3 className="text-lg font-bold">頁面設定</h3><p className="text-xs text-[#8a7f72]">公開網址：/promo/{campaign.slug}</p></div><select aria-label="狀態" value={draft.status} onChange={(e) => setDraft({ ...draft, status: e.target.value as Campaign['status'] })} className="h-10 border border-[#d8d0c6] bg-white px-3 text-sm font-semibold"><option value="draft">草稿</option><option value="published">發布</option><option value="archived">封存</option></select></div><div className="flex gap-2"><button type="button" onClick={onDelete} className="px-3 text-sm text-[#b23a3a]">刪除</button><button type="button" disabled={busy} onClick={() => onSave(draft)} className="rounded-md bg-[#1f1b19] px-5 py-2 text-sm font-semibold text-white disabled:opacity-50">儲存設定</button></div></div>
     <div className="mt-5 grid gap-4 sm:grid-cols-2">
       <Field label="後台活動名稱"><input value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} /></Field>
       <Field label="活動網址"><input value={draft.slug} onChange={(e) => setDraft({ ...draft, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '') })} /></Field>
-      <Field label="英文眉題"><input value={draft.eyebrow} onChange={(e) => setDraft({ ...draft, eyebrow: e.target.value })} /></Field>
-      <Field label="主標題"><input value={draft.title} onChange={(e) => setDraft({ ...draft, title: e.target.value })} /></Field>
       <Field label="開始時間"><input type="datetime-local" value={dateInput(draft.start_at)} onChange={(e) => setDraft({ ...draft, start_at: e.target.value || null })} /></Field>
       <Field label="結束時間"><input type="datetime-local" value={dateInput(draft.end_at)} onChange={(e) => setDraft({ ...draft, end_at: e.target.value || null })} /></Field>
-      <Field label="狀態"><select value={draft.status} onChange={(e) => setDraft({ ...draft, status: e.target.value as Campaign['status'] })}><option value="draft">草稿</option><option value="published">發布</option><option value="archived">封存</option></select></Field>
       <Field label="主色"><input type="color" value={draft.theme_color} onChange={(e) => setDraft({ ...draft, theme_color: e.target.value })} className="h-11" /></Field>
       <Field label="頁面說明" className="sm:col-span-2"><textarea rows={3} value={draft.description} onChange={(e) => setDraft({ ...draft, description: e.target.value })} /></Field>
       <Field label="首圖" className="sm:col-span-2"><div className="flex items-center gap-3">{draft.hero_image ? <img src={draft.hero_image} alt="" className="h-20 w-32 bg-[#f5f1eb] object-cover" /> : null}<label className="cursor-pointer border border-[#d8d0c6] px-4 py-2 text-sm font-semibold">上傳首圖<input type="file" accept="image/*" className="hidden" onChange={async (e) => { const file = e.target.files?.[0]; e.target.value = ''; if (!file) return; const url = await onUpload(file); if (url) setDraft((current) => ({ ...current, hero_image: url })); }} /></label></div></Field>
