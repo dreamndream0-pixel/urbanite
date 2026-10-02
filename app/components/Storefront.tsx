@@ -322,6 +322,25 @@ export default function Storefront({ campaign = null, preview = false }: { campa
 
   const activeCategory = categoryTabs.flatMap((c) => [c, ...(c.children ?? [])]).find((c) => c.slug === category) ?? ALL_TAB;
 
+  // 購物車縮圖:購物車可能有另一個商店(主站/活動頁)的商品,不在本頁清單時另外查詢
+  const [cartCatalog, setCartCatalog] = useState<Product[]>([]);
+  const missingCartIds = cart.some((item) => !products.some((p) => p.id === item.productId) && !cartCatalog.some((p) => p.id === item.productId));
+  useEffect(() => {
+    if (!cartOpen || !missingCartIds) return;
+    fetch('/api/products?cart=1')
+      .then((res) => (res.ok ? res.json() : []))
+      .then((data: Product[]) => setCartCatalog(data))
+      .catch(() => {});
+  }, [cartOpen, missingCartIds]);
+
+  function cartImage(item: CartItem) {
+    const product = products.find((p) => p.id === item.productId) ?? cartCatalog.find((p) => p.id === item.productId);
+    if (!product) return '';
+    // 有該顏色的專屬圖就用顏色圖
+    const colorImage = item.variant.split(' / ').map((option) => product.color_images?.[option]).find(Boolean);
+    return colorImage || product.image || product.images?.[0] || '';
+  }
+
   function addToCart(
     product: Product,
     opts?: { variant?: string; quantity?: number; openCart?: boolean },
@@ -520,6 +539,7 @@ export default function Storefront({ campaign = null, preview = false }: { campa
         onUpdate={updateCart}
         onAdd={(product) => addToCart(product, { openCart: false })}
         maxOf={(item) => stockOf(products.find((p) => p.id === item.productId), item.variant)}
+        imageOf={cartImage}
         onCheckout={() => {
           setCartOpen(false);
           router.push('/checkout');
@@ -1213,6 +1233,7 @@ function CartDrawer({
   onUpdate,
   onAdd,
   maxOf,
+  imageOf,
   onCheckout,
 }: {
   cart: CartItem[];
@@ -1225,6 +1246,7 @@ function CartDrawer({
   onUpdate: (id: string, change: number) => void;
   onAdd: (product: Product) => void;
   maxOf: (item: CartItem) => number;
+  imageOf: (item: CartItem) => string;
   onCheckout: () => void;
 }) {
   return (
@@ -1252,9 +1274,20 @@ function CartDrawer({
             <p className="rounded-lg bg-[#f6f2ec] p-5 text-[#6b6156]">購物車目前是空的。</p>
           ) : (
             cart.map((item) => (
-              <div key={item.id} className="rounded-lg border border-[#e5ded4] p-4">
+              <div key={item.id} className="flex gap-3 rounded-lg border border-[#e5ded4] p-4">
+                <Link
+                  href={`/products/${encodeURIComponent(item.productId)}`}
+                  onClick={onClose}
+                  aria-label={`查看 ${item.name}`}
+                  className="aspect-[4/5] w-16 shrink-0 self-start overflow-hidden rounded-md bg-[#f6f2ec]"
+                >
+                  {imageOf(item) ? (
+                    <img src={imageOf(item)} alt="" className="h-full w-full object-cover" />
+                  ) : null}
+                </Link>
+                <div className="min-w-0 flex-1">
                 <div className="flex justify-between gap-3">
-                  <div>
+                  <div className="min-w-0">
                     <h3 className="font-semibold">{item.name}</h3>
                     <p className="mt-1 text-sm text-[#8a7f72]">{item.variant}</p>
                   </div>
@@ -1286,6 +1319,7 @@ function CartDrawer({
                   {Number.isFinite(maxOf(item)) && item.quantity >= maxOf(item) ? (
                     <span className="text-xs text-[#c0392b]">已達庫存上限（{maxOf(item)}）</span>
                   ) : null}
+                </div>
                 </div>
               </div>
             ))
