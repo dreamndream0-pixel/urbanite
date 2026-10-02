@@ -541,26 +541,32 @@ export default function ProductDetailClient({ product, homeHref = '/' }: { produ
 
           {tab === 'description' ? (
             <div className="mx-auto max-w-2xl py-10 text-center leading-8 text-[#5d5652]">
-              <h2 className="text-2xl font-semibold text-[#2c2826]">商品描述</h2>
-              <div className="mx-auto mt-4 h-1 w-10 bg-[#c84767]" />
               {product.tagline ? (
                 <div
-                  className="mx-auto mt-8 max-w-none text-left leading-8 [&_a]:text-[#c84767] [&_img]:my-4 [&_img]:max-w-full [&_ol]:list-decimal [&_ol]:pl-6 [&_table]:my-4 [&_table]:w-full [&_table]:border-collapse [&_td]:border [&_td]:border-[#e5ded4] [&_td]:p-2 [&_th]:border [&_th]:border-[#e5ded4] [&_th]:bg-[#f6f2ec] [&_th]:p-2 [&_ul]:list-disc [&_ul]:pl-6"
+                  className="mx-auto max-w-none text-left leading-8 [&_a]:text-[#c84767] [&_img]:my-4 [&_img]:max-w-full [&_ol]:list-decimal [&_ol]:pl-6 [&_table]:my-4 [&_table]:w-full [&_table]:border-collapse [&_td]:border [&_td]:border-[#e5ded4] [&_td]:p-2 [&_th]:border [&_th]:border-[#e5ded4] [&_th]:bg-[#f6f2ec] [&_th]:p-2 [&_ul]:list-disc [&_ul]:pl-6"
                   dangerouslySetInnerHTML={{ __html: product.tagline }}
                 />
               ) : (
-                <p className="mt-8">精選商品,適合日常穿搭與送禮。</p>
+                <p>精選商品,適合日常穿搭與送禮。</p>
               )}
               <p className="mt-3">庫存: {product.inventory}</p>
             </div>
           ) : (
             <div className="mx-auto max-w-2xl py-10 text-center leading-8 text-[#5d5652]">
-              <h2 className="text-2xl font-semibold text-[#2c2826]">送貨及付款方式</h2>
-              <div className="mx-auto mt-4 h-1 w-10 bg-[#c84767]" />
-              <h3 className="mt-10 text-xl font-medium text-[#2c2826]">送貨方式</h3>
-              <p className="mt-4">超商取貨、宅配到府。實際可用方式以結帳頁顯示為準。</p>
+              <h3 className="text-xl font-medium text-[#2c2826]">送貨方式</h3>
+              <p className="mt-4">
+                超商取貨、宅配到府。
+                <br />
+                實際運送方式以結帳頁顯示為準。
+              </p>
               <h3 className="mt-8 text-xl font-medium text-[#2c2826]">付款方式</h3>
-              <p className="mt-4">目前可先建立訂單,正式金流串接完成後會顯示付款選項。</p>
+              <p className="mt-4">
+                信用卡、電子支付、銀行轉帳。
+                <br />
+                實際付款方式以結帳頁顯示為準。
+              </p>
+              <h3 className="mt-8 text-xl font-medium text-[#2c2826]">退換貨方式</h3>
+              <p className="mt-4">請參考網站頁尾，退換貨政策說明資訊。</p>
             </div>
           )}
         </section>
