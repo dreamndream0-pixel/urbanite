@@ -50,7 +50,6 @@ export default function ProductDetailClient({ product, homeHref = '/' }: { produ
   });
   const [quantity, setQuantity] = useState(1);
   const [tab, setTab] = useState<'description' | 'shipping'>('shipping');
-  const [message, setMessage] = useState('');
   // 畫面置中的提示(深灰 80% 半透明,3 秒後消失)
   const [toast, setToast] = useState('');
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -210,11 +209,11 @@ export default function ProductDetailClient({ product, homeHref = '/' }: { produ
 
   function addToCart(action: 'cart' | 'buy') {
     if (hasSpecs && !allSpecsChosen) {
-      setMessage('請先選擇完整規格');
+      showToast('請先選擇完整規格');
       return;
     }
     if (soldOut) {
-      setMessage('此規格已售完');
+      showToast('此規格已售完');
       return;
     }
     const id = `${product.id}-${variantLabel}`;
@@ -225,11 +224,11 @@ export default function ProductDetailClient({ product, homeHref = '/' }: { produ
       const current = existing?.quantity ?? 0;
       const capped = Math.min(current + quantity, maxQty);
       if (capped <= current) {
-        setMessage(`此商品（${variantLabel}）庫存僅剩 ${maxQty} 件,已達可加入上限。`);
+        showToast(`此商品（${variantLabel}）庫存僅剩 ${maxQty} 件,已達可加入上限。`);
         return;
       }
       if (capped < current + quantity) {
-        setMessage(`此商品（${variantLabel}）庫存僅剩 ${maxQty} 件,已為你調整數量。`);
+        showToast(`此商品（${variantLabel}）庫存僅剩 ${maxQty} 件,已為你調整數量。`);
       }
       if (existing) {
         existing.quantity = capped;
@@ -476,11 +475,6 @@ export default function ProductDetailClient({ product, homeHref = '/' }: { produ
             </>
           )}
 
-          {message && (
-            <p className="mt-5 rounded-lg bg-[#f6f2ec] px-4 py-3 text-sm font-semibold text-[#5d5652]">
-              {message}
-            </p>
-          )}
 
           <section className="mt-6">
             <p className="mb-2 text-sm text-[#8a8480]">數量</p>
@@ -576,7 +570,7 @@ export default function ProductDetailClient({ product, homeHref = '/' }: { produ
       <div
         role="status"
         aria-live="polite"
-        className={`pointer-events-none fixed left-1/2 top-1/2 z-[80] -translate-x-1/2 -translate-y-1/2 rounded-xl bg-[#333333]/80 px-6 py-4 text-center text-sm font-semibold text-white shadow-lg transition-opacity duration-300 ${
+        className={`pointer-events-none fixed left-1/2 top-1/2 z-[80] w-max max-w-[85vw] -translate-x-1/2 -translate-y-1/2 rounded-xl leading-6 bg-[#333333]/80 px-6 py-4 text-center text-sm font-semibold text-white shadow-lg transition-opacity duration-300 ${
           toast ? 'opacity-100' : 'opacity-0'
         }`}
       >
