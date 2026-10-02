@@ -238,7 +238,7 @@ export default function ProductDetailClient({ product, homeHref = '/' }: { produ
         <div className="grid gap-8 lg:grid-cols-[1.05fr_0.95fr] lg:items-start">
         <div className="lg:sticky lg:top-24">
         <div
-          className="relative mx-auto aspect-[3/4] w-full max-w-md overflow-hidden rounded-xl bg-[#eee8e1] sm:max-w-lg lg:max-w-none"
+          className="relative mx-auto aspect-[4/5] w-full max-w-md overflow-hidden rounded-xl bg-[#eee8e1] sm:max-w-lg lg:max-w-none"
           // 開始滑動時收起顏色圖,回到相簿
           onPointerDownCapture={() => setColorImage('')}
         >
@@ -298,7 +298,7 @@ export default function ProductDetailClient({ product, homeHref = '/' }: { produ
                   carousel.go(index);
                 }}
                 aria-label={`查看圖片 ${index + 1}`}
-                className={`aspect-[3/4] w-12 shrink-0 overflow-hidden rounded-md border-2 bg-[#eee8e1] transition ${
+                className={`aspect-[4/5] w-12 shrink-0 overflow-hidden rounded-md border-2 bg-[#eee8e1] transition ${
                   !colorImage && carousel.realIndex === index ? 'border-[#c84767]' : 'border-transparent opacity-70 hover:opacity-100'
                 }`}
               >
