@@ -251,7 +251,8 @@ export default function ProductDetailClient({ product, homeHref = '/' }: { produ
                   src={url}
                   alt={product.name}
                   draggable={false}
-                  className="pointer-events-none h-full w-full shrink-0 object-contain drop-shadow-[0_18px_22px_rgba(31,27,25,0.22)]"
+                  // 照片需接收觸控(事件冒泡到軌道才能滑動);關閉 iOS 長按圖片選單
+                  className="h-full w-full shrink-0 select-none object-contain drop-shadow-[0_18px_22px_rgba(31,27,25,0.22)] [-webkit-touch-callout:none]"
                 />
               ))}
             </div>
