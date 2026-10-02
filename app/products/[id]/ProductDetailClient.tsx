@@ -52,6 +52,7 @@ export default function ProductDetailClient({ product, homeHref = '/' }: { produ
   const [tab, setTab] = useState<'description' | 'shipping'>('shipping');
   const [message, setMessage] = useState('');
   const [favorite, setFavorite] = useState(false);
+  const [favoritePending, setFavoritePending] = useState(false);
   const [logoUrl, setLogoUrl] = useState('');
   const [cartCount, setCartCount] = useState(0);
   const [favoriteCount, setFavoriteCount] = useState(0);
@@ -83,12 +84,46 @@ export default function ProductDetailClient({ product, homeHref = '/' }: { produ
       })
       .catch(() => {});
 
-    // 表頭收藏數(未登入時為 0)
+    // 表頭收藏數與本商品是否已收藏(未登入時為 0 / 未收藏)
     fetch('/api/favorites')
       .then((res) => (res.ok ? res.json() : { productIds: [] }))
-      .then((data: { productIds?: string[] }) => setFavoriteCount(data.productIds?.length ?? 0))
+      .then((data: { productIds?: string[] }) => {
+        const ids = data.productIds ?? [];
+        setFavoriteCount(ids.length);
+        setFavorite(ids.includes(product.id));
+      })
       .catch(() => {});
-  }, []);
+  }, [product.id]);
+
+  // 收藏/取消收藏,存在會員帳號(與首頁商品卡的愛心同一份清單)
+  async function toggleFavorite() {
+    if (favoritePending) return;
+    const next = !favorite;
+    setFavoritePending(true);
+    setFavorite(next);
+    try {
+      const res = next
+        ? await fetch('/api/favorites', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ productId: product.id }),
+          })
+        : await fetch(`/api/favorites?productId=${encodeURIComponent(product.id)}`, { method: 'DELETE' });
+      if (res.status === 401) {
+        setFavorite(!next);
+        router.push(`/login?next=${encodeURIComponent(`/products/${product.id}`)}`);
+        return;
+      }
+      if (!res.ok) throw new Error('favorite failed');
+      setFavoriteCount((n) => Math.max(0, n + (next ? 1 : -1)));
+      setMessage(next ? '已加入收藏' : '已取消收藏');
+    } catch {
+      setFavorite(!next);
+      setMessage('收藏未儲存，請再試一次');
+    } finally {
+      setFavoritePending(false);
+    }
+  }
 
   const variantLabel = useMemo(() => {
     if (hasSpecs) return specSel.filter(Boolean).join(' / ') || '標準款';
@@ -474,10 +509,14 @@ export default function ProductDetailClient({ product, homeHref = '/' }: { produ
           </div>
 
           <button
-            onClick={() => setFavorite((value) => !value)}
-            className="mx-auto mt-6 flex items-center justify-center gap-2 text-sm font-semibold text-[#5d5652]"
+            onClick={toggleFavorite}
+            disabled={favoritePending}
+            aria-pressed={favorite}
+            className={`mx-auto mt-6 flex items-center justify-center gap-2 text-sm font-semibold transition ${
+              favorite ? 'text-[#c84767]' : 'text-[#5d5652]'
+            }`}
           >
-            <IconStar filled={favorite} /> 收藏
+            <IconHeart filled={favorite} /> {favorite ? '已收藏' : '收藏'}
           </button>
         </div>
         </div>
@@ -538,10 +577,10 @@ export default function ProductDetailClient({ product, homeHref = '/' }: { produ
   );
 }
 
-function IconStar({ filled = false }: { filled?: boolean }) {
+function IconHeart({ filled = false }: { filled?: boolean }) {
   return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill={filled ? '#f5c542' : 'none'} stroke={filled ? '#d89a00' : 'currentColor'} strokeWidth="1.8" strokeLinejoin="round">
-      <path d="m12 2 3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21 7 14.2l-5-4.9 6.9-1L12 2Z" />
+    <svg width="18" height="18" viewBox="0 0 24 24" fill={filled ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinejoin="round" aria-hidden="true">
+      <path d="M12 21s-7.2-4.5-9.2-9.1C1.3 8.5 3.4 5 7 5c2 0 3.6 1.1 5 3 1.4-1.9 3-3 5-3 3.6 0 5.7 3.5 4.2 6.9C19.2 16.5 12 21 12 21z" />
     </svg>
   );
 }

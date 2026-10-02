@@ -59,29 +59,13 @@ export default function StoreHeader({
         </Link>
 
         {/* 右:圖示列 */}
-        <div className="flex items-center justify-end gap-1 sm:gap-2">
-          <button
-            onClick={onFavorites}
-            aria-label="收藏清單"
-            className={`relative rounded-md p-2 hover:bg-[#efe8dd] ${favoriteCount > 0 ? 'text-[#c84767]' : ''}`}
-          >
-            <IconHeart filled={favoriteCount > 0} />
-            {favoriteCount > 0 && (
-              <span className="absolute -right-0.5 -top-0.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-[#c84767] px-1 text-[10px] font-semibold text-white transition-opacity duration-150">
-                {favoriteCount}
-              </span>
-            )}
-          </button>
-          <button ref={cartIconRef} onClick={onCart} aria-label="購物車" className="relative rounded-md p-2 hover:bg-[#efe8dd]">
-            <IconBag />
-            {cartCount > 0 && (
-              <span className="absolute -right-0.5 -top-0.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-[#c84767] px-1 text-[10px] font-semibold text-white">
-                {cartCount}
-              </span>
-            )}
-          </button>
-          <AccountMenu nextPath="/account" />
-        </div>
+        <HeaderIcons
+          favoriteCount={favoriteCount}
+          cartCount={cartCount}
+          cartIconRef={cartIconRef}
+          onFavorites={onFavorites}
+          onCart={onCart}
+        />
       </nav>
 
       {/* 搜尋列 */}
@@ -106,6 +90,50 @@ export default function StoreHeader({
         </div>
       )}
     </header>
+  );
+}
+
+// 表頭右側圖示(收藏/購物車/會員):首頁、活動頁、商品頁、會員中心、結帳頁共用
+export function HeaderIcons({
+  favoriteCount,
+  cartCount,
+  cartIconRef,
+  favoriteActive = false,
+  onFavorites,
+  onCart,
+}: {
+  favoriteCount: number;
+  cartCount: number;
+  cartIconRef?: Ref<HTMLButtonElement>;
+  favoriteActive?: boolean;
+  onFavorites: () => void;
+  onCart: () => void;
+}) {
+  const heartOn = favoriteActive || favoriteCount > 0;
+  return (
+    <div className="flex items-center justify-end gap-1 sm:gap-2">
+      <button
+        onClick={onFavorites}
+        aria-label="收藏清單"
+        className={`relative rounded-md p-2 hover:bg-[#efe8dd] ${heartOn ? 'text-[#c84767]' : ''}`}
+      >
+        <IconHeart filled={heartOn} />
+        {favoriteCount > 0 && (
+          <span className="absolute -right-0.5 -top-0.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-[#c84767] px-1 text-[10px] font-semibold text-white transition-opacity duration-150">
+            {favoriteCount}
+          </span>
+        )}
+      </button>
+      <button ref={cartIconRef} onClick={onCart} aria-label="購物車" className="relative rounded-md p-2 hover:bg-[#efe8dd]">
+        <IconBag />
+        {cartCount > 0 && (
+          <span className="absolute -right-0.5 -top-0.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-[#c84767] px-1 text-[10px] font-semibold text-white">
+            {cartCount}
+          </span>
+        )}
+      </button>
+      <AccountMenu nextPath="/account" />
+    </div>
   );
 }
 

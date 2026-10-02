@@ -1,8 +1,9 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
-import AccountMenu from './AccountMenu';
+import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
+import { HeaderIcons } from './StoreHeader';
 import { useShopHome } from '@/lib/shop-home';
 
 const STORE_NAME = process.env.NEXT_PUBLIC_STORE_NAME || 'URBANITE';
@@ -24,6 +25,7 @@ type ShopHeaderProps = {
   onFavoriteClick?: () => void;
 };
 
+// 內頁表頭(會員中心、結帳、頁尾內文頁):左側回商店,右側圖示與首頁相同
 export default function ShopHeader({
   logoUrl = '',
   leftHref,
@@ -31,17 +33,19 @@ export default function ShopHeader({
   showBack = true,
   logoLinked = true,
   cartCount,
-  favoriteCount = 0,
+  favoriteCount,
   favoriteActive = false,
   onFavoriteClick,
 }: ShopHeaderProps) {
+  const router = useRouter();
   const [resolvedLogoUrl, setResolvedLogoUrl] = useState(logoUrl);
   // 未指定時回到顧客原本所在的商店(主站或活動頁)
   const shopHome = useShopHome();
   const backHref = leftHref ?? shopHome;
   const [localCartCount, setLocalCartCount] = useState(0);
+  const [localFavoriteCount, setLocalFavoriteCount] = useState(0);
   const shownCartCount = cartCount ?? localCartCount;
-  const shownFavoriteActive = favoriteActive || favoriteCount > 0;
+  const shownFavoriteCount = favoriteCount ?? localFavoriteCount;
 
   useEffect(() => {
     if (logoUrl) {
@@ -67,31 +71,20 @@ export default function ShopHeader({
     }
   }, [cartCount]);
 
-  const favoriteButton = useMemo(() => {
-    const content = (
-      <>
-        <IconStar filled={shownFavoriteActive} />
-        {favoriteCount > 0 && (
-          <span className="absolute -right-0.5 -top-0.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-[#c84767] px-1 text-[10px] font-semibold text-white">
-            {favoriteCount}
-          </span>
-        )}
-      </>
-    );
-    const className = 'relative rounded-md p-2 hover:bg-[#efe8dd]';
-    if (onFavoriteClick) {
-      return (
-        <button type="button" onClick={onFavoriteClick} aria-label="收藏" className={className}>
-          {content}
-        </button>
-      );
-    }
-    return (
-      <Link href="/account" aria-label="收藏" className={className}>
-        {content}
-      </Link>
-    );
-  }, [favoriteCount, onFavoriteClick, shownFavoriteActive]);
+  // 頁面沒有提供收藏數時,自行讀取(未登入為 0)
+  useEffect(() => {
+    if (typeof favoriteCount === 'number') return;
+    fetch('/api/favorites')
+      .then((res) => (res.ok ? res.json() : { productIds: [] }))
+      .then((data: { productIds?: string[] }) => setLocalFavoriteCount(data.productIds?.length ?? 0))
+      .catch(() => {});
+  }, [favoriteCount]);
+
+  const logo = resolvedLogoUrl ? (
+    <img src={resolvedLogoUrl} alt={STORE_NAME} className="mx-auto h-8 w-auto object-contain sm:h-10" />
+  ) : (
+    <span className="inline-block h-8 w-28 sm:h-10 sm:w-36" aria-hidden />
+  );
 
   return (
     <header className="sticky top-0 z-30 border-b border-[#e5ded4] bg-[#faf7f2]/95 backdrop-blur">
@@ -106,52 +99,20 @@ export default function ShopHeader({
 
         {logoLinked ? (
           <Link href={backHref} className="justify-self-center px-2 text-center">
-            {resolvedLogoUrl ? (
-              <img src={resolvedLogoUrl} alt={STORE_NAME} className="mx-auto h-8 w-auto object-contain sm:h-10" />
-            ) : (
-              <span className="inline-block h-8 w-28 sm:h-10 sm:w-36" aria-hidden />
-            )}
+            {logo}
           </Link>
         ) : (
-          <div className="justify-self-center px-2 text-center">
-            {resolvedLogoUrl ? (
-              <img src={resolvedLogoUrl} alt={STORE_NAME} className="mx-auto h-8 w-auto object-contain sm:h-10" />
-            ) : (
-              <span className="inline-block h-8 w-28 sm:h-10 sm:w-36" aria-hidden />
-            )}
-          </div>
+          <div className="justify-self-center px-2 text-center">{logo}</div>
         )}
 
-        <div className="flex items-center justify-end gap-1 sm:gap-2">
-          {favoriteButton}
-          <Link href="/checkout" aria-label="購物車" className="relative rounded-md p-2 hover:bg-[#efe8dd]">
-            <IconBag />
-            {shownCartCount > 0 && (
-              <span className="absolute -right-0.5 -top-0.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-[#c84767] px-1 text-[10px] font-semibold text-white">
-                {shownCartCount}
-              </span>
-            )}
-          </Link>
-          <AccountMenu />
-        </div>
+        <HeaderIcons
+          favoriteCount={shownFavoriteCount}
+          favoriteActive={favoriteActive}
+          cartCount={shownCartCount}
+          onFavorites={onFavoriteClick ?? (() => router.push('/account?tab=favorites'))}
+          onCart={() => router.push('/checkout')}
+        />
       </nav>
     </header>
-  );
-}
-
-function IconBag() {
-  return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
-      <path d="M6 8h12l-1 12H7L6 8z" strokeLinejoin="round" />
-      <path d="M9 8V6a3 3 0 016 0v2" strokeLinecap="round" />
-    </svg>
-  );
-}
-
-function IconStar({ filled = false }: { filled?: boolean }) {
-  return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill={filled ? '#f5c542' : 'none'} stroke={filled ? '#d89a00' : 'currentColor'} strokeWidth="1.8" strokeLinejoin="round">
-      <path d="m12 2 3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21 7 14.2l-5-4.9 6.9-1L12 2Z" />
-    </svg>
   );
 }
