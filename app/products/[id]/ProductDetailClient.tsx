@@ -1,14 +1,13 @@
 'use client';
 
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Product } from '@/lib/types';
 import { FREE_SHIPPING_THRESHOLD } from '@/lib/shipping';
-import AccountMenu from '@/app/components/AccountMenu';
+import StoreHeader from '@/app/components/StoreHeader';
+import { useLoopCarousel } from '@/app/components/useLoopCarousel';
 import { setShopHome } from '@/lib/shop-home';
 
-const STORE_NAME = process.env.NEXT_PUBLIC_STORE_NAME || 'URBANITE';
 const CART_KEY = 'cart';
 
 type CartItem = {
@@ -30,7 +29,11 @@ export default function ProductDetailClient({ product, homeHref = '/' }: { produ
   const gallery = product.images?.length ? product.images : product.image ? [product.image] : [];
   const specs = product.specs ?? [];
   const hasSpecs = specs.length > 0;
-  const [activeImage, setActiveImage] = useState(gallery[0] ?? '');
+  // 商品照片可左右滑動(與首頁輪播圖相同的無限循環)
+  const carousel = useLoopCarousel(gallery);
+  // 選擇顏色時若該顏色圖不在相簿中,暫時顯示該圖;滑動或點縮圖後恢復相簿
+  const [colorImage, setColorImage] = useState('');
+  const activeImage = colorImage || gallery[carousel.realIndex] || '';
   const [selectedColor, setSelectedColor] = useState(product.colors[0] ?? '');
   const [selectedSize, setSelectedSize] = useState(product.sizes[0] ?? '');
   // 預設規格:優先選每個維度的第一個選項;但若那個組合剛好沒庫存,
@@ -51,6 +54,9 @@ export default function ProductDetailClient({ product, homeHref = '/' }: { produ
   const [favorite, setFavorite] = useState(false);
   const [logoUrl, setLogoUrl] = useState('');
   const [cartCount, setCartCount] = useState(0);
+  const [favoriteCount, setFavoriteCount] = useState(0);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [query, setQuery] = useState('');
   const router = useRouter();
 
   function refreshCartCount() {
@@ -76,6 +82,12 @@ export default function ProductDetailClient({ product, homeHref = '/' }: { produ
         if (settings?.logo_url) setLogoUrl(settings.logo_url);
       })
       .catch(() => {});
+
+    // 表頭收藏數(未登入時為 0)
+    fetch('/api/favorites')
+      .then((res) => (res.ok ? res.json() : { productIds: [] }))
+      .then((data: { productIds?: string[] }) => setFavoriteCount(data.productIds?.length ?? 0))
+      .catch(() => {});
   }, []);
 
   const variantLabel = useMemo(() => {
@@ -100,7 +112,7 @@ export default function ProductDetailClient({ product, homeHref = '/' }: { produ
     ? Number.POSITIVE_INFINITY
     : Math.max(0, hasSpecs ? (allSpecsChosen ? variantInventory : 0) : product.inventory ?? 0);
 
-  const cartIconRef = useRef<HTMLAnchorElement>(null);
+  const cartIconRef = useRef<HTMLButtonElement>(null);
   const mainImgRef = useRef<HTMLImageElement>(null);
   const [added, setAdded] = useState(false);
   const addedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -126,6 +138,16 @@ export default function ProductDetailClient({ product, homeHref = '/' }: { produ
       el.style.opacity = '0.15';
     });
     window.setTimeout(() => el.remove(), 1160);
+  }
+
+  function showImage(url: string) {
+    const index = gallery.indexOf(url);
+    if (index >= 0) {
+      setColorImage('');
+      carousel.go(index);
+    } else {
+      setColorImage(url);
+    }
   }
 
   function showAdded() {
@@ -193,57 +215,47 @@ export default function ProductDetailClient({ product, homeHref = '/' }: { produ
 
   return (
     <main className="min-h-screen bg-white text-[#2c2826]">
-      <header className="sticky top-0 z-30 border-b border-[#e5ded4] bg-[#faf7f2]/95 backdrop-blur">
-        <nav className="mx-auto grid max-w-7xl grid-cols-[1fr_auto_1fr] items-center px-4 py-4 sm:px-6">
-          <div className="flex items-center gap-3">
-            <Link href={homeHref} aria-label="回到選單" className="rounded-md p-1 text-[#1f1b19] hover:bg-[#efe8dd]">
-              <IconMenu />
-            </Link>
-          </div>
-
-          <Link href={homeHref} className="justify-self-center px-2 text-center">
-            {logoUrl ? (
-              <img
-                src={logoUrl}
-                alt={STORE_NAME}
-                className="mx-auto h-8 w-auto object-contain sm:h-10"
-              />
-            ) : (
-              <span className="inline-block h-8 w-28 sm:h-10 sm:w-36" aria-hidden />
-            )}
-          </Link>
-
-          <div className="flex items-center justify-end gap-1 sm:gap-2">
-            <Link href={homeHref} aria-label="搜尋" className="rounded-md p-2 hover:bg-[#efe8dd]">
-              <IconSearch />
-            </Link>
-            <button
-              type="button"
-              onClick={() => setFavorite((value) => !value)}
-              aria-label="收藏商品"
-              className="rounded-md p-2 hover:bg-[#efe8dd]"
-            >
-              <IconStar filled={favorite} />
-            </button>
-            <Link ref={cartIconRef} href="/checkout" aria-label="購物車" className="relative rounded-md p-2 hover:bg-[#efe8dd]">
-              <IconBag />
-              {cartCount > 0 && (
-                <span className="absolute -right-0.5 -top-0.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-[#c84767] px-1 text-[10px] font-semibold text-white">
-                  {cartCount}
-                </span>
-              )}
-            </Link>
-            <AccountMenu nextPath={`/products/${encodeURIComponent(product.id)}`} />
-          </div>
-        </nav>
-      </header>
+      <StoreHeader
+        homeHref={homeHref}
+        logoUrl={logoUrl}
+        favoriteCount={favoriteCount}
+        cartCount={cartCount}
+        cartIconRef={cartIconRef}
+        searchOpen={searchOpen}
+        query={query}
+        onMenu={() => router.push(homeHref)}
+        onSearchToggle={() => setSearchOpen((v) => !v)}
+        onQueryChange={setQuery}
+        onSearchSubmit={() => {
+          const q = query.trim();
+          router.push(q ? `${homeHref}?q=${encodeURIComponent(q)}` : homeHref);
+        }}
+        onFavorites={() => router.push('/account?tab=favorites')}
+        onCart={() => router.push('/checkout')}
+      />
 
       <section className="mx-auto max-w-6xl px-4 py-4 sm:px-6 lg:py-8">
         <div className="grid gap-8 lg:grid-cols-[1.05fr_0.95fr] lg:items-start">
         <div className="lg:sticky lg:top-24">
         <div className="mx-auto aspect-[3/4] w-full max-w-md overflow-hidden rounded-xl bg-[#eee8e1] sm:max-w-lg lg:max-w-none">
-          {activeImage ? (
-            <img ref={mainImgRef} src={activeImage} alt={product.name} className="h-full w-full object-contain drop-shadow-[0_18px_22px_rgba(31,27,25,0.22)]" />
+          {colorImage ? (
+            <img ref={mainImgRef} src={colorImage} alt={product.name} className="h-full w-full object-contain drop-shadow-[0_18px_22px_rgba(31,27,25,0.22)]" />
+          ) : gallery.length ? (
+            <div
+              {...carousel.trackProps}
+              className={`h-full touch-pan-y select-none ${carousel.trackProps.className}`}
+            >
+              {carousel.slides.map((url, i) => (
+                <img
+                  key={`${url}-${i}`}
+                  ref={i === carousel.pos ? mainImgRef : undefined}
+                  src={url}
+                  alt={product.name}
+                  draggable={false}
+                  className="pointer-events-none h-full w-full shrink-0 object-contain drop-shadow-[0_18px_22px_rgba(31,27,25,0.22)]"
+                />
+              ))}
+            </div>
           ) : (
             <div className="flex h-full items-center justify-center text-[#8a7f72]">無商品圖片</div>
           )}
@@ -253,10 +265,13 @@ export default function ProductDetailClient({ product, homeHref = '/' }: { produ
             {gallery.map((url, index) => (
               <button
                 key={`${url}-${index}`}
-                onClick={() => setActiveImage(url)}
+                onClick={() => {
+                  setColorImage('');
+                  carousel.go(index);
+                }}
                 aria-label={`查看圖片 ${index + 1}`}
                 className={`aspect-[3/4] w-12 shrink-0 overflow-hidden rounded-md border-2 bg-[#eee8e1] transition ${
-                  activeImage === url ? 'border-[#c84767]' : 'border-transparent opacity-70 hover:opacity-100'
+                  !colorImage && carousel.realIndex === index ? 'border-[#c84767]' : 'border-transparent opacity-70 hover:opacity-100'
                 }`}
               >
                 <img src={url} alt="" className="h-full w-full object-contain drop-shadow-[0_8px_10px_rgba(31,27,25,0.18)]" />
@@ -316,7 +331,7 @@ export default function ProductDetailClient({ product, homeHref = '/' }: { produ
                           onClick={() => {
                             setSpecSel((prev) => prev.map((v, idx) => (idx === i ? opt : v)));
                             if (dim.name.includes('色') && product.color_images?.[opt]) {
-                              setActiveImage(product.color_images[opt]);
+                              showImage(product.color_images[opt]);
                             }
                           }}
                           className={`min-w-16 border px-5 py-3 text-sm font-semibold ${
@@ -492,32 +507,6 @@ export default function ProductDetailClient({ product, homeHref = '/' }: { produ
         已加入購物車
       </div>
     </main>
-  );
-}
-
-function IconMenu() {
-  return (
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
-      <path d="M4 7h16M4 12h16M4 17h16" strokeLinecap="round" />
-    </svg>
-  );
-}
-
-function IconSearch() {
-  return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
-      <circle cx="11" cy="11" r="7" />
-      <path d="M21 21l-4-4" strokeLinecap="round" />
-    </svg>
-  );
-}
-
-function IconBag() {
-  return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
-      <path d="M6 8h12l-1 12H7L6 8z" strokeLinejoin="round" />
-      <path d="M9 8V6a3 3 0 016 0v2" strokeLinecap="round" />
-    </svg>
   );
 }
 

@@ -9,9 +9,10 @@ import { uiAlert } from '@/lib/ui-dialog';
 import { computeShipping } from '@/lib/shipping';
 import { setShopHome } from '@/lib/shop-home';
 import { campaignHomeHref } from '@/lib/campaign';
-import AccountMenu from '@/app/components/AccountMenu';
 import FavoriteFoldButton from '@/app/components/FavoriteFoldButton';
 import CategoryNavigation from '@/app/components/CategoryNavigation';
+import { useLoopCarousel } from '@/app/components/useLoopCarousel';
+import StoreHeader from '@/app/components/StoreHeader';
 
 // 購物車存在瀏覽器本機的 key(結帳頁會讀同一份)
 const CART_KEY = 'cart';
@@ -138,6 +139,17 @@ export default function Storefront({ campaign = null, preview = false }: { campa
     window.setTimeout(() => el.remove(), 1160);
   }
 
+  // 從商品頁搜尋過來(?q=):直接顯示搜尋結果
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search).get('q');
+    if (!q) return;
+    Promise.resolve().then(() => {
+      setQuery(q);
+      setSearchOpen(true);
+      setCategory('all');
+    });
+  }, []);
+
   // 記住目前所在的商店,購物車/結帳頁的「回商店」會帶回這裡
   useEffect(() => {
     setShopHome(homeHref);
@@ -163,13 +175,7 @@ export default function Storefront({ campaign = null, preview = false }: { campa
       })
       .catch(() => {});
 
-    // 活動頁的輪播圖使用活動主視覺
-    if (campaign) {
-      setBanners(campaign.hero_image
-        ? [{ id: campaign.id, image: campaign.hero_image, link: '', title: campaign.title || campaign.name, active: true, sort_order: 0 }]
-        : []);
-      return;
-    }
+    if (campaign) return; // 活動頁的輪播圖使用活動主視覺(見 heroBanners)
     fetch('/api/banners')
       .then((res) => (res.ok ? res.json() : []))
       .then((data: Banner[]) => setBanners(data))
@@ -262,6 +268,13 @@ export default function Storefront({ campaign = null, preview = false }: { campa
   ];
 
   const liveProducts = products.filter((p) => p.status !== '已下架');
+
+  // 活動頁的輪播圖使用活動主視覺
+  const heroBanners: Banner[] = campaign
+    ? campaign.hero_image
+      ? [{ id: campaign.id, image: campaign.hero_image, link: '', title: campaign.title || campaign.name, active: true, sort_order: 0 }]
+      : []
+    : banners.filter((b) => b.active);
 
   const visibleProducts = useMemo(() => {
     let list = liveProducts;
@@ -426,87 +439,22 @@ export default function Storefront({ campaign = null, preview = false }: { campa
         <div className="bg-[#221f1d] px-4 py-2 text-center text-xs font-semibold tracking-widest text-white">草稿預覽模式</div>
       )}
       {/* 頂部導覽 */}
-      <header className="sticky top-0 z-30 bg-[#faf7f2]/95 backdrop-blur">
-        <nav className="mx-auto grid max-w-6xl grid-cols-[1fr_auto_1fr] items-center px-4 py-4 sm:px-6 sm:py-5">
-          {/* 左:漢堡選單 + 搜尋 */}
-          <div className="flex items-center gap-1 sm:gap-2">
-            <button
-              onClick={() => setMenuOpen(true)}
-              aria-label="開啟選單"
-              className="rounded-md p-1 text-[#1f1b19] hover:bg-[#efe8dd]"
-            >
-              <IconMenu />
-            </button>
-            <button
-              onClick={() => setSearchOpen((v) => !v)}
-              aria-label="搜尋"
-              className="rounded-md p-2 hover:bg-[#efe8dd]"
-            >
-              <IconSearch />
-            </button>
-          </div>
+      <StoreHeader
+        homeHref={homeHref}
+        logoUrl={logoUrl}
+        favoriteCount={confirmedFavorites.size}
+        cartCount={cartCount}
+        cartIconRef={cartIconRef}
+        searchOpen={searchOpen}
+        query={query}
+        onMenu={() => setMenuOpen(true)}
+        onSearchToggle={() => setSearchOpen((v) => !v)}
+        onQueryChange={setQuery}
+        onFavorites={() => setFavoritesOpen(true)}
+        onCart={() => setCartOpen(true)}
+      />
 
-          {/* 中:Logo(載入完成前先留白,避免先閃文字再換成 Logo 圖)*/}
-          <Link href={homeHref} className="justify-self-center px-2 text-center">
-            {logoUrl ? (
-              <img
-                src={logoUrl}
-                alt={STORE_NAME}
-                className="mx-auto h-8 w-auto object-contain sm:h-10"
-              />
-            ) : (
-              <span className="inline-block h-8 w-28 sm:h-10 sm:w-36" aria-hidden />
-            )}
-          </Link>
-
-          {/* 右:圖示列 */}
-          <div className="flex items-center justify-end gap-1 sm:gap-2">
-            <button
-              onClick={() => setFavoritesOpen(true)}
-              aria-label="收藏清單"
-              className={`relative rounded-md p-2 hover:bg-[#efe8dd] ${confirmedFavorites.size > 0 ? 'text-[#c84767]' : ''}`}
-            >
-              <IconHeart filled={confirmedFavorites.size > 0} size={20} />
-              {confirmedFavorites.size > 0 && (
-                <span className="absolute -right-0.5 -top-0.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-[#c84767] px-1 text-[10px] font-semibold text-white transition-opacity duration-150">
-                  {confirmedFavorites.size}
-                </span>
-              )}
-            </button>
-            <button
-              ref={cartIconRef}
-              onClick={() => setCartOpen(true)}
-              aria-label="購物車"
-              className="relative rounded-md p-2 hover:bg-[#efe8dd]"
-            >
-              <IconBag />
-              {cartCount > 0 && (
-                <span className="absolute -right-0.5 -top-0.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-[#c84767] px-1 text-[10px] font-semibold text-white">
-                  {cartCount}
-                </span>
-              )}
-            </button>
-            <AccountMenu nextPath="/account" />
-          </div>
-        </nav>
-
-        {/* 搜尋列 */}
-        {searchOpen && (
-          <div className="border-t border-[#e5ded4] bg-[#faf7f2]">
-            <div className="mx-auto max-w-7xl px-4 py-3 sm:px-6">
-              <input
-                autoFocus
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="搜尋商品…"
-                className="w-full rounded-full border border-[#e5ded4] bg-white px-5 py-2.5 text-sm outline-none focus:border-[#c9a] "
-              />
-            </div>
-          </div>
-        )}
-      </header>
-
-      <HeroCarousel banners={banners.filter((b) => b.active)} />
+      <HeroCarousel banners={heroBanners} />
       <CategoryNavigation categories={categoryTabs} value={category} onSelect={setCategory} />
 
       <div className="mx-auto max-w-6xl px-4 pb-8 sm:px-6">
@@ -1369,116 +1317,17 @@ function Row({ label, value, strong = false }: { label: string; value: string; s
   );
 }
 
-const SLIDE_MS = 500;
-
 function HeroCarousel({ banners }: { banners: Banner[] }) {
+  const { slides, realIndex, realOf, step, go, trackProps } = useLoopCarousel(banners, { autoplayMs: 4000 });
   const count = banners.length;
-  const looping = count > 1;
-  // 無限循環:軌道為 [最後一張副本, ...全部, 第一張副本],pos 為軌道上的位置(真實第 1 張 = 1)。
-  // 滑過最後一張會繼續滑到「第一張副本」,動畫結束後無動畫地換回真實第一張,看起來像一直往同方向滑。
-  const slides = looping ? [banners[count - 1], ...banners, banners[0]] : banners;
-  const [pos, setPos] = useState(looping ? 1 : 0);
-  const [instant, setInstant] = useState(false); // 換回真實張時暫停過場動畫
-  const [dragX, setDragX] = useState(0); // 手指拖動中的即時位移(px)
-  const [dragging, setDragging] = useState(false);
-  const [widthPx, setWidthPx] = useState(0);
-  const dragXRef = useRef(0);
-  const startX = useRef<number | null>(null);
-  const width = useRef(0);
-
-  const realIndex = looping ? (pos - 1 + count) % count : 0;
-  const onClone = looping && (pos === 0 || pos === count + 1);
-
-  // 落在副本上時,過場結束後瞬間換回對應的真實張
-  function settle() {
-    setInstant(true);
-    setPos((p) => (p === 0 ? count : p === count + 1 ? 1 : p));
-  }
-
-  // 換回真實張並畫面更新後,再恢復過場動畫
-  useEffect(() => {
-    if (!instant) return;
-    const timer = window.setTimeout(() => setInstant(false), 50);
-    return () => window.clearTimeout(timer);
-  }, [instant]);
-
-  useEffect(() => {
-    if (!onClone || dragging) return;
-    const timer = window.setTimeout(settle, SLIDE_MS);
-    return () => window.clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [onClone, dragging]);
-
-  // 每 4 秒自動往下一張(與手動滑動同一個循環邏輯)
-  useEffect(() => {
-    if (!looping || dragging) return;
-    const timer = setInterval(() => setPos((p) => Math.min(p + 1, count + 1)), 4000);
-    return () => clearInterval(timer);
-  }, [looping, count, dragging]);
-
-  // 輪播圖數量改變時回到第一張
-  useEffect(() => {
-    setPos(looping ? 1 : 0);
-  }, [looping, count]);
-
   if (count === 0) return null;
-
-  const step = (delta: number) => setPos((p) => Math.max(0, Math.min(count + 1, p + delta)));
-  const go = (i: number) => setPos(looping ? i + 1 : 0);
-
-  function onDown(clientX: number, currentTarget: HTMLElement) {
-    if (onClone) settle();
-    startX.current = clientX;
-    width.current = currentTarget.offsetWidth || 1;
-    setWidthPx(width.current);
-    setDragging(true);
-    dragXRef.current = 0;
-    setDragX(0);
-  }
-  function onMove(clientX: number) {
-    if (startX.current === null) return;
-    dragXRef.current = clientX - startX.current;
-    setDragX(dragXRef.current);
-  }
-  function onUp() {
-    if (startX.current === null) return;
-    const d = dragXRef.current;
-    const threshold = width.current * 0.15;
-    if (looping && d <= -threshold) step(1);
-    else if (looping && d >= threshold) step(-1);
-    startX.current = null;
-    dragXRef.current = 0;
-    setDragging(false);
-    setDragX(0);
-  }
-
-  const dragPercent = widthPx ? (dragX / widthPx) * 100 : 0;
 
   return (
     <section aria-label="首頁輪播" className="group relative w-full select-none overflow-hidden bg-[#e9e1d6]">
-      <div
-        className={`flex ${dragging || instant ? '' : 'transition-transform duration-500 ease-out'}`}
-        style={{ transform: `translateX(calc(-${pos * 100}% + ${dragPercent}%))` }}
-        onTouchStart={(e) => onDown(e.touches[0].clientX, e.currentTarget)}
-        onTouchMove={(e) => onMove(e.touches[0].clientX)}
-        onTouchEnd={onUp}
-        onPointerDown={(e) => {
-          if (e.pointerType === 'mouse') onDown(e.clientX, e.currentTarget);
-        }}
-        onPointerMove={(e) => {
-          if (e.pointerType === 'mouse' && startX.current !== null) onMove(e.clientX);
-        }}
-        onPointerUp={(e) => {
-          if (e.pointerType === 'mouse') onUp();
-        }}
-        onPointerLeave={(e) => {
-          if (e.pointerType === 'mouse') onUp();
-        }}
-      >
+      <div {...trackProps}>
         {slides.map((banner, i) => {
           // 副本與真實張共用同一個「真實序號」,換回真實張時樣式不會閃動
-          const slideReal = looping ? (i - 1 + count) % count : i;
-          const active = slideReal === realIndex;
+          const active = realOf(i) === realIndex;
           const img = (
             <img
               src={banner.image}
@@ -1790,25 +1639,10 @@ function QuickAddModal({
 }
 
 /* ---------- 圖示 ---------- */
-function IconMenu() {
-  return (
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
-      <path d="M3 6h18M3 12h18M3 18h18" strokeLinecap="round" />
-    </svg>
-  );
-}
 function IconClose() {
   return (
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
       <path d="M6 6l12 12M18 6L6 18" strokeLinecap="round" />
-    </svg>
-  );
-}
-function IconSearch() {
-  return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
-      <circle cx="11" cy="11" r="7" />
-      <path d="M21 21l-4-4" strokeLinecap="round" />
     </svg>
   );
 }
@@ -1819,17 +1653,6 @@ function IconHeart({ filled = false, size = 16 }: { filled?: boolean; size?: num
     </svg>
   );
 }
-function IconBag() {
-  return (
-    <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="9" cy="20" r="1.7" />
-      <circle cx="18" cy="20" r="1.7" />
-      <path d="M3 4h2l2.4 11.2a2 2 0 0 0 2 1.6h7.8a2 2 0 0 0 1.9-1.4L21 8H7" />
-      <path d="M8 8h13" />
-    </svg>
-  );
-}
-
 function IconCart() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
