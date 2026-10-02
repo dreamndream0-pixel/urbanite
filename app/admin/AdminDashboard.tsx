@@ -6556,9 +6556,6 @@ function ProductModal({
                 >
                   貼上網址
                 </button>
-                <span className="text-xs text-[#8a7f72]">
-                  {draft.images.length}/{MAX_PRODUCT_IMAGES}
-                </span>
               </div>
               {uploadProgress && (
                 <div>
@@ -6576,9 +6573,6 @@ function ProductModal({
                   </div>
                 </div>
               )}
-              <p className="text-xs text-[#8a7f72]">
-                可一次選多張。圖片會上傳到 Supabase Storage,第一張會成為前台封面圖。
-              </p>
 	            </div>
 	          </Field>
 	          </section>
