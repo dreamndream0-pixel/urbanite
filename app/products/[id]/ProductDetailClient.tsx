@@ -549,7 +549,6 @@ export default function ProductDetailClient({ product, homeHref = '/' }: { produ
               ) : (
                 <p>精選商品,適合日常穿搭與送禮。</p>
               )}
-              <p className="mt-3">庫存: {product.inventory}</p>
             </div>
           ) : (
             <div className="mx-auto max-w-2xl py-10 text-center leading-8 text-[#5d5652]">
