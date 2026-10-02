@@ -273,7 +273,7 @@ export default function ProductDetailClient({ product, homeHref = '/' }: { produ
                 type="button"
                 onClick={() => carousel.step(-1)}
                 aria-label="上一張照片"
-                className="absolute left-2 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-black/15 text-white backdrop-blur-sm transition hover:bg-black/25"
+                className="absolute left-2 top-1/2 flex h-10 w-8 -translate-y-1/2 items-center justify-center text-[#1f1b19]/60 drop-shadow-[0_1px_1px_rgba(255,255,255,0.8)] transition hover:text-[#1f1b19]"
               >
                 <IconChevron dir="left" />
               </button>
@@ -281,7 +281,7 @@ export default function ProductDetailClient({ product, homeHref = '/' }: { produ
                 type="button"
                 onClick={() => carousel.step(1)}
                 aria-label="下一張照片"
-                className="absolute right-2 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-black/15 text-white backdrop-blur-sm transition hover:bg-black/25"
+                className="absolute right-2 top-1/2 flex h-10 w-8 -translate-y-1/2 items-center justify-center text-[#1f1b19]/60 drop-shadow-[0_1px_1px_rgba(255,255,255,0.8)] transition hover:text-[#1f1b19]"
               >
                 <IconChevron dir="right" />
               </button>
@@ -548,7 +548,7 @@ function IconStar({ filled = false }: { filled?: boolean }) {
 
 function IconChevron({ dir }: { dir: 'left' | 'right' }) {
   return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d={dir === 'left' ? 'M15 6l-6 6 6 6' : 'M9 6l6 6-6 6'} />
     </svg>
   );
