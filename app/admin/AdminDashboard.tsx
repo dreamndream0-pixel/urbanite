@@ -6344,7 +6344,7 @@ function ProductModal({
 	            </Field>
 	          </div>
 	          <div className="mt-4 rounded-xl border border-[#e5ded4] p-4">
-	            <Field label="商品規格">
+	            <FieldGroup label="商品規格">
 	              <div className="space-y-2">
 	                {draft.specs.map((s, i) => (
 	                  <div key={i} className="grid gap-3 rounded-xl border border-[#e5ded4] p-3 md:grid-cols-[220px_1fr_auto]">
@@ -6437,7 +6437,7 @@ function ProductModal({
                   </div>
                 )}
 	              </div>
-	            </Field>
+	            </FieldGroup>
 	            {hasSpecs && (
 	              <p className="mt-3 text-xs text-[#8a7f72]">
 	                已建立 {modalCombos.length} 個規格組合。新增商品時不建庫存,請到「庫存管理」使用入庫單登錄。
@@ -6469,7 +6469,7 @@ function ProductModal({
 	            </Field>
 	          </div>
 	          <div className="grid gap-3 sm:grid-cols-2">
-            <Field label="可用金流(未勾選=全部)">
+            <FieldGroup label="可用金流(未勾選=全部)">
               <div className="space-y-2 rounded-lg border border-[#e5ded4] p-3">
                 {paymentMethods.length === 0 ? (
                   <p className="text-sm text-[#8a7f72]">請先到系統設定新增金流方式。</p>
@@ -6486,8 +6486,8 @@ function ProductModal({
                   ))
                 )}
               </div>
-            </Field>
-            <Field label="可用物流與運費(未勾選=全部;運費留空=用後台預設)">
+            </FieldGroup>
+            <FieldGroup label="可用物流與運費(未勾選=全部;運費留空=用後台預設)">
               <div className="space-y-2 rounded-lg border border-[#e5ded4] p-3">
                 {shippingMethods.length === 0 ? (
                   <p className="text-sm text-[#8a7f72]">請先到系統設定新增物流方式。</p>
@@ -6526,11 +6526,13 @@ function ProductModal({
                   })
                 )}
               </div>
-	            </Field>
+	            </FieldGroup>
 	          </div>
 	          </section>
 	          <section className="rounded-2xl bg-white p-5">
-	          <Field label={`商品圖片(最多 ${MAX_PRODUCT_IMAGES} 張,第一張為封面)`}>
+	          {/* 不能用 <label>(Field):點區塊任何地方都會觸發第一個按鈕,誤刪第一張圖 */}
+	          <div className="block">
+	            <span className="mb-1 block text-sm font-semibold text-[#8a7f72]">{`商品圖片(最多 ${MAX_PRODUCT_IMAGES} 張,第一張為封面)`}</span>
             <div className="grid gap-3">
               {draft.images.length > 0 && (
                 <div className="grid grid-cols-4 gap-2 sm:grid-cols-5">
@@ -6620,7 +6622,7 @@ function ProductModal({
                 </div>
               )}
 	            </div>
-	          </Field>
+	          </div>
 	          </section>
 		          <div className="grid gap-3 sm:grid-cols-3">
             <Field label="排序(小的在前)">
@@ -6658,6 +6660,16 @@ function ProductModal({
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+// 含多個按鈕/勾選框的區塊用 FieldGroup(div):<label> 會把區塊內任何點擊轉給第一個控制項
+function FieldGroup({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="block">
+      <span className="mb-1 block text-sm font-semibold text-[#8a7f72]">{label}</span>
+      {children}
     </div>
   );
 }
