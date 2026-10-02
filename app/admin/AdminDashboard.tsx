@@ -4010,6 +4010,51 @@ function prepareProductImage(file: File, index: number, maxDim = 1600, quality =
   });
 }
 
+// 商品照統一 4:5(1080 × 1350):照片比例不同或尺寸不夠時,自動放大並以中央裁切成滿版。
+// 去背圖(透明 PNG)則完整縮放置中,避免把商品本體裁掉。GIF 保留原檔(避免失去動畫)。
+const PRODUCT_PHOTO_W = 1080;
+const PRODUCT_PHOTO_H = 1350;
+
+function fitProductPhoto(source: Blob, index: number, mode: 'cover' | 'contain'): Promise<{ blob: Blob; filename: string }> {
+  if (source.type === 'image/gif') {
+    return Promise.resolve({ blob: source, filename: `product-${Date.now()}-${index}.gif` });
+  }
+  const png = mode === 'contain';
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(source);
+    const img = new Image();
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const canvas = document.createElement('canvas');
+      canvas.width = PRODUCT_PHOTO_W;
+      canvas.height = PRODUCT_PHOTO_H;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        reject(new Error('無法處理圖片'));
+        return;
+      }
+      const fit = mode === 'cover' ? Math.max : Math.min;
+      const scale = fit(PRODUCT_PHOTO_W / img.naturalWidth, PRODUCT_PHOTO_H / img.naturalHeight);
+      const w = img.naturalWidth * scale;
+      const h = img.naturalHeight * scale;
+      ctx.imageSmoothingQuality = 'high';
+      ctx.drawImage(img, (PRODUCT_PHOTO_W - w) / 2, (PRODUCT_PHOTO_H - h) / 2, w, h);
+      canvas.toBlob(
+        (blob) => (blob
+          ? resolve({ blob, filename: `product-${Date.now()}-${index}.${png ? 'png' : 'jpg'}` })
+          : reject(new Error('圖片處理失敗'))),
+        png ? 'image/png' : 'image/jpeg',
+        0.88,
+      );
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error('圖片讀取失敗(可能是不支援的格式)'));
+    };
+    img.src = url;
+  });
+}
+
 // 用 XMLHttpRequest 上傳,才能拿到上傳進度(fetch 沒有上傳進度事件)
 function uploadImageWithProgress(
   blob: Blob,
@@ -6141,10 +6186,11 @@ function ProductModal({
           // 在瀏覽器端去背(第一次會下載去背模型,需要幾秒)
           setUploadProgress({ done: i, total: picked.length, percent: 0 });
           const { removeBackground } = await import('@imgly/background-removal');
-          blob = await removeBackground(picked[i]);
-          filename = `product-${Date.now()}-${i}.png`;
+          const cutout = await fitProductPhoto(await removeBackground(picked[i]), i, 'contain');
+          blob = cutout.blob;
+          filename = cutout.filename;
         } else {
-          const prepared = await prepareProductImage(picked[i], i);
+          const prepared = await fitProductPhoto(picked[i], i, 'cover');
           blob = prepared.blob;
           filename = prepared.filename;
         }
