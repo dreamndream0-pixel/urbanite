@@ -51,6 +51,14 @@ export default function ProductDetailClient({ product, homeHref = '/' }: { produ
   const [quantity, setQuantity] = useState(1);
   const [tab, setTab] = useState<'description' | 'shipping'>('shipping');
   const [message, setMessage] = useState('');
+  // 畫面置中的提示(深灰 80% 半透明,3 秒後消失)
+  const [toast, setToast] = useState('');
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  function showToast(text: string) {
+    setToast(text);
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => setToast(''), 3000);
+  }
   const [favorite, setFavorite] = useState(false);
   const [favoritePending, setFavoritePending] = useState(false);
   const [logoUrl, setLogoUrl] = useState('');
@@ -116,10 +124,10 @@ export default function ProductDetailClient({ product, homeHref = '/' }: { produ
       }
       if (!res.ok) throw new Error('favorite failed');
       setFavoriteCount((n) => Math.max(0, n + (next ? 1 : -1)));
-      setMessage(next ? '已加入收藏' : '已取消收藏');
+      showToast(next ? '已加入收藏' : '已取消收藏');
     } catch {
       setFavorite(!next);
-      setMessage('收藏未儲存，請再試一次');
+      showToast('收藏未儲存，請再試一次');
     } finally {
       setFavoritePending(false);
     }
@@ -563,6 +571,17 @@ export default function ProductDetailClient({ product, homeHref = '/' }: { produ
           )}
         </section>
       </section>
+
+      {/* 置中懸浮提示(收藏等) */}
+      <div
+        role="status"
+        aria-live="polite"
+        className={`pointer-events-none fixed left-1/2 top-1/2 z-[80] -translate-x-1/2 -translate-y-1/2 rounded-xl bg-[#333333]/80 px-6 py-4 text-center text-sm font-semibold text-white shadow-lg transition-opacity duration-300 ${
+          toast ? 'opacity-100' : 'opacity-0'
+        }`}
+      >
+        {toast}
+      </div>
 
       {/* 已加入購物車 提示(停約 3 秒後淡出) */}
       <div
