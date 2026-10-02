@@ -1369,28 +1369,65 @@ function Row({ label, value, strong = false }: { label: string; value: string; s
   );
 }
 
+const SLIDE_MS = 500;
+
 function HeroCarousel({ banners }: { banners: Banner[] }) {
-  const [index, setIndex] = useState(0);
+  const count = banners.length;
+  const looping = count > 1;
+  // 無限循環:軌道為 [最後一張副本, ...全部, 第一張副本],pos 為軌道上的位置(真實第 1 張 = 1)。
+  // 滑過最後一張會繼續滑到「第一張副本」,動畫結束後無動畫地換回真實第一張,看起來像一直往同方向滑。
+  const slides = looping ? [banners[count - 1], ...banners, banners[0]] : banners;
+  const [pos, setPos] = useState(looping ? 1 : 0);
+  const [instant, setInstant] = useState(false); // 換回真實張時暫停過場動畫
   const [dragX, setDragX] = useState(0); // 手指拖動中的即時位移(px)
   const [dragging, setDragging] = useState(false);
   const [widthPx, setWidthPx] = useState(0);
   const dragXRef = useRef(0);
   const startX = useRef<number | null>(null);
   const width = useRef(0);
-  const count = banners.length;
 
-  const go = (i: number) => setIndex((i + count) % count);
+  const realIndex = looping ? (pos - 1 + count) % count : 0;
+  const onClone = looping && (pos === 0 || pos === count + 1);
+
+  // 落在副本上時,過場結束後瞬間換回對應的真實張
+  function settle() {
+    setInstant(true);
+    setPos((p) => (p === 0 ? count : p === count + 1 ? 1 : p));
+  }
+
+  // 換回真實張並畫面更新後,再恢復過場動畫
+  useEffect(() => {
+    if (!instant) return;
+    const timer = window.setTimeout(() => setInstant(false), 50);
+    return () => window.clearTimeout(timer);
+  }, [instant]);
 
   useEffect(() => {
-    if (count <= 1) return;
-    const timer = setInterval(() => setIndex((i) => (i + 1) % count), 4000);
+    if (!onClone || dragging) return;
+    const timer = window.setTimeout(settle, SLIDE_MS);
+    return () => window.clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [onClone, dragging]);
+
+  // 每 4 秒自動往下一張(與手動滑動同一個循環邏輯)
+  useEffect(() => {
+    if (!looping || dragging) return;
+    const timer = setInterval(() => setPos((p) => Math.min(p + 1, count + 1)), 4000);
     return () => clearInterval(timer);
-  }, [count]);
+  }, [looping, count, dragging]);
+
+  // 輪播圖數量改變時回到第一張
+  useEffect(() => {
+    setPos(looping ? 1 : 0);
+  }, [looping, count]);
 
   if (count === 0) return null;
-  const safeIndex = Math.min(index, count - 1);
+
+  const step = (delta: number) => setPos((p) => Math.max(0, Math.min(count + 1, p + delta)));
+  const go = (i: number) => setPos(looping ? i + 1 : 0);
 
   function onDown(clientX: number, currentTarget: HTMLElement) {
+    if (onClone) settle();
     startX.current = clientX;
     width.current = currentTarget.offsetWidth || 1;
     setWidthPx(width.current);
@@ -1407,8 +1444,8 @@ function HeroCarousel({ banners }: { banners: Banner[] }) {
     if (startX.current === null) return;
     const d = dragXRef.current;
     const threshold = width.current * 0.15;
-    if (d <= -threshold) setIndex((i) => (i + 1) % count);
-    else if (d >= threshold) setIndex((i) => (i - 1 + count) % count);
+    if (looping && d <= -threshold) step(1);
+    else if (looping && d >= threshold) step(-1);
     startX.current = null;
     dragXRef.current = 0;
     setDragging(false);
@@ -1420,8 +1457,8 @@ function HeroCarousel({ banners }: { banners: Banner[] }) {
   return (
     <section aria-label="首頁輪播" className="group relative w-full select-none overflow-hidden bg-[#e9e1d6]">
       <div
-        className={`flex ${dragging ? '' : 'transition-transform duration-500 ease-out'}`}
-        style={{ transform: `translateX(calc(-${safeIndex * 100}% + ${dragPercent}%))` }}
+        className={`flex ${dragging || instant ? '' : 'transition-transform duration-500 ease-out'}`}
+        style={{ transform: `translateX(calc(-${pos * 100}% + ${dragPercent}%))` }}
         onTouchStart={(e) => onDown(e.touches[0].clientX, e.currentTarget)}
         onTouchMove={(e) => onMove(e.touches[0].clientX)}
         onTouchEnd={onUp}
@@ -1438,8 +1475,10 @@ function HeroCarousel({ banners }: { banners: Banner[] }) {
           if (e.pointerType === 'mouse') onUp();
         }}
       >
-        {banners.map((banner, i) => {
-          const active = i === safeIndex;
+        {slides.map((banner, i) => {
+          // 副本與真實張共用同一個「真實序號」,換回真實張時樣式不會閃動
+          const slideReal = looping ? (i - 1 + count) % count : i;
+          const active = slideReal === realIndex;
           const img = (
             <img
               src={banner.image}
@@ -1453,7 +1492,7 @@ function HeroCarousel({ banners }: { banners: Banner[] }) {
           );
           return (
             <div
-              key={banner.id}
+              key={`${banner.id}-${i}`}
               className="relative aspect-[4/5] w-full shrink-0 bg-[#e9e1d6] sm:aspect-[16/7] lg:aspect-[16/5]"
             >
               {banner.link ? (
@@ -1471,14 +1510,14 @@ function HeroCarousel({ banners }: { banners: Banner[] }) {
       {count > 1 && (
         <>
           <button
-            onClick={() => go(index - 1)}
+            onClick={() => step(-1)}
             aria-label="上一張"
             className="absolute left-2 top-1/2 hidden -translate-y-1/2 items-center justify-center rounded-full bg-black/30 p-2 text-white opacity-0 transition group-hover:opacity-100 sm:flex"
           >
             <IconChevron dir="left" />
           </button>
           <button
-            onClick={() => go(index + 1)}
+            onClick={() => step(1)}
             aria-label="下一張"
             className="absolute right-2 top-1/2 hidden -translate-y-1/2 items-center justify-center rounded-full bg-black/30 p-2 text-white opacity-0 transition group-hover:opacity-100 sm:flex"
           >
@@ -1488,10 +1527,10 @@ function HeroCarousel({ banners }: { banners: Banner[] }) {
             {banners.map((banner, i) => (
               <button
                 key={banner.id}
-                onClick={() => setIndex(i)}
+                onClick={() => go(i)}
                 aria-label={`第 ${i + 1} 張`}
                 className={`h-2 rounded-full border border-white/80 transition-all ${
-                  i === index ? 'w-2 bg-white' : 'w-2 bg-transparent hover:bg-white/60'
+                  i === realIndex ? 'w-2 bg-white' : 'w-2 bg-transparent hover:bg-white/60'
                 }`}
               />
             ))}
