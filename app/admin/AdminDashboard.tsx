@@ -106,6 +106,7 @@ type Draft = {
   variantSafety: Record<string, number>; // 各規格安全庫存
   is_featured: boolean;
   sort_order: number;
+  campaign_id: string | null; // 一頁式活動頁商品;null = 主站商品
 };
 
 type DiscountDraft = {
@@ -317,7 +318,7 @@ function buildCategoryTree(cats: Category[]): { cat: Category; depth: number }[]
   return result;
 }
 
-function blankDraft(): Draft {
+function blankDraft(campaignId: string | null = null): Draft {
   return {
     id: '',
     name: '',
@@ -343,6 +344,7 @@ function blankDraft(): Draft {
     variantSafety: {},
     is_featured: false,
     sort_order: 0,
+    campaign_id: campaignId,
   };
 }
 
@@ -373,6 +375,7 @@ function toDraft(p: Product): Draft {
     variantStock,
     variantCost,
     variantSafety,
+    campaign_id: p.campaign_id ?? null,
   };
 }
 
@@ -387,7 +390,6 @@ export default function AdminDashboard({
   initialUserCoupons,
   initialCouponUsages,
   initialCampaigns,
-  initialCampaignProducts,
   initialLogoUrl,
   initialSettings,
   userEmail,
@@ -402,7 +404,6 @@ export default function AdminDashboard({
   initialUserCoupons: UserCoupon[];
   initialCouponUsages: CouponUsage[];
   initialCampaigns: import('@/lib/types').Campaign[];
-  initialCampaignProducts: import('@/lib/types').CampaignProduct[];
   initialLogoUrl: string;
   initialSettings: SiteSettings | null;
   userEmail: string;
@@ -1933,7 +1934,7 @@ export default function AdminDashboard({
                 }
               >
                 <div className="space-y-3">
-                  {products.map((product) => (
+                  {products.filter((product) => !product.campaign_id).map((product) => (
                     <div
                       key={product.id}
                       className="flex items-center gap-4 rounded-lg border border-[#e5ded4] p-3"
@@ -2674,7 +2675,20 @@ export default function AdminDashboard({
 
           {/* ===== 報表及分析 ===== */}
           {section === 'campaign-pages' && (
-            <CampaignManager initialCampaigns={initialCampaigns} initialProducts={initialCampaignProducts} />
+            <CampaignManager
+              initialCampaigns={initialCampaigns}
+              products={products.filter((product) => product.campaign_id)}
+              onNewProduct={(campaignId) => {
+                setEditing(blankDraft(campaignId));
+                setIsNew(true);
+              }}
+              onEditProduct={(product) => {
+                setEditing(toDraft(product));
+                setIsNew(false);
+              }}
+              onDeleteProduct={deleteProduct}
+              onCampaignDeleted={(campaignId) => setProducts((list) => list.filter((product) => product.campaign_id !== campaignId))}
+            />
           )}
 
           {/* ===== 報表及分析 ===== */}

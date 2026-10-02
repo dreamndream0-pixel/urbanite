@@ -15,7 +15,6 @@ import type {
   UserCoupon,
   Shipment,
   Campaign,
-  CampaignProduct,
 } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
@@ -53,7 +52,6 @@ export default async function AdminPage() {
     { data: userCoupons },
     { data: couponUsages },
     { data: campaigns },
-    { data: campaignProducts },
   ] = await Promise.all([
     supabase.from('products').select('*').order('sort_order', { ascending: true }),
     supabase.from('orders').select('*').order('created_at', { ascending: false }),
@@ -67,7 +65,6 @@ export default async function AdminPage() {
     supabase.from('user_coupons').select('*, coupon:discounts(*)').order('received_at', { ascending: false }),
     supabase.from('coupon_usages').select('*').order('used_at', { ascending: false }),
     supabase.from('campaigns').select('*').order('created_at', { ascending: false }),
-    supabase.from('campaign_products').select('*').order('sort_order', { ascending: true }),
   ]);
 
   return (
@@ -82,7 +79,6 @@ export default async function AdminPage() {
       initialUserCoupons={(userCoupons ?? []) as UserCoupon[]}
       initialCouponUsages={(couponUsages ?? []) as CouponUsage[]}
       initialCampaigns={(campaigns ?? []) as Campaign[]}
-      initialCampaignProducts={(campaignProducts ?? []) as CampaignProduct[]}
       initialLogoUrl={settings?.logo_url ?? ''}
       initialSettings={settings as SiteSettings | null}
       userEmail={user.email ?? ''}

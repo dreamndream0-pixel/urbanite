@@ -1,8 +1,9 @@
 import { notFound } from 'next/navigation';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getAdminUser } from '@/lib/supabase/server';
-import type { Campaign, CampaignProduct, SiteSettings } from '@/lib/types';
-import CampaignPageClient from './CampaignPageClient';
+import { isCampaignLive } from '@/lib/campaign';
+import type { Campaign } from '@/lib/types';
+import Storefront from '@/app/components/Storefront';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,28 +16,11 @@ export default async function CampaignPage({
 }) {
   const { slug } = await params;
   const preview = (await searchParams).preview === '1' && Boolean(await getAdminUser());
-  const supabase = createAdminClient();
-  const { data: campaign } = await supabase.from('campaigns').select('*').eq('slug', slug).maybeSingle();
+  const { data } = await createAdminClient().from('campaigns').select('*').eq('slug', slug).maybeSingle();
+  const campaign = data as Campaign | null;
   if (!campaign) notFound();
-  const item = campaign as Campaign;
-  // 此頁為動態伺服器頁面；每次請求都需依實際時間判斷活動是否開放。
-  // eslint-disable-next-line react-hooks/purity
-  const now = Date.now();
-  const outsideWindow = (item.start_at && new Date(item.start_at).getTime() > now)
-    || (item.end_at && new Date(item.end_at).getTime() < now);
-  if (!preview && (item.status !== 'published' || outsideWindow)) notFound();
+  if (!preview && !isCampaignLive(campaign)) notFound();
 
-  const [{ data: products }, { data: settings }] = await Promise.all([
-    supabase.from('campaign_products').select('*').eq('campaign_id', item.id).eq('status', '上架中').order('sort_order'),
-    supabase.from('site_settings').select('*').eq('id', 1).maybeSingle(),
-  ]);
-
-  return (
-    <CampaignPageClient
-      campaign={item}
-      products={(products ?? []) as CampaignProduct[]}
-      settings={(settings ?? null) as SiteSettings | null}
-      preview={preview}
-    />
-  );
+  // 活動頁與主站首頁使用同一個商店畫面,只顯示該活動的商品
+  return <Storefront campaign={campaign} preview={preview} />;
 }

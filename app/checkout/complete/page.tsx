@@ -4,6 +4,7 @@ import { Suspense, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import ShopHeader from '@/app/components/ShopHeader';
+import { useShopHome } from '@/lib/shop-home';
 
 type OrderStatus = {
   order_no: string;
@@ -51,6 +52,7 @@ function CompleteInner() {
     };
   }, [orderNo, hintStatus]);
 
+  const shopHome = useShopHome();
   const paid = order?.paid ?? false;
   const failed = hintStatus === 'fail' && !paid;
 
@@ -102,7 +104,7 @@ function CompleteInner() {
           )}
 
           <Link
-            href="/"
+            href={shopHome}
             className="mt-6 inline-block rounded-full border border-[#1f1b19] px-6 py-3 font-semibold"
           >
             繼續購物

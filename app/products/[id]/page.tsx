@@ -1,7 +1,9 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { createAdminClient } from '@/lib/supabase/admin';
-import type { Product } from '@/lib/types';
+import { getAdminUser } from '@/lib/supabase/server';
+import { campaignHomeHref, isCampaignLive } from '@/lib/campaign';
+import type { Campaign, Product } from '@/lib/types';
 import ProductDetailClient from './ProductDetailClient';
 
 export const dynamic = 'force-dynamic';
@@ -37,5 +39,13 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
 
   if (!product || product.status === '已下架') notFound();
 
-  return <ProductDetailClient product={product} />;
+  // 活動頁商品:活動未開放時只有管理員可預覽;頁面上的回首頁連結都回到該活動頁
+  let homeHref = '/';
+  if (product.campaign_id) {
+    const { data: campaign } = await supabase.from('campaigns').select('*').eq('id', product.campaign_id).maybeSingle();
+    if (!campaign || (!isCampaignLive(campaign as Campaign) && !(await getAdminUser()))) notFound();
+    homeHref = campaignHomeHref((campaign as Campaign).slug);
+  }
+
+  return <ProductDetailClient product={product} homeHref={homeHref} />;
 }

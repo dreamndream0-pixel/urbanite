@@ -6,6 +6,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Product } from '@/lib/types';
 import { FREE_SHIPPING_THRESHOLD } from '@/lib/shipping';
 import AccountMenu from '@/app/components/AccountMenu';
+import { setShopHome } from '@/lib/shop-home';
 
 const STORE_NAME = process.env.NEXT_PUBLIC_STORE_NAME || 'URBANITE';
 const CART_KEY = 'cart';
@@ -25,7 +26,7 @@ const formatter = new Intl.NumberFormat('zh-TW', {
   maximumFractionDigits: 0,
 });
 
-export default function ProductDetailClient({ product }: { product: Product }) {
+export default function ProductDetailClient({ product, homeHref = '/' }: { product: Product; homeHref?: string }) {
   const gallery = product.images?.length ? product.images : product.image ? [product.image] : [];
   const specs = product.specs ?? [];
   const hasSpecs = specs.length > 0;
@@ -61,6 +62,10 @@ export default function ProductDetailClient({ product }: { product: Product }) {
       setCartCount(0);
     }
   }
+
+  useEffect(() => {
+    setShopHome(homeHref);
+  }, [homeHref]);
 
   useEffect(() => {
     Promise.resolve().then(refreshCartCount);
@@ -191,12 +196,12 @@ export default function ProductDetailClient({ product }: { product: Product }) {
       <header className="sticky top-0 z-30 border-b border-[#e5ded4] bg-[#faf7f2]/95 backdrop-blur">
         <nav className="mx-auto grid max-w-7xl grid-cols-[1fr_auto_1fr] items-center px-4 py-4 sm:px-6">
           <div className="flex items-center gap-3">
-            <Link href="/" aria-label="回到選單" className="rounded-md p-1 text-[#1f1b19] hover:bg-[#efe8dd]">
+            <Link href={homeHref} aria-label="回到選單" className="rounded-md p-1 text-[#1f1b19] hover:bg-[#efe8dd]">
               <IconMenu />
             </Link>
           </div>
 
-          <Link href="/" className="justify-self-center px-2 text-center">
+          <Link href={homeHref} className="justify-self-center px-2 text-center">
             {logoUrl ? (
               <img
                 src={logoUrl}
@@ -209,7 +214,7 @@ export default function ProductDetailClient({ product }: { product: Product }) {
           </Link>
 
           <div className="flex items-center justify-end gap-1 sm:gap-2">
-            <Link href="/" aria-label="搜尋" className="rounded-md p-2 hover:bg-[#efe8dd]">
+            <Link href={homeHref} aria-label="搜尋" className="rounded-md p-2 hover:bg-[#efe8dd]">
               <IconSearch />
             </Link>
             <button

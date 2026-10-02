@@ -1,34 +1,35 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getAdminUser } from '@/lib/supabase/server';
-import { campaignProductAsProduct, type CampaignProduct, type Product } from '@/lib/types';
+import { isCampaignLive } from '@/lib/campaign';
+import type { Campaign, Product } from '@/lib/types';
 
-// GET /api/products — 取得所有商品(前台與後台共用)
+// GET /api/products — 取得商品(前台與後台共用)
+//   預設:主站商品(不含活動頁商品)
+//   ?campaign=<id>:該活動頁的商品
+//   ?cart=1:結帳用,主站商品 + 仍在活動期間內的活動頁商品
 export async function GET(request: NextRequest) {
   const supabase = createAdminClient();
-  const { data, error } = await supabase
-    .from('products')
-    .select('*')
-    .order('sort_order', { ascending: true });
+  const campaignId = request.nextUrl.searchParams.get('campaign') ?? '';
+  const forCart = request.nextUrl.searchParams.get('cart') === '1';
+  let query = supabase.from('products').select('*').order('sort_order', { ascending: true });
+  if (campaignId) query = query.eq('campaign_id', campaignId);
+  else if (!forCart) query = query.is('campaign_id', null);
+  const { data, error } = await query;
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   let result = (data ?? []) as Product[];
-  if (request.nextUrl.searchParams.get('cart') === '1') {
-    const { data: campaignProducts } = await supabase
-      .from('campaign_products')
-      .select('*, campaign:campaigns!inner(status,start_at,end_at)')
-      .eq('status', '上架中')
-      .eq('campaign.status', 'published');
-    const now = Date.now();
-    const active = ((campaignProducts ?? []) as (CampaignProduct & { campaign?: { start_at?: string | null; end_at?: string | null } })[])
-      .filter((product) => (!product.campaign?.start_at || new Date(product.campaign.start_at).getTime() <= now)
-        && (!product.campaign?.end_at || new Date(product.campaign.end_at).getTime() >= now))
-      .map(campaignProductAsProduct);
-    result = [...result, ...active];
+  const campaignIds = [...new Set(result.map((p) => p.campaign_id).filter(Boolean))] as string[];
+  if (campaignIds.length) {
+    const admin = campaignId ? await getAdminUser() : null;
+    const { data: campaigns } = await supabase.from('campaigns').select('id,status,start_at,end_at').in('id', campaignIds);
+    const live = new Set(((campaigns ?? []) as Campaign[]).filter((c) => isCampaignLive(c)).map((c) => c.id));
+    // 管理員可預覽草稿活動頁
+    if (!admin) result = result.filter((p) => !p.campaign_id || live.has(p.campaign_id));
   }
-  // 結帳模式也會帶入仍在活動期間內的促銷商品；主站列表仍只回傳主站商品。
   return NextResponse.json(result, {
-    headers: { 'Cache-Control': 's-maxage=120, stale-while-revalidate=600' },
+    // 活動頁可能是管理員預覽草稿,不可被 CDN 快取給其他人
+    headers: { 'Cache-Control': campaignId ? 'no-store' : 's-maxage=120, stale-while-revalidate=600' },
   });
 }
 
@@ -74,6 +75,7 @@ export async function POST(request: Request) {
       color_images: body.color_images ?? {},
       is_featured: body.is_featured ?? false,
       sort_order: body.sort_order ?? 0,
+      campaign_id: body.campaign_id || null,
     })
     .select()
     .single();

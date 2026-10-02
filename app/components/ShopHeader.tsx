@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import AccountMenu from './AccountMenu';
+import { useShopHome } from '@/lib/shop-home';
 
 const STORE_NAME = process.env.NEXT_PUBLIC_STORE_NAME || 'URBANITE';
 const CART_KEY = 'cart';
@@ -25,7 +26,7 @@ type ShopHeaderProps = {
 
 export default function ShopHeader({
   logoUrl = '',
-  leftHref = '/',
+  leftHref,
   leftLabel = '← 回商店',
   showBack = true,
   logoLinked = true,
@@ -35,6 +36,9 @@ export default function ShopHeader({
   onFavoriteClick,
 }: ShopHeaderProps) {
   const [resolvedLogoUrl, setResolvedLogoUrl] = useState(logoUrl);
+  // 未指定時回到顧客原本所在的商店(主站或活動頁)
+  const shopHome = useShopHome();
+  const backHref = leftHref ?? shopHome;
   const [localCartCount, setLocalCartCount] = useState(0);
   const shownCartCount = cartCount ?? localCartCount;
   const shownFavoriteActive = favoriteActive || favoriteCount > 0;
@@ -94,14 +98,14 @@ export default function ShopHeader({
       <nav className="mx-auto grid max-w-6xl grid-cols-[1fr_auto_1fr] items-center px-4 py-4 sm:px-6 sm:py-5">
         <div className="flex min-w-0 items-center">
           {showBack ? (
-            <Link href={leftHref} className="truncate text-sm text-[#6b6156] hover:text-[#1f1b19]">
+            <Link href={backHref} className="truncate text-sm text-[#6b6156] hover:text-[#1f1b19]">
               {leftLabel}
             </Link>
           ) : null}
         </div>
 
         {logoLinked ? (
-          <Link href="/" className="justify-self-center px-2 text-center">
+          <Link href={backHref} className="justify-self-center px-2 text-center">
             {resolvedLogoUrl ? (
               <img src={resolvedLogoUrl} alt={STORE_NAME} className="mx-auto h-8 w-auto object-contain sm:h-10" />
             ) : (

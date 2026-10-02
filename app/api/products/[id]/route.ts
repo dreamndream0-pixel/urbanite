@@ -26,6 +26,7 @@ const EDITABLE: (keyof Product)[] = [
   'color_images',
   'is_featured',
   'sort_order',
+  'campaign_id',
 ];
 
 // PATCH /api/products/[id] — 編輯商品(限管理員)

@@ -6,7 +6,8 @@ import { isStorePickup, shipTypeFromMethod } from '@/lib/newebpay-logistics';
 import { deriveStatuses } from '@/lib/order-status';
 import { initialOrderStatus } from '@/lib/payment';
 import { computeShipping, resolveMethodFee } from '@/lib/shipping';
-import { campaignProductAsProduct, type CampaignProduct, type Discount, type Order, type OrderItem, type Product, type Shipment } from '@/lib/types';
+import { isCampaignLive } from '@/lib/campaign';
+import type { Campaign, Discount, Order, OrderItem, Product, Shipment } from '@/lib/types';
 
 // GET /api/orders — 取得所有訂單(限管理員)
 export async function GET() {
@@ -75,24 +76,15 @@ export async function POST(request: Request) {
 
   // 一次查出所有相關商品
   const productIds = [...new Set(items.map((i) => String(i.productId)))] as string[];
-  const mainProductIds = productIds.filter((id) => !id.startsWith('campaign:'));
-  const campaignProductIds = productIds.filter((id) => id.startsWith('campaign:')).map((id) => id.slice('campaign:'.length));
-  const [{ data: mainProducts, error: prodErr }, { data: campaignProducts, error: campaignErr }] = await Promise.all([
-    mainProductIds.length
-      ? supabase.from('products').select('*').in('id', mainProductIds)
-      : Promise.resolve({ data: [] as Product[], error: null }),
-    campaignProductIds.length
-      ? supabase.from('campaign_products').select('*, campaign:campaigns!inner(status,start_at,end_at)').in('id', campaignProductIds).eq('status', '上架中').eq('campaign.status', 'published')
-      : Promise.resolve({ data: [] as CampaignProduct[], error: null }),
-  ]);
-
-  if (prodErr || campaignErr) return NextResponse.json({ error: (prodErr || campaignErr)?.message }, { status: 500 });
-  const now = Date.now();
-  const activeCampaignProducts = ((campaignProducts ?? []) as (CampaignProduct & { campaign?: { start_at?: string | null; end_at?: string | null } })[])
-    .filter((product) => (!product.campaign?.start_at || new Date(product.campaign.start_at).getTime() <= now)
-      && (!product.campaign?.end_at || new Date(product.campaign.end_at).getTime() >= now))
-    .map(campaignProductAsProduct);
-  const products = [...((mainProducts ?? []) as Product[]), ...activeCampaignProducts];
+  const { data: productRows, error: prodErr } = await supabase.from('products').select('*').in('id', productIds);
+  if (prodErr) return NextResponse.json({ error: prodErr.message }, { status: 500 });
+  // 活動頁商品只有在活動開放期間可以下單
+  const campaignIds = [...new Set(((productRows ?? []) as Product[]).map((p) => p.campaign_id).filter(Boolean))] as string[];
+  const { data: campaignRows } = campaignIds.length
+    ? await supabase.from('campaigns').select('id,status,start_at,end_at').in('id', campaignIds)
+    : { data: [] as Campaign[] };
+  const liveCampaigns = new Set(((campaignRows ?? []) as Campaign[]).filter((c) => isCampaignLive(c)).map((c) => c.id));
+  const products = ((productRows ?? []) as Product[]).filter((p) => !p.campaign_id || liveCampaigns.has(p.campaign_id));
   const priceMap = new Map(products.map((p) => [p.id, p]));
   const user = await getSessionUser();
 
@@ -358,18 +350,16 @@ export async function POST(request: Request) {
     working.set(pid, w);
   }
   for (const [pid, w] of working) {
-    const campaignProduct = pid.startsWith('campaign:');
     await supabase
-      .from(campaignProduct ? 'campaign_products' : 'products')
+      .from('products')
       .update({ inventory: w.inventory, variants: w.variants })
-      .eq('id', campaignProduct ? pid.slice('campaign:'.length) : pid);
+      .eq('id', pid);
   }
 
   // 記錄出庫(訂單銷貨),供進出庫紀錄查閱
   try {
     const movements = items
       .map((item) => {
-        if (String(item.productId).startsWith('campaign:')) return null;
         const base = priceMap.get(String(item.productId));
         if (!base) return null;
         const hasVariants = Array.isArray(base.variants) && base.variants.length > 0;

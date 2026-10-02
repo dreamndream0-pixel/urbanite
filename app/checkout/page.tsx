@@ -7,6 +7,7 @@ import { isOnlinePayment } from '@/lib/payment';
 import { TW_CITIES, TW_REGIONS } from '@/lib/tw-regions';
 import { computeShipping, resolveMethodFee } from '@/lib/shipping';
 import ShopHeader from '@/app/components/ShopHeader';
+import { useShopHome } from '@/lib/shop-home';
 
 const CART_KEY = 'cart';
 
@@ -84,6 +85,7 @@ function readCart(): CartItem[] {
 }
 
 export default function CheckoutPage() {
+  const shopHome = useShopHome();
   // 先以空購物車渲染,掛載後再從 localStorage 載入,避免 hydration 不匹配
   const [cart, setCart] = useState<CartItem[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -491,7 +493,7 @@ export default function CheckoutPage() {
               </div>
             ) : null}
             <Link
-              href="/"
+              href={shopHome}
               className="mt-6 inline-block rounded-full bg-[#1f1b19] px-6 py-3 font-semibold text-white"
             >
               繼續購物
@@ -503,7 +505,7 @@ export default function CheckoutPage() {
           <div className="rounded-2xl bg-white p-8 text-center shadow-sm">
             <p className="text-[#6b6156]">購物車是空的。</p>
             <Link
-              href="/"
+              href={shopHome}
               className="mt-6 inline-block rounded-full bg-[#1f1b19] px-6 py-3 font-semibold text-white"
             >
               去逛逛

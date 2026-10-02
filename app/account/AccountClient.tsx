@@ -197,7 +197,6 @@ export default function AccountClient({
     <main className="min-h-screen bg-[#f6f2ec] text-[#1f1b19]">
       <ShopHeader
         logoUrl={logoUrl}
-        leftHref="/"
         leftLabel="← 回商店"
         cartCount={cartCount}
         favoriteCount={favoriteIds.length}
