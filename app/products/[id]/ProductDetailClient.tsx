@@ -237,18 +237,17 @@ export default function ProductDetailClient({ product, homeHref = '/' }: { produ
       <section className="mx-auto max-w-6xl px-4 py-4 sm:px-6 lg:py-8">
         <div className="grid gap-8 lg:grid-cols-[1.05fr_0.95fr] lg:items-start">
         <div className="lg:sticky lg:top-24">
-        <div className="mx-auto aspect-[3/4] w-full max-w-md overflow-hidden rounded-xl bg-[#eee8e1] sm:max-w-lg lg:max-w-none">
-          {colorImage ? (
-            <img ref={mainImgRef} src={colorImage} alt={product.name} className="h-full w-full object-contain drop-shadow-[0_18px_22px_rgba(31,27,25,0.22)]" />
-          ) : gallery.length ? (
-            <div
-              {...carousel.trackProps}
-              className={`h-full touch-pan-y select-none ${carousel.trackProps.className}`}
-            >
+        <div
+          className="relative mx-auto aspect-[3/4] w-full max-w-md overflow-hidden rounded-xl bg-[#eee8e1] sm:max-w-lg lg:max-w-none"
+          // 開始滑動時收起顏色圖,回到相簿
+          onPointerDownCapture={() => setColorImage('')}
+        >
+          {gallery.length ? (
+            <div {...carousel.trackProps} className={`h-full select-none ${carousel.trackProps.className}`}>
               {carousel.slides.map((url, i) => (
                 <img
                   key={`${url}-${i}`}
-                  ref={i === carousel.pos ? mainImgRef : undefined}
+                  ref={!colorImage && i === carousel.pos ? mainImgRef : undefined}
                   src={url}
                   alt={product.name}
                   draggable={false}
@@ -258,6 +257,34 @@ export default function ProductDetailClient({ product, homeHref = '/' }: { produ
             </div>
           ) : (
             <div className="flex h-full items-center justify-center text-[#8a7f72]">無商品圖片</div>
+          )}
+          {colorImage && (
+            <img
+              ref={mainImgRef}
+              src={colorImage}
+              alt={product.name}
+              className="pointer-events-none absolute inset-0 h-full w-full bg-[#eee8e1] object-contain drop-shadow-[0_18px_22px_rgba(31,27,25,0.22)]"
+            />
+          )}
+          {carousel.looping && (
+            <>
+              <button
+                type="button"
+                onClick={() => carousel.step(-1)}
+                aria-label="上一張照片"
+                className="absolute left-2 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-white/75 text-[#1f1b19] shadow-sm backdrop-blur transition hover:bg-white"
+              >
+                <IconChevron dir="left" />
+              </button>
+              <button
+                type="button"
+                onClick={() => carousel.step(1)}
+                aria-label="下一張照片"
+                className="absolute right-2 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-white/75 text-[#1f1b19] shadow-sm backdrop-blur transition hover:bg-white"
+              >
+                <IconChevron dir="right" />
+              </button>
+            </>
           )}
         </div>
         {gallery.length > 1 && (
@@ -514,6 +541,14 @@ function IconStar({ filled = false }: { filled?: boolean }) {
   return (
     <svg width="20" height="20" viewBox="0 0 24 24" fill={filled ? '#f5c542' : 'none'} stroke={filled ? '#d89a00' : 'currentColor'} strokeWidth="1.8" strokeLinejoin="round">
       <path d="m12 2 3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21 7 14.2l-5-4.9 6.9-1L12 2Z" />
+    </svg>
+  );
+}
+
+function IconChevron({ dir }: { dir: 'left' | 'right' }) {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d={dir === 'left' ? 'M15 6l-6 6 6 6' : 'M9 6l6 6-6 6'} />
     </svg>
   );
 }

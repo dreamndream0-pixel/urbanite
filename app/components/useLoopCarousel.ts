@@ -54,53 +54,80 @@ export function useLoopCarousel<T>(items: T[], { autoplayMs = 0 }: { autoplayMs?
   const step = (delta: number) => setPos((p) => Math.max(0, Math.min(count + 1, p + delta)));
   const go = (i: number) => setPos(looping ? i + 1 : 0);
 
-  function onDown(clientX: number, el: HTMLElement) {
+  const pointerId = useRef<number | null>(null);
+  const moved = useRef(false); // 有拖曳過:放開時不要觸發點擊(例如輪播圖連結)
+  const lastWheel = useRef(0);
+
+  // 手指、滑鼠、觸控筆共用 Pointer Events;軌道設 touch-action: pan-y,
+  // 讓瀏覽器只接管上下捲動,左右滑動交給輪播
+  function onPointerDown(e: React.PointerEvent<HTMLElement>) {
+    if (!looping || (e.pointerType === 'mouse' && e.button !== 0)) return;
     if (onClone) settle();
-    startX.current = clientX;
-    width.current = el.offsetWidth || 1;
+    pointerId.current = e.pointerId;
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId); // 手指滑出軌道外也持續追蹤
+    } catch {
+      /* 無法捕捉時仍可滑動 */
+    }
+    startX.current = e.clientX;
+    width.current = e.currentTarget.offsetWidth || 1;
+    moved.current = false;
     setWidthPx(width.current);
     setDragging(true);
     dragXRef.current = 0;
     setDragX(0);
   }
-  function onMove(clientX: number) {
-    if (startX.current === null) return;
-    dragXRef.current = clientX - startX.current;
+  function onPointerMove(e: React.PointerEvent<HTMLElement>) {
+    if (startX.current === null || e.pointerId !== pointerId.current) return;
+    dragXRef.current = e.clientX - startX.current;
+    if (Math.abs(dragXRef.current) > 6) moved.current = true;
     setDragX(dragXRef.current);
   }
-  function onUp() {
-    if (startX.current === null) return;
-    const d = dragXRef.current;
-    const threshold = width.current * 0.15;
-    if (looping && d <= -threshold) step(1);
-    else if (looping && d >= threshold) step(-1);
+  function finish(e: React.PointerEvent<HTMLElement>, cancelled: boolean) {
+    if (startX.current === null || e.pointerId !== pointerId.current) return;
+    try {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    } catch {
+      /* 已釋放 */
+    }
+    const d = cancelled ? 0 : dragXRef.current;
+    const threshold = Math.min(width.current * 0.12, 60);
+    if (d <= -threshold) step(1);
+    else if (d >= threshold) step(-1);
     startX.current = null;
+    pointerId.current = null;
     dragXRef.current = 0;
     setDragging(false);
     setDragX(0);
   }
+  // 觸控板左右兩指滑動
+  function onWheel(e: React.WheelEvent<HTMLElement>) {
+    if (!looping || Math.abs(e.deltaX) <= Math.abs(e.deltaY) || Math.abs(e.deltaX) < 20) return;
+    const now = Date.now();
+    if (now - lastWheel.current < SLIDE_MS + 150) return;
+    lastWheel.current = now;
+    step(e.deltaX > 0 ? 1 : -1);
+  }
 
   const dragPercent = widthPx ? (dragX / widthPx) * 100 : 0;
 
-  // 套在 flex 軌道上的屬性(觸控與滑鼠拖曳)
+  // 套在 flex 軌道上的屬性
   const trackProps = {
-    className: `flex ${dragging || instant ? '' : 'transition-transform duration-500 ease-out'}`,
+    className: `flex touch-pan-y ${dragging || instant ? '' : 'transition-transform duration-500 ease-out'}`,
     style: { transform: `translateX(calc(-${pos * 100}% + ${dragPercent}%))` },
-    onTouchStart: (e: React.TouchEvent<HTMLElement>) => onDown(e.touches[0].clientX, e.currentTarget),
-    onTouchMove: (e: React.TouchEvent<HTMLElement>) => onMove(e.touches[0].clientX),
-    onTouchEnd: onUp,
-    onPointerDown: (e: React.PointerEvent<HTMLElement>) => {
-      if (e.pointerType === 'mouse') onDown(e.clientX, e.currentTarget);
+    onPointerDown,
+    onPointerMove,
+    onPointerUp: (e: React.PointerEvent<HTMLElement>) => finish(e, false),
+    onPointerCancel: (e: React.PointerEvent<HTMLElement>) => finish(e, true),
+    onWheel,
+    onClickCapture: (e: React.MouseEvent<HTMLElement>) => {
+      if (moved.current) {
+        e.preventDefault();
+        e.stopPropagation();
+        moved.current = false;
+      }
     },
-    onPointerMove: (e: React.PointerEvent<HTMLElement>) => {
-      if (e.pointerType === 'mouse' && startX.current !== null) onMove(e.clientX);
-    },
-    onPointerUp: (e: React.PointerEvent<HTMLElement>) => {
-      if (e.pointerType === 'mouse') onUp();
-    },
-    onPointerLeave: (e: React.PointerEvent<HTMLElement>) => {
-      if (e.pointerType === 'mouse') onUp();
-    },
+    onDragStart: (e: React.DragEvent<HTMLElement>) => e.preventDefault(),
   };
 
   // 軌道第 i 張對應的真實序號(副本與真實張相同,換回時樣式不閃動)
