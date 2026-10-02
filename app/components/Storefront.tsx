@@ -1102,6 +1102,12 @@ function SideMenu({
   current: string;
   onSelect: (key: string) => void;
 }) {
+  // 使用者手動開合的狀態;未操作過的分類依「是否正在瀏覽其子分類」決定
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  function toggle(slug: string, isOpen: boolean) {
+    setExpanded((prev) => ({ ...prev, [slug]: !isOpen }));
+  }
+
   return (
     <>
       <div
@@ -1122,34 +1128,73 @@ function SideMenu({
           </button>
         </div>
         <nav className="flex-1 overflow-auto px-5 py-6">
-          {categories.map((c) => (
-            <div key={c.slug} className="border-b border-[#efe8dd]">
-              <button
-                onClick={() => onSelect(c.slug)}
-                className={`block w-full py-4 text-left transition ${
-                  current === c.slug ? 'text-[#1f1b19]' : 'text-[#6b6156] hover:text-[#1f1b19]'
-                }`}
-              >
-                <span className="block text-[11px] tracking-[0.2em] text-[#a99e8f]">{c.en}</span>
-                <span className="mt-0.5 block text-lg font-medium">{c.name}</span>
-              </button>
-              {c.children && c.children.length > 0 && (
-                <div className="pb-3 pl-4">
-                  {c.children.map((s) => (
+          {categories.map((c) => {
+            const hasChildren = Boolean(c.children?.length);
+            // 子分類預設收合;目前所在的子分類其上層自動展開
+            const isOpen = expanded[c.slug] ?? Boolean(c.children?.some((s) => s.slug === current));
+            return (
+              <div key={c.slug} className="border-b border-[#efe8dd]">
+                <div className="flex items-center">
+                  <button
+                    onClick={() => onSelect(c.slug)}
+                    className={`block min-w-0 flex-1 py-4 text-left transition ${
+                      current === c.slug ? 'text-[#1f1b19]' : 'text-[#6b6156] hover:text-[#1f1b19]'
+                    }`}
+                  >
+                    <span className="block text-[11px] tracking-[0.2em] text-[#a99e8f]">{c.en}</span>
+                    <span className="mt-0.5 block text-lg font-medium">{c.name}</span>
+                  </button>
+                  {hasChildren && (
                     <button
-                      key={s.slug}
-                      onClick={() => onSelect(s.slug)}
-                      className={`block w-full py-2 text-left text-sm transition ${
-                        current === s.slug ? 'font-semibold text-[#1f1b19]' : 'text-[#8a7f72] hover:text-[#1f1b19]'
-                      }`}
+                      onClick={() => toggle(c.slug, isOpen)}
+                      aria-label={`${isOpen ? '收合' : '展開'}${c.name}`}
+                      aria-expanded={isOpen}
+                      className="-mr-2 flex h-11 w-11 shrink-0 items-center justify-center rounded-md text-[#8a7f72] transition hover:bg-[#efe8dd] hover:text-[#1f1b19]"
                     >
-                      └ {s.name}
+                      <svg
+                        width="18"
+                        height="18"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.8"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        aria-hidden="true"
+                        className={`transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`}
+                      >
+                        <path d="M6 9l6 6 6-6" />
+                      </svg>
                     </button>
-                  ))}
+                  )}
                 </div>
-              )}
-            </div>
-          ))}
+                {hasChildren && (
+                  <div
+                    className={`grid transition-[grid-template-rows] duration-300 ease-out ${
+                      isOpen ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'
+                    }`}
+                  >
+                    <div className="overflow-hidden">
+                      <div className="pb-3 pl-4">
+                        {c.children!.map((s) => (
+                          <button
+                            key={s.slug}
+                            tabIndex={isOpen ? 0 : -1}
+                            onClick={() => onSelect(s.slug)}
+                            className={`block w-full py-2 text-left text-sm transition ${
+                              current === s.slug ? 'font-semibold text-[#1f1b19]' : 'text-[#8a7f72] hover:text-[#1f1b19]'
+                            }`}
+                          >
+                            {s.name}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </nav>
       </aside>
     </>
