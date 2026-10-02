@@ -3,6 +3,7 @@
 import { type ReactNode, useMemo, useState } from 'react';
 import type { Campaign, Product } from '@/lib/types';
 import { uiConfirm } from '@/lib/ui-dialog';
+import FixedBannerCropModal from './FixedBannerCropModal';
 
 type CampaignDraft = Omit<Campaign, 'id' | 'created_at' | 'updated_at'>;
 
@@ -201,6 +202,8 @@ export default function CampaignManager({
 
 function CampaignSettings({ campaign, busy, onSave, onUpload, onDelete }: { campaign: Campaign; busy: boolean; onSave: (patch: Partial<Campaign>) => void; onUpload: (file: File) => Promise<string>; onDelete: () => void }) {
   const [draft, setDraft] = useState(campaign);
+  const [cropFile, setCropFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
   return <section className="border border-[#e5ded4] bg-white p-4 sm:p-5">
     <div className="flex flex-wrap items-center justify-between gap-3"><div className="flex flex-wrap items-center gap-3"><div><h3 className="text-lg font-bold">頁面設定</h3><p className="text-xs text-[#8a7f72]">公開網址：/promo/{campaign.slug}</p></div><select aria-label="狀態" value={draft.status} onChange={(e) => setDraft({ ...draft, status: e.target.value as Campaign['status'] })} className="h-10 border border-[#d8d0c6] bg-white px-3 text-sm font-semibold"><option value="draft">草稿</option><option value="published">發布</option><option value="archived">封存</option></select></div><div className="flex gap-2"><button type="button" onClick={onDelete} className="px-3 text-sm text-[#b23a3a]">刪除</button><button type="button" disabled={busy} onClick={() => onSave(draft)} className="rounded-md bg-[#1f1b19] px-5 py-2 text-sm font-semibold text-white disabled:opacity-50">儲存設定</button></div></div>
     <div className="mt-5 grid gap-4 sm:grid-cols-2">
@@ -210,8 +213,26 @@ function CampaignSettings({ campaign, busy, onSave, onUpload, onDelete }: { camp
       <Field label="結束時間"><input type="datetime-local" value={dateInput(draft.end_at)} onChange={(e) => setDraft({ ...draft, end_at: e.target.value || null })} /></Field>
       <Field label="主色"><input type="color" value={draft.theme_color} onChange={(e) => setDraft({ ...draft, theme_color: e.target.value })} className="h-11" /></Field>
       <Field label="頁面說明" className="sm:col-span-2"><textarea rows={3} value={draft.description} onChange={(e) => setDraft({ ...draft, description: e.target.value })} /></Field>
-      <Field label="首圖（輪播圖，建議 1080 × 1350 px，4:5）" className="sm:col-span-2"><div className="flex items-center gap-3">{draft.hero_image ? <img src={draft.hero_image} alt="" className="h-20 w-32 bg-[#f5f1eb] object-cover" /> : null}<label className="cursor-pointer border border-[#d8d0c6] px-4 py-2 text-sm font-semibold">上傳首圖<input type="file" accept="image/*" className="hidden" onChange={async (e) => { const file = e.target.files?.[0]; e.target.value = ''; if (!file) return; const url = await onUpload(file); if (url) setDraft((current) => ({ ...current, hero_image: url })); }} /></label></div></Field>
+      <Field label="首圖（輪播圖，建議 1080 × 1350 px，4:5）" className="sm:col-span-2"><div className="flex items-center gap-3">{draft.hero_image ? <img src={draft.hero_image} alt="" className="aspect-[4/5] h-24 bg-[#f5f1eb] object-cover" /> : null}<label className="cursor-pointer border border-[#d8d0c6] px-4 py-2 text-sm font-semibold">上傳首圖<input type="file" accept="image/*" className="hidden" onChange={(e) => { const file = e.target.files?.[0]; e.target.value = ''; if (file) setCropFile(file); }} /></label></div></Field>
     </div>
+    {cropFile ? (
+      <FixedBannerCropModal
+        file={cropFile}
+        busy={uploading}
+        title="活動頁首圖 — 固定首頁比例取景"
+        onCancel={() => setCropFile(null)}
+        onConfirm={async (blob, filename) => {
+          setUploading(true);
+          try {
+            const url = await onUpload(new File([blob], filename, { type: 'image/jpeg' }));
+            if (url) setDraft((current) => ({ ...current, hero_image: url }));
+            setCropFile(null);
+          } finally {
+            setUploading(false);
+          }
+        }}
+      />
+    ) : null}
   </section>;
 }
 
