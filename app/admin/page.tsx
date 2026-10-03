@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import { getAdminUser, getSessionUser } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { expireOverdueOrders } from '@/lib/order-expiry';
 import AdminDashboard from './AdminDashboard';
 import type {
   Banner,
@@ -39,6 +40,8 @@ export default async function AdminPage() {
 
   // 已是管理員 → 讀取初始資料並顯示後台
   const supabase = createAdminClient();
+  // 逾期未付款的訂單先自動轉為取消,再讀取訂單
+  await expireOverdueOrders(supabase).catch(() => {});
   const [
     { data: products },
     { data: orders },

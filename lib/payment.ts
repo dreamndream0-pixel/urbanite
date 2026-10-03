@@ -28,3 +28,29 @@ export function paymentDeadlineDays(): number {
 export function paymentDeadline(createdAt: string | number | Date, days = paymentDeadlineDays()): Date {
   return new Date(new Date(createdAt).getTime() + days * 24 * 3600 * 1000);
 }
+
+type PayableOrder = {
+  paid?: boolean;
+  status?: string;
+  cancel_status?: string;
+  fulfillment_status?: string;
+  payment_method?: string;
+  shipping_method?: string;
+};
+
+// 訂單是否在「等客人付款」:未付款、需先付款(非取貨付款/貨到付款)、尚未出貨、未取消/退貨。
+// 付款期限提示與逾期自動取消共用此規則(不只看 status 是否為「尚未付款」)。
+export function awaitingPayment(order: PayableOrder): boolean {
+  if (order.paid) return false;
+  if (['取消', '退貨', '已完成'].includes(order.status ?? '')) return false;
+  if (order.cancel_status === 'APPROVED') return false;
+  if (['SHIPPED', 'IN_TRANSIT', 'DELIVERED', 'RETURNING', 'RETURNED'].includes(order.fulfillment_status ?? '')) return false;
+  if (isCollectOnDelivery(order.shipping_method ?? '', order.payment_method ?? '')) return false;
+  return true;
+}
+
+// 是否已超過付款期限(且仍在等付款)
+export function isPaymentOverdue(order: PayableOrder & { created_at?: string }, now = Date.now(), days = paymentDeadlineDays()): boolean {
+  if (!order.created_at || !awaitingPayment(order)) return false;
+  return paymentDeadline(order.created_at, days).getTime() < now;
+}
