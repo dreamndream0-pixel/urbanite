@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getAdminUser } from '@/lib/supabase/server';
 import { campaignHomeHref, isCampaignLive } from '@/lib/campaign';
+import { isVisibleInStore } from '@/lib/product-status';
 import type { Campaign, Product } from '@/lib/types';
 import ProductDetailClient from './ProductDetailClient';
 
@@ -37,7 +38,8 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
   const { data } = await supabase.from('products').select('*').eq('id', id).maybeSingle();
   const product = data as Product | null;
 
-  if (!product || product.status === '已下架') notFound();
+  // 未上架,或售完自動下架的純現貨商品:前台不開放
+  if (!product || !isVisibleInStore(product)) notFound();
 
   // 活動頁商品:活動未開放時只有管理員可預覽;頁面上的回首頁連結都回到該活動頁
   let homeHref = '/';

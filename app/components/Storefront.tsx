@@ -12,6 +12,7 @@ import { campaignHomeHref } from '@/lib/campaign';
 import FavoriteFoldButton from '@/app/components/FavoriteFoldButton';
 import CategoryNavigation from '@/app/components/CategoryNavigation';
 import { useLoopCarousel } from '@/app/components/useLoopCarousel';
+import { isProductSoldOut, isVisibleInStore } from '@/lib/product-status';
 import StoreHeader from '@/app/components/StoreHeader';
 
 // 購物車存在瀏覽器本機的 key(結帳頁會讀同一份)
@@ -27,16 +28,6 @@ function stockOf(product: Product | undefined, variant: string): number {
     return Math.max(0, v?.inventory ?? 0);
   }
   return Math.max(0, product.inventory ?? 0);
-}
-
-function isProductSoldOut(product: Product): boolean {
-  if (/售完|完售|sold\s*out/i.test(product.status || '')) return true;
-  if ((product.sale_mode || '').includes('預購')) return false;
-  const variants = product.variants ?? [];
-  if (variants.length > 0) {
-    return variants.every((variant) => (variant.inventory ?? 0) <= 0);
-  }
-  return (product.inventory ?? 0) <= 0;
 }
 
 type CartItem = {
@@ -267,7 +258,8 @@ export default function Storefront({ campaign = null, preview = false }: { campa
       })),
   ];
 
-  const liveProducts = products.filter((p) => p.status !== '已下架');
+  // 未上架、以及售完的純現貨商品(自動下架)不顯示;預購商品售完仍顯示
+  const liveProducts = products.filter(isVisibleInStore);
 
   // 活動頁的輪播圖使用活動主視覺
   const heroBanners: Banner[] = campaign

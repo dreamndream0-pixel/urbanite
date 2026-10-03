@@ -34,6 +34,7 @@ import { COUPON_PRESETS } from '@/lib/coupon-presets';
 import { isoToTaipeiInput } from '@/lib/taipei-time';
 import CampaignManager from './CampaignManager';
 import FixedBannerCropModal from './FixedBannerCropModal';
+import { ADMIN_PRODUCT_TABS, adminProductTab, UNLISTED_STATUS, type AdminProductTab } from '@/lib/product-status';
 
 const formatter = new Intl.NumberFormat('zh-TW', {
   style: 'currency',
@@ -441,6 +442,7 @@ export default function AdminDashboard({
   const [overviewOrderSearch, setOverviewOrderSearch] = useState('');
   const [openOrderId, setOpenOrderId] = useState<string | null>(null);
   const [productsTab, setProductsTab] = useState<'items' | 'categories'>('items');
+  const [productListTab, setProductListTab] = useState<AdminProductTab>('上架中');
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
   const [categoryProductQuery, setCategoryProductQuery] = useState('');
   const [movements, setMovements] = useState<StockMovement[]>(initialMovements);
@@ -1934,8 +1936,31 @@ export default function AdminDashboard({
                   </button>
                 }
               >
+                {/* 商品分類標籤:上架中 / 未上架 / 已售完(純現貨售完自動歸到已售完,補貨後自動回到上架中) */}
+                <div className="mb-4 flex gap-2 overflow-x-auto">
+                  {ADMIN_PRODUCT_TABS.map((tab) => {
+                    const count = products.filter((product) => !product.campaign_id && adminProductTab(product) === tab).length;
+                    return (
+                      <button
+                        key={tab}
+                        type="button"
+                        onClick={() => setProductListTab(tab)}
+                        className={`shrink-0 rounded-full border px-4 py-1.5 text-sm font-semibold transition ${
+                          productListTab === tab
+                            ? 'border-[#1f1b19] bg-[#1f1b19] text-white'
+                            : 'border-[#e5ded4] bg-white text-[#6b6156] hover:border-[#1f1b19]'
+                        }`}
+                      >
+                        {tab}（{count}）
+                      </button>
+                    );
+                  })}
+                </div>
                 <div className="space-y-3">
-                  {products.filter((product) => !product.campaign_id).map((product) => (
+                  {products.filter((product) => !product.campaign_id && adminProductTab(product) === productListTab).length === 0 && (
+                    <p className="py-8 text-center text-sm text-[#a99e8f]">沒有{productListTab}的商品。</p>
+                  )}
+                  {products.filter((product) => !product.campaign_id && adminProductTab(product) === productListTab).map((product) => (
                     <div
                       key={product.id}
                       className="flex items-center gap-4 rounded-lg border border-[#e5ded4] p-3"
@@ -6258,7 +6283,7 @@ function ProductModal({
 	              >
 	                {PRODUCT_STATUSES.map((s) => (
 	                  <option key={s} value={s}>
-	                    {s}
+	                    {s === UNLISTED_STATUS ? '未上架' : s}
 	                  </option>
 	                ))}
 	              </select>
