@@ -1,31 +1,25 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import type { SiteSettings } from '@/lib/types';
+import { formatLineId, getCheckoutLine, lineAddFriendUrl } from '@/lib/checkout-line';
 
-// 後台「LINE 官方帳號」欄位可填完整網址或 LINE ID(例如 @urbanite),統一轉成加好友連結
-export function lineAddFriendUrl(value?: string | null) {
-  const v = (value ?? '').trim();
-  if (!v) return '';
-  if (/^https?:\/\//i.test(v)) return v;
-  if (/^(line\.me|lin\.ee)\//i.test(v)) return `https://${v}`;
-  const id = v.startsWith('@') ? v : `@${v}`;
-  return `https://line.me/R/ti/p/${encodeURIComponent(id)}`;
-}
+// 訂單完成頁:引導加入官方 LINE 查詢出貨進度、聯絡客服(後台:系統設定 → 頁尾 → 結帳頁 LINE 設定)
+export default function LineContactCard({ settings }: { settings?: SiteSettings | null }) {
+  const [fetched, setFetched] = useState<SiteSettings | null>(null);
 
-// 訂單完成頁:引導加入官方 LINE 查詢出貨進度、聯絡客服
-export default function LineContactCard({ lineUrl }: { lineUrl?: string | null }) {
-  const [fetchedUrl, setFetchedUrl] = useState('');
-  const href = lineAddFriendUrl(lineUrl ?? fetchedUrl);
-
-  // 頁面沒傳入時自行讀取系統設定
+  // 頁面沒傳入設定時自行讀取
   useEffect(() => {
-    if (lineUrl !== undefined) return;
+    if (settings !== undefined) return;
     fetch('/api/settings')
       .then((res) => (res.ok ? res.json() : null))
-      .then((settings) => setFetchedUrl(settings?.footer_line_url ?? ''))
+      .then((data: SiteSettings | null) => setFetched(data))
       .catch(() => {});
-  }, [lineUrl]);
+  }, [settings]);
 
+  const line = getCheckoutLine(settings === undefined ? fetched : settings);
+  const href = lineAddFriendUrl(line);
+  const lineId = formatLineId(line.id);
   if (!href) return null;
 
   return (
@@ -35,6 +29,11 @@ export default function LineContactCard({ lineUrl }: { lineUrl?: string | null }
         <br />
         查詢出貨進度，以及聯絡客服人員
       </p>
+      {lineId && (
+        <p className="mt-2 text-sm font-semibold text-[#1f5a33]">
+          LINE ID：<span className="select-all">{lineId}</span>
+        </p>
+      )}
       <a
         href={href}
         target="_blank"

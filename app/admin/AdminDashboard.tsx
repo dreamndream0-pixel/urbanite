@@ -34,6 +34,7 @@ import { COUPON_PRESETS } from '@/lib/coupon-presets';
 import { isoToTaipeiInput } from '@/lib/taipei-time';
 import CampaignManager from './CampaignManager';
 import FixedBannerCropModal from './FixedBannerCropModal';
+import { getCheckoutLine, HIDDEN_FOOTER_SECTION_TITLES, withCheckoutLine } from '@/lib/checkout-line';
 import { ADMIN_PRODUCT_TABS, adminProductTab, UNLISTED_STATUS, type AdminProductTab } from '@/lib/product-status';
 
 const formatter = new Intl.NumberFormat('zh-TW', {
@@ -499,6 +500,8 @@ export default function AdminDashboard({
     taxId: initialSettings?.footer_tax_id ?? '',
     instagramUrl: initialSettings?.footer_instagram_url ?? '',
     lineUrl: initialSettings?.footer_line_url ?? '',
+    checkoutLineId: getCheckoutLine(initialSettings).id,
+    checkoutLineUrl: getCheckoutLine(initialSettings).url,
     socialLinks: JSON.stringify(
       initialSettings?.footer_social_links?.length
         ? initialSettings.footer_social_links.slice(0, 3)
@@ -1421,7 +1424,7 @@ export default function AdminDashboard({
           footer_tax_id: footerDraft.taxId.trim(),
           footer_instagram_url: footerDraft.instagramUrl.trim(),
           footer_line_url: footerDraft.lineUrl.trim(),
-          footer_sections: footerSections,
+          footer_sections: withCheckoutLine(footerSections, { id: footerDraft.checkoutLineId, url: footerDraft.checkoutLineUrl }),
           payment_methods: toLines(footerDraft.payments),
           shipping_methods: toLines(footerDraft.shippings),
           enabled_payment_methods: toLines(footerDraft.payments),
@@ -3014,6 +3017,33 @@ export default function AdminDashboard({
                     onChange={(socialLinks) => setFooterDraft({ ...footerDraft, socialLinks })}
                   />
                 </div>
+                {/* 結帳完成頁的「加入官方 LINE」區塊 */}
+                <div className="mt-6 rounded-xl border border-[#cfe9d6] bg-[#f3fbf5] p-4">
+                  <h3 className="font-semibold text-[#1f5a33]">結帳頁 LINE 設定</h3>
+                  <p className="mt-1 text-xs leading-5 text-[#5f7a66]">
+                    顯示在訂單完成頁「歡迎加入官方 LINE」區塊。兩欄都空白時不顯示該區塊。
+                  </p>
+                  <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                    <label className="block text-sm">
+                      <span className="mb-1 block font-semibold text-[#6b6156]">LINE ID(顯示給客人看)</span>
+                      <input
+                        value={footerDraft.checkoutLineId}
+                        onChange={(e) => setFooterDraft({ ...footerDraft, checkoutLineId: e.target.value })}
+                        placeholder="例如 @urbanite"
+                        className="w-full rounded-lg border border-[#e5ded4] bg-white px-3 py-2"
+                      />
+                    </label>
+                    <label className="block text-sm">
+                      <span className="mb-1 block font-semibold text-[#6b6156]">加好友連結(選填)</span>
+                      <input
+                        value={footerDraft.checkoutLineUrl}
+                        onChange={(e) => setFooterDraft({ ...footerDraft, checkoutLineUrl: e.target.value })}
+                        placeholder="例如 https://lin.ee/xxxxxx,空白則依 LINE ID 產生"
+                        className="w-full rounded-lg border border-[#e5ded4] bg-white px-3 py-2"
+                      />
+                    </label>
+                  </div>
+                </div>
               </Card>
               )}
               {settingsTab === 'payments' && (
@@ -3444,7 +3474,7 @@ function FooterPagesEditor({ value, onChange }: { value: string; onChange: (valu
               url: typeof item?.url === 'string' ? item.url : '',
             }))
           : [],
-      })).filter((section) => section.title !== FOOTER_SOCIAL_SECTION_TITLE);
+      })).filter((section) => !HIDDEN_FOOTER_SECTION_TITLES.includes(section.title));
     } catch {
       return [];
     }

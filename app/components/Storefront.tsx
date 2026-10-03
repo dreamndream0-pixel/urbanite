@@ -13,6 +13,7 @@ import FavoriteFoldButton from '@/app/components/FavoriteFoldButton';
 import CategoryNavigation from '@/app/components/CategoryNavigation';
 import { useLoopCarousel } from '@/app/components/useLoopCarousel';
 import { isProductSoldOut, isVisibleInStore } from '@/lib/product-status';
+import { HIDDEN_FOOTER_SECTION_TITLES } from '@/lib/checkout-line';
 import StoreHeader from '@/app/components/StoreHeader';
 
 // 購物車存在瀏覽器本機的 key(結帳頁會讀同一份)
@@ -688,7 +689,7 @@ function Footer({ settings, logoUrl, homeHref }: { settings: SiteSettings | null
       title: section.title.trim(),
       items: section.items.filter((item) => item.subtitle.trim()),
     }))
-    .filter((section) => section.title !== FOOTER_SOCIAL_SECTION_TITLE && (section.title || section.items.length));
+    .filter((section) => !HIDDEN_FOOTER_SECTION_TITLES.includes(section.title) && (section.title || section.items.length));
   const sections = savedSections.length
     ? savedSections
     : [
