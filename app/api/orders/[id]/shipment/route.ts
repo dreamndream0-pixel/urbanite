@@ -55,7 +55,7 @@ export async function POST(
   const nowIso = new Date().toISOString();
   if (useNewebpay) {
     if (!order.store_id) {
-      return NextResponse.json({ error: '此訂單沒有取貨門市，無法建立藍新物流單' }, { status: 400 });
+      return NextResponse.json({ error: '此訂單沒有取貨門市，無法建立物流單' }, { status: 400 });
     }
     const shipType = order.store_ship_type || shipTypeFromMethod(order.shipping_method || '');
     const lgsType = order.store_lgs_type || 'C2C';
@@ -81,8 +81,8 @@ export async function POST(
       // 這是藍新帳號層級設定,非參數錯誤,需到藍新物流後台申請開通對應超商/宅配服務。
       const noService = /無啟用|未啟用|對應物流商|物流商服務|尚未開通/.test(msg);
       const error = noService
-        ? `藍新回報「${msg || '無啟用對應物流商服務'}」:此藍新物流帳號尚未開通${shipTypeName(shipType)}（${lgsType}）服務。請至藍新物流後台申請開通該超商/宅配服務後再建單，或改用已開通的物流方式。`
-        : (msg || '藍新物流建單失敗');
+        ? `物流商回報「${msg || '無啟用對應物流商服務'}」:物流帳號尚未開通${shipTypeName(shipType)}（${lgsType}）服務。請至物流後台申請開通該超商/宅配服務後再建單，或改用已開通的物流方式。`
+        : (msg || '物流建單失敗');
       return NextResponse.json(
         { error, detail: createResult.raw, sent: { shipType, shipTypeName: shipTypeName(shipType), lgsType, tradeType } },
         { status: 400 },
@@ -103,7 +103,7 @@ export async function POST(
       .from('shipments')
       .insert({
         order_id: id,
-        provider: `藍新物流-${shipTypeName(shipType)}`,
+        provider: shipTypeName(shipType),
         shipping_method: order.shipping_method || '',
         tracking_number: lgsNo || storePrintNo,
         recipient_name: order.customer_name ?? '',
@@ -127,7 +127,7 @@ export async function POST(
     await supabase.from('shipment_events').insert({
       shipment_id: shipment.id,
       status: 'READY_TO_SHIP',
-      description: lgsNo || storePrintNo ? `已建立藍新物流單，寄件代碼 ${lgsNo || storePrintNo}` : '已建立藍新物流單',
+      description: lgsNo || storePrintNo ? `已建立物流單，寄件代碼 ${lgsNo || storePrintNo}` : '已建立物流單',
       event_at: nowIso,
       raw_response: createResult.data,
     });
@@ -140,7 +140,7 @@ export async function POST(
       type: 'fulfillment',
       from_status: order.fulfillment_status ?? 'UNFULFILLED',
       to_status: 'READY_TO_SHIP',
-      note: '已建立藍新物流單',
+      note: '已建立物流單',
       created_by: admin.email || '後台管理員',
     });
 
@@ -221,18 +221,29 @@ export async function PATCH(
       .select('id, order_no, total, paid, payment_status, fulfillment_status, shipping_method, payment_method')
       .eq('id', id).maybeSingle();
     if (!order?.order_no) return NextResponse.json({ error: '找不到訂單單號' }, { status: 404 });
-    if (!shipment.lgs_type || !shipment.ship_type) return NextResponse.json({ error: '此物流單不是藍新物流單' }, { status: 400 });
+    if (!shipment.lgs_type || !shipment.ship_type) return NextResponse.json({ error: '此物流單無法查詢貨態' }, { status: 400 });
     const trace = await requestNewebpayLogistics('trace', { MerchantOrderNo: order.order_no });
-    if (!trace.ok) return NextResponse.json({ error: trace.message || '查詢藍新貨態失敗', detail: trace.raw }, { status: 400 });
+    if (!trace.ok) return NextResponse.json({ error: trace.message || '查詢貨態失敗', detail: trace.raw }, { status: 400 });
     const rows = historyRows(trace.data);
     const newest = rows[rows.length - 1] ?? trace.data ?? {};
     const eventAt = String(newest.EventTime ?? '') || new Date().toISOString();
-    const eventDescription = String(newest.RetString ?? trace.message ?? '藍新物流貨態更新');
+    const eventDescription = String(newest.RetString ?? trace.message ?? '貨態更新');
     const isPickup = Boolean(shipment.store_id) || Boolean(shipment.ship_type);
     const nextStatus = retToFulfillmentStatus(newest.Retld ?? newest.RetID, { description: eventDescription, isPickup });
     // 不倒退:已取貨(收款完成)後,後續貨態不再覆蓋
     if (shipment.status === 'PICKED_UP') {
       return NextResponse.json({ ok: true, skipped: '已取貨,不再更新貨態' }, { status: 200 });
+    }
+    const retId = String(newest.Retld ?? newest.RetID ?? '');
+    const { data: lastEvent } = await supabase
+      .from('shipment_events')
+      .select('status, description, ret_id')
+      .eq('shipment_id', shipmentId)
+      .order('event_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (lastEvent && lastEvent.status === nextStatus && (lastEvent.ret_id ?? '') === retId && (lastEvent.description ?? '') === eventDescription) {
+      return NextResponse.json({ ok: true, unchanged: true });
     }
     const { data: event, error } = await supabase
       .from('shipment_events')
@@ -276,9 +287,9 @@ export async function PATCH(
   if (action === 'getno') {
     const { data: order } = await supabase.from('orders').select('order_no').eq('id', id).maybeSingle();
     if (!order?.order_no) return NextResponse.json({ error: '找不到訂單單號' }, { status: 404 });
-    if (!shipment.lgs_type || !shipment.ship_type) return NextResponse.json({ error: '此物流單不是藍新物流單' }, { status: 400 });
+    if (!shipment.lgs_type || !shipment.ship_type) return NextResponse.json({ error: '此物流單無法查詢貨態' }, { status: 400 });
     const r = await getShipmentNoWithRetry(order.order_no);
-    if (!r || !r.ok) return NextResponse.json({ error: r?.status === '1109' ? '藍新查無此物流單,請改用「建立藍新物流單」重新建立' : (r?.message || '取號失敗'), detail: r?.raw }, { status: 400 });
+    if (!r || !r.ok) return NextResponse.json({ error: r?.status === '1109' ? '查無此物流單,請重新建立物流單' : (r?.message || '取號失敗'), detail: r?.raw }, { status: 400 });
     const parsed = parseShipmentNo(r.data);
     if (parsed.error && !parsed.lgsNo && !parsed.storePrintNo) {
       return NextResponse.json({ error: `取號失敗:${parsed.error}` }, { status: 400 });
@@ -367,7 +378,7 @@ export async function PATCH(
   if (action === 'modify') {
     const { data: order } = await supabase.from('orders').select('order_no').eq('id', id).maybeSingle();
     if (!order?.order_no) return NextResponse.json({ error: '找不到訂單單號' }, { status: 404 });
-    if (!shipment.lgs_type || !shipment.ship_type) return NextResponse.json({ error: '此物流單不是藍新物流單' }, { status: 400 });
+    if (!shipment.lgs_type || !shipment.ship_type) return NextResponse.json({ error: '此物流單無法查詢貨態' }, { status: 400 });
     const userName = String(body?.recipient_name ?? '').trim();
     const userTel = String(body?.recipient_phone ?? '').trim();
     const userEmail = String(body?.recipient_email ?? '').trim();

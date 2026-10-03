@@ -4296,6 +4296,8 @@ function AdminOrderModal({
   const [detail, setDetail] = useState<Pick<OrderDetail, 'payments' | 'shipments' | 'history' | 'returns' | 'refunds'> | null>(null);
   const [detailLoading, setDetailLoading] = useState(true);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [toast, setToast] = useState('');
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const paidAt = detail?.history?.find((h) => h.type === 'payment' && h.to_status === 'PAID')?.created_at
     ?? detail?.payments?.find((p) => p.status === 'PAID')?.paid_at
     ?? undefined;
@@ -4303,13 +4305,13 @@ function AdminOrderModal({
   // 訂單歷程:狀態紀錄 + 物流貨態事件,依時間合併
   const timeline = detail
     ? [
-        ...detail.history.map((h) => ({ id: h.id, at: h.created_at, text: historyLabel(h), by: h.created_by || 'SYSTEM', kind: historyKind(h) })),
+        ...detail.history.map((h) => ({ id: h.id, at: h.created_at, text: stripBrand(historyLabel(h)), by: historyActor(h.created_by), kind: historyKind(h) })),
         ...detail.shipments.flatMap((sh) =>
           (sh.events ?? []).map((ev) => ({
             id: `ev-${ev.id}`,
             at: ev.event_at,
-            text: `${ev.description || (FULFILLMENT_STATUS_LABEL[ev.status ?? ''] ?? ev.status ?? '')}${ev.location ? `(${ev.location})` : ''}`,
-            by: sh.provider || '物流',
+            text: stripBrand(`${ev.description || (FULFILLMENT_STATUS_LABEL[ev.status ?? ''] ?? ev.status ?? '')}${ev.location ? `(${ev.location})` : ''}`),
+            by: stripBrand(sh.provider || '物流') || '物流',
             kind: { label: '物流', tone: '#1f7a44' },
           })),
         ),
@@ -4354,7 +4356,7 @@ function AdminOrderModal({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(useNewebpay ? { use_newebpay: true } : {}),
       });
-      if (!res.ok) { void uiAlert((await res.json()).error ?? '建立出貨失敗'); return; }
+      if (!res.ok) { void uiAlert(stripBrand((await res.json()).error ?? '建立出貨失敗')); return; }
       const shipment = (await res.json()) as Shipment;
       onShipmentCreated(shipment);
     } finally { setBusy(false); }
@@ -4369,17 +4371,30 @@ function AdminOrderModal({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ shipment_id: shipmentId, action: 'trace' }),
       });
-      if (!res.ok) { void uiAlert((await res.json()).error ?? '查詢貨態失敗'); return; }
+      const data = await res.json();
+      if (!res.ok) { void uiAlert(stripBrand(data.error ?? '查詢貨態失敗')); return; }
+      if (data.unchanged || data.skipped) { flash('目前沒有新的貨態'); return; }
       await loadDetail();
+      flash('貨態已更新');
     } finally { setBusy(false); }
   }
 
+  // 置中提示,3 秒後淡出
+  function flash(text: string) {
+    setToast(text);
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => setToast(''), 3000);
+  }
+
+  // 寄件單:物流商的寄件標籤(需已建立物流單)
+  const labelShipment = [...(detail?.shipments ?? [])].reverse().find((sh) => sh.lgs_type && sh.ship_type);
+  function printShippingLabel() {
+    if (!labelShipment) return;
+    window.open(`/api/orders/${order.id}/shipment/label?shipment_id=${labelShipment.id}`, '_blank', 'noopener,noreferrer');
+  }
+
+  // 出貨單:撿貨 / 包裝用的出貨資訊(品項、收件人、配送方式)
   function printShippingDocument() {
-    const shipment = detail?.shipments?.[detail.shipments.length - 1];
-    if (shipment?.lgs_type && shipment.ship_type) {
-      window.open(`/api/orders/${order.id}/shipment/label?shipment_id=${shipment.id}`, '_blank', 'noopener,noreferrer');
-      return;
-    }
     const rows = order.items
       .map((it) => `<tr><td>${escapeHtml(it.name)}</td><td>${escapeHtml(it.variant)}</td><td style="text-align:center">${it.quantity}</td><td style="text-align:right">${formatter.format(it.price * it.quantity)}</td></tr>`)
       .join('');
@@ -4436,6 +4451,9 @@ ${order.note ? `<div class="sec"><h2>備註</h2><p class="muted">${escapeHtml(or
           {/* 主要操作固定在內容最上方 */}
           <div className="flex flex-wrap gap-2">
             <button onClick={printShippingDocument} className="inline-flex h-10 items-center rounded-full bg-[#1f1b19] px-6 text-sm font-semibold text-white hover:bg-black">列印出貨單</button>
+            {labelShipment ? (
+              <button onClick={printShippingLabel} className="inline-flex h-10 items-center rounded-full border border-[#1f1b19] px-6 text-sm font-semibold text-[#1f1b19] hover:bg-[#efe8dd]">列印寄件單</button>
+            ) : null}
             {order.status !== '待出貨' ? (
               <button onClick={markRefund} className="inline-flex h-10 items-center rounded-full border border-[#d7c9bd] px-6 text-sm font-semibold text-[#6b6156] hover:bg-[#efe8dd]">標記退款</button>
             ) : null}
@@ -4460,7 +4478,7 @@ ${order.note ? `<div class="sec"><h2>備註</h2><p class="muted">${escapeHtml(or
                     disabled={busy}
                     className="rounded-full border border-[#d7c9bd] bg-white px-3 py-1 text-xs font-semibold text-[#6b6156] disabled:opacity-50"
                   >
-                    更新藍新貨態
+                    更新貨態
                   </button>
                 ) : null}
               </div>
@@ -4539,39 +4557,18 @@ ${order.note ? `<div class="sec"><h2>備註</h2><p class="muted">${escapeHtml(or
             </div>
           ) : null}
 
-          {/* 物流:取貨門市 / 建立出貨單(已建立時寄件單號顯示在上方,貨態在訂單歷程) */}
-          {order.store_id || !hasShipment ? (
-          <div className="rounded-xl border border-[#efe8dd] p-4">
-            <div className="mb-3 flex items-center gap-2.5">
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#f3ede4] text-[#6b6156]">
-                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 7h11v9H3zM14 10h4l3 3v3h-7z" /><circle cx="7" cy="18" r="1.5" /><circle cx="17.5" cy="18" r="1.5" /></svg>
-              </span>
-              <div>
-                <p className="text-sm font-semibold text-[#2c2826]">物流資訊</p>
-                <p className="text-xs text-[#8a7f72]">{hasShipment ? '寄件單號在上方，物流進度請見訂單歷程' : '建立出貨單後，系統將自動更新物流進度'}</p>
-              </div>
+          {/* 尚未建立物流單:建立出貨單(門市與收件資料見下方「送貨資訊」) */}
+          {!detailLoading && !hasShipment ? (
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[#efe8dd] px-4 py-3">
+              <p className="text-sm text-[#6b6156]">尚未建立物流單</p>
+              <button
+                onClick={() => createShipment(Boolean(order.store_id))}
+                disabled={busy}
+                className="rounded-full bg-[#1f1b19] px-4 py-1.5 text-sm font-semibold text-white disabled:opacity-50"
+              >
+                建立出貨單
+              </button>
             </div>
-            {order.store_id ? (
-              <div className="mb-3 rounded-lg bg-[#faf7f2] p-3 text-xs leading-5 text-[#6b6156]">
-                <p className="font-semibold text-[#1f1b19]">取貨門市：{order.store_name || order.store_id}</p>
-                <p>{order.store_address}</p>
-                <p>門市代號：{order.store_id}{order.store_phone ? `｜${order.store_phone}` : ''}</p>
-              </div>
-            ) : null}
-            {detailLoading ? (
-              <p className="text-xs text-[#a99e8f]">載入中…</p>
-            ) : hasShipment ? null : (
-              <div>
-                <button
-                  onClick={() => createShipment(Boolean(order.store_id))}
-                  disabled={busy}
-                  className="rounded-full bg-[#1f1b19] px-4 py-1.5 text-sm font-semibold text-white disabled:opacity-50"
-                >
-                  建立出貨單
-                </button>
-              </div>
-            )}
-          </div>
           ) : null}
 
           {/* 品項 */}
@@ -4674,6 +4671,7 @@ ${order.note ? `<div class="sec"><h2>備註</h2><p class="muted">${escapeHtml(or
               {row('送貨方式', order.shipping_method)}
               {row('取貨門市', order.store_name ? `${order.store_name}（${order.store_id ?? ''}）` : order.store_id)}
               {row('門市地址', order.store_address)}
+              {row('門市電話', order.store_phone)}
               {row('付款方式', order.payment_method)}
             </div>
           </div>
@@ -4718,8 +4716,28 @@ ${order.note ? `<div class="sec"><h2>備註</h2><p class="muted">${escapeHtml(or
 
         </div>
       </div>
+      <div
+        role="status"
+        aria-live="polite"
+        className={`pointer-events-none fixed left-1/2 top-1/2 z-[80] w-max max-w-[85vw] -translate-x-1/2 -translate-y-1/2 rounded-xl bg-[#333333]/80 px-6 py-4 text-center text-sm font-semibold leading-6 text-white shadow-lg transition-opacity duration-300 ${toast ? 'opacity-100' : 'opacity-0'}`}
+      >
+        {toast}
+      </div>
     </div>
   );
+}
+
+// 後台畫面不顯示金流 / 物流服務商品牌字樣(「藍新」)
+function stripBrand(text: string) {
+  return text.replace(/藍新物流[-－]/g, '').replace(/藍新/g, '').trim();
+}
+
+// 歷程操作者:不顯示 Email
+function historyActor(by?: string | null) {
+  if (!by) return '系統';
+  if (by.includes('@')) return '管理員';
+  if (/^system$/i.test(by)) return '系統';
+  return stripBrand(by) || '系統';
 }
 
 // 寄件單號標題,例如「全家店到店」「7-11 店到店」「宅配」

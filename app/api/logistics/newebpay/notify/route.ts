@@ -32,7 +32,7 @@ export async function POST(request: Request) {
     // 不倒退:買家已取貨(收款完成)後,後續貨態不再覆蓋
     if (shipment.status === 'PICKED_UP') return new NextResponse('1|OK');
     const eventAt = String(payload.EventTime ?? '') || new Date().toISOString();
-    const description = String(payload.RetString ?? payload.Message ?? '藍新物流狀態更新');
+    const description = String(payload.RetString ?? payload.Message ?? '物流狀態更新');
 
     await supabase.from('shipment_events').insert({
       shipment_id: shipment.id,
