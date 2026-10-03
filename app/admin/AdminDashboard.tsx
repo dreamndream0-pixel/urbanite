@@ -15,6 +15,7 @@ import type {
   OrderStatusHistory,
   Product,
   ReturnRequest,
+  Refund,
   SiteSettings,
   Shipment,
   StockMovement,
@@ -4224,6 +4225,67 @@ function AdminOrderProgress({ order, createdAt, paidAt }: { order: Order; create
   );
 }
 
+// 退貨訂單:有退貨申請,或物流狀態為退貨中 / 已退回
+function isReturnOrder(order: Order, returns?: ReturnRequest[]) {
+  return Boolean(returns?.length) || ['RETURNING', 'RETURNED'].includes(order.fulfillment_status ?? '') || order.status === '退貨';
+}
+
+// 退貨進度:退貨已申請 → 退貨已收貨 → 退貨處理中 → 退款處理中 → 已退款
+function AdminReturnProgress({ order, returns, refunds }: { order: Order; returns: ReturnRequest[]; refunds: Refund[] }) {
+  const ret = returns[0]; // 最新一筆退貨申請
+  const st = ret?.status ?? '';
+  const rejected = st === 'REJECTED';
+  const refundStarted = refunds.length > 0;
+  const refundDone = refunds.some((r) => r.status === 'COMPLETED');
+  const orderRefunded = ['REFUNDED', 'PARTIALLY_REFUNDED'].includes(order.payment_status ?? '');
+  const refunded = refundDone || ['REFUNDED', 'COMPLETED'].includes(st) || orderRefunded;
+  const received = refunded || ['RECEIVED', 'PROCESSING'].includes(st) || Boolean(ret?.received_at) || order.fulfillment_status === 'RETURNED';
+  const processing = refunded || refundStarted || st === 'PROCESSING';
+  const refunding = refunded || refundStarted;
+  const firstRefund = [...refunds].sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)))[0];
+  const steps = [
+    { key: 'applied', label: '退貨已申請', done: true, time: ret?.requested_at ?? ret?.created_at },
+    { key: 'received', label: rejected ? '退貨已拒絕' : '退貨已收貨', done: received, time: ret?.received_at ?? undefined },
+    { key: 'processing', label: '退貨處理中', done: processing, time: undefined },
+    { key: 'refunding', label: '退款處理中', done: refunding, time: firstRefund?.created_at },
+    { key: 'refunded', label: '已退款', done: refunded, time: refundDone ? ret?.completed_at ?? undefined : undefined },
+  ];
+  const currentIndex = rejected ? 1 : steps.findIndex((step) => !step.done);
+  const fmt = (v?: string | null) => (v ? new Date(v).toLocaleString('zh-TW', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : '');
+  const icon = (key: string) => {
+    const p = { width: 16, height: 16, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 1.8, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const };
+    if (key === 'applied') return (<svg {...p}><path d="M7 3h7l4 4v14H7z" /><path d="M14 3v4h4M9 13l2 2 4-4" /></svg>);
+    if (key === 'received') return (<svg {...p}><path d="M3 7l9-4 9 4-9 4-9-4zM3 7v10l9 4 9-4V7" /><path d="M9 14l-3-3 3-3" /></svg>);
+    if (key === 'processing') return (<svg {...p}><circle cx="12" cy="12" r="8" /><path d="M12 8v4l3 2" /></svg>);
+    if (key === 'refunding') return (<svg {...p}><rect x="3" y="6" width="18" height="12" rx="2" /><path d="M3 10h18M7 15h4" /></svg>);
+    return (<svg {...p}><path d="M5 13l4 4L19 7" strokeWidth={2.2} /></svg>);
+  };
+  return (
+    <div className="flex items-start">
+      {steps.map((step, i) => {
+        const isCurrent = i === currentIndex;
+        const active = step.done || isCurrent;
+        const danger = rejected && i === 1;
+        const bg = danger ? '#c0392b' : step.done ? '#1f1b19' : isCurrent ? '#8a7f72' : '#efe8dd';
+        const fg = active ? '#fff' : '#b3a897';
+        return (
+          <div key={step.key} className="flex flex-1 flex-col items-center">
+            <div className="flex w-full items-center">
+              <div className={`h-0.5 flex-1 ${i === 0 ? 'opacity-0' : ''}`} style={{ background: active ? '#1f1b19' : '#e5ded4' }} />
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full" style={{ background: bg, color: fg }}>
+                {icon(step.key)}
+              </div>
+              <div className={`h-0.5 flex-1 ${i === steps.length - 1 ? 'opacity-0' : ''}`} style={{ background: steps[i + 1]?.done ? '#1f1b19' : '#e5ded4' }} />
+            </div>
+            <span className={`mt-1.5 text-center text-[11px] leading-tight ${danger ? 'font-semibold text-[#c0392b]' : active ? 'font-semibold text-[#2c2826]' : 'text-[#a99e8f]'}`}>{step.label}</span>
+            {step.done && fmt(step.time) ? <span className="mt-0.5 text-center text-[10px] text-[#a99e8f]">{fmt(step.time)}</span> : null}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 // 後台專用的訂單完整資訊，與客人端的訂單明細分開。
 function AdminOrderModal({
   order,
@@ -4389,7 +4451,11 @@ ${order.note ? `<div class="sec"><h2>備註</h2><p class="muted">${escapeHtml(or
           </div>
 
           {/* 進度(含圖示) */}
-          <AdminOrderProgress order={order} createdAt={order.created_at} paidAt={paidAt} />
+          {isReturnOrder(order, detail?.returns) ? (
+            <AdminReturnProgress order={order} returns={detail?.returns ?? []} refunds={detail?.refunds ?? []} />
+          ) : (
+            <AdminOrderProgress order={order} createdAt={order.created_at} paidAt={paidAt} />
+          )}
 
           {/* 三套狀態卡 */}
           <div className="grid grid-cols-3 gap-2">
