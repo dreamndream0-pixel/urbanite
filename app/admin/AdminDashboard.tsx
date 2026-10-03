@@ -36,6 +36,7 @@ import { isoToTaipeiInput } from '@/lib/taipei-time';
 import CampaignManager from './CampaignManager';
 import FixedBannerCropModal from './FixedBannerCropModal';
 import IntegrationSettings from './IntegrationSettings';
+import { buildReturnSteps, historyKind, isReturnOrder } from '@/lib/return-progress';
 import { getCheckoutLine, HIDDEN_FOOTER_SECTION_TITLES, withCheckoutLine } from '@/lib/checkout-line';
 import { ADMIN_PRODUCT_TABS, adminProductTab, UNLISTED_STATUS, type AdminProductTab } from '@/lib/product-status';
 
@@ -4225,32 +4226,9 @@ function AdminOrderProgress({ order, createdAt, paidAt }: { order: Order; create
   );
 }
 
-// 退貨訂單:有退貨申請,或物流狀態為退貨中 / 已退回
-function isReturnOrder(order: Order, returns?: ReturnRequest[]) {
-  return Boolean(returns?.length) || ['RETURNING', 'RETURNED'].includes(order.fulfillment_status ?? '') || order.status === '退貨';
-}
-
-// 退貨進度:退貨已申請 → 退貨已收貨 → 退貨處理中 → 退款處理中 → 已退款
+// 退貨進度:退貨已申請 → 退貨已收貨 → 退貨處理中 → 退款處理中 → 已退款(規則見 lib/return-progress)
 function AdminReturnProgress({ order, returns, refunds }: { order: Order; returns: ReturnRequest[]; refunds: Refund[] }) {
-  const ret = returns[0]; // 最新一筆退貨申請
-  const st = ret?.status ?? '';
-  const rejected = st === 'REJECTED';
-  const refundStarted = refunds.length > 0;
-  const refundDone = refunds.some((r) => r.status === 'COMPLETED');
-  const orderRefunded = ['REFUNDED', 'PARTIALLY_REFUNDED'].includes(order.payment_status ?? '');
-  const refunded = refundDone || ['REFUNDED', 'COMPLETED'].includes(st) || orderRefunded;
-  const received = refunded || ['RECEIVED', 'PROCESSING'].includes(st) || Boolean(ret?.received_at) || order.fulfillment_status === 'RETURNED';
-  const processing = refunded || refundStarted || st === 'PROCESSING';
-  const refunding = refunded || refundStarted;
-  const firstRefund = [...refunds].sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)))[0];
-  const steps = [
-    { key: 'applied', label: '退貨已申請', done: true, time: ret?.requested_at ?? ret?.created_at },
-    { key: 'received', label: rejected ? '退貨已拒絕' : '退貨已收貨', done: received, time: ret?.received_at ?? undefined },
-    { key: 'processing', label: '退貨處理中', done: processing, time: undefined },
-    { key: 'refunding', label: '退款處理中', done: refunding, time: firstRefund?.created_at },
-    { key: 'refunded', label: '已退款', done: refunded, time: refundDone ? ret?.completed_at ?? undefined : undefined },
-  ];
-  const currentIndex = rejected ? 1 : steps.findIndex((step) => !step.done);
+  const steps = buildReturnSteps(order, returns, refunds);
   const fmt = (v?: string | null) => (v ? new Date(v).toLocaleString('zh-TW', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : '');
   const icon = (key: string) => {
     const p = { width: 16, height: 16, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 1.8, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const };
@@ -4263,9 +4241,9 @@ function AdminReturnProgress({ order, returns, refunds }: { order: Order; return
   return (
     <div className="flex items-start">
       {steps.map((step, i) => {
-        const isCurrent = i === currentIndex;
+        const isCurrent = step.current;
         const active = step.done || isCurrent;
-        const danger = rejected && i === 1;
+        const danger = step.danger;
         const bg = danger ? '#c0392b' : step.done ? '#1f1b19' : isCurrent ? '#8a7f72' : '#efe8dd';
         const fg = active ? '#fff' : '#b3a897';
         return (
@@ -4317,6 +4295,7 @@ function AdminOrderModal({
 
   const [detail, setDetail] = useState<Pick<OrderDetail, 'payments' | 'shipments' | 'history' | 'returns' | 'refunds'> | null>(null);
   const [detailLoading, setDetailLoading] = useState(true);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const paidAt = detail?.history?.find((h) => h.type === 'payment' && h.to_status === 'PAID')?.created_at
     ?? detail?.payments?.find((p) => p.status === 'PAID')?.paid_at
     ?? undefined;
@@ -4456,6 +4435,39 @@ ${order.note ? `<div class="sec"><h2>備註</h2><p class="muted">${escapeHtml(or
           ) : (
             <AdminOrderProgress order={order} createdAt={order.created_at} paidAt={paidAt} />
           )}
+
+          {/* 訂單歷程(放在進度下方,可展開) */}
+          {detail && detail.history.length > 0 ? (
+            <div className="-mt-2 text-center">
+              <button
+                type="button"
+                onClick={() => setHistoryOpen((v) => !v)}
+                aria-expanded={historyOpen}
+                className="inline-flex items-center gap-1 text-xs text-[#8a7f72] hover:text-[#1f1b19]"
+              >
+                訂單歷程({detail.history.length})
+                <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className={`transition-transform ${historyOpen ? 'rotate-180' : ''}`}><path d="M6 9l6 6 6-6" /></svg>
+              </button>
+              {historyOpen && (
+                <ol className="mt-3 space-y-3 rounded-xl border border-[#efe8dd] bg-[#faf7f2] p-4 text-left">
+                  {detail.history.map((h: OrderStatusHistory) => {
+                    const kind = historyKind(h);
+                    return (
+                      <li key={h.id} className="flex gap-3">
+                        <span className="mt-0.5 shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ background: `${kind.tone}1a`, color: kind.tone }}>{kind.label}</span>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm text-[#3f3a34]">{historyLabel(h)}</p>
+                          <p className="text-xs text-[#a99e8f]">
+                            {new Date(h.created_at).toLocaleString('zh-TW')} · {h.created_by || 'SYSTEM'}
+                          </p>
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ol>
+              )}
+            </div>
+          ) : null}
 
           {/* 三套狀態卡 */}
           <div className="grid grid-cols-3 gap-2">
@@ -4719,24 +4731,6 @@ ${order.note ? `<div class="sec"><h2>備註</h2><p class="muted">${escapeHtml(or
             </div>
           ) : null}
 
-          {detail && detail.history.length > 0 ? (
-            <div className="border-t border-[#efe8dd] pt-4">
-              <h3 className="mb-3 font-semibold">訂單歷程</h3>
-              <ol className="space-y-3">
-                {detail.history.map((h: OrderStatusHistory) => (
-                  <li key={h.id} className="flex gap-3">
-                    <div className="mt-1 h-2 w-2 shrink-0 rounded-full bg-[#ada265]" />
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm text-[#3f3a34]">{historyLabel(h)}</p>
-                      <p className="text-xs text-[#a99e8f]">
-                        {new Date(h.created_at).toLocaleString('zh-TW')} · {h.created_by || 'SYSTEM'}
-                      </p>
-                    </div>
-                  </li>
-                ))}
-              </ol>
-            </div>
-          ) : null}
         </div>
       </div>
     </div>
@@ -4750,7 +4744,7 @@ function historyLabel(h: OrderStatusHistory): string {
     : ORDER_STATUS_LABEL;
   const to = map[h.to_status ?? ''] ?? h.to_status ?? '';
   const kind = h.type === 'payment' ? '付款' : h.type === 'fulfillment' ? '物流' : '訂單';
-  return h.note ? `${kind}：${h.note}` : `${kind}狀態 → ${to}`;
+  return h.note ? h.note : `${kind}狀態 → ${to}`;
 }
 
 type MvForm = {

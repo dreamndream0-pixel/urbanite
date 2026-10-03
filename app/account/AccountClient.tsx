@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import type { Customer, Discount, Order, OrderStatusHistory, Product, Recipient, ReturnRequest, SiteSettings, UserCoupon } from '@/lib/types';
 import { TW_CITIES, TW_REGIONS } from '@/lib/tw-regions';
 import { awaitingPayment, isOnlinePayment, paymentDeadline } from '@/lib/payment';
+import { buildReturnSteps, historyKind, isReturnOrder } from '@/lib/return-progress';
 import { orderNeedsAttention } from '@/app/components/OrderStatusBadge';
 import ShopHeader from '@/app/components/ShopHeader';
 import { couponImageStyle, couponScript } from '@/lib/coupon-presets';
@@ -1392,7 +1393,7 @@ function OrderModal({
 
         <div className="flex-1 space-y-6 overflow-y-auto overscroll-contain p-5">
           {/* 訂單進度(下方中央小字可展開狀態更新紀錄) */}
-          <OrderProgress order={order} onShowHistory={history.length > 0 ? () => setHistoryOpen(true) : undefined} />
+          <OrderProgress order={order} returns={returns} onShowHistory={history.length > 0 ? () => setHistoryOpen(true) : undefined} />
 
           {/* 品項(含縮圖、原價劃線) */}
           <div className="space-y-3">
@@ -1622,8 +1623,7 @@ function OrderModal({
               ) : (
                 <ol className="relative space-y-4 border-l border-[#e5ded4] pl-5">
                   {history.map((h) => {
-                    const tone = h.type === 'payment' ? '#2b5fa5' : h.type === 'fulfillment' ? '#1f7a44' : '#ada265';
-                    const typeLabel = h.type === 'payment' ? '付款' : h.type === 'fulfillment' ? '物流' : '訂單';
+                    const { tone, label: typeLabel } = historyKind(h);
                     return (
                       <li key={h.id} className="relative">
                         <span className="absolute -left-[26px] top-1 h-3 w-3 rounded-full ring-2 ring-white" style={{ background: tone }} />
@@ -1921,15 +1921,18 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
   );
 }
 
-function OrderProgress({ order, onShowHistory }: { order: Order; onShowHistory?: () => void }) {
-  const steps = buildProgress(order);
+function OrderProgress({ order, returns = [], onShowHistory }: { order: Order; returns?: ReturnRequest[]; onShowHistory?: () => void }) {
+  // 退貨訂單改顯示退貨進度(與後台相同規則)
+  const steps: { key: string; label: string; done: boolean; current: boolean; danger?: boolean }[] = isReturnOrder(order, returns)
+    ? buildReturnSteps(order, returns)
+    : buildProgress(order);
   const cancelled = order.status === '取消';
   return (
     <div className="rounded-xl bg-[#faf7f2] p-4 pb-2">
       <div className="flex items-start">
         {steps.map((s, i) => {
           const active = s.done || s.current;
-          const color = cancelled ? '#c0392b' : active ? '#ada265' : '#d7c9bd';
+          const color = cancelled || s.danger ? '#c0392b' : active ? '#ada265' : '#d7c9bd';
           return (
             <div key={s.key} className="flex flex-1 flex-col items-center">
               <div className="flex w-full items-center">
