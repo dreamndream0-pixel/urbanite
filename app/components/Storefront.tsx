@@ -562,7 +562,8 @@ export default function Storefront({ campaign = null, preview = false }: { campa
           onClose={() => setQuickAdd(null)}
           onFly={flyToCart}
           onAdd={(variant, quantity, buyNow) => {
-            addToCart(quickAdd, { variant, quantity, openCart: !buyNow });
+            // 商品卡加入購物車:只顯示飛入動畫與「已加入購物車」提示,不自動打開購物車清單
+            addToCart(quickAdd, { variant, quantity, openCart: false });
             setQuickAdd(null);
             if (buyNow) router.push('/checkout');
           }}
