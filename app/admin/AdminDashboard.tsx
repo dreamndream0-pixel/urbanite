@@ -4425,7 +4425,7 @@ ${order.note ? `<div class="sec"><h2>備註</h2><p class="muted">${escapeHtml(or
               <button onClick={markRefund} className="inline-flex h-10 items-center rounded-full border border-[#d7c9bd] px-6 text-sm font-semibold text-[#6b6156] hover:bg-[#efe8dd]">標記退款</button>
             ) : null}
             {order.status !== '取消' && order.status !== '退貨' ? (
-              <button onClick={async () => { if (await uiConfirm('直接取消訂單?將回補庫存。', { danger: true })) onUpdate({ status: '取消' }); }} className="inline-flex h-10 items-center rounded-full border border-[#e0b4b4] px-6 text-sm font-semibold text-[#c0392b] hover:bg-[#fbf3f0]">取消訂單</button>
+              <button onClick={async () => { if (await uiConfirm('確定要取消這筆訂單嗎?', { danger: true })) onUpdate({ status: '取消' }); }} className="inline-flex h-10 items-center rounded-full border border-[#e0b4b4] px-6 text-sm font-semibold text-[#c0392b] hover:bg-[#fbf3f0]">取消訂單</button>
             ) : null}
           </div>
 
@@ -4503,7 +4503,7 @@ ${order.note ? `<div class="sec"><h2>備註</h2><p class="muted">${escapeHtml(or
               />
               <div className="mt-2 flex flex-wrap gap-2">
                 <button
-                  onClick={async () => { if (await uiConfirm('核准取消?將取消訂單並回補庫存。')) onReviewCancel('approve', cancelReply.trim()); }}
+                  onClick={async () => { if (await uiConfirm('核准取消?將取消這筆訂單。')) onReviewCancel('approve', cancelReply.trim()); }}
                   className="rounded-full bg-[#c0392b] px-4 py-1.5 text-sm font-semibold text-white hover:bg-[#a83226]"
                 >
                   核准取消

@@ -29,5 +29,16 @@ export async function GET(
     .order('created_at', { ascending: true });
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  return NextResponse.json((data ?? []) as OrderStatusHistory[]);
+  // 給客人看的紀錄:拿掉庫存回補、金流後台退刷等內部作業說明(後台仍保留完整紀錄)
+  const rows = ((data ?? []) as OrderStatusHistory[]).map((h) => ({ ...h, note: customerNote(h.note) }));
+  return NextResponse.json(rows);
+}
+
+function customerNote(note?: string) {
+  if (!note) return note;
+  return note
+    .replace(/並?回補庫存/g, '')
+    .replace(/[,，]?\s*需退款\s*[(（]請至金流後台退刷[)）]/g, ',將為你辦理退款')
+    .replace(/[(（]請至金流後台退刷[)）]/g, '')
+    .trim();
 }
