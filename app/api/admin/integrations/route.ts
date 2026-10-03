@@ -1,20 +1,30 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { getAdminUser } from '@/lib/supabase/server';
-import { listIntegrationStatus, saveIntegrations } from '@/lib/integrations';
+import { listIntegrationStatus, PANEL_UNLOCK_COOKIE, saveIntegrations, verifyUnlockToken } from '@/lib/integrations';
 
 export const dynamic = 'force-dynamic';
 
-// GET /api/admin/integrations — 各串接設定的狀態(金鑰只回傳遮罩,不回傳完整值)
-export async function GET() {
+// 需為管理員,且已輸入串接設定密碼解鎖
+async function authorize(request: NextRequest) {
   const admin = await getAdminUser();
-  if (!admin) return NextResponse.json({ error: '未授權' }, { status: 401 });
+  if (!admin?.email) return NextResponse.json({ error: '未授權' }, { status: 401 });
+  if (!verifyUnlockToken(request.cookies.get(PANEL_UNLOCK_COOKIE)?.value, admin.email)) {
+    return NextResponse.json({ error: '請先輸入串接設定密碼', locked: true }, { status: 423 });
+  }
+  return null;
+}
+
+// GET /api/admin/integrations — 各串接設定的狀態(金鑰只回傳遮罩,不回傳完整值)
+export async function GET(request: NextRequest) {
+  const denied = await authorize(request);
+  if (denied) return denied;
   return NextResponse.json(await listIntegrationStatus(), { headers: { 'Cache-Control': 'no-store' } });
 }
 
 // PATCH /api/admin/integrations { KEY: value } — 空字串代表清除(恢復使用主機環境變數)
-export async function PATCH(request: Request) {
-  const admin = await getAdminUser();
-  if (!admin) return NextResponse.json({ error: '未授權' }, { status: 401 });
+export async function PATCH(request: NextRequest) {
+  const denied = await authorize(request);
+  if (denied) return denied;
   const body = await request.json().catch(() => null);
   if (!body || typeof body !== 'object') return NextResponse.json({ error: '資料格式錯誤' }, { status: 400 });
   try {

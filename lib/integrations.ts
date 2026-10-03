@@ -125,3 +125,57 @@ export async function saveIntegrations(updates: Record<string, string>) {
   }
   cache = null;
 }
+
+// ---------- 串接設定的開啟密碼 ----------
+// 以 scrypt 雜湊後(再加密)存在同一張表;未設定時預設密碼為 000000。
+const PANEL_PASSWORD_KEY = '__PANEL_PASSWORD__';
+export const DEFAULT_PANEL_PASSWORD = '000000';
+export const PANEL_UNLOCK_COOKIE = 'integrations_unlock';
+const UNLOCK_MS = 30 * 60 * 1000; // 解鎖後 30 分鐘自動上鎖
+
+function hashPassword(password: string, salt = crypto.randomBytes(16).toString('hex')) {
+  const hash = crypto.scryptSync(password, salt, 32).toString('hex');
+  return `${salt}:${hash}`;
+}
+
+export async function verifyPanelPassword(password: string) {
+  cache = null;
+  // 尚未改過密碼時,與預設密碼比對
+  const stored = (await loadStored()).get(PANEL_PASSWORD_KEY) ?? hashPassword(DEFAULT_PANEL_PASSWORD, 'default');
+  const [salt, expected] = stored.split(':');
+  if (!salt || !expected) return false;
+  const actual = hashPassword(password, salt).split(':')[1];
+  return crypto.timingSafeEqual(Buffer.from(actual, 'hex'), Buffer.from(expected, 'hex'));
+}
+
+export async function isDefaultPanelPassword() {
+  cache = null;
+  return !(await loadStored()).has(PANEL_PASSWORD_KEY);
+}
+
+export async function setPanelPassword(password: string) {
+  const { error } = await createAdminClient()
+    .from('integration_settings')
+    .upsert({ key: PANEL_PASSWORD_KEY, value: encrypt(hashPassword(password)), updated_at: new Date().toISOString() }, { onConflict: 'key' });
+  if (error) throw new Error(error.message);
+  cache = null;
+}
+
+// 解鎖憑證:綁定管理員 Email 與到期時間,以主鑰簽章,存在 httpOnly cookie
+function signUnlock(email: string, exp: number) {
+  return crypto.createHmac('sha256', masterKey()).update(`unlock:${email.toLowerCase()}:${exp}`).digest('base64url');
+}
+
+export function createUnlockToken(email: string) {
+  const exp = Date.now() + UNLOCK_MS;
+  return { token: `${exp}.${signUnlock(email, exp)}`, maxAge: Math.floor(UNLOCK_MS / 1000) };
+}
+
+export function verifyUnlockToken(token: string | undefined, email: string) {
+  if (!token) return false;
+  const [expText, signature] = token.split('.');
+  const exp = Number(expText);
+  if (!Number.isFinite(exp) || exp < Date.now() || !signature) return false;
+  const expected = signUnlock(email, exp);
+  return expected.length === signature.length && crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(signature));
+}
