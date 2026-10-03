@@ -8,6 +8,7 @@ import { TW_CITIES, TW_REGIONS } from '@/lib/tw-regions';
 import { computeShipping, resolveMethodFee } from '@/lib/shipping';
 import ShopHeader from '@/app/components/ShopHeader';
 import { useShopHome } from '@/lib/shop-home';
+import LineContactCard from '@/app/components/LineContactCard';
 
 const CART_KEY = 'cart';
 
@@ -500,6 +501,7 @@ export default function CheckoutPage() {
                 <p className="mt-2 text-xs text-[#a99e8f]">請完成付款後保留交易明細，方便我們對帳。</p>
               </div>
             ) : null}
+            <LineContactCard lineUrl={settings ? settings.footer_line_url ?? '' : undefined} />
             <Link
               href={shopHome}
               className="mt-6 inline-block rounded-full bg-[#1f1b19] px-6 py-3 font-semibold text-white"

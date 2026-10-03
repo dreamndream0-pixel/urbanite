@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import ShopHeader from '@/app/components/ShopHeader';
 import { useShopHome } from '@/lib/shop-home';
+import LineContactCard from '@/app/components/LineContactCard';
 
 type OrderStatus = {
   order_no: string;
@@ -102,6 +103,8 @@ function CompleteInner() {
               </p>
             </>
           )}
+
+          {!loading && !failed && <LineContactCard />}
 
           <Link
             href={shopHome}
