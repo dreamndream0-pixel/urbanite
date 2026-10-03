@@ -4,7 +4,7 @@ import { settleNewebpayPayment } from '@/lib/newebpay-settle';
 // POST /api/payment/newebpay/return — 藍新 ReturnURL 付款後瀏覽器帶結果導回
 // 解出訂單編號後,導向前台完成頁;若背景通知延遲,這裡也會補做付款入帳。
 export async function POST(request: Request) {
-  const cfg = getNewebpayConfig();
+  const cfg = await getNewebpayConfig();
   let orderNo = '';
   let status = '';
   try {

@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import type { User } from '@supabase/supabase-js';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { getIntegrations } from '@/lib/integrations';
 
 export type LineProfile = {
   userId: string;
@@ -27,11 +28,10 @@ function signLineState(payload: string, channelSecret: string) {
   return crypto.createHmac('sha256', channelSecret).update(payload).digest('base64url');
 }
 
-export function getLineLoginConfig() {
-  return {
-    channelId: process.env.LINE_LOGIN_CHANNEL_ID?.trim() ?? '',
-    channelSecret: process.env.LINE_LOGIN_CHANNEL_SECRET?.trim() ?? '',
-  };
+// 由後台「串接設定」管理(未設定時沿用環境變數)
+export async function getLineLoginConfig() {
+  const cfg = await getIntegrations(['LINE_LOGIN_CHANNEL_ID', 'LINE_LOGIN_CHANNEL_SECRET'] as const);
+  return { channelId: cfg.LINE_LOGIN_CHANNEL_ID, channelSecret: cfg.LINE_LOGIN_CHANNEL_SECRET };
 }
 
 export function getLineRedirectUri(origin: string) {

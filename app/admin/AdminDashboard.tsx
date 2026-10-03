@@ -34,6 +34,7 @@ import { COUPON_PRESETS } from '@/lib/coupon-presets';
 import { isoToTaipeiInput } from '@/lib/taipei-time';
 import CampaignManager from './CampaignManager';
 import FixedBannerCropModal from './FixedBannerCropModal';
+import IntegrationSettings from './IntegrationSettings';
 import { getCheckoutLine, HIDDEN_FOOTER_SECTION_TITLES, withCheckoutLine } from '@/lib/checkout-line';
 import { ADMIN_PRODUCT_TABS, adminProductTab, UNLISTED_STATUS, type AdminProductTab } from '@/lib/product-status';
 
@@ -435,7 +436,7 @@ export default function AdminDashboard({
   const [customers] = useState<Customer[]>(initialCustomers);
   const [banners, setBanners] = useState<Banner[]>(initialBanners);
   const [uploadingBanner, setUploadingBanner] = useState(false);
-  const [settingsTab, setSettingsTab] = useState<'general' | 'banners' | 'footer' | 'payments' | 'shippings'>('general');
+  const [settingsTab, setSettingsTab] = useState<'general' | 'banners' | 'footer' | 'payments' | 'shippings' | 'integrations'>('general');
   const [orderFilter, setOrderFilter] = useState<string>('全部');
   const [orderSearch, setOrderSearch] = useState('');
   const [orderPaidFilter, setOrderPaidFilter] = useState<'全部' | '已付款' | '未付款'>('全部');
@@ -2750,18 +2751,19 @@ export default function AdminDashboard({
           {/* ===== 系統設定 ===== */}
           {section === 'settings' && (
             <div className="space-y-6">
-              <div className="flex gap-2 border-b border-[#e5ded4]">
+              <div className="flex gap-2 overflow-x-auto border-b border-[#e5ded4] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                 {([
                   { key: 'general', label: '一般設定' },
                   { key: 'banners', label: '輪播圖' },
                   { key: 'footer', label: '頁尾資訊' },
                   { key: 'payments', label: '金流設定' },
                   { key: 'shippings', label: '物流設定' },
+                  { key: 'integrations', label: '串接設定' },
                 ] as const).map((t) => (
                   <button
                     key={t.key}
                     onClick={() => setSettingsTab(t.key)}
-                    className={`-mb-px border-b-2 px-4 py-2 text-sm font-semibold transition ${
+                    className={`-mb-px shrink-0 border-b-2 px-4 py-2 text-sm font-semibold transition ${
                       settingsTab === t.key
                         ? 'border-[#1f1b19] text-[#1f1b19]'
                         : 'border-transparent text-[#8a7f72] hover:text-[#1f1b19]'
@@ -3079,6 +3081,7 @@ export default function AdminDashboard({
               </Card>
               )}
 
+              {settingsTab === 'integrations' && <IntegrationSettings />}
               {settingsTab === 'shippings' && (
               <Card
                 title="物流設定"

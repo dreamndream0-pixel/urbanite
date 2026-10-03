@@ -35,7 +35,7 @@ export async function GET(
   if (!order || !shipment) return NextResponse.json({ error: '找不到物流單' }, { status: 404 });
   if (!shipment.lgs_type || !shipment.ship_type) return NextResponse.json({ error: '此物流單不是藍新物流單' }, { status: 400 });
 
-  const { actionUrl, fields } = buildNewebpayLogisticsForm('printLabel', {
+  const { actionUrl, fields } = await buildNewebpayLogisticsForm('printLabel', {
     LgsType: shipment.lgs_type,
     ShipType: shipment.ship_type,
     MerchantOrderNo: [order.order_no],

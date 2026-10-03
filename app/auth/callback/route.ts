@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createServerSupabase } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { getAdminEmails } from '@/lib/integrations';
 import { getServerRedirectOrigin } from '@/lib/site-url';
 
 // 社群登入完成後,Supabase 會把使用者導回這裡,換取登入 session。
@@ -34,10 +35,7 @@ export async function GET(request: Request) {
       data: { user },
     } = await supabase.auth.getUser();
     if (user) {
-      const adminEmails = (process.env.ADMIN_EMAILS ?? '')
-        .split(',')
-        .map((e) => e.trim().toLowerCase())
-        .filter(Boolean);
+      const adminEmails = await getAdminEmails();
       const isAdmin = adminEmails.includes((user.email ?? '').toLowerCase());
       if (!isAdmin) {
         const name =

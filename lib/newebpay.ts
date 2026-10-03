@@ -2,15 +2,18 @@
 // 依官方技術串接手冊 NDNF-1.2.5。
 import crypto from 'crypto';
 import { getConfiguredSiteUrl } from '@/lib/site-url';
+import { getIntegrations } from '@/lib/integrations';
 
-export function getNewebpayConfig() {
-  const env = (process.env.NEWEBPAY_ENV || 'stage').toLowerCase();
+// 金鑰由後台「串接設定」管理(未設定時沿用環境變數)
+export async function getNewebpayConfig() {
+  const cfg = await getIntegrations(['NEWEBPAY_ENV', 'NEWEBPAY_MERCHANT_ID', 'NEWEBPAY_HASH_KEY', 'NEWEBPAY_HASH_IV'] as const);
+  const env = (cfg.NEWEBPAY_ENV || 'stage').toLowerCase();
   const isProd = env === 'production' || env === 'prod';
   return {
     isProd,
-    merchantId: process.env.NEWEBPAY_MERCHANT_ID || '',
-    hashKey: process.env.NEWEBPAY_HASH_KEY || '',
-    hashIv: process.env.NEWEBPAY_HASH_IV || '',
+    merchantId: cfg.NEWEBPAY_MERCHANT_ID,
+    hashKey: cfg.NEWEBPAY_HASH_KEY,
+    hashIv: cfg.NEWEBPAY_HASH_IV,
     mpgUrl: isProd
       ? 'https://core.newebpay.com/MPG/mpg_gateway'
       : 'https://ccore.newebpay.com/MPG/mpg_gateway',
@@ -59,13 +62,13 @@ export function buildItemDesc(items: { name: string; variant?: string; quantity:
 }
 
 // 組出送往藍新 MPG 的表單參數(MerchantID / TradeInfo / TradeSha / Version)
-export function buildMPGParams(order: {
+export async function buildMPGParams(order: {
   order_no: string;
   total: number;
   email?: string;
   items: { name: string; variant?: string; quantity: number }[];
-}): { params: Record<string, string>; action: string } {
-  const cfg = getNewebpayConfig();
+}): Promise<{ params: Record<string, string>; action: string }> {
+  const cfg = await getNewebpayConfig();
   const trade: Record<string, string> = {
     MerchantID: cfg.merchantId,
     RespondType: 'JSON',

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { getAdminEmails } from '@/lib/integrations';
 import { getSessionUser } from '@/lib/supabase/server';
 
 // POST /api/customers — 把目前登入者寫進顧客系統(註冊/登入後呼叫,重複呼叫安全)
@@ -8,10 +9,7 @@ export async function POST() {
   if (!user) return NextResponse.json({ error: '請先登入' }, { status: 401 });
 
   // 管理員帳號不建成顧客
-  const adminEmails = (process.env.ADMIN_EMAILS ?? '')
-    .split(',')
-    .map((e) => e.trim().toLowerCase())
-    .filter(Boolean);
+  const adminEmails = await getAdminEmails();
   if (adminEmails.includes((user.email ?? '').toLowerCase())) {
     return NextResponse.json({ ok: true, skipped: 'admin' });
   }

@@ -20,7 +20,7 @@ export async function GET(request: Request) {
   const o = order as Order;
   if (o.paid) return redirect(`/checkout/complete?order_no=${encodeURIComponent(orderNo)}`);
 
-  const { params, action } = buildMPGParams({
+  const { params, action } = await buildMPGParams({
     order_no: o.order_no,
     total: o.total,
     email: o.email,

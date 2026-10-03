@@ -18,7 +18,7 @@ export async function GET(request: Request) {
     return NextResponse.redirect(`${redirectOrigin}/auth/line/start?next=${encodeURIComponent(next)}`);
   }
 
-  const { channelId, channelSecret } = getLineLoginConfig();
+  const { channelId, channelSecret } = await getLineLoginConfig();
   if (!channelId || !channelSecret) {
     const loginUrl = new URL('/login', redirectOrigin);
     loginUrl.searchParams.set('next', next);

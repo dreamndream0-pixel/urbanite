@@ -1,5 +1,6 @@
 import crypto from 'crypto';
 import { aesEncrypt, tradeSha, verifyTradeSha } from '@/lib/newebpay';
+import { getIntegrations } from '@/lib/integrations';
 import { getConfiguredSiteUrl } from '@/lib/site-url';
 
 // 解密藍新物流回傳:比照官方範例(OPENSSL_ZERO_PADDING + 自行去 padding),
@@ -28,22 +29,29 @@ const LOGISTIC_PATHS = {
 
 export type NewebpayLogisticsAction = keyof typeof LOGISTIC_PATHS;
 
-export function getNewebpayLogisticsConfig() {
-  const env = (process.env.NEWEBPAY_LOGISTICS_ENV || 'stage').toLowerCase();
+// 金鑰由後台「串接設定」管理(未設定時沿用環境變數)
+export async function getNewebpayLogisticsConfig() {
+  const cfg = await getIntegrations([
+    'NEWEBPAY_LOGISTICS_ENV',
+    'NEWEBPAY_LOGISTICS_UID',
+    'NEWEBPAY_LOGISTICS_HASH_KEY',
+    'NEWEBPAY_LOGISTICS_HASH_IV',
+  ] as const);
+  const env = (cfg.NEWEBPAY_LOGISTICS_ENV || 'stage').toLowerCase();
   const isProd = env === 'production' || env === 'prod';
   return {
-    uid: process.env.NEWEBPAY_LOGISTICS_UID || '',
-    hashKey: process.env.NEWEBPAY_LOGISTICS_HASH_KEY || '',
-    hashIv: process.env.NEWEBPAY_LOGISTICS_HASH_IV || '',
+    uid: cfg.NEWEBPAY_LOGISTICS_UID,
+    hashKey: cfg.NEWEBPAY_LOGISTICS_HASH_KEY,
+    hashIv: cfg.NEWEBPAY_LOGISTICS_HASH_IV,
     apiBase: isProd ? 'https://core.newebpay.com/API/Logistic' : 'https://ccore.newebpay.com/API/Logistic',
     siteUrl: getConfiguredSiteUrl(),
   };
 }
 
-function requireLogisticsConfig() {
-  const cfg = getNewebpayLogisticsConfig();
+async function requireLogisticsConfig() {
+  const cfg = await getNewebpayLogisticsConfig();
   if (!cfg.uid || !cfg.hashKey || !cfg.hashIv) {
-    throw new Error('缺少藍新物流設定，請設定 NEWEBPAY_LOGISTICS_UID、NEWEBPAY_LOGISTICS_HASH_KEY、NEWEBPAY_LOGISTICS_HASH_IV');
+    throw new Error('缺少藍新物流設定，請到後台「系統設定 → 串接設定」填寫藍新物流 UID、HashKey、HashIV');
   }
   return cfg;
 }
@@ -57,8 +65,8 @@ function parsePayload(plain: string): Record<string, unknown> {
   }
 }
 
-export function decodeNewebpayLogisticsResponse(form: Record<string, FormDataEntryValue | string>) {
-  const cfg = requireLogisticsConfig();
+export async function decodeNewebpayLogisticsResponse(form: Record<string, FormDataEntryValue | string>) {
+  const cfg = await requireLogisticsConfig();
   const encrypted = String(form.EncryptData_ ?? form.EncryptData ?? '');
   const receivedHash = String(form.HashData_ ?? form.HashData ?? '');
   if (!encrypted) throw new Error('缺少藍新物流回傳資料');
@@ -68,11 +76,11 @@ export function decodeNewebpayLogisticsResponse(form: Record<string, FormDataEnt
   return parsePayload(logisticsAesDecrypt(encrypted, cfg.hashKey, cfg.hashIv));
 }
 
-export function buildNewebpayLogisticsForm(
+export async function buildNewebpayLogisticsForm(
   action: NewebpayLogisticsAction,
   data: Record<string, string | number | string[] | undefined | null>,
 ) {
-  const cfg = requireLogisticsConfig();
+  const cfg = await requireLogisticsConfig();
   // 藍新物流規格:EncryptData 明文為「JSON 字串」(非金流的 query string),
   // 再 AES-256-CBC → hex,雜湊 = SHA256(HashKey=..&<enc>&HashIV=..) 轉大寫。
   // 陣列值(如 getShipmentNo / printLabel 的 MerchantOrderNo)需保留為 JSON 陣列。
@@ -101,7 +109,7 @@ export async function requestNewebpayLogistics(
   action: NewebpayLogisticsAction,
   data: Record<string, string | number | string[] | undefined | null>,
 ) {
-  const form = buildNewebpayLogisticsForm(action, data);
+  const form = await buildNewebpayLogisticsForm(action, data);
   const res = await fetch(form.actionUrl, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -116,7 +124,7 @@ export async function requestNewebpayLogistics(
   }
   const encrypted = String(raw.EncryptData ?? raw.EncryptData_ ?? '');
   const hash = String(raw.HashData ?? raw.HashData_ ?? '');
-  const dataPayload = encrypted ? decodeNewebpayLogisticsResponse({ EncryptData: encrypted, HashData: hash }) : null;
+  const dataPayload = encrypted ? await decodeNewebpayLogisticsResponse({ EncryptData: encrypted, HashData: hash }) : null;
   // 藍新物流成功外層 Status 固定為 SUCCESS;其餘(1102/1109/2100…)皆為失敗。
   return {
     ok: res.ok && String(raw.Status ?? '').toUpperCase() === 'SUCCESS',

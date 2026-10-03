@@ -1,4 +1,5 @@
 import { createServerClient } from '@supabase/ssr';
+import { getAdminEmails } from '@/lib/integrations';
 import { cookies } from 'next/headers';
 
 // 伺服器端的登入用 client:透過 cookie 讀寫使用者的登入狀態(session)。
@@ -42,10 +43,8 @@ export async function getAdminUser() {
   } = await supabase.auth.getUser();
   if (!user?.email) return null;
 
-  const allow = (process.env.ADMIN_EMAILS ?? '')
-    .split(',')
-    .map((e) => e.trim().toLowerCase())
-    .filter(Boolean);
+  // 主機環境變數 ∪ 後台「串接設定」的管理員 Email
+  const allow = await getAdminEmails();
 
   if (allow.length > 0 && !allow.includes(user.email.toLowerCase())) {
     return null;

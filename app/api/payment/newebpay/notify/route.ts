@@ -7,7 +7,7 @@ export async function POST(request: Request) {
   const form = await request.formData();
   const tradeInfo = String(form.get('TradeInfo') ?? '');
   const receivedSha = String(form.get('TradeSha') ?? '');
-  const cfg = getNewebpayConfig();
+  const cfg = await getNewebpayConfig();
 
   if (!tradeInfo || !verifyTradeSha(tradeInfo, receivedSha, cfg.hashKey, cfg.hashIv)) {
     console.error('[NewebPay notify] TradeSha 驗證失敗');

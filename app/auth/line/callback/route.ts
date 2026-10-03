@@ -38,7 +38,7 @@ export async function GET(request: Request) {
   if (providerError) return loginError(redirectOrigin, next, providerError);
   if (!code || !state) return loginError(redirectOrigin, next, '登入驗證資料不完整，請重新登入');
 
-  const { channelId, channelSecret } = getLineLoginConfig();
+  const { channelId, channelSecret } = await getLineLoginConfig();
   if (!channelId || !channelSecret) {
     return loginError(redirectOrigin, next, 'LINE 登入尚未完成環境變數設定');
   }

@@ -9,7 +9,7 @@ export async function GET(request: Request) {
     const lgsType = url.searchParams.get('lgs_type') || 'C2C';
     const returnUrl = `${getConfiguredSiteUrl()}/api/logistics/newebpay/store-map/return`;
     const merchantOrderNo = `MAP${Date.now()}`;
-    const { actionUrl, fields } = buildNewebpayLogisticsForm('storeMap', {
+    const { actionUrl, fields } = await buildNewebpayLogisticsForm('storeMap', {
       MerchantOrderNo: merchantOrderNo,
       LgsType: lgsType,
       ShipType: shipType,

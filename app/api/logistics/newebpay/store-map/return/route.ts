@@ -8,7 +8,7 @@ function esc(value: unknown) {
 export async function POST(request: Request) {
   try {
     const formData = await request.formData();
-    const payload = decodeNewebpayLogisticsResponse(Object.fromEntries(formData.entries()));
+    const payload = await decodeNewebpayLogisticsResponse(Object.fromEntries(formData.entries()));
     const store = {
       store_id: String(payload.StoreID ?? ''),
       store_name: String(payload.StoreName ?? ''),
