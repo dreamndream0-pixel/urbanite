@@ -4305,13 +4305,12 @@ function AdminOrderModal({
   // 訂單歷程:狀態紀錄 + 物流貨態事件,依時間合併
   const timeline = detail
     ? [
-        ...detail.history.map((h) => ({ id: h.id, at: h.created_at, text: stripBrand(historyLabel(h)), by: historyActor(h.created_by), kind: historyKind(h) })),
+        ...detail.history.map((h) => ({ id: h.id, at: h.created_at, text: stripBrand(historyLabel(h)), kind: historyKind(h) })),
         ...detail.shipments.flatMap((sh) =>
           (sh.events ?? []).map((ev) => ({
             id: `ev-${ev.id}`,
             at: ev.event_at,
             text: stripBrand(`${ev.description || (FULFILLMENT_STATUS_LABEL[ev.status ?? ''] ?? ev.status ?? '')}${ev.location ? `(${ev.location})` : ''}`),
-            by: stripBrand(sh.provider || '物流') || '物流',
             kind: { label: '物流', tone: '#1f7a44' },
           })),
         ),
@@ -4512,7 +4511,7 @@ ${order.note ? `<div class="sec"><h2>備註</h2><p class="muted">${escapeHtml(or
                       <div className="min-w-0 flex-1">
                         <p className="text-sm text-[#3f3a34]">{item.text}</p>
                         <p className="text-xs text-[#a99e8f]">
-                          {new Date(item.at).toLocaleString('zh-TW')} · {item.by}
+                          {new Date(item.at).toLocaleString('zh-TW')}
                         </p>
                       </div>
                     </li>
@@ -4730,14 +4729,6 @@ ${order.note ? `<div class="sec"><h2>備註</h2><p class="muted">${escapeHtml(or
 // 後台畫面不顯示金流 / 物流服務商品牌字樣(「藍新」)
 function stripBrand(text: string) {
   return text.replace(/藍新物流[-－]/g, '').replace(/藍新/g, '').trim();
-}
-
-// 歷程操作者:不顯示 Email
-function historyActor(by?: string | null) {
-  if (!by) return '系統';
-  if (by.includes('@')) return '管理員';
-  if (/^system$/i.test(by)) return '系統';
-  return stripBrand(by) || '系統';
 }
 
 // 寄件單號標題,例如「全家店到店」「7-11 店到店」「宅配」
