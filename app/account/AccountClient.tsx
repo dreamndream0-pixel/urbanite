@@ -1992,30 +1992,38 @@ function FavoritesTab({ products }: { products: Product[] }) {
   if (products.length === 0) {
     return (
       <p className="rounded-2xl border border-[#e5ded4] bg-white p-8 text-center text-[#6b6156]">
-        還沒有收藏商品。到商品頁點星號即可加入追蹤清單。
+        還沒有收藏商品。到商品頁點愛心即可加入追蹤清單。
       </p>
     );
   }
+  // 與首頁商品卡相同的樣式:照片完整顯示(不裁切)
   return (
     <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
       {products.map((p) => (
         <Link
           key={p.id}
           href={`/products/${encodeURIComponent(p.id)}`}
-          className="group overflow-hidden rounded-xl border border-[#e5ded4] bg-white"
+          className="group flex flex-col overflow-hidden rounded-lg bg-[#f9f8f6] p-3 shadow-sm transition hover:shadow-md"
         >
-          <div className="aspect-[4/5] overflow-hidden bg-[#e9e1d6]">
+          <div className="aspect-[4/5] overflow-hidden rounded-[6px] bg-white">
             {p.image ? (
               <img
                 src={p.image}
                 alt={p.name}
-                className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
+                className="h-full w-full object-contain drop-shadow-[0_14px_16px_rgba(31,27,25,0.22)]"
               />
-            ) : null}
+            ) : (
+              <div className="flex h-full w-full items-center justify-center text-sm text-[#a99]">無圖片</div>
+            )}
           </div>
-          <div className="p-3">
-            <p className="line-clamp-1 text-sm font-medium">{p.name}</p>
-            <p className="mt-1 text-sm font-semibold text-[#c84767]">{formatter.format(p.price)}</p>
+          <div className="mt-3 px-1">
+            <p className="line-clamp-1 text-sm font-semibold leading-5 group-hover:text-[#c84767]">{p.name}</p>
+            <div className="mt-2 flex items-baseline gap-2">
+              <span className="font-semibold tracking-wide">{formatter.format(p.price)}</span>
+              {p.original_price ? (
+                <span className="text-xs text-[#b3a897] line-through">{formatter.format(p.original_price)}</span>
+              ) : null}
+            </div>
           </div>
         </Link>
       ))}
