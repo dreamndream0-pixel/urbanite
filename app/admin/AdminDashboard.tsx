@@ -36,6 +36,7 @@ import { isoToTaipeiInput } from '@/lib/taipei-time';
 import CampaignManager from './CampaignManager';
 import FixedBannerCropModal from './FixedBannerCropModal';
 import IntegrationSettings from './IntegrationSettings';
+import { isCollectOnDelivery } from '@/lib/payment';
 import { buildReturnSteps, historyKind, isReturnOrder } from '@/lib/return-progress';
 import { getCheckoutLine, HIDDEN_FOOTER_SECTION_TITLES, withCheckoutLine } from '@/lib/checkout-line';
 import { ADMIN_PRODUCT_TABS, adminProductTab, UNLISTED_STATUS, type AdminProductTab } from '@/lib/product-status';
@@ -54,6 +55,12 @@ function formatOverviewCurrency(value: number) {
 const CANCEL_REVIEW_TAB = '待審核取消';
 const PROCESSED_TAB = '已處理';
 const ORDER_TAB_KEYS = ['全部', CANCEL_REVIEW_TAB, '尚未付款', '待出貨', PROCESSED_TAB, '已出貨', '已完成', '取消', '退貨'];
+
+// 訂單計入營收的金額:取消的訂單為 0;有退款則扣除退款金額
+function orderRevenue(order: Order) {
+  if (order.status === '取消') return 0;
+  return Math.max(0, order.total - (order.refund_amount ?? 0));
+}
 
 function orderMatchesTab(order: Order, tab: string) {
   if (tab === '全部') return true;
@@ -561,7 +568,7 @@ export default function AdminDashboard({
       if (!o.user_id) continue;
       const ex = stat.get(o.user_id) ?? { count: 0, total: 0, last: '' };
       ex.count += 1;
-      ex.total += o.total;
+      ex.total += orderRevenue(o);
       if (o.created_at && o.created_at > ex.last) ex.last = o.created_at;
       stat.set(o.user_id, ex);
     }
@@ -579,12 +586,13 @@ export default function AdminDashboard({
   }, [customers, orders]);
 
   const report = useMemo(() => {
-    const totalRevenue = orders.reduce((s, o) => s + o.total, 0);
-    const paidRevenue = orders.filter((o) => o.paid).reduce((s, o) => s + o.total, 0);
-    const orderCount = orders.length;
+    const counted = orders.filter((o) => o.status !== '取消');
+    const totalRevenue = counted.reduce((s, o) => s + orderRevenue(o), 0);
+    const paidRevenue = counted.filter((o) => o.paid).reduce((s, o) => s + orderRevenue(o), 0);
+    const orderCount = counted.length;
     const avg = orderCount ? Math.round(totalRevenue / orderCount) : 0;
     const prodMap = new Map<string, number>();
-    for (const o of orders) for (const it of o.items) prodMap.set(it.name, (prodMap.get(it.name) || 0) + it.quantity);
+    for (const o of counted) for (const it of o.items) prodMap.set(it.name, (prodMap.get(it.name) || 0) + it.quantity);
     const topProducts = [...prodMap.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5);
     return { totalRevenue, paidRevenue, orderCount, avg, topProducts };
   }, [orders]);
@@ -593,7 +601,7 @@ export default function AdminDashboard({
     const today = new Date().toDateString();
     return orders
       .filter((o) => o.created_at && new Date(o.created_at).toDateString() === today)
-      .reduce((s, o) => s + o.total, 0);
+      .reduce((s, o) => s + orderRevenue(o), 0);
   }, [orders]);
 
   const pendingCount = orders.filter((o) => orderMatchesTab(o, '待出貨')).length;
@@ -691,11 +699,11 @@ export default function AdminDashboard({
     } else void uiAlert('更新失敗');
   }
 
-  async function reviewCancel(id: string, action: 'approve' | 'reject', response: string) {
+  async function reviewCancel(id: string, action: 'approve' | 'reject', response: string, markRefunded = false) {
     const res = await fetch(`/api/orders/${id}/cancel`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action, response }),
+      body: JSON.stringify({ action, response, mark_refunded: markRefunded }),
     });
     const data = await res.json();
     if (res.ok) {
@@ -3160,7 +3168,7 @@ export default function AdminDashboard({
           imageByName={imageByName}
           onClose={() => setOpenOrderId(null)}
           onUpdate={(patch) => updateOrder(openOrderId, patch)}
-          onReviewCancel={(action, response) => reviewCancel(openOrderId, action, response)}
+          onReviewCancel={(action, response, markRefunded) => reviewCancel(openOrderId, action, response, markRefunded)}
           onOrderChange={(o) => setOrders((list) => list.map((x) => (x.id === o.id ? { ...x, ...o } : x)))}
           onShipmentCreated={(shipment) => {
             setOrders((list) => list.map((item) => item.id === openOrderId ? {
@@ -4278,7 +4286,7 @@ function AdminOrderModal({
   imageByName: Map<string, string>;
   onClose: () => void;
   onUpdate: (patch: Partial<Order>) => void;
-  onReviewCancel: (action: 'approve' | 'reject', response: string) => void;
+  onReviewCancel: (action: 'approve' | 'reject', response: string, markRefunded?: boolean) => void;
   onOrderChange?: (o: Order) => void;
   onShipmentCreated: (shipment: Shipment) => void;
 }) {
@@ -4296,12 +4304,16 @@ function AdminOrderModal({
   const [detail, setDetail] = useState<Pick<OrderDetail, 'payments' | 'shipments' | 'history' | 'returns' | 'refunds'> | null>(null);
   const [detailLoading, setDetailLoading] = useState(true);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [homeShipOpen, setHomeShipOpen] = useState(false);
   const [toast, setToast] = useState('');
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const paidAt = detail?.history?.find((h) => h.type === 'payment' && h.to_status === 'PAID')?.created_at
     ?? detail?.payments?.find((p) => p.status === 'PAID')?.paid_at
     ?? undefined;
   const hasShipment = (detail?.shipments?.length ?? 0) > 0;
+  // 宅配到府(非超商取貨):收款後才能出貨(貨到付款除外)
+  const isHomeDelivery = !order.store_id && /宅配|到府|home/i.test(order.shipping_method ?? '');
+  const canShipHome = order.paid || isCollectOnDelivery(order.shipping_method ?? '', order.payment_method ?? '');
   // 訂單歷程:狀態紀錄 + 物流貨態事件,依時間合併
   const timeline = detail
     ? [
@@ -4358,6 +4370,24 @@ function AdminOrderModal({
       if (!res.ok) { void uiAlert(stripBrand((await res.json()).error ?? '建立出貨失敗')); return; }
       const shipment = (await res.json()) as Shipment;
       onShipmentCreated(shipment);
+    } finally { setBusy(false); }
+  }
+
+  async function shipHome(carrier: string, tracking: string) {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/orders/${order.id}/shipment`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ home_delivery: true, provider: carrier, tracking_number: tracking }),
+      });
+      const data = await res.json();
+      if (!res.ok) { void uiAlert(stripBrand(data.error ?? '出貨失敗')); return; }
+      setHomeShipOpen(false);
+      onOrderChange?.({ ...order, status: '已出貨', fulfillment_status: 'SHIPPED', order_status: 'PROCESSING' });
+      await loadDetail();
+      flash('已宅配出貨');
     } finally { setBusy(false); }
   }
 
@@ -4449,15 +4479,27 @@ ${order.note ? `<div class="sec"><h2>備註</h2><p class="muted">${escapeHtml(or
         <div className="flex-1 space-y-5 overflow-y-auto overscroll-contain p-5">
           {/* 主要操作固定在內容最上方 */}
           <div className="flex flex-wrap gap-2">
+            {isHomeDelivery && !hasShipment && order.status !== '取消' && order.status !== '退貨' ? (
+              <button
+                onClick={() => {
+                  if (!canShipHome) { void uiAlert('此訂單尚未收款,請先確認已收款(標記已付款)後再宅配出貨。'); return; }
+                  setHomeShipOpen(true);
+                }}
+                className={`inline-flex h-10 items-center rounded-full px-6 text-sm font-semibold text-white ${canShipHome ? 'bg-[#1f7a44] hover:bg-[#186437]' : 'bg-[#b8c9bd]'}`}
+              >
+                宅配出貨
+              </button>
+            ) : null}
             <button onClick={printShippingDocument} className="inline-flex h-10 items-center rounded-full bg-[#1f1b19] px-6 text-sm font-semibold text-white hover:bg-black">列印出貨單</button>
             {labelShipment ? (
               <button onClick={printShippingLabel} className="inline-flex h-10 items-center rounded-full border border-[#1f1b19] px-6 text-sm font-semibold text-[#1f1b19] hover:bg-[#efe8dd]">列印寄件單</button>
             ) : null}
-            {order.status !== '待出貨' ? (
-              <button onClick={markRefund} className="inline-flex h-10 items-center rounded-full border border-[#d7c9bd] px-6 text-sm font-semibold text-[#6b6156] hover:bg-[#efe8dd]">標記退款</button>
-            ) : null}
             {order.status !== '取消' && order.status !== '退貨' ? (
-              <button onClick={async () => { if (await uiConfirm('確定要取消這筆訂單嗎?', { danger: true })) onUpdate({ status: '取消' }); }} className="inline-flex h-10 items-center rounded-full border border-[#e0b4b4] px-6 text-sm font-semibold text-[#c0392b] hover:bg-[#fbf3f0]">取消訂單</button>
+              <button onClick={async () => {
+                if (!(await uiConfirm('確定要取消這筆訂單嗎?', { danger: true }))) return;
+                const refunded = order.paid ? await uiConfirm(`此訂單已付款 ${formatter.format(order.total)},是否一併標記已退款?\n(實際退刷仍需至金流後台操作)`) : false;
+                onUpdate(refunded ? { status: '取消', refund_amount: order.total } : { status: '取消' });
+              }} className="inline-flex h-10 items-center rounded-full border border-[#e0b4b4] px-6 text-sm font-semibold text-[#c0392b] hover:bg-[#fbf3f0]">取消訂單</button>
             ) : null}
           </div>
 
@@ -4536,7 +4578,11 @@ ${order.note ? `<div class="sec"><h2>備註</h2><p class="muted">${escapeHtml(or
               />
               <div className="mt-2 flex flex-wrap gap-2">
                 <button
-                  onClick={async () => { if (await uiConfirm('核准取消?將取消這筆訂單。')) onReviewCancel('approve', cancelReply.trim()); }}
+                  onClick={async () => {
+                    if (!(await uiConfirm('核准取消?將取消這筆訂單。'))) return;
+                    const refunded = order.paid ? await uiConfirm(`此訂單已付款 ${formatter.format(order.total)},是否一併標記已退款?\n(實際退刷仍需至金流後台操作)`) : false;
+                    onReviewCancel('approve', cancelReply.trim(), refunded);
+                  }}
                   className="rounded-full bg-[#c0392b] px-4 py-1.5 text-sm font-semibold text-white hover:bg-[#a83226]"
                 >
                   核准取消
@@ -4557,7 +4603,7 @@ ${order.note ? `<div class="sec"><h2>備註</h2><p class="muted">${escapeHtml(or
           ) : null}
 
           {/* 尚未建立物流單:建立出貨單(門市與收件資料見下方「送貨資訊」) */}
-          {!detailLoading && !hasShipment ? (
+          {!detailLoading && !hasShipment && !isHomeDelivery ? (
             <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[#efe8dd] px-4 py-3">
               <p className="text-sm text-[#6b6156]">尚未建立物流單</p>
               <button
@@ -4612,7 +4658,15 @@ ${order.note ? `<div class="sec"><h2>備註</h2><p class="muted">${escapeHtml(or
               {row('訂單號碼', order.order_no)}
               {row('訂單日期', dateStr)}
               {row('訂單狀態', order.status)}
-              {row('付款狀態', order.paid ? '已付款' : '未付款')}
+              {row('付款狀態', order.paid ? (order.refund_amount ? `已付款(已退款 ${formatter.format(order.refund_amount)})` : '已付款') : '未付款')}
+              <div className="flex flex-wrap justify-end gap-2 pt-1">
+                {!order.paid && order.status !== '取消' ? (
+                  <button onClick={async () => { if (await uiConfirm('確認已收到這筆訂單的款項?')) onUpdate({ paid: true }); }} className="rounded-full bg-[#1f7a44] px-4 py-1.5 text-xs font-semibold text-white">標記已付款</button>
+                ) : null}
+                {order.paid ? (
+                  <button onClick={markRefund} className="rounded-full border border-[#d7c9bd] px-4 py-1.5 text-xs font-semibold text-[#6b6156] hover:bg-[#efe8dd]">標記退款</button>
+                ) : null}
+              </div>
               {row('客人備註', order.note)}
             </div>
           </div>
@@ -4715,6 +4769,7 @@ ${order.note ? `<div class="sec"><h2>備註</h2><p class="muted">${escapeHtml(or
 
         </div>
       </div>
+      {homeShipOpen ? <HomeShipModal busy={busy} onClose={() => setHomeShipOpen(false)} onSubmit={shipHome} /> : null}
       <div
         role="status"
         aria-live="polite"
@@ -4722,6 +4777,49 @@ ${order.note ? `<div class="sec"><h2>備註</h2><p class="muted">${escapeHtml(or
       >
         {toast}
       </div>
+    </div>
+  );
+}
+
+const HOME_CARRIERS = ['黑貓宅急便', '新竹物流', '中華郵政', '宅配通', '嘉里大榮'];
+
+// 宅配出貨:輸入物流公司與物流單號
+function HomeShipModal({ busy, onClose, onSubmit }: { busy: boolean; onClose: () => void; onSubmit: (carrier: string, tracking: string) => void }) {
+  const [carrier, setCarrier] = useState(HOME_CARRIERS[0]);
+  const [other, setOther] = useState('');
+  const [tracking, setTracking] = useState('');
+  const name = carrier === '其他' ? other.trim() : carrier;
+  return (
+    <div className="fixed inset-0 z-[75] flex items-end justify-center bg-black/40 sm:items-center sm:p-4" onClick={onClose}>
+      <form
+        className="w-full max-w-sm rounded-t-2xl bg-white p-5 sm:rounded-2xl"
+        onClick={(e) => e.stopPropagation()}
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (!name || !tracking.trim()) { void uiAlert('請填寫物流公司與物流單號'); return; }
+          onSubmit(name, tracking.trim());
+        }}
+      >
+        <h3 className="text-lg font-semibold">宅配出貨</h3>
+        <p className="mt-1 text-xs text-[#8a7f72]">填寫後訂單會標記為已出貨,並記錄在訂單歷程。</p>
+        <label className="mt-4 block text-sm">
+          <span className="mb-1 block font-semibold text-[#6b6156]">物流公司</span>
+          <select value={carrier} onChange={(e) => setCarrier(e.target.value)} className="w-full rounded-lg border border-[#e5ded4] bg-white px-3 py-2">
+            {[...HOME_CARRIERS, '其他'].map((c) => <option key={c} value={c}>{c}</option>)}
+          </select>
+        </label>
+        {carrier === '其他' ? (
+          <input value={other} onChange={(e) => setOther(e.target.value)} placeholder="物流公司名稱" className="mt-2 w-full rounded-lg border border-[#e5ded4] px-3 py-2 text-sm" />
+        ) : null}
+        <label className="mt-3 block text-sm">
+          <span className="mb-1 block font-semibold text-[#6b6156]">物流單號</span>
+          <input value={tracking} onChange={(e) => setTracking(e.target.value)} inputMode="numeric" placeholder="例如 123456789012" className="w-full rounded-lg border border-[#e5ded4] px-3 py-2" />
+        </label>
+        <div className="mt-5 flex justify-end gap-2">
+          <button type="button" onClick={onClose} className="rounded-full border border-[#d7c9bd] px-4 py-2 text-sm font-semibold">取消</button>
+          <button type="submit" disabled={busy} className="rounded-full bg-[#1f7a44] px-5 py-2 text-sm font-semibold text-white disabled:opacity-50">{busy ? '處理中…' : '確認出貨'}</button>
+        </div>
+      </form>
     </div>
   );
 }

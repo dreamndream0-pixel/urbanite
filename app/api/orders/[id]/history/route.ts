@@ -30,7 +30,9 @@ export async function GET(
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   // 給客人看的紀錄:拿掉庫存回補、金流後台退刷等內部作業說明(後台仍保留完整紀錄)
-  const rows = ((data ?? []) as OrderStatusHistory[]).map((h) => ({ ...h, note: customerNote(h.note) }));
+  const rows = ((data ?? []) as OrderStatusHistory[])
+    .filter((h) => !/尚未標記退款/.test(h.note ?? '')) // 內部提醒,不給客人看
+    .map((h) => ({ ...h, note: customerNote(h.note) }));
   return NextResponse.json(rows);
 }
 

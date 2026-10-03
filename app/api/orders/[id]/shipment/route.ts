@@ -13,6 +13,7 @@ import {
 import { getConfiguredSiteUrl } from '@/lib/site-url';
 import { finalizePickedUp } from '@/lib/pickup-complete';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { isCollectOnDelivery } from '@/lib/payment';
 import { getAdminUser } from '@/lib/supabase/server';
 import type { Shipment } from '@/lib/types';
 
@@ -43,16 +44,50 @@ export async function POST(
   const shippingMethod = String(body?.shipping_method ?? '').trim();
   const trackingNumber = String(body?.tracking_number ?? '').trim();
   const useNewebpay = Boolean(body?.use_newebpay);
+  const homeDelivery = Boolean(body?.home_delivery); // 宅配出貨:已交寄物流公司
 
   const supabase = createAdminClient();
   const { data: order } = await supabase
     .from('orders')
-    .select('id, order_no, customer_name, phone, email, total, items, status, fulfillment_status, shipping_method, payment_method, store_id, store_name, store_phone, store_address, store_ship_type, store_lgs_type')
+    .select('id, order_no, customer_name, phone, email, total, paid, items, status, fulfillment_status, shipping_method, payment_method, store_id, store_name, store_phone, store_address, store_ship_type, store_lgs_type')
     .eq('id', id)
     .maybeSingle();
   if (!order) return NextResponse.json({ error: '找不到訂單' }, { status: 404 });
 
   const nowIso = new Date().toISOString();
+  if (homeDelivery) {
+    if (!provider || !trackingNumber) return NextResponse.json({ error: '請填寫物流公司與物流單號' }, { status: 400 });
+    if (!order.paid && !isCollectOnDelivery(order.shipping_method ?? '', order.payment_method ?? '')) {
+      return NextResponse.json({ error: '此訂單尚未收款,請先確認已收款再出貨' }, { status: 409 });
+    }
+    const note = `宅配出貨:${provider},物流單號 ${trackingNumber}`;
+    const { data: shipment, error } = await supabase
+      .from('shipments')
+      .insert({
+        order_id: id,
+        provider,
+        shipping_method: order.shipping_method || '宅配到府',
+        tracking_number: trackingNumber,
+        recipient_name: order.customer_name ?? '',
+        recipient_phone: order.phone ?? '',
+        status: 'SHIPPED',
+        shipped_at: nowIso,
+      })
+      .select()
+      .single();
+    if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+    await supabase.from('shipment_events').insert({ shipment_id: shipment.id, status: 'SHIPPED', description: note, event_at: nowIso });
+    await supabase.from('orders').update({ status: '已出貨', fulfillment_status: 'SHIPPED', order_status: 'PROCESSING' }).eq('id', id);
+    await supabase.from('order_status_history').insert({
+      order_id: id,
+      type: 'fulfillment',
+      from_status: order.fulfillment_status ?? 'UNFULFILLED',
+      to_status: 'SHIPPED',
+      note,
+      created_by: admin.email || '後台管理員',
+    });
+    return NextResponse.json(shipment as Shipment, { status: 201 });
+  }
   if (useNewebpay) {
     if (!order.store_id) {
       return NextResponse.json({ error: '此訂單沒有取貨門市，無法建立物流單' }, { status: 400 });

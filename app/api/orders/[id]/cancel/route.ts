@@ -60,6 +60,7 @@ export async function PATCH(
   const body = await request.json().catch(() => ({}));
   const action = String(body?.action ?? '').trim();
   const response = String(body?.response ?? '').trim();
+  const markRefunded = Boolean(body?.mark_refunded); // 核准取消時是否一併標記已退款
   if (action !== 'approve' && action !== 'reject') {
     return NextResponse.json({ error: '請指定 approve 或 reject' }, { status: 400 });
   }
@@ -103,7 +104,7 @@ export async function PATCH(
       cancel_response: response,
       cancel_reviewed_at: nowIso,
       ...derived,
-      ...(order.paid ? { refund_amount: order.total, net_amount: 0, payment_status: 'REFUNDED' } : {}),
+      ...(order.paid && markRefunded ? { refund_amount: order.total, net_amount: 0, payment_status: 'REFUNDED' } : {}),
     })
     .eq('id', id)
     .select()
@@ -116,7 +117,9 @@ export async function PATCH(
     { order_id: id, type: 'order', from_status: 'CANCEL_REQUESTED', to_status: 'CANCELLED', note: response ? `核准取消:${response}` : '核准取消申請', created_by: actor },
   ];
   if (order.paid) {
-    rows.push({ order_id: id, type: 'payment', from_status: 'PAID', to_status: 'REFUNDED', note: '訂單取消,需退款(請至金流後台退刷)', created_by: actor });
+    rows.push(markRefunded
+      ? { order_id: id, type: 'payment', from_status: 'PAID', to_status: 'REFUNDED', note: `標記已退款 ${order.total}`, created_by: actor }
+      : { order_id: id, type: 'payment', from_status: 'PAID', to_status: 'PAID', note: '訂單已取消,尚未標記退款', created_by: actor });
   }
   try { await supabase.from('order_status_history').insert(rows); } catch { /* 歷程失敗不影響審核 */ }
 

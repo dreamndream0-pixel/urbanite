@@ -137,14 +137,11 @@ export async function PATCH(
   if (nowCancelled && !wasCancelled) {
     try {
       await restoreOrderStock(supabase, id, actor);
-      if (current.paid) {
-        await supabase
-          .from('orders')
-          .update({ refund_amount: current.total, net_amount: 0, payment_status: 'REFUNDED' })
-          .eq('id', id);
+      // 已付款訂單:是否標記退款由管理員在取消時選擇(同一請求帶 refund_amount);未選擇只記錄尚未退款
+      if (current.paid && !hasRefund) {
         await supabase.from('order_status_history').insert({
-          order_id: id, type: 'payment', from_status: 'PAID', to_status: 'REFUNDED',
-          note: '訂單取消,需退款(請至金流後台退刷)', created_by: actor,
+          order_id: id, type: 'payment', from_status: 'PAID', to_status: 'PAID',
+          note: '訂單已取消,尚未標記退款', created_by: actor,
         });
       }
     } catch { /* 回補失敗不影響狀態更新 */ }
