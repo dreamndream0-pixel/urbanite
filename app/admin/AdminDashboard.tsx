@@ -4300,6 +4300,21 @@ function AdminOrderModal({
     ?? detail?.payments?.find((p) => p.status === 'PAID')?.paid_at
     ?? undefined;
   const hasShipment = (detail?.shipments?.length ?? 0) > 0;
+  // 訂單歷程:狀態紀錄 + 物流貨態事件,依時間合併
+  const timeline = detail
+    ? [
+        ...detail.history.map((h) => ({ id: h.id, at: h.created_at, text: historyLabel(h), by: h.created_by || 'SYSTEM', kind: historyKind(h) })),
+        ...detail.shipments.flatMap((sh) =>
+          (sh.events ?? []).map((ev) => ({
+            id: `ev-${ev.id}`,
+            at: ev.event_at,
+            text: `${ev.description || (FULFILLMENT_STATUS_LABEL[ev.status ?? ''] ?? ev.status ?? '')}${ev.location ? `(${ev.location})` : ''}`,
+            by: sh.provider || '物流',
+            kind: { label: '物流', tone: '#1f7a44' },
+          })),
+        ),
+      ].sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime())
+    : [];
   const [busy, setBusy] = useState(false);
 
   const loadDetail = useCallback(async () => {
@@ -4429,6 +4444,29 @@ ${order.note ? `<div class="sec"><h2>備註</h2><p class="muted">${escapeHtml(or
             ) : null}
           </div>
 
+          {/* 寄件單號(取代原本重複的物流資訊) */}
+          {detail?.shipments.map((sh) => {
+            const code = sh.store_print_no || sh.tracking_number;
+            if (!code) return null;
+            return (
+              <div key={sh.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-[#faf7f2] px-4 py-3">
+                <p className="text-sm text-[#2c2826]">
+                  <span className="font-semibold">{shipmentLabel(sh, order.shipping_method)}：</span>
+                  <span className="select-all tracking-wide">{code}</span>
+                </p>
+                {sh.lgs_type && sh.ship_type ? (
+                  <button
+                    onClick={() => traceShipment(sh.id)}
+                    disabled={busy}
+                    className="rounded-full border border-[#d7c9bd] bg-white px-3 py-1 text-xs font-semibold text-[#6b6156] disabled:opacity-50"
+                  >
+                    更新藍新貨態
+                  </button>
+                ) : null}
+              </div>
+            );
+          })}
+
           {/* 進度(含圖示) */}
           {isReturnOrder(order, detail?.returns) ? (
             <AdminReturnProgress order={order} returns={detail?.returns ?? []} refunds={detail?.refunds ?? []} />
@@ -4437,7 +4475,7 @@ ${order.note ? `<div class="sec"><h2>備註</h2><p class="muted">${escapeHtml(or
           )}
 
           {/* 訂單歷程(放在進度下方,可展開) */}
-          {detail && detail.history.length > 0 ? (
+          {timeline.length > 0 ? (
             <div className="-mt-2 text-center">
               <button
                 type="button"
@@ -4445,48 +4483,26 @@ ${order.note ? `<div class="sec"><h2>備註</h2><p class="muted">${escapeHtml(or
                 aria-expanded={historyOpen}
                 className="inline-flex items-center gap-1 text-xs text-[#8a7f72] hover:text-[#1f1b19]"
               >
-                訂單歷程({detail.history.length})
+                訂單歷程({timeline.length})
                 <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className={`transition-transform ${historyOpen ? 'rotate-180' : ''}`}><path d="M6 9l6 6 6-6" /></svg>
               </button>
               {historyOpen && (
                 <ol className="mt-3 space-y-3 rounded-xl border border-[#efe8dd] bg-[#faf7f2] p-4 text-left">
-                  {detail.history.map((h: OrderStatusHistory) => {
-                    const kind = historyKind(h);
-                    return (
-                      <li key={h.id} className="flex gap-3">
-                        <span className="mt-0.5 shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ background: `${kind.tone}1a`, color: kind.tone }}>{kind.label}</span>
-                        <div className="min-w-0 flex-1">
-                          <p className="text-sm text-[#3f3a34]">{historyLabel(h)}</p>
-                          <p className="text-xs text-[#a99e8f]">
-                            {new Date(h.created_at).toLocaleString('zh-TW')} · {h.created_by || 'SYSTEM'}
-                          </p>
-                        </div>
-                      </li>
-                    );
-                  })}
+                  {timeline.map((item) => (
+                    <li key={item.id} className="flex gap-3">
+                      <span className="mt-0.5 shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ background: `${item.kind.tone}1a`, color: item.kind.tone }}>{item.kind.label}</span>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm text-[#3f3a34]">{item.text}</p>
+                        <p className="text-xs text-[#a99e8f]">
+                          {new Date(item.at).toLocaleString('zh-TW')} · {item.by}
+                        </p>
+                      </div>
+                    </li>
+                  ))}
                 </ol>
               )}
             </div>
           ) : null}
-
-          {/* 三套狀態卡 */}
-          <div className="grid grid-cols-3 gap-2">
-            <div className="rounded-xl border border-[#eee5da] bg-[#faf7f2] p-3">
-              <p className="text-xs text-[#a99e8f]">訂單狀態</p>
-              <p className="mt-1 text-sm font-bold">{ORDER_STATUS_LABEL[order.order_status ?? ''] ?? order.status}</p>
-              <p className="mt-1 flex items-center gap-1 text-[11px] text-[#8a7f72]"><span className="h-1.5 w-1.5 rounded-full bg-[#c9b8a8]" />{order.status === '取消' ? '已取消' : order.status === '已完成' ? '已完成' : '處理中'}</p>
-            </div>
-            <div className="rounded-xl border border-[#eee5da] bg-[#faf7f2] p-3">
-              <p className="text-xs text-[#a99e8f]">付款狀態</p>
-              <p className={`mt-1 inline-block rounded-md px-2 py-0.5 text-sm font-bold ${order.paid ? 'bg-[#e9f7ee] text-[#1f7a44]' : 'bg-[#fdf3e7] text-[#9a6a1f]'}`}>{order.paid ? '已付款' : '未付款'}</p>
-              <p className="mt-1 text-[11px] text-[#8a7f72]">{order.paid ? (paidAt ? new Date(paidAt).toLocaleString('zh-TW') : '已收款') : '尚未付款'}</p>
-            </div>
-            <div className="rounded-xl border border-[#eee5da] bg-[#faf7f2] p-3">
-              <p className="text-xs text-[#a99e8f]">物流狀態</p>
-              <p className="mt-1 text-sm font-bold">{FULFILLMENT_STATUS_LABEL[order.fulfillment_status ?? ''] ?? '未出貨'}</p>
-              <p className="mt-1 flex items-center gap-1 text-[11px] text-[#8a7f72]"><span className="h-1.5 w-1.5 rounded-full bg-[#c9b8a8]" />{hasShipment ? '已建立物流單' : '尚未建立物流單'}</p>
-            </div>
-          </div>
 
           {/* 客人取消申請審核 */}
           {order.cancel_status === 'REQUESTED' ? (
@@ -4523,7 +4539,8 @@ ${order.note ? `<div class="sec"><h2>備註</h2><p class="muted">${escapeHtml(or
             </div>
           ) : null}
 
-          {/* 物流 */}
+          {/* 物流:取貨門市 / 建立出貨單(已建立時寄件單號顯示在上方,貨態在訂單歷程) */}
+          {order.store_id || !hasShipment ? (
           <div className="rounded-xl border border-[#efe8dd] p-4">
             <div className="mb-3 flex items-center gap-2.5">
               <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#f3ede4] text-[#6b6156]">
@@ -4531,7 +4548,7 @@ ${order.note ? `<div class="sec"><h2>備註</h2><p class="muted">${escapeHtml(or
               </span>
               <div>
                 <p className="text-sm font-semibold text-[#2c2826]">物流資訊</p>
-                <p className="text-xs text-[#8a7f72]">建立出貨單後，系統將自動更新物流進度</p>
+                <p className="text-xs text-[#8a7f72]">{hasShipment ? '寄件單號在上方，物流進度請見訂單歷程' : '建立出貨單後，系統將自動更新物流進度'}</p>
               </div>
             </div>
             {order.store_id ? (
@@ -4543,40 +4560,7 @@ ${order.note ? `<div class="sec"><h2>備註</h2><p class="muted">${escapeHtml(or
             ) : null}
             {detailLoading ? (
               <p className="text-xs text-[#a99e8f]">載入中…</p>
-            ) : detail && detail.shipments.length > 0 ? (
-              <div className="space-y-3">
-                {detail.shipments.map((s) => (
-                  <div key={s.id} className="rounded-lg bg-[#faf7f2] p-3">
-                    <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
-                      <span className="font-medium">{s.provider || '物流'}</span>
-                      <span className="text-[#8a7f72]">{FULFILLMENT_STATUS_LABEL[s.status] ?? s.status}</span>
-                    </div>
-                    {s.tracking_number ? <p className="mt-1 text-xs text-[#6b6156]">單號：{s.tracking_number}</p> : null}
-                    {s.store_print_no ? <p className="mt-1 text-xs text-[#6b6156]">寄件代碼：{s.store_print_no}</p> : null}
-                    {s.store_name ? <p className="mt-1 text-xs text-[#6b6156]">門市：{s.store_name}（{s.store_id}）</p> : null}
-                    {s.events && s.events.length > 0 ? (
-                      <ul className="mt-2 space-y-1 border-t border-[#efe8dd] pt-2 text-xs text-[#6b6156]">
-                        {s.events.map((ev) => (
-                          <li key={ev.id} className="flex gap-2">
-                            <span className="shrink-0 text-[#a99e8f]">{new Date(ev.event_at).toLocaleString('zh-TW')}</span>
-                            <span>{ev.description || (FULFILLMENT_STATUS_LABEL[ev.status ?? ''] ?? ev.status)}{ev.location ? `（${ev.location}）` : ''}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    ) : null}
-                    {s.lgs_type && s.ship_type ? (
-                      <button
-                        onClick={() => traceShipment(s.id)}
-                        disabled={busy}
-                        className="mt-2 rounded-full border border-[#d7c9bd] px-3 py-1 text-xs font-semibold text-[#6b6156] disabled:opacity-50"
-                      >
-                        更新藍新貨態
-                      </button>
-                    ) : null}
-                  </div>
-                ))}
-              </div>
-            ) : (
+            ) : hasShipment ? null : (
               <div>
                 <button
                   onClick={() => createShipment(Boolean(order.store_id))}
@@ -4588,6 +4572,7 @@ ${order.note ? `<div class="sec"><h2>備註</h2><p class="muted">${escapeHtml(or
               </div>
             )}
           </div>
+          ) : null}
 
           {/* 品項 */}
           <div className="space-y-3">
@@ -4735,6 +4720,17 @@ ${order.note ? `<div class="sec"><h2>備註</h2><p class="muted">${escapeHtml(or
       </div>
     </div>
   );
+}
+
+// 寄件單號標題,例如「全家店到店」「7-11 店到店」「宅配」
+function shipmentLabel(sh: Shipment, shippingMethod = '') {
+  const text = `${sh.provider ?? ''} ${sh.store_name ?? ''} ${sh.shipping_method ?? ''} ${shippingMethod}`;
+  if (/全家/.test(text)) return '全家店到店';
+  if (/7-?11|統一|7-ELEVEN/i.test(text)) return '7-11 店到店';
+  if (/萊爾富/.test(text)) return '萊爾富店到店';
+  if (/OK/i.test(text)) return 'OK 店到店';
+  if (/宅配|黑貓|新竹|郵局/.test(text)) return `${sh.provider || '宅配'}單號`;
+  return `${sh.provider || '物流'}單號`;
 }
 
 function historyLabel(h: OrderStatusHistory): string {
