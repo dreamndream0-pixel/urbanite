@@ -4,6 +4,7 @@ import { getSessionUser } from '@/lib/supabase/server';
 import { getCheckoutLine, lineAddFriendUrl } from '@/lib/checkout-line';
 import { bindLineToUser, fetchBotProfile, getMessagingConfig, verifyBindToken } from '@/lib/line-messaging';
 import { createLinkToken, getLineLoginConfig } from '@/lib/line-login';
+import { syncMemberMenu } from '@/lib/line-bot';
 
 export const dynamic = 'force-dynamic';
 
@@ -55,10 +56,14 @@ export async function POST(request: Request) {
 export async function DELETE() {
   const user = await getSessionUser();
   if (!user) return NextResponse.json({ error: '請先登入' }, { status: 401 });
-  const { error } = await createAdminClient()
+  const supabase = createAdminClient();
+  const { data: before } = await supabase.from('customers').select('line_user_id').eq('user_id', user.id).maybeSingle();
+  const { error } = await supabase
     .from('customers')
     .update({ line_user_id: null, line_display_name: '', line_picture_url: '', line_bound_at: null })
     .eq('user_id', user.id);
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  // 換回非會員圖文選單
+  if (before?.line_user_id) await syncMemberMenu(before.line_user_id, false);
   return NextResponse.json({ ok: true });
 }

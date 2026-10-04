@@ -38,6 +38,7 @@ import FixedBannerCropModal from './FixedBannerCropModal';
 import IntegrationSettings from './IntegrationSettings';
 import ProfileCardManager from './ProfileCardManager';
 import SiteThemeEditor from './SiteThemeEditor';
+import LineBotManager from './line-bot/LineBotManager';
 import { isCollectOnDelivery } from '@/lib/payment';
 import { buildReturnSteps, historyKind, isReturnOrder } from '@/lib/return-progress';
 import { getCheckoutLine, HIDDEN_FOOTER_SECTION_TITLES, lineAddFriendUrl, withCheckoutLine } from '@/lib/checkout-line';
@@ -91,6 +92,7 @@ const NAV = [
   { key: 'promotions', label: '促銷管理', Icon: IconGift },
   { key: 'campaign-pages', label: '一頁式促銷頁', Icon: IconGrid },
   { key: 'profile-card', label: '個人名片', Icon: IconIdCard },
+  { key: 'line-bot', label: 'LINE 機器人', Icon: IconChat },
   { key: 'reports', label: '報表及分析', Icon: IconChart },
   { key: 'settings', label: '系統設定', Icon: IconGear },
 ] as const;
@@ -2730,6 +2732,7 @@ export default function AdminDashboard({
           )}
 
           {/* ===== 報表及分析 ===== */}
+          {section === 'line-bot' && <LineBotManager products={products} coupons={discounts} logoUrl={logoUrl} />}
           {section === 'profile-card' && <ProfileCardManager products={products} lineUrl={lineAddFriendUrl(getCheckoutLine(initialSettings))} />}
 
           {section === 'campaign-pages' && (
@@ -6994,6 +6997,15 @@ function IconHome() {
       <path d="M3 11.5 12 4l9 7.5" strokeLinecap="round" strokeLinejoin="round" />
       <path d="M5.5 10.5V20h13v-9.5" strokeLinecap="round" strokeLinejoin="round" />
       <path d="M10 20v-5h4v5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function IconChat() {
+  return (
+    <svg {...svgProps}>
+      <path d="M12 4C7 4 3 7.1 3 11c0 3.4 3 6.2 7.1 6.9l-.6 2.6 3.6-2.5C17.6 17.6 21 14.6 21 11c0-3.9-4-7-9-7z" />
+      <path d="M8 10.5h8M8 13.5h5" />
     </svg>
   );
 }

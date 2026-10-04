@@ -116,12 +116,15 @@ export async function bindLineToUser(
     })
     .eq('user_id', userId);
   if (error) throw new Error(error.message);
+  // 換成會員圖文選單
+  await import('@/lib/line-bot').then((m) => m.syncMemberMenu(lineUserId, true)).catch(() => {});
 }
 
 // ---------- 查詢內容 ----------
 const dateText = (iso?: string | null) => (iso ? new Date(iso).toLocaleDateString('zh-TW', { timeZone: 'Asia/Taipei' }) : '');
 
-export async function ordersText(userId: string) {
+// intro:後台「內建查詢」設定的開頭文字(空白時用預設)
+export async function ordersText(userId: string, intro = '') {
   const supabase = createAdminClient();
   const { data } = await supabase
     .from('orders')
@@ -133,9 +136,9 @@ export async function ordersText(userId: string) {
   if (!orders.length) return '目前沒有訂單紀錄。';
   const lines = orders.map((o) => {
     const count = Array.isArray(o.items) ? o.items.reduce((n, i) => n + (Number(i.quantity) || 0), 0) : 0;
-    return `📦 ${o.order_no}\n${dateText(o.created_at)}・${count} 件・${formatter.format(o.total)}\n狀態:${o.status}`;
+    return `${o.order_no}\n${dateText(o.created_at)}・${count} 件・${formatter.format(o.total)}\n狀態:${o.status}`;
   });
-  return `最近 ${orders.length} 筆訂單\n\n${lines.join('\n\n')}\n\n完整明細:${getConfiguredSiteUrl()}/account?tab=orders`;
+  return `${intro || `最近 ${orders.length} 筆訂單`}\n\n${lines.join('\n\n')}\n\n完整明細:${getConfiguredSiteUrl()}/account?tab=orders`;
 }
 
 function couponValue(c: Discount) {
@@ -144,7 +147,7 @@ function couponValue(c: Discount) {
   return `折抵 ${formatter.format(c.value)}`;
 }
 
-export async function couponsText(userId: string) {
+export async function couponsText(userId: string, intro = '') {
   const supabase = createAdminClient();
   const { data } = await supabase
     .from('user_coupons')
@@ -161,14 +164,14 @@ export async function couponsText(userId: string) {
   const lines = rows.slice(0, 8).map(({ coupon: c, expired_at }) => {
     const end = c!.end_at ?? expired_at;
     const min = c!.min_spend ? `滿 ${formatter.format(c!.min_spend)}` : '無門檻';
-    return `🎟 ${c!.name || c!.code}\n${couponValue(c!)}・${min}\n代碼:${c!.code}${end ? `\n使用期限:${dateText(end)}` : ''}`;
+    return `${c!.name || c!.code}\n${couponValue(c!)}・${min}\n代碼:${c!.code}${end ? `\n使用期限:${dateText(end)}` : ''}`;
   });
-  return `可使用的優惠券 ${rows.length} 張\n\n${lines.join('\n\n')}`;
+  return `${intro || `可使用的優惠券 ${rows.length} 張`}\n\n${lines.join('\n\n')}`;
 }
 
 // 購物金目前尚未開放累積,先回覆餘額 0
-export async function creditText() {
-  return `購物金餘額:${formatter.format(0)}\n\n消費與活動累積的購物金會顯示在這裡。`;
+export async function creditText(intro = '') {
+  return `${intro ? `${intro}\n\n` : ''}購物金餘額:${formatter.format(0)}\n\n消費與活動累積的購物金會顯示在這裡。`;
 }
 
 // 個資遮蔽:0989****58、dr****@gmail.com
@@ -178,7 +181,7 @@ const maskEmail = (e: string) => {
   return domain ? `${name.slice(0, 2)}****@${domain}` : '****';
 };
 
-export async function memberText(customer: BoundCustomer) {
+export async function memberText(customer: BoundCustomer, intro = '') {
   const supabase = createAdminClient();
   const [{ count: orderCount }, { count: couponCount }] = await Promise.all([
     supabase.from('orders').select('id', { count: 'exact', head: true }).eq('user_id', customer.user_id),
@@ -186,7 +189,8 @@ export async function memberText(customer: BoundCustomer) {
   ]);
   const email = customer.email && !customer.email.endsWith('@line.urbanite.com.tw') ? customer.email : '';
   return [
-    `👤 ${customer.name || customer.line_display_name || '會員'}`,
+    ...(intro ? [intro, ''] : []),
+    `${customer.name || customer.line_display_name || '會員'}`,
     email ? `Email:${maskEmail(email)}` : '',
     customer.phone ? `手機:${maskPhone(customer.phone)}` : '',
     `訂單:${orderCount ?? 0} 筆`,
