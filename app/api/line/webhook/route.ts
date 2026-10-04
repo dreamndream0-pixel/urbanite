@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { getConfiguredSiteUrl } from '@/lib/site-url';
 import {
   bindUrl,
   couponsText,
@@ -24,17 +25,20 @@ type LineEvent = {
   postback?: { data?: string };
 };
 
-// 未綁定:附上綁定連結
+// 未綁定:LINE 一鍵加入會員(LINE 登入即自動綁定),或已用其他方式註冊的會員用綁定連結
 function bindMessages(lineUserId: string, channelSecret: string, intro: string): LineMessage[] {
   const url = bindUrl(createBindToken(lineUserId, channelSecret));
   return [
     {
       type: 'template',
-      altText: '綁定會員帳號',
+      altText: '加入會員 / 綁定帳號',
       template: {
         type: 'buttons',
-        text: `${intro}\n\n綁定會員後,就能在這裡查詢訂單、優惠券與購物金(連結 30 分鐘內有效)。`.slice(0, 160),
-        actions: [{ type: 'uri', label: '綁定會員帳號', uri: url }],
+        text: `${intro}\n\n加入會員後,就能在這裡查詢訂單、優惠券與購物金。`.slice(0, 160),
+        actions: [
+          { type: 'uri', label: 'LINE 一鍵加入會員', uri: `${getConfiguredSiteUrl()}/auth/line/start?next=/account` },
+          { type: 'uri', label: '已有會員帳號?綁定', uri: url },
+        ],
       },
     },
   ];

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getConfiguredSiteUrl, getServerRedirectOrigin } from '@/lib/site-url';
 import { createLineState, getLineLoginConfig, getLineRedirectUri } from '@/lib/line-login';
+import { getSessionUser } from '@/lib/supabase/server';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,9 +14,16 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const redirectOrigin = getServerRedirectOrigin(url.origin);
   const next = normalizeNext(url.searchParams.get('next'));
+  const linkMode = url.searchParams.get('mode') === 'link';
 
   if (url.origin !== redirectOrigin && redirectOrigin === getConfiguredSiteUrl()) {
-    return NextResponse.redirect(`${redirectOrigin}/auth/line/start?next=${encodeURIComponent(next)}`);
+    return NextResponse.redirect(`${redirectOrigin}/auth/line/start?next=${encodeURIComponent(next)}${linkMode ? '&mode=link' : ''}`);
+  }
+
+  // 會員中心「加入 LINE」:已登入的會員連結自己的 LINE(同時加入官方帳號好友)
+  const linkUser = linkMode ? await getSessionUser() : null;
+  if (linkMode && !linkUser) {
+    return NextResponse.redirect(`${redirectOrigin}/login?next=${encodeURIComponent(next)}`);
   }
 
   const { channelId, channelSecret } = await getLineLoginConfig();
@@ -26,13 +34,15 @@ export async function GET(request: Request) {
     return NextResponse.redirect(loginUrl);
   }
 
-  const state = createLineState(next, channelSecret);
+  const state = createLineState(next, channelSecret, linkUser ? { uid: linkUser.id } : undefined);
   const lineUrl = new URL('https://access.line.me/oauth2/v2.1/authorize');
   lineUrl.searchParams.set('response_type', 'code');
   lineUrl.searchParams.set('client_id', channelId);
   lineUrl.searchParams.set('redirect_uri', getLineRedirectUri(redirectOrigin));
   lineUrl.searchParams.set('state', state);
   lineUrl.searchParams.set('scope', 'profile');
+  // 授權畫面同時邀請加入官方帳號好友(需在 LINE Login channel 連結官方帳號)
+  lineUrl.searchParams.set('bot_prompt', linkMode ? 'aggressive' : 'normal');
 
   const response = NextResponse.redirect(lineUrl);
   response.cookies.set('line_oauth_next', next, {

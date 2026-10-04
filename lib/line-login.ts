@@ -14,6 +14,9 @@ type LineStatePayload = {
   next: string;
   nonce: string;
   issuedAt: number;
+  // link:已登入的會員連結 LINE(不重新登入),uid 為發起連結的會員
+  mode?: 'link';
+  uid?: string;
 };
 
 function toBase64Url(input: string) {
@@ -51,11 +54,12 @@ export function getLineSyntheticPassword(lineUserId: string, channelSecret: stri
   return `${digest}Aa1!`;
 }
 
-export function createLineState(next: string, channelSecret: string) {
+export function createLineState(next: string, channelSecret: string, link?: { uid: string }) {
   const payload = toBase64Url(JSON.stringify({
     next,
     nonce: crypto.randomBytes(16).toString('hex'),
     issuedAt: Date.now(),
+    ...(link ? { mode: 'link' as const, uid: link.uid } : {}),
   } satisfies LineStatePayload));
   const signature = signLineState(payload, channelSecret);
   return `${payload}.${signature}`;
@@ -163,17 +167,14 @@ export async function upsertLineAuthUser(profile: LineProfile, channelSecret: st
   return { user: data.user, password, email };
 }
 
+// 第一次 LINE 登入才建立會員資料;之後登入不覆蓋會員自己填的手機、地址
 export async function upsertLineCustomer(userId: string, email: string, profile: LineProfile) {
   const admin = createAdminClient();
-  const { error } = await admin.from('customers').upsert(
-    {
-      user_id: userId,
-      email,
-      name: profile.displayName,
-      phone: '',
-      address: '',
-    },
-    { onConflict: 'user_id' },
-  );
+  const { data: existing } = await admin.from('customers').select('user_id, name').eq('user_id', userId).maybeSingle();
+  if (existing) {
+    if (!existing.name) await admin.from('customers').update({ name: profile.displayName }).eq('user_id', userId);
+    return;
+  }
+  const { error } = await admin.from('customers').insert({ user_id: userId, email, name: profile.displayName, phone: '', address: '' });
   if (error) throw new Error(error.message);
 }
