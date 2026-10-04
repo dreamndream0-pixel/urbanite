@@ -208,7 +208,7 @@ export default function ProfileCardView({
 
   const coverBand = (className: string) => (
     <div className={`-mx-5 self-stretch overflow-hidden ${className}`} style={{ background: theme.bandColor }}>
-      {theme.coverImage ? <img src={theme.coverImage} alt="" className="h-full w-full object-cover" /> : null}
+      {theme.coverImage ? <img src={theme.coverImage} alt="" className="h-full w-full object-cover" style={{ objectPosition: 'center 22%' }} /> : null}
     </div>
   );
   const paperShadow = '0 10px 26px rgba(0,0,0,0.14)';
@@ -224,8 +224,16 @@ export default function ProfileCardView({
   const avatarBox = (w: string) => `${w} ${aspect} ${round}`;
   const ringStyle: CSSProperties = { border: '6px solid #ffffff', boxShadow: '0 4px 14px rgba(0,0,0,0.12)' };
   // 大照片:方形 / 直式為滿版,圓形改成置中(或靠左)的大圓
-  const bigPhoto = (fullClass: string) =>
-    !photo ? null : shape === 'circle' ? (
+  const cover = theme.coverImage;
+  const coverAvatar = (className: string) =>
+    showAvatar && card.avatar_url ? avatar(`${className} ${avatarBox('w-16')}`, { border: '3px solid #ffffff', boxShadow: '0 4px 12px rgba(0,0,0,0.15)' }) : null;
+  const bigPhoto = (fullClass: string, withAvatar = true) =>
+    cover ? (
+      <div className={`relative ${fullClass}`}>
+        <img src={cover} alt="" className="block h-auto w-full" />
+        {withAvatar ? coverAvatar('absolute bottom-3 right-4') : null}
+      </div>
+    ) : !photo ? null : shape === 'circle' ? (
       <div className={`flex px-5 pt-8 ${isLeft ? 'justify-start' : 'justify-center'}`}>{photoImg('aspect-square w-[72%] rounded-full', ringStyle)}</div>
     ) : (
       <div className={fullClass}>{photoImg(`${aspect} w-full`)}</div>
@@ -311,8 +319,13 @@ export default function ProfileCardView({
     const p = info({ align: al });
     header = (
       <div className={`flex w-full flex-col ${items}`}>
-        {shape === 'circle' ? (
+        {shape === 'circle' && !cover ? (
           <div className="-mx-5 self-stretch">{bigPhoto('')}</div>
+        ) : cover ? (
+          <>
+            <div className="-mx-5 self-stretch" style={{ clipPath: 'ellipse(85% 100% at 50% 0)' }}>{bigPhoto('', false)}</div>
+            {coverAvatar('relative -mt-8')}
+          </>
         ) : (
           <div className="-mx-5 self-stretch" style={{ clipPath: 'ellipse(85% 100% at 50% 0)' }}>
             {photoImg(`${aspect} w-full`) ?? <div className="h-48" style={{ background: theme.bandColor }} />}
@@ -350,15 +363,20 @@ export default function ProfileCardView({
     const p = info({ align: al });
     header = (
       <div className="-mx-5 flex self-stretch" style={{ minHeight: 300 }}>
-        {photo ? (
+        {cover ? (
+          <div className="w-1/2 shrink-0 overflow-hidden"><img src={cover} alt="" className="h-full w-full object-cover" /></div>
+        ) : photo ? (
           shape === 'circle' ? (
             <div className="flex w-1/2 shrink-0 items-center justify-center p-3">{photoImg('aspect-square w-full rounded-full', ringStyle)}</div>
           ) : (
             photoImg('w-1/2 shrink-0')
           )
         ) : null}
-        <div className={`flex flex-col justify-between py-6 ${items} ${textAl} ${photo ? 'w-1/2 px-4' : 'w-full px-5'}`}>
-          <h1 className="text-[22px] font-semibold leading-7 tracking-[0.04em]">{name}</h1>
+        <div className={`flex flex-col justify-between py-6 ${items} ${textAl} ${photo || cover ? 'w-1/2 px-4' : 'w-full px-5'}`}>
+          <div className={`flex flex-col gap-2 ${items}`}>
+            {cover ? coverAvatar('') : null}
+            <h1 className="text-[22px] font-semibold leading-7 tracking-[0.04em]">{name}</h1>
+          </div>
           <div className={`flex flex-col ${items}`}>
             {p.tags}
             {p.bio}
@@ -574,6 +592,16 @@ export default function ProfileCardView({
         {p.bio}
         {p.email}
       </div>
+    );
+  }
+
+  // 相框類版面(大頭照在相框裡):有封面時加在最上方
+  if (cover && ['polaroid', 'framed', 'blob', 'sticker', 'news', 'boxed'].includes(layout)) {
+    header = (
+      <>
+        {coverBand('aspect-[5/2]')}
+        {header}
+      </>
     );
   }
 
