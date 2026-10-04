@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, type CSSProperties } from 'react';
+import { useEffect, useMemo, useRef, type CSSProperties, type ReactNode } from 'react';
 import Link from 'next/link';
 import SocialIcon from '@/app/components/SocialIcon';
 import ProfileImageBlock from '@/app/components/ProfileImageBlock';
@@ -50,7 +50,6 @@ export default function ProfileCardView({
   // 卡片 / 標籤底色:淺色背景用白,深色背景用半透明白
   const surface = dark ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.85)';
   const surfaceSoft = dark ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.6)';
-  const cover = theme.coverImage || theme.headerBand;
   const showAvatar = theme.showAvatar !== false && Boolean(card.avatar_url);
   const source = useRef('direct');
 
@@ -128,70 +127,239 @@ export default function ProfileCardView({
     border: `1px solid ${tint(theme.textColor, 12)}`,
     boxShadow: theme.buttonShadow ? '0 6px 18px rgba(0,0,0,0.06)' : undefined,
   };
-  const avatarClass =
-    theme.avatarShape === 'portrait'
-      ? 'aspect-[4/5] w-28 rounded-2xl'
-      : theme.avatarShape === 'square'
-        ? 'h-24 w-24 rounded-2xl'
-        : 'h-24 w-24 rounded-full';
+  const layout = theme.layout ?? 'classic';
+  const name = card.display_name || card.slug;
+  const avatarRound = theme.avatarShape === 'circle' ? 'rounded-full' : 'rounded-2xl';
+  const avatar = (className: string, style?: CSSProperties) => (
+    <div className={`shrink-0 overflow-hidden bg-white ${className}`} style={style ?? { border: `1px solid ${tint(theme.textColor, 12)}` }}>
+      <img src={card.avatar_url} alt={name} className={`h-full w-full ${theme.avatarShape === 'portrait' ? 'object-cover' : 'object-contain'}`} />
+    </div>
+  );
+  const arrow = <span className="shrink-0 text-base leading-none opacity-50">›</span>;
 
-  return (
-    <div className={fullScreen ? 'min-h-screen' : 'min-h-full'} style={pageStyle}>
-      <div className={`mx-auto flex max-w-[440px] flex-col px-5 pb-10 ${cover ? 'pt-0' : 'pt-12'} ${left ? 'items-start' : 'items-center'}`}>
-        {/* 封面照片 / 頂部色塊 */}
-        {cover ? (
-          <div className="-mx-5 aspect-[5/2] self-stretch overflow-hidden" style={{ background: theme.bandColor }}>
-            {theme.coverImage ? <img src={theme.coverImage} alt="" className="h-full w-full object-cover" /> : null}
-          </div>
-        ) : null}
-        {showAvatar ? (
-          <div
-            className={`relative overflow-hidden bg-white ${avatarClass} ${cover ? '-mt-12' : ''}`}
-            style={{ border: cover ? `3px solid ${theme.bgColor}` : `1px solid ${tint(theme.textColor, 12)}` }}
-          >
-            <img src={card.avatar_url} alt={card.display_name} className={`h-full w-full ${theme.avatarShape === 'portrait' ? 'object-cover' : 'object-contain'}`} />
-          </div>
-        ) : null}
-
-        <h1 className={`${showAvatar || !cover ? 'mt-4' : 'mt-6'} text-[22px] font-semibold tracking-[0.04em] ${left ? 'text-left' : 'text-center'}`}>{card.display_name || card.slug}</h1>
-
-        {card.show_tags && card.tags.length > 0 ? (
-          <div className={`mt-3 flex flex-wrap gap-1.5 ${left ? 'justify-start' : 'justify-center'}`}>
+  // 名稱以外的資料:依版型決定排列方向,疊在照片上時改白字
+  const info = (align: 'left' | 'center', light = false) => {
+    const center = align === 'center';
+    const muted = light ? 'rgba(255,255,255,0.88)' : theme.mutedColor;
+    const line = light ? 'rgba(255,255,255,0.5)' : tint(theme.textColor, 15);
+    const chip = light ? 'rgba(255,255,255,0.12)' : surfaceSoft;
+    const justify = center ? 'justify-center' : 'justify-start';
+    const textAlign = center ? 'text-center' : 'text-left';
+    return {
+      tags:
+        card.show_tags && card.tags.length > 0 ? (
+          <div className={`mt-3 flex flex-wrap gap-1.5 ${justify}`}>
             {card.tags.map((tag) => (
-              <span key={tag} className="rounded-full px-3 py-1 text-xs" style={{ border: `1px solid ${tint(theme.textColor, 15)}`, color: theme.mutedColor, background: surfaceSoft }}>
-                {tag}
-              </span>
+              <span key={tag} className="rounded-full px-3 py-1 text-xs" style={{ border: `1px solid ${line}`, color: muted, background: chip }}>{tag}</span>
             ))}
           </div>
-        ) : null}
-
-        {socials.length > 0 ? (
-          <div className={`mt-4 flex flex-wrap gap-2 ${left ? 'justify-start' : 'justify-center'}`}>
-            {socials.map((s, i) => (
+        ) : null,
+      socials:
+        socials.length > 0 ? (
+          <div className={`mt-4 flex flex-wrap gap-2 ${justify}`}>
+            {socials.map((sc, i) => (
               <a
-                key={`${s.type}-${i}`}
-                href={socialUrl(s)}
+                key={`${sc.type}-${i}`}
+                href={socialUrl(sc)}
                 target="_blank"
                 rel="noreferrer"
-                aria-label={SOCIAL_PLATFORMS.find((p) => p.type === s.type)?.label ?? s.type}
+                aria-label={SOCIAL_PLATFORMS.find((p) => p.type === sc.type)?.label ?? sc.type}
                 className="flex h-10 w-10 items-center justify-center rounded-full transition hover:opacity-75"
-                style={{ border: `1px solid ${tint(theme.textColor, 15)}`, background: surfaceSoft, color: theme.textColor }}
+                style={{ border: `1px solid ${line}`, background: chip, color: light ? '#ffffff' : theme.textColor }}
               >
-                <SocialIcon type={s.type} />
+                <SocialIcon type={sc.type} />
               </a>
             ))}
           </div>
-        ) : null}
+        ) : null,
+      bio:
+        card.show_bio && card.bio ? (
+          <p className={`mt-3 whitespace-pre-line text-sm leading-6 ${textAlign} ${center ? 'mx-auto max-w-[340px]' : ''}`} style={{ color: muted }}>{card.bio}</p>
+        ) : null,
+      email:
+        card.show_email && card.email ? (
+          <a href={`mailto:${card.email}`} className={`mt-2 block text-xs underline-offset-2 hover:underline ${textAlign}`} style={{ color: muted }}>{card.email}</a>
+        ) : null,
+    };
+  };
 
-        {card.show_bio && card.bio ? (
-          <p className={`mt-4 max-w-[340px] whitespace-pre-line text-sm leading-6 ${left ? 'text-left' : 'text-center'}`} style={{ color: theme.mutedColor }}>
-            {card.bio}
-          </p>
-        ) : null}
+  const coverBand = (className: string) => (
+    <div className={`-mx-5 self-stretch overflow-hidden ${className}`} style={{ background: theme.bandColor }}>
+      {theme.coverImage ? <img src={theme.coverImage} alt="" className="h-full w-full object-cover" /> : null}
+    </div>
+  );
 
-        {card.show_email && card.email ? (
-          <a href={`mailto:${card.email}`} className="mt-2 text-xs underline-offset-2 hover:underline" style={{ color: theme.mutedColor }}>{card.email}</a>
+  let header: ReactNode;
+  if (layout === 'hero') {
+    // 滿版封面:封面照(沒有時用大頭照)延伸到簡介,文字疊在底部漸層上
+    const image = theme.coverImage || (showAvatar ? card.avatar_url : '');
+    const p = info('center', true);
+    header = (
+      <div className="relative -mx-5 flex flex-col justify-end self-stretch overflow-hidden" style={{ aspectRatio: '4 / 5', background: theme.bandColor }}>
+        {image ? <img src={image} alt="" className="absolute inset-0 h-full w-full object-cover" /> : null}
+        <div className="absolute inset-0" style={{ background: 'linear-gradient(180deg, rgba(0,0,0,0) 30%, rgba(0,0,0,0.3) 55%, rgba(0,0,0,0.8) 100%)' }} />
+        <div className="relative flex flex-col items-center px-6 pb-7 pt-32 text-center text-white">
+          {showAvatar && theme.coverImage ? avatar('h-16 w-16 rounded-full', { border: '2px solid rgba(255,255,255,0.9)' }) : null}
+          <h1 className="mt-3 text-[26px] font-bold tracking-[0.06em]">{name}</h1>
+          {p.bio}
+          {p.email}
+          {p.tags}
+          {p.socials}
+        </div>
+      </div>
+    );
+  } else if (layout === 'card') {
+    // 名片卡:頂部封面/色塊+浮起的資料卡
+    const p = info('center');
+    header = (
+      <>
+        {coverBand('h-40')}
+        <div
+          className="relative -mt-20 flex w-full flex-col items-center rounded-3xl px-5 pb-6 pt-5 text-center"
+          style={{ background: dark ? `color-mix(in srgb, ${theme.bgColor} 90%, white)` : '#ffffff', border: `1px solid ${tint(theme.textColor, 8)}`, boxShadow: '0 12px 32px rgba(0,0,0,0.1)' }}
+        >
+          {showAvatar ? avatar(`-mt-14 h-20 w-20 ${avatarRound}`, { border: `3px solid ${dark ? theme.bgColor : '#ffffff'}` }) : null}
+          <h1 className={`${showAvatar ? 'mt-3' : 'mt-1'} text-[21px] font-semibold tracking-[0.04em]`}>{name}</h1>
+          {p.tags}
+          {p.bio}
+          {p.email}
+          {p.socials}
+        </div>
+      </>
+    );
+  } else if (layout === 'split') {
+    // 左右並排:大頭照在左、名稱與 E-mail 在右
+    const cover = Boolean(theme.coverImage || theme.headerBand);
+    const p = info('left');
+    header = (
+      <div className="w-full">
+        {cover ? coverBand('aspect-[3/1]') : null}
+        <div className={`flex items-end gap-4 ${cover ? '' : 'pt-12'}`}>
+          {showAvatar ? avatar(`h-24 w-24 ${avatarRound} ${cover ? '-mt-10' : ''}`, cover ? { border: `3px solid ${theme.bgColor}` } : undefined) : null}
+          <div className={`min-w-0 flex-1 pb-1 ${!showAvatar && cover ? 'pt-5' : ''}`}>
+            <h1 className="text-[22px] font-semibold leading-7 tracking-[0.03em]">{name}</h1>
+            {p.email}
+          </div>
+        </div>
+        {p.bio}
+        {p.tags}
+        {p.socials}
+      </div>
+    );
+  } else if (layout === 'magazine') {
+    // 雜誌大圖:大字名稱+直式大照片
+    const image = theme.coverImage || (showAvatar ? card.avatar_url : '');
+    const p = info('left');
+    header = (
+      <div className="w-full pt-12">
+        <h1 className="text-[34px] font-bold leading-[1.12] tracking-[0.02em]">{name}</h1>
+        {p.tags}
+        {image ? (
+          <div className="mt-5 aspect-[4/5] w-full overflow-hidden" style={{ borderRadius: Math.min(radius, 24) }}>
+            <img src={image} alt="" className="h-full w-full object-cover" />
+          </div>
         ) : null}
+        {p.bio}
+        {p.email}
+        {p.socials}
+      </div>
+    );
+  } else if (layout === 'minimal') {
+    // 極簡:小頭像與名稱同一行,細線分隔
+    const p = info('left');
+    header = (
+      <div className="w-full pt-14">
+        {theme.coverImage ? (
+          <div className="mb-6 aspect-[3/1] w-full overflow-hidden" style={{ borderRadius: Math.min(radius, 18) }}>
+            <img src={theme.coverImage} alt="" className="h-full w-full object-cover" />
+          </div>
+        ) : null}
+        <div className="flex items-center gap-3">
+          {showAvatar ? avatar(`h-14 w-14 ${avatarRound}`) : null}
+          <div className="min-w-0">
+            <h1 className="text-xl font-semibold tracking-[0.03em]">{name}</h1>
+            {p.email ? <div className="-mt-1">{p.email}</div> : null}
+          </div>
+        </div>
+        <div className="mt-5 h-px w-full" style={{ background: tint(theme.textColor, 15) }} />
+        {p.bio}
+        {p.tags}
+        {p.socials}
+      </div>
+    );
+  } else {
+    // 經典置中(可在簡介樣式改成靠左)
+    const cover = Boolean(theme.coverImage || theme.headerBand);
+    const p = info(left ? 'left' : 'center');
+    const avatarClass =
+      theme.avatarShape === 'portrait' ? 'aspect-[4/5] w-28 rounded-2xl' : theme.avatarShape === 'square' ? 'h-24 w-24 rounded-2xl' : 'h-24 w-24 rounded-full';
+    header = (
+      <div className={`flex w-full flex-col ${left ? 'items-start' : 'items-center'} ${cover ? '' : 'pt-12'}`}>
+        {cover ? coverBand('aspect-[5/2]') : null}
+        {showAvatar ? avatar(`relative ${avatarClass} ${cover ? '-mt-12' : ''}`, cover ? { border: `3px solid ${theme.bgColor}` } : undefined) : null}
+        <h1 className={`${showAvatar || !cover ? 'mt-4' : 'mt-6'} text-[22px] font-semibold tracking-[0.04em] ${left ? 'text-left' : 'text-center'}`}>{name}</h1>
+        {p.tags}
+        {p.socials}
+        {p.bio}
+        {p.email}
+      </div>
+    );
+  }
+
+  // 連結按鈕:置中按鈕 / 靠左按鈕 / 清單 / 圖卡
+  function renderLink(b: ProfileCardBlock) {
+    const common = { href: normalizeUrl(b.url), target: '_blank', rel: 'noreferrer', onClick: () => track(b.id) };
+    const thumbRadius = Math.max(Math.min(radius, 16) - 6, 2);
+    if (theme.linkStyle === 'left') {
+      return (
+        <a key={b.id} {...common} className="flex min-h-[56px] items-center gap-3 px-4 py-2.5 text-left text-sm font-medium leading-5 transition hover:opacity-85" style={buttonStyle}>
+          {b.image ? <img src={b.image} alt="" className="h-10 w-10 shrink-0 bg-white object-cover" style={{ borderRadius: thumbRadius }} /> : null}
+          <span className="min-w-0 flex-1 pl-1">{b.title}</span>
+          {arrow}
+        </a>
+      );
+    }
+    if (theme.linkStyle === 'list') {
+      return (
+        <a key={b.id} {...common} className="flex min-h-[56px] items-center gap-3 py-2.5 text-left text-sm font-medium leading-5 transition hover:opacity-70" style={{ borderBottom: `1px solid ${tint(theme.textColor, 15)}`, color: theme.textColor }}>
+          {b.image ? <img src={b.image} alt="" className="h-11 w-11 shrink-0 rounded-lg bg-white object-cover" /> : null}
+          <span className="min-w-0 flex-1">{b.title}</span>
+          {arrow}
+        </a>
+      );
+    }
+    if (theme.linkStyle === 'card') {
+      return (
+        <a
+          key={b.id}
+          {...common}
+          className="block overflow-hidden transition hover:opacity-90"
+          style={{ borderRadius: Math.min(radius, 18), border: `1.5px solid ${theme.buttonFill === 'soft' ? tint(theme.textColor, 15) : theme.buttonColor}`, background: surface, color: theme.textColor, boxShadow: theme.buttonShadow ? '0 6px 18px rgba(0,0,0,0.06)' : undefined }}
+        >
+          <span className="flex items-center gap-2 px-4 py-3 text-sm font-medium leading-5">
+            <span className="min-w-0 flex-1">{b.title}</span>
+            {b.image ? null : arrow}
+          </span>
+          {b.image ? (
+            <span className="block px-3 pb-3">
+              <img src={b.image} alt="" className="aspect-[16/9] w-full bg-white object-cover" style={{ borderRadius: Math.max(Math.min(radius, 18) - 6, 4) }} />
+            </span>
+          ) : null}
+        </a>
+      );
+    }
+    return (
+      <a key={b.id} {...common} className="relative flex min-h-[56px] items-center justify-center px-14 py-3 text-center text-sm font-medium leading-5 transition hover:opacity-85" style={buttonStyle}>
+        {b.image ? <img src={b.image} alt="" className="absolute left-2 top-1/2 h-10 w-10 -translate-y-1/2 bg-white object-cover" style={{ borderRadius: Math.max(radius - 6, 2) }} /> : null}
+        {b.title}
+      </a>
+    );
+  }
+
+  return (
+    <div className={fullScreen ? 'min-h-screen' : 'min-h-full'} style={pageStyle}>
+      <div className={`mx-auto flex max-w-[440px] flex-col px-5 pb-10 ${left && layout === 'classic' ? 'items-start' : 'items-center'}`}>
+        {header}
 
         {/* 區塊 */}
         <div className="mt-8 w-full space-y-3">
@@ -262,22 +430,7 @@ export default function ProfileCardView({
                 </a>
               );
             }
-            return (
-              <a
-                key={b.id}
-                href={normalizeUrl(b.url)}
-                target="_blank"
-                rel="noreferrer"
-                onClick={() => track(b.id)}
-                className="relative flex min-h-[56px] items-center justify-center px-14 py-3 text-center text-sm font-medium leading-5 transition hover:opacity-85"
-                style={buttonStyle}
-              >
-                {b.image ? (
-                  <img src={b.image} alt="" className="absolute left-2 top-1/2 h-10 w-10 -translate-y-1/2 bg-white object-cover" style={{ borderRadius: Math.max(radius - 6, 2) }} />
-                ) : null}
-                {b.title}
-              </a>
-            );
+            return renderLink(b);
           })}
         </div>
 

@@ -12,7 +12,9 @@ import {
   blockOptions,
   IMAGE_LAYOUTS,
   IMAGE_LIMIT,
+  LINK_STYLES,
   LINK_TITLE_LIMIT,
+  PROFILE_LAYOUTS,
   CARD_TEMPLATES,
   cardPath,
   FONT_OPTIONS,
@@ -1070,7 +1072,7 @@ function ProfileEditor({ draft, setDraft }: { draft: ProfileCard; setDraft: (c: 
             <input type="file" accept="image/png,image/jpeg,image/webp" className="hidden" disabled={coverUploading} onChange={(e) => { void uploadCover(e.target.files?.[0]); e.target.value = ''; }} />
           </label>
           {theme.coverImage ? <button type="button" onClick={() => setTheme({ coverImage: '' })} className="text-xs text-[#8a7f72]">移除</button> : null}
-          <span className="text-[11px] text-[#a99e8f]">建議 1500×600(5:2),單張上限 10MB</span>
+          <span className="text-[11px] text-[#a99e8f]">單張上限 10MB。選「滿版封面」版面時,封面會延伸到簡介後方(建議直式 1080×1350)</span>
         </div>
       </Section>
 
@@ -1324,11 +1326,16 @@ function StyleEditor({
       {tab === 'profile' ? (
         <Section title="簡介樣式">
           <div>
+            <p className="mb-2 text-xs text-[#8a7f72]">版面配置</p>
+            <Pills value={theme.layout} options={PROFILE_LAYOUTS} onChange={(v) => setTheme({ layout: v })} />
+            {theme.layout === 'hero' ? <p className="mt-2 text-[11px] text-[#a99e8f]">封面照片會延伸到名稱與簡述後方;沒有封面時改用大頭照。</p> : null}
+          </div>
+          <div>
             <p className="mb-2 text-xs text-[#8a7f72]">頭像形狀</p>
             <Pills value={theme.avatarShape} options={[{ key: 'circle', label: '圓形' }, { key: 'square', label: '方形' }, { key: 'portrait', label: '直式 4:5' }]} onChange={(v) => setTheme({ avatarShape: v })} />
           </div>
           <div>
-            <p className="mb-2 text-xs text-[#8a7f72]">排列</p>
+            <p className="mb-2 text-xs text-[#8a7f72]">文字排列(經典置中版面)</p>
             <Pills value={theme.align} options={[{ key: 'center', label: '置中' }, { key: 'left', label: '靠左' }]} onChange={(v) => setTheme({ align: v })} />
           </div>
           <div>
@@ -1340,6 +1347,10 @@ function StyleEditor({
 
       {tab === 'button' ? (
         <Section title="連結樣式">
+          <div>
+            <p className="mb-2 text-xs text-[#8a7f72]">排列方式</p>
+            <Pills value={theme.linkStyle} options={LINK_STYLES} onChange={(v) => setTheme({ linkStyle: v })} />
+          </div>
           <div>
             <p className="mb-2 text-xs text-[#8a7f72]">形狀</p>
             <Pills value={theme.buttonShape} options={[{ key: 'pill', label: '膠囊' }, { key: 'rounded', label: '圓角' }, { key: 'square', label: '直角' }]} onChange={(v) => setTheme({ buttonShape: v })} />

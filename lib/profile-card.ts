@@ -3,8 +3,29 @@
 export type SocialLink = { type: string; value: string };
 
 // ---------- 外觀 ----------
+export type ProfileLayout = 'classic' | 'hero' | 'card' | 'split' | 'magazine' | 'minimal';
+export type LinkStyle = 'button' | 'left' | 'list' | 'card';
+
+export const PROFILE_LAYOUTS: { key: ProfileLayout; label: string }[] = [
+  { key: 'hero', label: '滿版封面' },
+  { key: 'classic', label: '經典置中' },
+  { key: 'card', label: '名片卡' },
+  { key: 'split', label: '左右並排' },
+  { key: 'magazine', label: '雜誌大圖' },
+  { key: 'minimal', label: '極簡' },
+];
+
+export const LINK_STYLES: { key: LinkStyle; label: string }[] = [
+  { key: 'button', label: '置中按鈕' },
+  { key: 'left', label: '靠左按鈕' },
+  { key: 'list', label: '清單' },
+  { key: 'card', label: '圖卡' },
+];
+
 export type CardTheme = {
   template: string;
+  layout: ProfileLayout; // 頁首版面配置
+  linkStyle: LinkStyle; // 連結排列方式
   bgType: 'color' | 'image' | 'grid' | 'gradient' | 'dots' | 'stripes';
   bgColor: string;
   bgColor2: string; // 漸層第二色
@@ -29,6 +50,8 @@ export type CardTheme = {
 
 export const DEFAULT_THEME: CardTheme = {
   template: 'ivory',
+  layout: 'classic',
+  linkStyle: 'button',
   bgType: 'color',
   bgColor: '#f6f2ec',
   bgColor2: '#ebe2d6',
@@ -63,38 +86,44 @@ export const TEMPLATE_CATEGORIES: { key: 'all' | TemplateCategory; label: string
 
 // 每個樣板都從同一組基礎樣式出發,切換樣板時不會殘留上一個樣板的設定
 const STYLE_BASE: Omit<CardTheme, 'template' | (typeof THEME_CONTENT_KEYS)[number]> = {
-  bgType: 'color', bgColor: '#f6f2ec', bgColor2: '#ebe2d6', textColor: '#1f1b19', mutedColor: '#6b6156', accentColor: '#702838',
+  layout: 'classic', linkStyle: 'button', bgType: 'color', bgColor: '#f6f2ec', bgColor2: '#ebe2d6', textColor: '#1f1b19', mutedColor: '#6b6156', accentColor: '#702838',
   avatarShape: 'circle', align: 'center', buttonShape: 'pill', buttonFill: 'solid', buttonColor: '#1f1b19', buttonTextColor: '#ffffff',
   buttonShadow: false, font: 'sans', headerBand: false, bandColor: '#e5dccf',
 };
 const tpl = (key: string, name: string, category: TemplateCategory, theme: Partial<CardTheme>) => ({ key, name, category, theme: { ...STYLE_BASE, ...theme } });
 
-// 預設樣板(新的排前面):套用後仍可再微調
+// 預設樣板(新的排前面):版面配置 × 連結排列 × 配色,套用後仍可再微調
 export const CARD_TEMPLATES: { key: string; name: string; category: TemplateCategory; theme: Partial<CardTheme> }[] = [
-  tpl('peach', '蜜桃汽水', 'lively', { bgType: 'gradient', bgColor: '#ffe6dc', bgColor2: '#ffd3e2', textColor: '#5a2633', mutedColor: '#8c5a66', accentColor: '#e0465f', buttonColor: '#ff7a8a', buttonShadow: true }),
-  tpl('midnight', '午夜藍', 'dark', { bgColor: '#141c2e', textColor: '#e8ecf5', mutedColor: '#9aa6bd', accentColor: '#9cc2ff', buttonFill: 'outline', buttonColor: '#e8ecf5', buttonTextColor: '#e8ecf5' }),
-  tpl('sage', '鼠尾草', 'minimal', { bgColor: '#eef1ea', textColor: '#34412e', mutedColor: '#6b7764', accentColor: '#5b7a4a', headerBand: true, bandColor: '#bfcbb3', buttonColor: '#ffffff', buttonTextColor: '#34412e', buttonShadow: true }),
-  tpl('lemon', '檸檬格紋', 'lively', { bgType: 'grid', bgColor: '#fff8db', textColor: '#4a3b00', mutedColor: '#7a6a2c', accentColor: '#c27c00', avatarShape: 'square', buttonShape: 'rounded', buttonColor: '#ffd84d', buttonTextColor: '#3a2e00' }),
-  tpl('noir', '純黑極簡', 'dark', { bgColor: '#0e0e0e', textColor: '#f2f2f2', mutedColor: '#9a9a9a', accentColor: '#ffffff', avatarShape: 'portrait', align: 'left', buttonShape: 'square', buttonColor: '#f2f2f2', buttonTextColor: '#0e0e0e', font: 'classic' }),
-  tpl('sand', '沙丘漸層', 'minimal', { bgType: 'gradient', bgColor: '#f8f1e7', bgColor2: '#e8d6c0', textColor: '#4f3b2a', mutedColor: '#86705b', accentColor: '#9a5b2e', buttonShape: 'rounded', buttonColor: '#ffffff', buttonTextColor: '#4f3b2a', buttonShadow: true }),
-  tpl('sky', '晴空藍', 'lively', { bgColor: '#eef6ff', textColor: '#1d3557', mutedColor: '#5a7193', accentColor: '#2f6fd6', headerBand: true, bandColor: '#9ccbff', buttonColor: '#3d8bfd' }),
-  tpl('forest', '墨綠森林', 'dark', { bgType: 'gradient', bgColor: '#1f2e26', bgColor2: '#0f1713', textColor: '#e6efe9', mutedColor: '#9fb3a7', accentColor: '#b8e0c4', buttonShape: 'rounded', buttonFill: 'soft', buttonColor: '#2c3e34', buttonTextColor: '#e6efe9' }),
-  tpl('linen', '亞麻杏', 'minimal', { bgColor: '#efe6da', textColor: '#5a4634', mutedColor: '#8a7462', accentColor: '#8a5a35', buttonShape: 'rounded', buttonFill: 'outline', buttonColor: '#8a6e55', buttonTextColor: '#5a4634', font: 'serif' }),
-  tpl('mint', '薄荷條紋', 'lively', { bgType: 'stripes', bgColor: '#e6f7f0', textColor: '#1f4d3c', mutedColor: '#4f7a69', accentColor: '#1d9a6c', buttonShape: 'rounded', buttonColor: '#2fb380' }),
-  tpl('wine', '夜色酒紅', 'dark', { bgColor: '#2a0f17', textColor: '#f6e9ec', mutedColor: '#c7a3ad', accentColor: '#ffb3c3', headerBand: true, bandColor: '#702838', buttonColor: '#f6e9ec', buttonTextColor: '#2a0f17', font: 'serif' }),
-  tpl('paper', '純白留白', 'minimal', { bgColor: '#ffffff', textColor: '#222222', mutedColor: '#777777', accentColor: '#222222', align: 'left', buttonShape: 'rounded', buttonFill: 'soft', buttonColor: '#f3f3f3', buttonTextColor: '#222222' }),
-  tpl('lavender', '薰衣草', 'lively', { bgType: 'gradient', bgColor: '#f1e9ff', bgColor2: '#dfe9ff', textColor: '#3d3270', mutedColor: '#6f66a0', accentColor: '#6a4fd6', buttonColor: '#ffffff', buttonTextColor: '#4b3c7a', buttonShadow: true }),
-  tpl('starry', '星空點點', 'dark', { bgType: 'dots', bgColor: '#10131f', textColor: '#eef0ff', mutedColor: '#a3a9cc', accentColor: '#ffd36b', buttonShape: 'rounded', buttonColor: '#2b3150', buttonTextColor: '#eef0ff', buttonShadow: true }),
-  tpl('cloud', '雲朵點點', 'minimal', { bgType: 'dots', bgColor: '#f4f6f8', textColor: '#34404c', mutedColor: '#6b7783', accentColor: '#3f5c78', buttonShape: 'rounded', buttonColor: '#ffffff', buttonTextColor: '#34404c', buttonShadow: true }),
-  tpl('candy', '糖果點點', 'lively', { bgType: 'dots', bgColor: '#fff0f5', textColor: '#6a2a45', mutedColor: '#9a6078', accentColor: '#e0447c', buttonColor: '#ff9ec0', buttonShadow: true }),
-  tpl('cocoa', '可可咖啡', 'dark', { bgType: 'gradient', bgColor: '#3b2a22', bgColor2: '#1f1612', textColor: '#f3e9e1', mutedColor: '#c4ad9c', accentColor: '#e8c39e', buttonShape: 'rounded', buttonFill: 'outline', buttonColor: '#d9b99b', buttonTextColor: '#f3e9e1', font: 'serif' }),
-  tpl('stone', '石墨灰', 'minimal', { bgColor: '#ececea', textColor: '#2b2b2b', mutedColor: '#6e6e6a', accentColor: '#2b2b2b', avatarShape: 'portrait', buttonShape: 'square', buttonFill: 'outline', buttonColor: '#3a3a3a', buttonTextColor: '#2b2b2b', font: 'classic' }),
-  tpl('orange', '橘子派對', 'lively', { bgColor: '#fff6ec', textColor: '#6b3a0c', mutedColor: '#9a6a3e', accentColor: '#e57a00', headerBand: true, bandColor: '#ffb066', buttonShape: 'rounded', buttonColor: '#ffffff', buttonTextColor: '#8a4b10', buttonShadow: true }),
-  tpl('ivory', '經典米白', 'minimal', {}),
-  tpl('burgundy', '酒紅質感', 'minimal', { bgColor: '#f4ece6', textColor: '#3a1820', mutedColor: '#7a5a60', accentColor: '#702838', buttonColor: '#702838', font: 'serif' }),
-  tpl('mono', '黑白時尚', 'minimal', { bgColor: '#ffffff', textColor: '#111111', mutedColor: '#666666', accentColor: '#111111', buttonFill: 'outline', buttonColor: '#111111', buttonTextColor: '#111111', buttonShape: 'square', font: 'classic', avatarShape: 'portrait', align: 'left' }),
-  tpl('notebook', '手帳格紋', 'lively', { bgType: 'grid', bgColor: '#f3f6ee', textColor: '#2f3b2a', mutedColor: '#66735f', accentColor: '#5b7a4a', buttonFill: 'soft', buttonColor: '#dfe8d6', buttonTextColor: '#2f3b2a', buttonShape: 'rounded', avatarShape: 'square', buttonShadow: true }),
-  tpl('mist', '柔霧灰藍', 'dark', { bgType: 'gradient', bgColor: '#2c3a48', bgColor2: '#1a232c', textColor: '#e9edf1', mutedColor: '#a8b5c2', accentColor: '#9fc3e6', buttonShape: 'rounded', buttonColor: '#e9edf1', buttonTextColor: '#26313b', buttonShadow: true }),
+  // 滿版封面:封面照延伸到簡介,文字疊在照片上
+  tpl('hero-sun', '滿版・暖陽', 'lively', { layout: 'hero', linkStyle: 'left', bgColor: '#fdf4e7', textColor: '#3a2a14', mutedColor: '#7a6448', accentColor: '#c46a00', buttonColor: '#ffc978', buttonTextColor: '#3a2a10', bandColor: '#5a4a3a' }),
+  tpl('hero-noir', '滿版・黑夜', 'dark', { layout: 'hero', linkStyle: 'list', bgColor: '#111111', textColor: '#f2f2f2', mutedColor: '#9a9a9a', accentColor: '#ffffff', bandColor: '#2a2a2a', font: 'classic' }),
+  tpl('hero-white', '滿版・純白', 'minimal', { layout: 'hero', linkStyle: 'card', bgColor: '#ffffff', textColor: '#1f1b19', mutedColor: '#6b6156', buttonColor: '#1f1b19', buttonShape: 'rounded', bandColor: '#8a8178' }),
+  tpl('hero-rose', '滿版・玫瑰', 'lively', { layout: 'hero', linkStyle: 'button', bgColor: '#fff1f4', textColor: '#5a2633', mutedColor: '#8c5a66', accentColor: '#e0465f', buttonColor: '#ff8fab', buttonShadow: true, bandColor: '#b0707f' }),
+  tpl('hero-forest', '滿版・森林', 'dark', { layout: 'hero', linkStyle: 'left', bgColor: '#17231d', textColor: '#e6efe9', mutedColor: '#9fb3a7', accentColor: '#b8e0c4', buttonShape: 'rounded', buttonFill: 'soft', buttonColor: '#24352c', buttonTextColor: '#e6efe9', bandColor: '#2f4a3c' }),
+  // 名片卡:資料放在浮起的卡片裡
+  tpl('card-sky', '名片卡・晴空', 'lively', { layout: 'card', linkStyle: 'button', bgColor: '#eef6ff', textColor: '#1d3557', mutedColor: '#5a7193', accentColor: '#2f6fd6', bandColor: '#9ccbff', buttonColor: '#3d8bfd' }),
+  tpl('card-sage', '名片卡・鼠尾草', 'minimal', { layout: 'card', linkStyle: 'list', bgColor: '#eef1ea', textColor: '#34412e', mutedColor: '#6b7764', accentColor: '#5b7a4a', bandColor: '#bfcbb3' }),
+  tpl('card-wine', '名片卡・酒紅', 'dark', { layout: 'card', linkStyle: 'left', bgColor: '#2a0f17', textColor: '#f6e9ec', mutedColor: '#c7a3ad', accentColor: '#ffb3c3', bandColor: '#702838', buttonColor: '#f6e9ec', buttonTextColor: '#2a0f17', font: 'serif' }),
+  tpl('card-peach', '名片卡・蜜桃', 'lively', { layout: 'card', linkStyle: 'card', bgType: 'gradient', bgColor: '#ffe9df', bgColor2: '#ffd6e3', textColor: '#5a2633', mutedColor: '#8c5a66', accentColor: '#e0465f', bandColor: '#ffb3a7', buttonColor: '#ff8a8a', buttonShape: 'rounded' }),
+  // 左右並排:大頭照在左,名稱在右
+  tpl('split-paper', '並排・留白', 'minimal', { layout: 'split', linkStyle: 'list', bgColor: '#ffffff', textColor: '#222222', mutedColor: '#777777', accentColor: '#222222', avatarShape: 'square' }),
+  tpl('split-lemon', '並排・檸檬格紋', 'lively', { layout: 'split', linkStyle: 'left', bgType: 'grid', bgColor: '#fff8db', textColor: '#4a3b00', mutedColor: '#7a6a2c', accentColor: '#c27c00', buttonShape: 'rounded', buttonColor: '#ffd84d', buttonTextColor: '#3a2e00', avatarShape: 'square' }),
+  tpl('split-midnight', '並排・午夜藍', 'dark', { layout: 'split', linkStyle: 'button', bgColor: '#141c2e', textColor: '#e8ecf5', mutedColor: '#9aa6bd', accentColor: '#9cc2ff', buttonFill: 'outline', buttonColor: '#e8ecf5', buttonTextColor: '#e8ecf5', headerBand: true, bandColor: '#25324d' }),
+  tpl('split-linen', '並排・亞麻', 'minimal', { layout: 'split', linkStyle: 'card', bgColor: '#efe6da', textColor: '#5a4634', mutedColor: '#8a7462', accentColor: '#8a5a35', buttonColor: '#8a6e55', buttonShape: 'rounded', font: 'serif' }),
+  // 雜誌大圖:大字名稱+直式大照片
+  tpl('mag-mono', '雜誌・黑白', 'minimal', { layout: 'magazine', linkStyle: 'list', bgColor: '#ffffff', textColor: '#111111', mutedColor: '#666666', accentColor: '#111111', buttonShape: 'square', font: 'classic' }),
+  tpl('mag-cocoa', '雜誌・可可', 'dark', { layout: 'magazine', linkStyle: 'left', bgType: 'gradient', bgColor: '#3b2a22', bgColor2: '#1f1612', textColor: '#f3e9e1', mutedColor: '#c4ad9c', accentColor: '#e8c39e', buttonShape: 'rounded', buttonFill: 'outline', buttonColor: '#d9b99b', buttonTextColor: '#f3e9e1', font: 'serif' }),
+  tpl('mag-lavender', '雜誌・薰衣草', 'lively', { layout: 'magazine', linkStyle: 'button', bgType: 'gradient', bgColor: '#f1e9ff', bgColor2: '#dfe9ff', textColor: '#3d3270', mutedColor: '#6f66a0', accentColor: '#6a4fd6', buttonColor: '#ffffff', buttonTextColor: '#4b3c7a', buttonShadow: true }),
+  tpl('mag-ivory', '雜誌・米白', 'minimal', { layout: 'magazine', linkStyle: 'card', bgColor: '#f6f2ec', textColor: '#1f1b19', mutedColor: '#6b6156', buttonColor: '#1f1b19', buttonShape: 'rounded', font: 'serif' }),
+  // 極簡:小頭像+細線
+  tpl('min-stone', '極簡・石墨', 'minimal', { layout: 'minimal', linkStyle: 'list', bgColor: '#ececea', textColor: '#2b2b2b', mutedColor: '#6e6e6a', accentColor: '#2b2b2b', font: 'classic' }),
+  tpl('min-starry', '極簡・星空', 'dark', { layout: 'minimal', linkStyle: 'left', bgType: 'dots', bgColor: '#10131f', textColor: '#eef0ff', mutedColor: '#a3a9cc', accentColor: '#ffd36b', buttonShape: 'rounded', buttonColor: '#2b3150', buttonTextColor: '#eef0ff' }),
+  tpl('min-mint', '極簡・薄荷', 'lively', { layout: 'minimal', linkStyle: 'button', bgType: 'stripes', bgColor: '#e6f7f0', textColor: '#1f4d3c', mutedColor: '#4f7a69', accentColor: '#1d9a6c', buttonShape: 'rounded', buttonColor: '#2fb380' }),
+  // 經典置中
+  tpl('ivory', '經典・米白', 'minimal', {}),
+  tpl('burgundy', '經典・酒紅', 'minimal', { bgColor: '#f4ece6', textColor: '#3a1820', mutedColor: '#7a5a60', accentColor: '#702838', buttonColor: '#702838', font: 'serif' }),
+  tpl('notebook', '經典・手帳', 'lively', { linkStyle: 'left', bgType: 'grid', bgColor: '#f3f6ee', textColor: '#2f3b2a', mutedColor: '#66735f', accentColor: '#5b7a4a', buttonFill: 'soft', buttonColor: '#dfe8d6', buttonTextColor: '#2f3b2a', buttonShape: 'rounded', avatarShape: 'square', buttonShadow: true }),
+  tpl('candy', '經典・糖果', 'lively', { bgType: 'dots', bgColor: '#fff0f5', textColor: '#6a2a45', mutedColor: '#9a6078', accentColor: '#e0447c', buttonColor: '#ff9ec0', buttonShadow: true, headerBand: true, bandColor: '#ffc2d6' }),
 ];
 
 // 深色背景判斷(卡片底色、標籤底色跟著切換)
