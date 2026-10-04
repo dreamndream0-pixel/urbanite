@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getConfiguredSiteUrl, getServerRedirectOrigin } from '@/lib/site-url';
-import { createLineState, getLineLoginConfig, getLineRedirectUri } from '@/lib/line-login';
+import { createLineState, getLineLoginConfig, getLineRedirectUri, verifyLinkToken } from '@/lib/line-login';
 import { getSessionUser } from '@/lib/supabase/server';
 
 export const dynamic = 'force-dynamic';
@@ -17,17 +17,22 @@ export async function GET(request: Request) {
   const linkMode = url.searchParams.get('mode') === 'link';
 
   if (url.origin !== redirectOrigin && redirectOrigin === getConfiguredSiteUrl()) {
-    return NextResponse.redirect(`${redirectOrigin}/auth/line/start?next=${encodeURIComponent(next)}${linkMode ? '&mode=link' : ''}`);
+    const forward = new URL('/auth/line/start', redirectOrigin);
+    url.searchParams.forEach((v, k) => forward.searchParams.set(k, v));
+    return NextResponse.redirect(forward);
   }
 
-  // 會員中心「加入 LINE」:已登入的會員連結自己的 LINE(同時加入官方帳號好友)
-  const linkUser = linkMode ? await getSessionUser() : null;
+  // 會員中心「加入 LINE」:專屬連結(u=簽章)或目前登入的會員,連結自己的 LINE(同時加入官方帳號好友)
+  const { channelId: cfgId, channelSecret: cfgSecret } = await getLineLoginConfig();
+  const tokenUid = linkMode && cfgSecret ? verifyLinkToken(url.searchParams.get('u') ?? '', cfgSecret) : null;
+  const linkUser = linkMode ? (tokenUid ? { id: tokenUid } : await getSessionUser()) : null;
   if (linkMode && !linkUser) {
     // 登入後自動接回 LINE 授權
     return NextResponse.redirect(`${redirectOrigin}/login?next=${encodeURIComponent(`/auth/line/start?mode=link&next=${next}`)}`);
   }
 
-  const { channelId, channelSecret } = await getLineLoginConfig();
+  const channelId = cfgId;
+  const channelSecret = cfgSecret;
   if (!channelId || !channelSecret) {
     const loginUrl = new URL('/login', redirectOrigin);
     loginUrl.searchParams.set('next', next);

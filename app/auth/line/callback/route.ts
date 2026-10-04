@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createServerSupabase, getSessionUser } from '@/lib/supabase/server';
+import { createServerSupabase } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { bindLineToUser } from '@/lib/line-messaging';
 import { getServerRedirectOrigin } from '@/lib/site-url';
@@ -25,13 +25,6 @@ function loginError(origin: string, next: string, message: string) {
   loginUrl.searchParams.set('next', next);
   loginUrl.searchParams.set('error', `LINE 登入失敗：${message}`);
   return NextResponse.redirect(loginUrl);
-}
-
-// 回到會員中心並帶上 LINE 連結結果
-function withParam(origin: string, next: string, key: string, value: string) {
-  const target = new URL(next, origin);
-  target.searchParams.set(key, value);
-  return NextResponse.redirect(target);
 }
 
 // 這個 LINE 是否已綁定「用其他方式註冊」的會員(Google / Email…)
@@ -73,17 +66,20 @@ export async function GET(request: Request) {
     });
     const profile = await fetchLineProfile(accessToken);
 
-    // 會員中心「加入 LINE」:綁定到目前登入的會員,不切換帳號
-    if (lineState.mode === 'link') {
-      const current = await getSessionUser();
-      if (!current || current.id !== lineState.uid) return withParam(redirectOrigin, next, 'line_error', '登入狀態已變更,請重新操作');
+    // 會員中心「加入 LINE」:綁定到發起的會員(記在簽章過的 state 裡)。
+    // iPhone 授權會跳到 LINE App,回來時常在 LINE 內建瀏覽器開啟、沒有官網登入狀態,所以不依賴 session。
+    if (lineState.mode === 'link' && lineState.uid) {
+      const linked = new URL('/line/linked', redirectOrigin);
       try {
-        // LINE 授權已證明是本人的 LINE:若綁在本人的其他帳號,轉到目前帳號
-        await bindLineToUser(current.id, current.email ?? '', profile.userId, profile, { transfer: true });
+        const { data: member } = await createAdminClient().auth.admin.getUserById(lineState.uid);
+        if (!member.user) throw new Error('找不到會員帳號,請重新操作');
+        // LINE 授權已證明是本人的 LINE:若綁在本人的其他帳號,轉到這個帳號
+        await bindLineToUser(member.user.id, member.user.email ?? '', profile.userId, profile, { transfer: true });
+        linked.searchParams.set('ok', '1');
       } catch (e) {
-        return withParam(redirectOrigin, next, 'line_error', e instanceof Error ? e.message : 'LINE 綁定失敗');
+        linked.searchParams.set('error', e instanceof Error ? e.message : 'LINE 綁定失敗');
       }
-      const response = withParam(redirectOrigin, next, 'line', 'linked');
+      const response = NextResponse.redirect(linked);
       response.cookies.delete('line_oauth_next');
       return response;
     }

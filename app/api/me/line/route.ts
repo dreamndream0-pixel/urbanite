@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { getSessionUser } from '@/lib/supabase/server';
 import { getCheckoutLine, lineAddFriendUrl } from '@/lib/checkout-line';
 import { bindLineToUser, fetchBotProfile, getMessagingConfig, verifyBindToken } from '@/lib/line-messaging';
+import { createLinkToken, getLineLoginConfig } from '@/lib/line-login';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,7 +17,13 @@ export async function GET() {
     supabase.from('site_settings').select('footer_sections').eq('id', 1).maybeSingle(),
   ]);
   const line = getCheckoutLine(settings);
+  // 「加入 LINE」專屬連結:LINE 授權途中切換到 LINE App / 內建瀏覽器也能完成綁定
+  const { channelSecret: loginSecret } = await getLineLoginConfig();
+  const linkUrl = loginSecret
+    ? `/auth/line/start?mode=link&next=/account&u=${encodeURIComponent(createLinkToken(user.id, loginSecret))}`
+    : '/auth/line/start?mode=link&next=/account';
   return NextResponse.json({
+    linkUrl,
     bound: Boolean(customer?.line_user_id),
     displayName: customer?.line_display_name ?? '',
     pictureUrl: customer?.line_picture_url ?? '',

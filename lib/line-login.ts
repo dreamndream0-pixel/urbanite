@@ -65,6 +65,23 @@ export function createLineState(next: string, channelSecret: string, link?: { ui
   return `${payload}.${signature}`;
 }
 
+// 會員中心「加入 LINE」的專屬連結:簽章記錄是哪位會員(10 分鐘有效),不依賴瀏覽器登入狀態
+export function createLinkToken(userId: string, channelSecret: string) {
+  const payload = toBase64Url(JSON.stringify({ u: userId, t: Date.now() }));
+  return `${payload}.${signLineState(`link:${payload}`, channelSecret)}`;
+}
+
+export function verifyLinkToken(token: string, channelSecret: string) {
+  const [payload, signature] = token.split('.');
+  if (!payload || !signature) return null;
+  const a = Buffer.from(signature);
+  const b = Buffer.from(signLineState(`link:${payload}`, channelSecret));
+  if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) return null;
+  const data = JSON.parse(fromBase64Url(payload)) as { u?: string; t?: number };
+  if (!data.u || !data.t || Date.now() - data.t > 10 * 60 * 1000) return null;
+  return data.u;
+}
+
 export function verifyLineState(state: string, channelSecret: string) {
   const [payload, signature] = state.split('.');
   if (!payload || !signature) throw new Error('登入驗證資料不完整，請重新登入');

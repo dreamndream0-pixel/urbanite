@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { uiAlert, uiConfirm } from '@/lib/ui-dialog';
 
-type Status = { bound: boolean; displayName: string };
+type Status = { bound: boolean; displayName: string; linkUrl?: string };
 
 const LineMark = ({ size = 14 }: { size?: number }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -43,7 +43,7 @@ export default function LineBindingRow() {
     try {
       const res = await fetch('/api/me/line', { method: 'DELETE' });
       if (!res.ok) throw new Error((await res.json()).error ?? '解除失敗');
-      setStatus({ bound: false, displayName: '' });
+      setStatus((s) => ({ bound: false, displayName: '', linkUrl: s?.linkUrl }));
       setNotice({ ok: true, text: '已解除 LINE 綁定' });
     } catch (e) {
       void uiAlert(e instanceof Error ? e.message : '解除失敗');
@@ -81,7 +81,7 @@ export default function LineBindingRow() {
         <div className={box}>
           <span className="min-w-0 flex-1 text-xs leading-5 text-[var(--c-text2)]">加入 LINE 好友查詢訂單更方便,領取優惠券</span>
           <a
-            href="/auth/line/start?mode=link&next=/account"
+            href={status.linkUrl || '/auth/line/start?mode=link&next=/account'}
             className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-[#06C755] px-3.5 py-1.5 text-xs font-semibold text-white"
           >
             <LineMark />
