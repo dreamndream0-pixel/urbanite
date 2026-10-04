@@ -5,8 +5,9 @@ export type SocialLink = { type: string; value: string };
 // ---------- 外觀 ----------
 export type CardTheme = {
   template: string;
-  bgType: 'color' | 'image' | 'grid';
+  bgType: 'color' | 'image' | 'grid' | 'gradient' | 'dots' | 'stripes';
   bgColor: string;
+  bgColor2: string; // 漸層第二色
   bgImage: string;
   textColor: string;
   mutedColor: string;
@@ -19,12 +20,18 @@ export type CardTheme = {
   buttonTextColor: string;
   buttonShadow: boolean;
   font: 'sans' | 'serif' | 'classic';
+  headerBand: boolean; // 沒有封面照片時,最上方顯示色塊
+  bandColor: string;
+  // 以下為內容設定,套用樣板時不會被覆蓋
+  coverImage: string;
+  showAvatar: boolean;
 };
 
 export const DEFAULT_THEME: CardTheme = {
   template: 'ivory',
   bgType: 'color',
   bgColor: '#f6f2ec',
+  bgColor2: '#ebe2d6',
   bgImage: '',
   textColor: '#1f1b19',
   mutedColor: '#6b6156',
@@ -37,32 +44,66 @@ export const DEFAULT_THEME: CardTheme = {
   buttonTextColor: '#ffffff',
   buttonShadow: false,
   font: 'sans',
+  headerBand: false,
+  bandColor: '#e5dccf',
+  coverImage: '',
+  showAvatar: true,
 };
 
-// 預設樣板:套用後仍可再微調
-export const CARD_TEMPLATES: { key: string; name: string; theme: Partial<CardTheme> }[] = [
-  { key: 'ivory', name: '經典米白', theme: { ...DEFAULT_THEME } },
-  {
-    key: 'burgundy',
-    name: '酒紅質感',
-    theme: { bgType: 'color', bgColor: '#f4ece6', textColor: '#3a1820', mutedColor: '#7a5a60', accentColor: '#702838', buttonFill: 'solid', buttonColor: '#702838', buttonTextColor: '#ffffff', buttonShape: 'pill', font: 'serif', avatarShape: 'circle', align: 'center', buttonShadow: false },
-  },
-  {
-    key: 'mono',
-    name: '黑白時尚',
-    theme: { bgType: 'color', bgColor: '#ffffff', textColor: '#111111', mutedColor: '#666666', accentColor: '#111111', buttonFill: 'outline', buttonColor: '#111111', buttonTextColor: '#111111', buttonShape: 'square', font: 'classic', avatarShape: 'portrait', align: 'left', buttonShadow: false },
-  },
-  {
-    key: 'notebook',
-    name: '手帳格紋',
-    theme: { bgType: 'grid', bgColor: '#f3f6ee', textColor: '#2f3b2a', mutedColor: '#66735f', accentColor: '#5b7a4a', buttonFill: 'soft', buttonColor: '#dfe8d6', buttonTextColor: '#2f3b2a', buttonShape: 'rounded', font: 'sans', avatarShape: 'square', align: 'center', buttonShadow: true },
-  },
-  {
-    key: 'mist',
-    name: '柔霧灰藍',
-    theme: { bgType: 'color', bgColor: '#e9edf1', textColor: '#26313b', mutedColor: '#5d6b78', accentColor: '#3f5c78', buttonFill: 'solid', buttonColor: '#ffffff', buttonTextColor: '#26313b', buttonShape: 'rounded', font: 'sans', avatarShape: 'circle', align: 'center', buttonShadow: true },
-  },
+// 套用樣板時保留的欄位(使用者自己上傳的內容)
+export const THEME_CONTENT_KEYS = ['coverImage', 'showAvatar', 'bgImage'] as const;
+
+export type TemplateCategory = 'lively' | 'minimal' | 'dark';
+export const TEMPLATE_CATEGORIES: { key: 'all' | TemplateCategory; label: string }[] = [
+  { key: 'all', label: '最新' },
+  { key: 'lively', label: '活潑' },
+  { key: 'minimal', label: '簡約' },
+  { key: 'dark', label: '深色' },
 ];
+
+// 每個樣板都從同一組基礎樣式出發,切換樣板時不會殘留上一個樣板的設定
+const STYLE_BASE: Omit<CardTheme, 'template' | (typeof THEME_CONTENT_KEYS)[number]> = {
+  bgType: 'color', bgColor: '#f6f2ec', bgColor2: '#ebe2d6', textColor: '#1f1b19', mutedColor: '#6b6156', accentColor: '#702838',
+  avatarShape: 'circle', align: 'center', buttonShape: 'pill', buttonFill: 'solid', buttonColor: '#1f1b19', buttonTextColor: '#ffffff',
+  buttonShadow: false, font: 'sans', headerBand: false, bandColor: '#e5dccf',
+};
+const tpl = (key: string, name: string, category: TemplateCategory, theme: Partial<CardTheme>) => ({ key, name, category, theme: { ...STYLE_BASE, ...theme } });
+
+// 預設樣板(新的排前面):套用後仍可再微調
+export const CARD_TEMPLATES: { key: string; name: string; category: TemplateCategory; theme: Partial<CardTheme> }[] = [
+  tpl('peach', '蜜桃汽水', 'lively', { bgType: 'gradient', bgColor: '#ffe6dc', bgColor2: '#ffd3e2', textColor: '#5a2633', mutedColor: '#8c5a66', accentColor: '#e0465f', buttonColor: '#ff7a8a', buttonShadow: true }),
+  tpl('midnight', '午夜藍', 'dark', { bgColor: '#141c2e', textColor: '#e8ecf5', mutedColor: '#9aa6bd', accentColor: '#9cc2ff', buttonFill: 'outline', buttonColor: '#e8ecf5', buttonTextColor: '#e8ecf5' }),
+  tpl('sage', '鼠尾草', 'minimal', { bgColor: '#eef1ea', textColor: '#34412e', mutedColor: '#6b7764', accentColor: '#5b7a4a', headerBand: true, bandColor: '#bfcbb3', buttonColor: '#ffffff', buttonTextColor: '#34412e', buttonShadow: true }),
+  tpl('lemon', '檸檬格紋', 'lively', { bgType: 'grid', bgColor: '#fff8db', textColor: '#4a3b00', mutedColor: '#7a6a2c', accentColor: '#c27c00', avatarShape: 'square', buttonShape: 'rounded', buttonColor: '#ffd84d', buttonTextColor: '#3a2e00' }),
+  tpl('noir', '純黑極簡', 'dark', { bgColor: '#0e0e0e', textColor: '#f2f2f2', mutedColor: '#9a9a9a', accentColor: '#ffffff', avatarShape: 'portrait', align: 'left', buttonShape: 'square', buttonColor: '#f2f2f2', buttonTextColor: '#0e0e0e', font: 'classic' }),
+  tpl('sand', '沙丘漸層', 'minimal', { bgType: 'gradient', bgColor: '#f8f1e7', bgColor2: '#e8d6c0', textColor: '#4f3b2a', mutedColor: '#86705b', accentColor: '#9a5b2e', buttonShape: 'rounded', buttonColor: '#ffffff', buttonTextColor: '#4f3b2a', buttonShadow: true }),
+  tpl('sky', '晴空藍', 'lively', { bgColor: '#eef6ff', textColor: '#1d3557', mutedColor: '#5a7193', accentColor: '#2f6fd6', headerBand: true, bandColor: '#9ccbff', buttonColor: '#3d8bfd' }),
+  tpl('forest', '墨綠森林', 'dark', { bgType: 'gradient', bgColor: '#1f2e26', bgColor2: '#0f1713', textColor: '#e6efe9', mutedColor: '#9fb3a7', accentColor: '#b8e0c4', buttonShape: 'rounded', buttonFill: 'soft', buttonColor: '#2c3e34', buttonTextColor: '#e6efe9' }),
+  tpl('linen', '亞麻杏', 'minimal', { bgColor: '#efe6da', textColor: '#5a4634', mutedColor: '#8a7462', accentColor: '#8a5a35', buttonShape: 'rounded', buttonFill: 'outline', buttonColor: '#8a6e55', buttonTextColor: '#5a4634', font: 'serif' }),
+  tpl('mint', '薄荷條紋', 'lively', { bgType: 'stripes', bgColor: '#e6f7f0', textColor: '#1f4d3c', mutedColor: '#4f7a69', accentColor: '#1d9a6c', buttonShape: 'rounded', buttonColor: '#2fb380' }),
+  tpl('wine', '夜色酒紅', 'dark', { bgColor: '#2a0f17', textColor: '#f6e9ec', mutedColor: '#c7a3ad', accentColor: '#ffb3c3', headerBand: true, bandColor: '#702838', buttonColor: '#f6e9ec', buttonTextColor: '#2a0f17', font: 'serif' }),
+  tpl('paper', '純白留白', 'minimal', { bgColor: '#ffffff', textColor: '#222222', mutedColor: '#777777', accentColor: '#222222', align: 'left', buttonShape: 'rounded', buttonFill: 'soft', buttonColor: '#f3f3f3', buttonTextColor: '#222222' }),
+  tpl('lavender', '薰衣草', 'lively', { bgType: 'gradient', bgColor: '#f1e9ff', bgColor2: '#dfe9ff', textColor: '#3d3270', mutedColor: '#6f66a0', accentColor: '#6a4fd6', buttonColor: '#ffffff', buttonTextColor: '#4b3c7a', buttonShadow: true }),
+  tpl('starry', '星空點點', 'dark', { bgType: 'dots', bgColor: '#10131f', textColor: '#eef0ff', mutedColor: '#a3a9cc', accentColor: '#ffd36b', buttonShape: 'rounded', buttonColor: '#2b3150', buttonTextColor: '#eef0ff', buttonShadow: true }),
+  tpl('cloud', '雲朵點點', 'minimal', { bgType: 'dots', bgColor: '#f4f6f8', textColor: '#34404c', mutedColor: '#6b7783', accentColor: '#3f5c78', buttonShape: 'rounded', buttonColor: '#ffffff', buttonTextColor: '#34404c', buttonShadow: true }),
+  tpl('candy', '糖果點點', 'lively', { bgType: 'dots', bgColor: '#fff0f5', textColor: '#6a2a45', mutedColor: '#9a6078', accentColor: '#e0447c', buttonColor: '#ff9ec0', buttonShadow: true }),
+  tpl('cocoa', '可可咖啡', 'dark', { bgType: 'gradient', bgColor: '#3b2a22', bgColor2: '#1f1612', textColor: '#f3e9e1', mutedColor: '#c4ad9c', accentColor: '#e8c39e', buttonShape: 'rounded', buttonFill: 'outline', buttonColor: '#d9b99b', buttonTextColor: '#f3e9e1', font: 'serif' }),
+  tpl('stone', '石墨灰', 'minimal', { bgColor: '#ececea', textColor: '#2b2b2b', mutedColor: '#6e6e6a', accentColor: '#2b2b2b', avatarShape: 'portrait', buttonShape: 'square', buttonFill: 'outline', buttonColor: '#3a3a3a', buttonTextColor: '#2b2b2b', font: 'classic' }),
+  tpl('orange', '橘子派對', 'lively', { bgColor: '#fff6ec', textColor: '#6b3a0c', mutedColor: '#9a6a3e', accentColor: '#e57a00', headerBand: true, bandColor: '#ffb066', buttonShape: 'rounded', buttonColor: '#ffffff', buttonTextColor: '#8a4b10', buttonShadow: true }),
+  tpl('ivory', '經典米白', 'minimal', {}),
+  tpl('burgundy', '酒紅質感', 'minimal', { bgColor: '#f4ece6', textColor: '#3a1820', mutedColor: '#7a5a60', accentColor: '#702838', buttonColor: '#702838', font: 'serif' }),
+  tpl('mono', '黑白時尚', 'minimal', { bgColor: '#ffffff', textColor: '#111111', mutedColor: '#666666', accentColor: '#111111', buttonFill: 'outline', buttonColor: '#111111', buttonTextColor: '#111111', buttonShape: 'square', font: 'classic', avatarShape: 'portrait', align: 'left' }),
+  tpl('notebook', '手帳格紋', 'lively', { bgType: 'grid', bgColor: '#f3f6ee', textColor: '#2f3b2a', mutedColor: '#66735f', accentColor: '#5b7a4a', buttonFill: 'soft', buttonColor: '#dfe8d6', buttonTextColor: '#2f3b2a', buttonShape: 'rounded', avatarShape: 'square', buttonShadow: true }),
+  tpl('mist', '柔霧灰藍', 'dark', { bgType: 'gradient', bgColor: '#2c3a48', bgColor2: '#1a232c', textColor: '#e9edf1', mutedColor: '#a8b5c2', accentColor: '#9fc3e6', buttonShape: 'rounded', buttonColor: '#e9edf1', buttonTextColor: '#26313b', buttonShadow: true }),
+];
+
+// 深色背景判斷(卡片底色、標籤底色跟著切換)
+export function isDarkColor(hex: string) {
+  const m = hex.replace('#', '').match(/^([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i);
+  if (!m) return false;
+  const [r, g, b] = m.slice(1).map((v) => parseInt(v, 16));
+  return 0.299 * r + 0.587 * g + 0.114 * b < 110;
+}
 
 export function resolveTheme(theme: unknown): CardTheme {
   const t = (theme && typeof theme === 'object' ? theme : {}) as Partial<CardTheme>;

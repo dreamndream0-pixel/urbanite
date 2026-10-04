@@ -24,6 +24,7 @@ import {
   SOCIAL_PLATFORMS,
   SOURCE_LABELS,
   TAG_SUGGESTIONS,
+  TEMPLATE_CATEGORIES,
   videoEmbedUrl,
   type BlockItem,
   type BlockOptions,
@@ -385,7 +386,7 @@ export default function ProfileCardManager({ products, lineUrl = '' }: { product
           </>
         ) : null}
 
-        {mainTab === 'style' ? <StyleEditor draft={draft} setDraft={setDraft} onPreview={() => setPreviewOpen(true)} /> : null}
+        {mainTab === 'style' ? <StyleEditor draft={draft} setDraft={setDraft} onPreview={() => setPreviewOpen(true)} blocks={blocks} productMap={productMap} lineUrl={lineUrl} /> : null}
         {mainTab === 'stats' ? <StatsPanel cardId={card.id} url={url} blocks={blocks} productMap={productMap} /> : null}
         {mainTab === 'settings' ? <SettingsEditor draft={draft} setDraft={setDraft} /> : null}
 
@@ -1005,6 +1006,7 @@ function Section({ title, children, defaultOpen = true }: { title: string; child
 
 function ProfileEditor({ draft, setDraft }: { draft: ProfileCard; setDraft: (c: ProfileCard) => void }) {
   const [uploading, setUploading] = useState(false);
+  const [coverUploading, setCoverUploading] = useState(false);
   const [customTag, setCustomTag] = useState('');
   const [adding, setAdding] = useState(false);
   const set = <K extends keyof ProfileCard>(key: K, value: ProfileCard[K]) => setDraft({ ...draft, [key]: value });
@@ -1019,6 +1021,22 @@ function ProfileEditor({ draft, setDraft }: { draft: ProfileCard; setDraft: (c: 
       void uiAlert(e instanceof Error ? e.message : '上傳失敗');
     } finally {
       setUploading(false);
+    }
+  }
+
+  const theme = resolveTheme(draft.theme);
+  const setTheme = (patch: Partial<CardTheme>) => setDraft({ ...draft, theme: { ...theme, ...patch } });
+
+  async function uploadCover(file: File | undefined) {
+    if (!file) return;
+    if (file.size > 10 * 1024 * 1024) return void uiAlert('圖片請小於 10MB');
+    setCoverUploading(true);
+    try {
+      setTheme({ coverImage: await uploadImage(file) });
+    } catch (e) {
+      void uiAlert(e instanceof Error ? e.message : '上傳失敗');
+    } finally {
+      setCoverUploading(false);
     }
   }
 
@@ -1038,8 +1056,30 @@ function ProfileEditor({ draft, setDraft }: { draft: ProfileCard; setDraft: (c: 
 
   return (
     <div className="space-y-4">
+      <Section title="封面照片">
+        <div className="relative aspect-[5/2] overflow-hidden rounded-xl border border-dashed border-[#c9bcad] bg-[#faf7f2]">
+          {theme.coverImage ? (
+            <img src={theme.coverImage} alt="" className="h-full w-full object-cover" />
+          ) : (
+            <span className="absolute inset-0 flex items-center justify-center text-xs text-[#a99e8f]">名片最上方的封面照片</span>
+          )}
+        </div>
+        <div className="flex flex-wrap items-center gap-3">
+          <label className="cursor-pointer rounded-full border border-[#d7c9bd] px-4 py-1.5 text-xs font-medium hover:bg-[#f6f2ec]">
+            {coverUploading ? '上傳中…' : theme.coverImage ? '更換封面' : '上傳封面'}
+            <input type="file" accept="image/png,image/jpeg,image/webp" className="hidden" disabled={coverUploading} onChange={(e) => { void uploadCover(e.target.files?.[0]); e.target.value = ''; }} />
+          </label>
+          {theme.coverImage ? <button type="button" onClick={() => setTheme({ coverImage: '' })} className="text-xs text-[#8a7f72]">移除</button> : null}
+          <span className="text-[11px] text-[#a99e8f]">建議 1500×600(5:2),單張上限 10MB</span>
+        </div>
+      </Section>
+
       <Section title="大頭照及名稱">
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
+          <span className="text-sm">顯示大頭照</span>
+          <Toggle on={theme.showAvatar} onChange={(v) => setTheme({ showAvatar: v })} label="顯示大頭照" />
+        </div>
+        <div className={`flex items-center gap-4 ${theme.showAvatar ? '' : 'opacity-40'}`}>
           <div className="h-24 w-24 shrink-0 overflow-hidden rounded-full border border-dashed border-[#c9bcad] bg-[#faf7f2]">
             {draft.avatar_url ? <img src={draft.avatar_url} alt="" className="h-full w-full object-contain" /> : null}
           </div>
@@ -1155,8 +1195,28 @@ function ProfileEditor({ draft, setDraft }: { draft: ProfileCard; setDraft: (c: 
 }
 
 // ---------- 外觀風格 ----------
-function StyleEditor({ draft, setDraft, onPreview }: { draft: ProfileCard; setDraft: (c: ProfileCard) => void; onPreview: () => void }) {
+function StyleEditor({
+  draft,
+  setDraft,
+  onPreview,
+  blocks,
+  productMap,
+  lineUrl,
+}: {
+  draft: ProfileCard;
+  setDraft: (c: ProfileCard) => void;
+  onPreview: () => void;
+  blocks: ProfileCardBlock[];
+  productMap: Record<string, CardProduct>;
+  lineUrl: string;
+}) {
   const [tab, setTab] = useState<'template' | 'background' | 'profile' | 'button'>('template');
+  const [category, setCategory] = useState<(typeof TEMPLATE_CATEGORIES)[number]['key']>('all');
+  // 樣板縮圖只放前幾個區塊,輪播不自動播放
+  const sampleBlocks = useMemo(
+    () => blocks.slice(0, 5).map((b) => (b.options ? { ...b, options: { ...b.options, autoplay: false } } : b)),
+    [blocks],
+  );
   const [uploading, setUploading] = useState(false);
   const theme = resolveTheme(draft.theme);
   const setTheme = (patch: Partial<CardTheme>) => setDraft({ ...draft, theme: { ...theme, ...patch } });
@@ -1185,59 +1245,61 @@ function StyleEditor({ draft, setDraft, onPreview }: { draft: ProfileCard; setDr
       </div>
 
       {tab === 'template' ? (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-          {CARD_TEMPLATES.map((tpl) => {
-            const t = { ...theme, ...tpl.theme };
-            const selected = theme.template === tpl.key;
-            return (
-              <button
-                key={tpl.key}
-                type="button"
-                onClick={() => setTheme({ ...tpl.theme, template: tpl.key, bgImage: theme.bgImage })}
-                className={`overflow-hidden rounded-2xl border text-left transition ${selected ? 'border-[#1f1b19] ring-2 ring-[#1f1b19]/15' : 'border-[#e5ded4] hover:border-[#1f1b19]/30'}`}
-              >
-                <div
-                  className={`flex aspect-[4/5] flex-col gap-1.5 p-3 ${t.align === 'left' ? 'items-start' : 'items-center'}`}
-                  style={{
-                    background: t.bgColor,
-                    backgroundImage: t.bgType === 'grid' ? `linear-gradient(color-mix(in srgb, ${t.textColor} 8%, transparent) 1px, transparent 1px), linear-gradient(90deg, color-mix(in srgb, ${t.textColor} 8%, transparent) 1px, transparent 1px)` : undefined,
-                    backgroundSize: t.bgType === 'grid' ? '12px 12px' : undefined,
-                    fontFamily: FONT_OPTIONS.find((f) => f.key === t.font)?.css,
-                    color: t.textColor,
-                  }}
+        <section className="rounded-2xl border border-[#ebe4da] bg-white p-4">
+          <p className="text-sm leading-6 text-[#6b6156]">挑一個樣板快速套用,之後還能在「背景」「簡介樣式」「連結樣式」再微調。封面照片與大頭照不會被樣板覆蓋。</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {TEMPLATE_CATEGORIES.map((c) => {
+              const count = c.key === 'all' ? CARD_TEMPLATES.length : CARD_TEMPLATES.filter((t) => t.category === c.key).length;
+              return (
+                <button
+                  key={c.key}
+                  type="button"
+                  onClick={() => setCategory(c.key)}
+                  className={`rounded-full px-4 py-1.5 text-sm transition ${category === c.key ? 'bg-[#1f1b19] text-white' : 'border border-[#e5ded4] text-[#5f5852] hover:border-[#1f1b19]/30'}`}
                 >
-                  <span className={`mt-2 bg-white/80 ${t.avatarShape === 'circle' ? 'h-9 w-9 rounded-full' : t.avatarShape === 'square' ? 'h-9 w-9 rounded-lg' : 'h-11 w-9 rounded-lg'}`} style={{ border: `1px solid color-mix(in srgb, ${t.textColor} 15%, transparent)` }} />
-                  <span className="text-[11px] font-semibold">URBANITE</span>
-                  {[0, 1, 2].map((i) => (
-                    <span
-                      key={i}
-                      className="h-4 w-full"
-                      style={{
-                        borderRadius: t.buttonShape === 'pill' ? 999 : t.buttonShape === 'rounded' ? 6 : 1,
-                        background: t.buttonFill === 'outline' ? 'transparent' : t.buttonColor,
-                        border: `1px solid ${t.buttonFill === 'outline' ? t.buttonColor : 'transparent'}`,
-                      }}
-                    />
-                  ))}
-                </div>
-                <div className="flex items-center justify-between border-t border-[#efe8dd] bg-white px-3 py-2">
-                  <span className="text-sm">{tpl.name}</span>
-                  {selected ? <span className="text-xs text-[#1f7a44]">使用中</span> : null}
-                </div>
-              </button>
-            );
-          })}
-        </div>
+                  {c.label}({count})
+                </button>
+              );
+            })}
+          </div>
+          <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
+            {CARD_TEMPLATES.filter((t) => category === 'all' || t.category === category).map((tpl) => {
+              const selected = theme.template === tpl.key;
+              return (
+                <button
+                  key={tpl.key}
+                  type="button"
+                  onClick={() => setTheme({ ...tpl.theme, template: tpl.key })}
+                  className={`overflow-hidden rounded-2xl border text-left transition ${selected ? 'border-[#1f1b19] ring-2 ring-[#1f1b19]/15' : 'border-[#e5ded4] hover:border-[#1f1b19]/30'}`}
+                >
+                  <MiniPreview card={{ ...draft, theme: { ...theme, ...tpl.theme } }} blocks={sampleBlocks} productMap={productMap} lineUrl={lineUrl} />
+                  <div className="flex items-center justify-between border-t border-[#efe8dd] bg-white px-3 py-2">
+                    <span className="text-sm">{tpl.name}</span>
+                    {selected ? <span className="text-xs text-[#1f7a44]">使用中</span> : null}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </section>
       ) : null}
 
       {tab === 'background' ? (
         <Section title="背景">
           <Pills
             value={theme.bgType}
-            options={[{ key: 'color', label: '純色' }, { key: 'grid', label: '格紋' }, { key: 'image', label: '圖片' }]}
+            options={[
+              { key: 'color', label: '純色' },
+              { key: 'gradient', label: '漸層' },
+              { key: 'grid', label: '格紋' },
+              { key: 'dots', label: '點點' },
+              { key: 'stripes', label: '條紋' },
+              { key: 'image', label: '圖片' },
+            ]}
             onChange={(v) => setTheme({ bgType: v })}
           />
-          <ColorField label="背景色" value={theme.bgColor} onChange={(v) => setTheme({ bgColor: v })} />
+          <ColorField label={theme.bgType === 'gradient' ? '漸層上方' : '背景色'} value={theme.bgColor} onChange={(v) => setTheme({ bgColor: v })} />
+          {theme.bgType === 'gradient' ? <ColorField label="漸層下方" value={theme.bgColor2} onChange={(v) => setTheme({ bgColor2: v })} /> : null}
           {theme.bgType === 'image' ? (
             <div className="flex items-center gap-3">
               {theme.bgImage ? <img src={theme.bgImage} alt="" className="h-20 w-16 rounded-xl border border-[#efe8dd] object-cover" /> : null}
@@ -1250,6 +1312,12 @@ function StyleEditor({ draft, setDraft, onPreview }: { draft: ProfileCard; setDr
           <ColorField label="文字顏色" value={theme.textColor} onChange={(v) => setTheme({ textColor: v })} />
           <ColorField label="次要文字" value={theme.mutedColor} onChange={(v) => setTheme({ mutedColor: v })} />
           <ColorField label="重點色(價格等)" value={theme.accentColor} onChange={(v) => setTheme({ accentColor: v })} />
+          <div className="flex items-center gap-3 pt-1">
+            <span className="text-sm">頂部色塊</span>
+            <Toggle on={theme.headerBand} onChange={(v) => setTheme({ headerBand: v })} label="頂部色塊" />
+            <span className="ml-auto text-[11px] text-[#a99e8f]">有封面照片時以照片為主</span>
+          </div>
+          {theme.headerBand ? <ColorField label="色塊顏色" value={theme.bandColor} onChange={(v) => setTheme({ bandColor: v })} /> : null}
         </Section>
       ) : null}
 
@@ -1288,6 +1356,29 @@ function StyleEditor({ draft, setDraft, onPreview }: { draft: ProfileCard; setDr
           </div>
         </Section>
       ) : null}
+    </div>
+  );
+}
+
+// 樣板縮圖:用真正的名片畫面縮小顯示
+function MiniPreview({ card, blocks, productMap, lineUrl }: { card: ProfileCard; blocks: ProfileCardBlock[]; productMap: Record<string, CardProduct>; lineUrl: string }) {
+  const WIDTH = 360;
+  const boxRef = useRef<HTMLDivElement>(null);
+  const [scale, setScale] = useState(0.4);
+  useEffect(() => {
+    const el = boxRef.current;
+    if (!el) return;
+    const update = () => setScale(el.offsetWidth / WIDTH || 0.4);
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+  return (
+    <div ref={boxRef} className="pointer-events-none relative aspect-[9/19] overflow-hidden bg-white" aria-hidden="true">
+      <div className="absolute left-0 top-0 origin-top-left" style={{ width: WIDTH, height: `${100 / scale}%`, transform: `scale(${scale})` }}>
+        <ProfileCardView card={card} blocks={blocks} products={productMap} lineUrl={lineUrl} preview />
+      </div>
     </div>
   );
 }

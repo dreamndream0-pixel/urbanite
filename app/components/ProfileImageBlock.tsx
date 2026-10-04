@@ -14,7 +14,7 @@ import {
 
 const tint = (color: string, pct: number) => `color-mix(in srgb, ${color} ${pct}%, transparent)`;
 
-type Colors = { textColor: string; mutedColor: string };
+type Colors = { textColor: string; mutedColor: string; surface?: string };
 
 // 名片頁「圖文連結」:依版型顯示一張(多張時輪播)或多張排列
 export default function ProfileImageBlock({
@@ -36,7 +36,7 @@ export default function ProfileImageBlock({
   const href = (item: BlockItem) => normalizeUrl(custom && item.url ? item.url : block.url);
   const caption = (item: BlockItem) => (custom ? item.title : block.title);
 
-  const frame: CSSProperties = { borderRadius: r, border: `1px solid ${tint(colors.textColor, 12)}`, background: 'rgba(255,255,255,0.85)' };
+  const frame: CSSProperties = { borderRadius: r, border: `1px solid ${tint(colors.textColor, 12)}`, background: colors.surface ?? 'rgba(255,255,255,0.85)' };
 
   if (single) {
     const slide = (item: BlockItem, multi: boolean) => {

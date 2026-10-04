@@ -8,6 +8,7 @@ import {
   detectSource,
   FONT_OPTIONS,
   isBlockComplete,
+  isDarkColor,
   isBlockInWindow,
   normalizeUrl,
   resolveTheme,
@@ -45,6 +46,12 @@ export default function ProfileCardView({
 }) {
   const theme = resolveTheme(card.theme);
   const left = theme.align === 'left';
+  const dark = isDarkColor(theme.bgColor);
+  // 卡片 / 標籤底色:淺色背景用白,深色背景用半透明白
+  const surface = dark ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.85)';
+  const surfaceSoft = dark ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.6)';
+  const cover = theme.coverImage || theme.headerBand;
+  const showAvatar = theme.showAvatar !== false && Boolean(card.avatar_url);
   const source = useRef('direct');
 
   const visible = useMemo(
@@ -99,7 +106,13 @@ export default function ProfileCardView({
             backgroundImage: `linear-gradient(${tint(theme.textColor, 7)} 1px, transparent 1px), linear-gradient(90deg, ${tint(theme.textColor, 7)} 1px, transparent 1px)`,
             backgroundSize: '22px 22px',
           }
-        : {}),
+        : theme.bgType === 'gradient'
+          ? { backgroundImage: `linear-gradient(180deg, ${theme.bgColor}, ${theme.bgColor2})`, backgroundAttachment: fullScreen ? 'fixed' : undefined }
+          : theme.bgType === 'dots'
+            ? { backgroundImage: `radial-gradient(${tint(theme.textColor, 14)} 1.3px, transparent 1.6px)`, backgroundSize: '18px 18px' }
+            : theme.bgType === 'stripes'
+              ? { backgroundImage: `repeating-linear-gradient(135deg, ${tint(theme.textColor, 6)} 0 2px, transparent 2px 16px)` }
+              : {}),
   };
   const radius = theme.buttonShape === 'pill' ? 9999 : theme.buttonShape === 'rounded' ? 16 : 2;
   const buttonStyle: CSSProperties = {
@@ -111,7 +124,7 @@ export default function ProfileCardView({
   };
   const cardStyle: CSSProperties = {
     borderRadius: Math.min(radius, 18),
-    background: theme.buttonFill === 'outline' ? 'transparent' : 'rgba(255,255,255,0.85)',
+    background: theme.buttonFill === 'outline' ? 'transparent' : surface,
     border: `1px solid ${tint(theme.textColor, 12)}`,
     boxShadow: theme.buttonShadow ? '0 6px 18px rgba(0,0,0,0.06)' : undefined,
   };
@@ -124,19 +137,28 @@ export default function ProfileCardView({
 
   return (
     <div className={fullScreen ? 'min-h-screen' : 'min-h-full'} style={pageStyle}>
-      <div className={`mx-auto flex max-w-[440px] flex-col px-5 pb-10 pt-12 ${left ? 'items-start' : 'items-center'}`}>
-        {card.avatar_url ? (
-          <div className={`overflow-hidden bg-white ${avatarClass}`} style={{ border: `1px solid ${tint(theme.textColor, 12)}` }}>
+      <div className={`mx-auto flex max-w-[440px] flex-col px-5 pb-10 ${cover ? 'pt-0' : 'pt-12'} ${left ? 'items-start' : 'items-center'}`}>
+        {/* 封面照片 / 頂部色塊 */}
+        {cover ? (
+          <div className="-mx-5 aspect-[5/2] self-stretch overflow-hidden" style={{ background: theme.bandColor }}>
+            {theme.coverImage ? <img src={theme.coverImage} alt="" className="h-full w-full object-cover" /> : null}
+          </div>
+        ) : null}
+        {showAvatar ? (
+          <div
+            className={`relative overflow-hidden bg-white ${avatarClass} ${cover ? '-mt-12' : ''}`}
+            style={{ border: cover ? `3px solid ${theme.bgColor}` : `1px solid ${tint(theme.textColor, 12)}` }}
+          >
             <img src={card.avatar_url} alt={card.display_name} className={`h-full w-full ${theme.avatarShape === 'portrait' ? 'object-cover' : 'object-contain'}`} />
           </div>
         ) : null}
 
-        <h1 className={`mt-4 text-[22px] font-semibold tracking-[0.04em] ${left ? 'text-left' : 'text-center'}`}>{card.display_name || card.slug}</h1>
+        <h1 className={`${showAvatar || !cover ? 'mt-4' : 'mt-6'} text-[22px] font-semibold tracking-[0.04em] ${left ? 'text-left' : 'text-center'}`}>{card.display_name || card.slug}</h1>
 
         {card.show_tags && card.tags.length > 0 ? (
           <div className={`mt-3 flex flex-wrap gap-1.5 ${left ? 'justify-start' : 'justify-center'}`}>
             {card.tags.map((tag) => (
-              <span key={tag} className="rounded-full px-3 py-1 text-xs" style={{ border: `1px solid ${tint(theme.textColor, 15)}`, color: theme.mutedColor, background: 'rgba(255,255,255,0.5)' }}>
+              <span key={tag} className="rounded-full px-3 py-1 text-xs" style={{ border: `1px solid ${tint(theme.textColor, 15)}`, color: theme.mutedColor, background: surfaceSoft }}>
                 {tag}
               </span>
             ))}
@@ -153,7 +175,7 @@ export default function ProfileCardView({
                 rel="noreferrer"
                 aria-label={SOCIAL_PLATFORMS.find((p) => p.type === s.type)?.label ?? s.type}
                 className="flex h-10 w-10 items-center justify-center rounded-full transition hover:opacity-75"
-                style={{ border: `1px solid ${tint(theme.textColor, 15)}`, background: 'rgba(255,255,255,0.7)', color: theme.textColor }}
+                style={{ border: `1px solid ${tint(theme.textColor, 15)}`, background: surfaceSoft, color: theme.textColor }}
               >
                 <SocialIcon type={s.type} />
               </a>
@@ -197,12 +219,12 @@ export default function ProfileCardView({
                     allowFullScreen
                     loading="lazy"
                   />
-                  {b.title ? <p className="px-3 py-2 text-sm" style={{ background: 'rgba(255,255,255,0.85)' }}>{b.title}</p> : null}
+                  {b.title ? <p className="px-3 py-2 text-sm" style={{ background: surface }}>{b.title}</p> : null}
                 </div>
               );
             }
             if (b.type === 'image') {
-              return <ProfileImageBlock key={b.id} block={b} radius={radius} colors={theme} onOpen={() => track(b.id)} />;
+              return <ProfileImageBlock key={b.id} block={b} radius={radius} colors={{ ...theme, surface }} onOpen={() => track(b.id)} />;
             }
             if (b.type === 'product') {
               const p = products[b.product_id];
