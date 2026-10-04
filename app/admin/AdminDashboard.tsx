@@ -36,6 +36,7 @@ import { isoToTaipeiInput } from '@/lib/taipei-time';
 import CampaignManager from './CampaignManager';
 import FixedBannerCropModal from './FixedBannerCropModal';
 import IntegrationSettings from './IntegrationSettings';
+import ProfileCardManager from './ProfileCardManager';
 import { isCollectOnDelivery } from '@/lib/payment';
 import { buildReturnSteps, historyKind, isReturnOrder } from '@/lib/return-progress';
 import { getCheckoutLine, HIDDEN_FOOTER_SECTION_TITLES, withCheckoutLine } from '@/lib/checkout-line';
@@ -88,6 +89,7 @@ const NAV = [
   { key: 'customers', label: '顧客管理', Icon: IconUsers },
   { key: 'promotions', label: '促銷管理', Icon: IconGift },
   { key: 'campaign-pages', label: '一頁式促銷頁', Icon: IconGrid },
+  { key: 'profile-card', label: '個人名片', Icon: IconIdCard },
   { key: 'reports', label: '報表及分析', Icon: IconChart },
   { key: 'settings', label: '系統設定', Icon: IconGear },
 ] as const;
@@ -2714,6 +2716,8 @@ export default function AdminDashboard({
           )}
 
           {/* ===== 報表及分析 ===== */}
+          {section === 'profile-card' && <ProfileCardManager products={products} />}
+
           {section === 'campaign-pages' && (
             <CampaignManager
               initialCampaigns={initialCampaigns}
@@ -6974,6 +6978,16 @@ function IconHome() {
       <path d="M3 11.5 12 4l9 7.5" strokeLinecap="round" strokeLinejoin="round" />
       <path d="M5.5 10.5V20h13v-9.5" strokeLinecap="round" strokeLinejoin="round" />
       <path d="M10 20v-5h4v5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function IconIdCard() {
+  return (
+    <svg {...svgProps}>
+      <rect x="3" y="5" width="18" height="14" rx="2" />
+      <circle cx="9" cy="11" r="2" />
+      <path d="M6 16c.5-1.5 1.7-2.3 3-2.3s2.5.8 3 2.3M14 10h4M14 13h3" />
     </svg>
   );
 }
