@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, type CSSProperties, type ReactNode } from '
 import Link from 'next/link';
 import SocialIcon from '@/app/components/SocialIcon';
 import ProfileImageBlock from '@/app/components/ProfileImageBlock';
+import LinkIcon, { isIconImage } from '@/app/components/LinkIcon';
 import {
   detectSource,
   FONT_OPTIONS,
@@ -21,6 +22,9 @@ import {
 } from '@/lib/profile-card';
 
 export type CardProduct = { id: string; name: string; price: number; original_price: number | null; image: string };
+
+// 透明 PNG 縮圖完整顯示、不加白底
+const isPng = (url: string) => /\.png(\?|$)/i.test(url);
 
 const formatter = new Intl.NumberFormat('zh-TW', { style: 'currency', currency: 'TWD', maximumFractionDigits: 0 });
 
@@ -577,7 +581,17 @@ export default function ProfileCardView({
   function renderLink(b: ProfileCardBlock) {
     const common = { href: normalizeUrl(b.url), target: '_blank', rel: 'noreferrer', onClick: () => track(b.id) };
     const thumbRadius = Math.max(Math.min(radius, 16) - 6, 2);
-    const thumb = b.image ? <img src={b.image} alt="" className="h-10 w-10 shrink-0 bg-white object-cover" style={{ borderRadius: thumbRadius }} /> : null;
+    const icon = isIconImage(b.image);
+    // 縮圖:內建圖示(跟著文字顏色)/ 透明 PNG(完整顯示不加白底)/ 一般照片(裁切填滿)
+    const thumbFor = (size: string, r: number) =>
+      !b.image ? null : icon ? (
+        <span className={`flex ${size} shrink-0 items-center justify-center`}><LinkIcon value={b.image} size={22} /></span>
+      ) : isPng(b.image) ? (
+        <img src={b.image} alt="" className={`${size} shrink-0 object-contain`} style={{ borderRadius: r }} />
+      ) : (
+        <img src={b.image} alt="" className={`${size} shrink-0 bg-white object-cover`} style={{ borderRadius: r }} />
+      );
+    const thumb = thumbFor('h-10 w-10', thumbRadius);
     const row = 'flex min-h-[52px] items-center gap-3 px-4 py-2.5 text-left text-sm font-medium leading-5 transition';
     if (theme.linkStyle === 'left') {
       return (
@@ -627,7 +641,7 @@ export default function ProfileCardView({
     if (theme.linkStyle === 'list') {
       return (
         <a key={b.id} {...common} className="flex min-h-[56px] items-center gap-3 py-2.5 text-left text-sm font-medium leading-5 transition hover:opacity-70" style={{ borderBottom: `1px solid ${tint(theme.textColor, 15)}`, color: theme.textColor }}>
-          {b.image ? <img src={b.image} alt="" className="h-11 w-11 shrink-0 rounded-lg bg-white object-cover" /> : null}
+          {thumbFor('h-11 w-11', 8)}
           <span className="min-w-0 flex-1">{b.title}</span>
           {arrow}
         </a>
@@ -642,12 +656,13 @@ export default function ProfileCardView({
           style={{ borderRadius: Math.min(radius, 18), border: `1.5px solid ${theme.buttonFill === 'soft' ? tint(theme.textColor, 15) : theme.buttonColor}`, background: surface, color: theme.textColor, boxShadow: theme.buttonShadow ? '0 6px 18px rgba(0,0,0,0.06)' : undefined }}
         >
           <span className="flex items-center gap-2 px-4 py-3 text-sm font-medium leading-5">
+            {icon ? thumbFor('h-6 w-6', 0) : null}
             <span className="min-w-0 flex-1">{b.title}</span>
-            {b.image ? null : arrow}
+            {b.image && !icon ? null : arrow}
           </span>
-          {b.image ? (
+          {b.image && !icon ? (
             <span className="block px-3 pb-3">
-              <img src={b.image} alt="" className="aspect-[16/9] w-full bg-white object-cover" style={{ borderRadius: Math.max(Math.min(radius, 18) - 6, 4) }} />
+              <img src={b.image} alt="" className={`aspect-[16/9] w-full ${isPng(b.image) ? 'object-contain' : 'bg-white object-cover'}`} style={{ borderRadius: Math.max(Math.min(radius, 18) - 6, 4) }} />
             </span>
           ) : null}
         </a>
@@ -655,7 +670,7 @@ export default function ProfileCardView({
     }
     return (
       <a key={b.id} {...common} className="relative flex min-h-[56px] items-center justify-center px-14 py-3 text-center text-sm font-medium leading-5 transition hover:opacity-85" style={buttonStyle}>
-        {b.image ? <img src={b.image} alt="" className="absolute left-2 top-1/2 h-10 w-10 -translate-y-1/2 bg-white object-cover" style={{ borderRadius: Math.max(radius - 6, 2) }} /> : null}
+        {b.image ? <span className="absolute left-2 top-1/2 -translate-y-1/2">{thumbFor('h-10 w-10', Math.max(radius - 6, 2))}</span> : null}
         {b.title}
       </a>
     );

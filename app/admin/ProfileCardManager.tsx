@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import QRCode from 'qrcode';
 import ProfileCardView, { type CardProduct } from '@/app/components/ProfileCardView';
 import { LayoutThumb } from '@/app/components/ProfileImageBlock';
+import LinkIcon, { ICON_PREFIX, isIconImage, LINK_ICONS } from '@/app/components/LinkIcon';
 import SocialIcon from '@/app/components/SocialIcon';
 import {
   BIO_LIMIT,
@@ -715,16 +716,7 @@ function BlockRow({
             )}
 
             {block.type === 'link' && (
-              <div className="flex items-center gap-3">
-                {block.image ? <img src={block.image} alt="" className="h-12 w-12 rounded-xl border border-[#efe8dd] object-cover" /> : null}
-                <label className="cursor-pointer rounded-full border border-[#d7c9bd] px-3.5 py-1.5 text-xs font-medium text-[#1f1b19] hover:bg-[#f6f2ec]">
-                  {uploading ? '上傳中…' : block.image ? '更換圖片' : '加上縮圖(選填)'}
-                  <input type="file" accept="image/png,image/jpeg,image/webp" className="hidden" disabled={uploading} onChange={(e) => { void upload(e.target.files?.[0]); e.target.value = ''; }} />
-                </label>
-                {block.image ? (
-                  <button type="button" onClick={() => onPatch({ image: '' })} className="text-xs text-[#8a7f72]">移除縮圖</button>
-                ) : null}
-              </div>
+              <LinkThumbPicker value={block.image} uploading={uploading} onUpload={(file) => void upload(file)} onChange={(image) => onPatch({ image })} />
             )}
 
             {timedPanel}
@@ -987,6 +979,80 @@ function ImageBlockEditor({
           完成
         </button>
       </div>
+    </div>
+  );
+}
+
+// 連結按鈕縮圖:上傳圖片(PNG 透明背景會保留)或選內建圖示(預設顯示 2 排,其餘收合)
+const ICON_ROWS_SHOWN = 16;
+function LinkThumbPicker({
+  value,
+  uploading,
+  onUpload,
+  onChange,
+}: {
+  value: string;
+  uploading: boolean;
+  onUpload: (file: File | undefined) => void;
+  onChange: (image: string) => void;
+}) {
+  const [more, setMore] = useState(false);
+  const icon = isIconImage(value);
+  const selectedKey = icon ? value.slice(ICON_PREFIX.length) : '';
+  // 選到收合區的圖示時,自動展開讓使用者看得到
+  const selectedHidden = LINK_ICONS.findIndex((i) => i.key === selectedKey) >= ICON_ROWS_SHOWN;
+  const open = more || selectedHidden;
+  const list = open ? LINK_ICONS : LINK_ICONS.slice(0, ICON_ROWS_SHOWN);
+  return (
+    <div className="space-y-2.5 rounded-xl bg-[#faf7f2] p-3">
+      <div className="flex items-center gap-3">
+        <span className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-[#efe8dd] bg-white text-[#1f1b19]">
+          {!value ? (
+            <span className="text-[10px] text-[#b3a897]">無縮圖</span>
+          ) : icon ? (
+            <LinkIcon value={value} size={24} />
+          ) : (
+            <img src={value} alt="" className={`h-full w-full ${/\.png(\?|$)/i.test(value) ? 'object-contain' : 'object-cover'}`} />
+          )}
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm">縮圖(選填)</p>
+          <p className="text-[11px] text-[#a99e8f]">上傳 PNG / JPG / WEBP(透明 PNG 會保留透明),或從下方選圖示</p>
+        </div>
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <label className="cursor-pointer rounded-full border border-[#d7c9bd] bg-white px-3.5 py-1.5 text-xs font-medium text-[#1f1b19] hover:bg-[#f6f2ec]">
+          {uploading ? '上傳中…' : '上傳圖片'}
+          <input type="file" accept="image/png,image/jpeg,image/webp" className="hidden" disabled={uploading} onChange={(e) => { onUpload(e.target.files?.[0]); e.target.value = ''; }} />
+        </label>
+        {value ? (
+          <button type="button" onClick={() => onChange('')} className="text-xs text-[#8a7f72]">移除縮圖</button>
+        ) : null}
+      </div>
+      <div className="grid grid-cols-8 gap-1.5">
+        {list.map((i) => {
+          const selected = i.key === selectedKey;
+          return (
+            <button
+              key={i.key}
+              type="button"
+              title={i.label}
+              aria-label={i.label}
+              aria-pressed={selected}
+              onClick={() => onChange(selected ? '' : `${ICON_PREFIX}${i.key}`)}
+              className={`flex aspect-square items-center justify-center rounded-lg border transition ${selected ? 'border-[#1f1b19] bg-[#1f1b19] text-white' : 'border-[#efe8dd] bg-white text-[#3d3935] hover:border-[#1f1b19]/30'}`}
+            >
+              <LinkIcon value={`${ICON_PREFIX}${i.key}`} size={18} />
+            </button>
+          );
+        })}
+      </div>
+      {!selectedHidden ? (
+        <button type="button" onClick={() => setMore(!more)} className="flex w-full items-center justify-center gap-1 py-1 text-xs text-[#6b6156]">
+          {open ? '收合圖示' : `顯示更多圖示(${LINK_ICONS.length - ICON_ROWS_SHOWN})`}
+          <Icon size={14}><path d={open ? 'M6 15l6-6 6 6' : 'M6 9l6 6 6-6'} /></Icon>
+        </button>
+      ) : null}
     </div>
   );
 }
