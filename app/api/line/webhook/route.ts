@@ -44,7 +44,7 @@ function bindMessages(lineUserId: string, channelSecret: string, intro: string):
   ];
 }
 
-const HELP = '輸入以下關鍵字查詢:\n・訂單查詢\n・優惠券\n・購物金\n・會員資料\n・綁定(重新綁定帳號)';
+const HELP = '輸入以下關鍵字查詢:\n・訂單查詢\n・優惠券\n・購物金\n・會員資料';
 
 async function handleEvent(event: LineEvent, channelSecret: string, accessToken: string) {
   const lineUserId = event.source?.userId;
