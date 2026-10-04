@@ -378,7 +378,7 @@ export default function ProfileCardManager({ products, lineUrl = '' }: { product
         ) : null}
 
         {mainTab === 'style' ? <StyleEditor draft={draft} setDraft={setDraft} onPreview={() => setPreviewOpen(true)} /> : null}
-        {mainTab === 'stats' ? <StatsPanel cardId={card.id} blocks={blocks} productMap={productMap} /> : null}
+        {mainTab === 'stats' ? <StatsPanel cardId={card.id} url={url} blocks={blocks} productMap={productMap} /> : null}
         {mainTab === 'settings' ? <SettingsEditor draft={draft} setDraft={setDraft} /> : null}
 
         {needsSave ? (
@@ -1018,7 +1018,7 @@ function StyleEditor({ draft, setDraft, onPreview }: { draft: ProfileCard; setDr
 // ---------- 數據分析 ----------
 type Stats = { days: number; views: number; clicks: number; daily: { day: string; views: number; clicks: number }[]; blocks: Record<string, number>; sources: Record<string, number> };
 
-function StatsPanel({ cardId, blocks, productMap }: { cardId: string; blocks: ProfileCardBlock[]; productMap: Record<string, CardProduct> }) {
+function StatsPanel({ cardId, url, blocks, productMap }: { cardId: string; url: string; blocks: ProfileCardBlock[]; productMap: Record<string, CardProduct> }) {
   const [days, setDays] = useState<7 | 30>(7);
   const [stats, setStats] = useState<Stats | null>(null);
   const [error, setError] = useState('');
@@ -1124,10 +1124,10 @@ function StatsPanel({ cardId, blocks, productMap }: { cardId: string; blocks: Pr
             ))}
           </div>
         )}
-        <p className="mt-3 text-[11px] leading-5 text-[#a99e8f]">
-          小技巧:在不同地方分享時,網址後面加上 ?from=instagram、?from=line,來源會更準確。只統計次數,不記錄個人資料。
-        </p>
+        <p className="mt-3 text-[11px] leading-5 text-[#a99e8f]">只統計次數與來源,不記錄個人資料。</p>
       </section>
+
+      <ShareLinks url={url} />
     </div>
   );
 }
@@ -1195,5 +1195,57 @@ function SettingsEditor({ draft, setDraft }: { draft: ProfileCard; setDraft: (c:
         </div>
       </Section>
     </div>
+  );
+}
+
+// 各平台專屬分享連結:網址帶 ?from=平台,數據分析的流量來源更準確
+const SHARE_PLATFORMS: { key: string; label: string; icon: string; where: string }[] = [
+  { key: 'instagram', label: 'Instagram', icon: 'instagram', where: '個人簡介、限動連結' },
+  { key: 'line', label: 'LINE', icon: 'line', where: '官方帳號、群組訊息' },
+  { key: 'facebook', label: 'Facebook', icon: 'facebook', where: '粉專簡介、貼文' },
+  { key: 'threads', label: 'Threads', icon: 'threads', where: '個人簡介、貼文' },
+  { key: 'tiktok', label: 'TikTok', icon: 'tiktok', where: '個人簡介' },
+  { key: 'youtube', label: 'YouTube', icon: 'youtube', where: '頻道簡介、影片說明' },
+  { key: 'xiaohongshu', label: '小紅書', icon: 'xiaohongshu', where: '個人簡介' },
+];
+
+function ShareLinks({ url }: { url: string }) {
+  const [copied, setCopied] = useState('');
+
+  async function copy(key: string) {
+    try {
+      await navigator.clipboard.writeText(`${url}?from=${key}`);
+      setCopied(key);
+      window.setTimeout(() => setCopied((current) => (current === key ? '' : current)), 1800);
+    } catch {
+      void uiAlert('無法複製,請改用長按手動複製');
+    }
+  }
+
+  return (
+    <section className="rounded-2xl border border-[#ebe4da] bg-white p-4">
+      <p className="text-sm font-semibold">各平台分享連結</p>
+      <p className="mt-1 text-xs leading-5 text-[#a99e8f]">貼在哪個平台,就複製那個平台的連結,流量來源會統計得更準確。</p>
+      <div className="mt-3 divide-y divide-[#f3eee7]">
+        {SHARE_PLATFORMS.map((p) => (
+          <div key={p.key} className="flex items-center gap-3 py-2.5">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[#efe8dd] text-[#1f1b19]">
+              <SocialIcon type={p.icon} size={18} />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-sm">{p.label}</span>
+              <span className="block truncate text-[11px] text-[#a99e8f]">{p.where}</span>
+            </span>
+            <button
+              type="button"
+              onClick={() => copy(p.key)}
+              className={`shrink-0 rounded-full border px-3.5 py-1.5 text-xs font-semibold transition ${copied === p.key ? 'border-[#1f7a44] bg-[#e9f7ee] text-[#1f7a44]' : 'border-[#d7c9bd] text-[#1f1b19] hover:bg-[#f6f2ec]'}`}
+            >
+              {copied === p.key ? '已複製' : '複製連結'}
+            </button>
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }

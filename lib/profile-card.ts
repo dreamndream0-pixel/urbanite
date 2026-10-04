@@ -204,6 +204,8 @@ export const SOURCE_LABELS: Record<string, string> = {
   facebook: 'Facebook',
   threads: 'Threads',
   tiktok: 'TikTok',
+  youtube: 'YouTube',
+  xiaohongshu: '小紅書',
   google: 'Google',
   site: '官網',
   other: '其他網站',
@@ -228,6 +230,8 @@ export function detectSource(ua: string, referrer: string, utm: string | null) {
   if (r.includes('facebook') || r.includes('fb.')) return 'facebook';
   if (r.includes('threads')) return 'threads';
   if (r.includes('tiktok')) return 'tiktok';
+  if (r.includes('youtube') || r.includes('youtu.be')) return 'youtube';
+  if (r.includes('xiaohongshu') || r.includes('xhslink')) return 'xiaohongshu';
   if (r.includes('google')) return 'google';
   if (r.includes('urbanite')) return 'site';
   return 'other';
