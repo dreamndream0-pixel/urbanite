@@ -359,3 +359,12 @@ img {
 .center-toast {
   animation: center-toast-fade 3s ease forwards;
 }
+
+/* 後台(手機):輸入框不要自動放大(iPhone 小於 16px 會放大頁面造成跑位) */
+@media (max-width: 767px) {
+  .admin-root input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='color']):not([type='file']),
+  .admin-root select,
+  .admin-root textarea {
+    font-size: 16px;
+  }
+}

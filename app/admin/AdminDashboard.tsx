@@ -438,6 +438,19 @@ export default function AdminDashboard({
       window.history.replaceState(null, '', url);
     } catch { /* 略過 */ }
   };
+  // 手機:後台不要下拉重新整理、不要平滑捲動(iPhone 捲到頂端前會誤觸重新整理、畫面跑位)
+  useEffect(() => {
+    const html = document.documentElement;
+    const prev = { overscroll: html.style.overscrollBehaviorY, bodyOverscroll: document.body.style.overscrollBehaviorY, behavior: html.style.scrollBehavior };
+    html.style.overscrollBehaviorY = 'none';
+    document.body.style.overscrollBehaviorY = 'none';
+    html.style.scrollBehavior = 'auto';
+    return () => {
+      html.style.overscrollBehaviorY = prev.overscroll;
+      document.body.style.overscrollBehaviorY = prev.bodyOverscroll;
+      html.style.scrollBehavior = prev.behavior;
+    };
+  }, []);
   const [menuOpen, setMenuOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true); // 桌機側邊選單預設常開
   const [products, setProducts] = useState<Product[]>(initialProducts);
@@ -1513,8 +1526,8 @@ export default function AdminDashboard({
   const activeNav = NAV.find((n) => n.key === section) ?? NAV[0];
 
   return (
-    <div className="min-h-screen bg-[#f6f2ec] text-[#1f1b19]">
-      <header className="sticky top-0 z-30 border-b border-[#e5ded4] bg-[#faf7f2]/95 backdrop-blur">
+    <div className="admin-root min-h-screen bg-[#f6f2ec] text-[#1f1b19]">
+      <header className="sticky top-0 z-30 border-b border-[#e5ded4] bg-[#faf7f2]">
         <nav className="mx-auto grid max-w-7xl grid-cols-[1fr_auto_1fr] items-center px-4 py-4 sm:px-6">
           <div className="flex items-center">
             <button
