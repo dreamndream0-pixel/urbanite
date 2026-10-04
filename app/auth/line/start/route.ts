@@ -23,7 +23,8 @@ export async function GET(request: Request) {
   // 會員中心「加入 LINE」:已登入的會員連結自己的 LINE(同時加入官方帳號好友)
   const linkUser = linkMode ? await getSessionUser() : null;
   if (linkMode && !linkUser) {
-    return NextResponse.redirect(`${redirectOrigin}/login?next=${encodeURIComponent(next)}`);
+    // 登入後自動接回 LINE 授權
+    return NextResponse.redirect(`${redirectOrigin}/login?next=${encodeURIComponent(`/auth/line/start?mode=link&next=${next}`)}`);
   }
 
   const { channelId, channelSecret } = await getLineLoginConfig();

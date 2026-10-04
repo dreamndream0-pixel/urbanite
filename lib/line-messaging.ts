@@ -1,7 +1,6 @@
 import crypto from 'crypto';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getIntegrations } from '@/lib/integrations';
-import { getLineSyntheticEmail } from '@/lib/line-login';
 import { getConfiguredSiteUrl } from '@/lib/site-url';
 import type { Discount, Order } from '@/lib/types';
 
@@ -44,7 +43,8 @@ export function verifyBindToken(token: string, channelSecret: string): { lineUse
 }
 
 export function bindUrl(token: string) {
-  return `${getConfiguredSiteUrl()}/line/bind?t=${encodeURIComponent(token)}`;
+  // openExternalBrowser:在手機預設瀏覽器開啟(通常已登入官網),避免 LINE 內建瀏覽器沒有登入狀態
+  return `${getConfiguredSiteUrl()}/line/bind?t=${encodeURIComponent(token)}&openExternalBrowser=1`;
 }
 
 // ---------- LINE API ----------
@@ -79,28 +79,32 @@ export function text(textValue: string, withMenu = true): LineMessage {
 // ---------- 會員 ----------
 type BoundCustomer = { user_id: string; email: string | null; name: string | null; phone: string | null; line_display_name: string | null };
 
-// 找出綁定這個 LINE 的會員;用 LINE 登入的會員(同一個 Provider)會自動綁定
+// 找出綁定這個 LINE 的會員(只看已綁定的;LINE 登入時會自動綁定)
 export async function findCustomerByLine(lineUserId: string): Promise<BoundCustomer | null> {
   const supabase = createAdminClient();
-  const fields = 'user_id, email, name, phone, line_display_name';
-  const { data } = await supabase.from('customers').select(fields).eq('line_user_id', lineUserId).maybeSingle();
-  if (data?.user_id) return data as BoundCustomer;
-  const { data: lineLogin } = await supabase.from('customers').select(fields).eq('email', getLineSyntheticEmail(lineUserId)).maybeSingle();
-  if (lineLogin?.user_id) {
-    await supabase.from('customers').update({ line_user_id: lineUserId, line_bound_at: new Date().toISOString() }).eq('user_id', lineLogin.user_id);
-    return lineLogin as BoundCustomer;
-  }
-  return null;
+  const { data } = await supabase.from('customers').select('user_id, email, name, phone, line_display_name').eq('line_user_id', lineUserId).maybeSingle();
+  return data?.user_id ? (data as BoundCustomer) : null;
 }
 
-export async function bindLineToUser(userId: string, email: string, lineUserId: string, profile: { displayName?: string; pictureUrl?: string } | null) {
+// transfer:經 LINE 授權驗證過是本人的 LINE 時,可把綁定從本人的其他帳號轉到目前帳號
+export async function bindLineToUser(
+  userId: string,
+  email: string,
+  lineUserId: string,
+  profile: { displayName?: string; pictureUrl?: string } | null,
+  { transfer = false }: { transfer?: boolean } = {},
+) {
   const supabase = createAdminClient();
   // 舊帳號可能還沒有會員資料列,先補建
   const { data: mine } = await supabase.from('customers').select('user_id').eq('user_id', userId).maybeSingle();
   if (!mine) await supabase.from('customers').insert({ user_id: userId, email, name: '', phone: '' });
   const { data: other } = await supabase.from('customers').select('user_id').eq('line_user_id', lineUserId).maybeSingle();
   if (other?.user_id && other.user_id !== userId) {
-    throw new Error('這個 LINE 已綁定其他會員帳號,請先用該帳號解除綁定');
+    if (!transfer) throw new Error('這個 LINE 已綁定其他會員帳號,請先用該帳號解除綁定');
+    await supabase
+      .from('customers')
+      .update({ line_user_id: null, line_display_name: '', line_picture_url: '', line_bound_at: null })
+      .eq('user_id', other.user_id);
   }
   const { error } = await supabase
     .from('customers')

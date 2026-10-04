@@ -78,7 +78,8 @@ export async function GET(request: Request) {
       const current = await getSessionUser();
       if (!current || current.id !== lineState.uid) return withParam(redirectOrigin, next, 'line_error', '登入狀態已變更,請重新操作');
       try {
-        await bindLineToUser(current.id, current.email ?? '', profile.userId, profile);
+        // LINE 授權已證明是本人的 LINE:若綁在本人的其他帳號,轉到目前帳號
+        await bindLineToUser(current.id, current.email ?? '', profile.userId, profile, { transfer: true });
       } catch (e) {
         return withParam(redirectOrigin, next, 'line_error', e instanceof Error ? e.message : 'LINE 綁定失敗');
       }

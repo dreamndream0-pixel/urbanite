@@ -34,10 +34,11 @@ function bindMessages(lineUserId: string, channelSecret: string, intro: string):
       altText: '加入會員 / 綁定帳號',
       template: {
         type: 'buttons',
-        text: `${intro}\n\n加入會員後,就能在這裡查詢訂單、優惠券與購物金。`.slice(0, 160),
+        text: `${intro}\n\n綁定會員後,就能在這裡查詢訂單、優惠券與購物金。
+已用 Google / Email 註冊官網的會員,請按「已有官網帳號?綁定」。`.slice(0, 160),
         actions: [
-          { type: 'uri', label: 'LINE 一鍵加入會員', uri: `${getConfiguredSiteUrl()}/auth/line/start?next=/account` },
-          { type: 'uri', label: '已有會員帳號?綁定', uri: url },
+          { type: 'uri', label: '新會員 LINE 一鍵加入', uri: `${getConfiguredSiteUrl()}/auth/line/start?next=/account` },
+          { type: 'uri', label: '已有官網帳號?綁定', uri: url },
         ],
       },
     },
