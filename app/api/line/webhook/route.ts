@@ -61,8 +61,18 @@ async function handleEvent(event: LineEvent, channelSecret: string, accessToken:
   if (event.type !== 'message' || event.message?.type !== 'text') return;
   const input = (event.message.text ?? '').trim();
 
-  if (/^(綁定|綁定會員|會員綁定|重新綁定)$/.test(input)) {
-    return replyMessage(event.replyToken, bindMessages(lineUserId, channelSecret, '點下方按鈕登入會員,完成 LINE 綁定。'), accessToken);
+  if (/^(綁定|綁定會員|會員綁定|重新綁定|加入會員|註冊)$/.test(input)) {
+    // 已綁定的會員不再給綁定連結
+    const member = await findCustomerByLine(lineUserId);
+    if (member) {
+      const name = member.name || member.line_display_name || '';
+      return replyMessage(
+        event.replyToken,
+        [text(`${name ? `${name},` : ''}你已經是 Urbanite 官網會員囉!LINE 也已完成綁定 🎉\n\n${HELP}`)],
+        accessToken,
+      );
+    }
+    return replyMessage(event.replyToken, bindMessages(lineUserId, channelSecret, '點下方按鈕加入會員或登入,完成 LINE 綁定。'), accessToken);
   }
 
   const wants = (re: RegExp) => re.test(input);
