@@ -58,15 +58,15 @@ function CompleteInner() {
   const failed = hintStatus === 'fail' && !paid;
 
   return (
-    <main className="min-h-screen bg-[#f6f2ec] text-[#1f1b19]">
+    <main className="min-h-screen bg-[var(--c-bg)] text-[var(--c-text)]">
       <ShopHeader leftLabel="← 回商店" />
 
       <div className="mx-auto max-w-lg px-4 py-14 sm:px-6">
-        <div className="rounded-2xl bg-white p-8 text-center shadow-sm">
+        <div className="rounded-2xl bg-[var(--c-surface)] p-8 text-center shadow-sm">
           {loading ? (
             <>
-              <div className="mx-auto mb-4 h-9 w-9 animate-spin rounded-full border-[3px] border-[#e5ded4] border-t-[#c84767]" />
-              <p className="text-[#6b6156]">確認付款結果中…</p>
+              <div className="mx-auto mb-4 h-9 w-9 animate-spin rounded-full border-[3px] border-[var(--c-border)] border-t-[var(--c-sale)]" />
+              <p className="text-[var(--c-text2)]">確認付款結果中…</p>
             </>
           ) : paid ? (
             <>
@@ -74,8 +74,8 @@ function CompleteInner() {
                 <svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M5 13l4 4L19 7" /></svg>
               </div>
               <p className="text-lg font-semibold text-[#1f7a44]">付款成功,訂單成立!</p>
-              {orderNo && <p className="mt-2 text-[#6b6156]">單號:{orderNo}</p>}
-              <p className="mt-1 text-sm text-[#8a7f72]">我們會盡快為你備貨,感謝購買。</p>
+              {orderNo && <p className="mt-2 text-[var(--c-text2)]">單號:{orderNo}</p>}
+              <p className="mt-1 text-sm text-[var(--c-muted)]">我們會盡快為你備貨,感謝購買。</p>
             </>
           ) : failed ? (
             <>
@@ -83,12 +83,12 @@ function CompleteInner() {
                 <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
               </div>
               <p className="text-lg font-semibold text-[#c0392b]">付款未完成</p>
-              {orderNo && <p className="mt-2 text-[#6b6156]">單號:{orderNo}</p>}
-              <p className="mt-1 text-sm text-[#8a7f72]">訂單已保留,你可以重新付款或改用其他方式。</p>
+              {orderNo && <p className="mt-2 text-[var(--c-text2)]">單號:{orderNo}</p>}
+              <p className="mt-1 text-sm text-[var(--c-muted)]">訂單已保留,你可以重新付款或改用其他方式。</p>
               {orderNo && (
                 <a
                   href={`/api/payment/newebpay/checkout?order=${encodeURIComponent(orderNo)}`}
-                  className="mt-5 inline-block rounded-full bg-[#c84767] px-6 py-3 font-semibold text-white"
+                  className="mt-5 inline-block rounded-full bg-[var(--c-sale)] px-6 py-3 font-semibold text-white"
                 >
                   重新付款
                 </a>
@@ -97,8 +97,8 @@ function CompleteInner() {
           ) : (
             <>
               <p className="text-lg font-semibold">訂單已成立</p>
-              {orderNo && <p className="mt-2 text-[#6b6156]">單號:{orderNo}</p>}
-              <p className="mt-1 text-sm text-[#8a7f72]">
+              {orderNo && <p className="mt-2 text-[var(--c-text2)]">單號:{orderNo}</p>}
+              <p className="mt-1 text-sm text-[var(--c-muted)]">
                 {order && !order.paid ? '款項尚未入帳,若已付款請稍候更新。' : '感謝購買。'}
               </p>
             </>
@@ -108,7 +108,7 @@ function CompleteInner() {
 
           <Link
             href={shopHome}
-            className="mt-6 inline-block rounded-full border border-[#1f1b19] px-6 py-3 font-semibold"
+            className="mt-6 inline-block rounded-full border border-[var(--c-text)] px-6 py-3 font-semibold"
           >
             繼續購物
           </Link>
@@ -120,7 +120,7 @@ function CompleteInner() {
 
 export default function CompletePage() {
   return (
-    <Suspense fallback={<main className="min-h-screen bg-[#f6f2ec]" />}>
+    <Suspense fallback={<main className="min-h-screen bg-[var(--c-bg)]" />}>
       <CompleteInner />
     </Suspense>
   );

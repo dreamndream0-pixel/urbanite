@@ -446,7 +446,7 @@ export default function Storefront({ campaign = null, preview = false }: { campa
   }
 
   return (
-    <main className="min-h-screen bg-[#f6f2ec] text-[#1f1b19]">
+    <main className="min-h-screen bg-[var(--c-bg)] text-[var(--c-text)]">
       {preview && (
         <div className="bg-[#221f1d] px-4 py-2 text-center text-xs font-semibold tracking-widest text-white">草稿預覽模式</div>
       )}
@@ -473,17 +473,17 @@ export default function Storefront({ campaign = null, preview = false }: { campa
         {/* 商品格狀排列 */}
         <section className="mt-6">
           <div className="mb-5">
-            <h1 className="text-2xl font-semibold tracking-wide sm:text-3xl">
+            <h1 className="store-title text-2xl font-semibold tracking-wide sm:text-3xl">
               {activeCategory.slug === 'all' ? '全部商品' : activeCategory.name}
             </h1>
           </div>
           {loading ? (
-            <p className="py-20 text-center text-[#8a7f72]">商品載入中…</p>
+            <p className="py-20 text-center text-[var(--c-muted)]">商品載入中…</p>
           ) : visibleProducts.length === 0 ? (
-            <p className="py-20 text-center text-[#8a7f72]">這個分類目前沒有商品。</p>
+            <p className="py-20 text-center text-[var(--c-muted)]">這個分類目前沒有商品。</p>
           ) : (
             <>
-              <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+              <div className="store-grid grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
                 {shown.map((product) => (
                   <ProductCard
                     key={product.id}
@@ -497,7 +497,7 @@ export default function Storefront({ campaign = null, preview = false }: { campa
                 ))}
               </div>
               {hasMore && (
-                <p className="mt-5 text-center text-sm text-[#a99e8f]">下滑載入更多…</p>
+                <p className="mt-5 text-center text-sm text-[var(--c-muted)]">下滑載入更多…</p>
               )}
             </>
           )}
@@ -572,7 +572,7 @@ export default function Storefront({ campaign = null, preview = false }: { campa
 
       {/* 已加入購物車 提示(停約 3 秒後淡出) */}
       <div
-        className={`pointer-events-none fixed right-4 top-20 z-[70] flex items-center gap-2 rounded-full bg-[#1f1b19] px-4 py-2.5 text-sm font-semibold text-white shadow-lg transition-all duration-500 ${
+        className={`pointer-events-none fixed right-4 top-20 z-[70] flex items-center gap-2 rounded-full bg-[var(--c-button)] px-4 py-2.5 text-sm font-semibold text-white shadow-lg transition-all duration-500 ${
           cartToast ? 'translate-y-0 opacity-100' : '-translate-y-2 opacity-0'
         }`}
       >
@@ -581,7 +581,7 @@ export default function Storefront({ campaign = null, preview = false }: { campa
       </div>
       <div
         aria-live="polite"
-        className={`pointer-events-none fixed bottom-8 left-1/2 z-[70] -translate-x-1/2 rounded-full bg-[#1f1b19] px-4 py-2.5 text-sm font-semibold text-white shadow-lg transition-all duration-300 ${
+        className={`pointer-events-none fixed bottom-8 left-1/2 z-[70] -translate-x-1/2 rounded-full bg-[var(--c-button)] px-4 py-2.5 text-sm font-semibold text-white shadow-lg transition-all duration-300 ${
           favoriteNotice ? 'translate-y-0 opacity-100' : 'translate-y-2 opacity-0'
         }`}
       >
@@ -613,31 +613,31 @@ function FavoritesDrawer({
         onClick={onClose}
       />
       <aside
-        className={`fixed bottom-0 right-0 top-[72px] z-50 flex w-full max-w-md flex-col bg-white shadow-2xl transition-transform duration-300 sm:top-[80px] ${
+        className={`fixed bottom-0 right-0 top-[72px] z-50 flex w-full max-w-md flex-col bg-[var(--c-surface)] shadow-2xl transition-transform duration-300 sm:top-[80px] ${
           open ? 'translate-x-0' : 'translate-x-full'
         }`}
       >
-        <div className="flex items-center justify-between border-b border-[#e5ded4] px-5 py-4">
-          <h2 className="flex items-center gap-2 text-xl font-semibold text-[#c84767]">
-            <IconHeart filled /> <span className="text-[#1f1b19]">收藏清單</span>
+        <div className="flex items-center justify-between border-b border-[var(--c-border)] px-5 py-4">
+          <h2 className="flex items-center gap-2 text-xl font-semibold text-[var(--c-sale)]">
+            <IconHeart filled /> <span className="text-[var(--c-text)]">收藏清單</span>
           </h2>
-          <button className="rounded-md p-1 hover:bg-[#efe8dd]" onClick={onClose} aria-label="關閉">
+          <button className="rounded-md p-1 hover:bg-[var(--c-soft)]" onClick={onClose} aria-label="關閉">
             <IconClose />
           </button>
         </div>
 
         <div className="flex-1 space-y-4 overflow-auto p-5">
           {items.length === 0 ? (
-            <p className="rounded-lg bg-[#f6f2ec] p-5 text-[#6b6156]">
+            <p className="rounded-lg bg-[var(--c-bg)] p-5 text-[var(--c-text2)]">
               還沒有收藏商品。點商品右上角的折角即可加入收藏。
             </p>
           ) : (
             items.map((product) => (
-              <div key={product.id} className="flex gap-3 rounded-lg border border-[#e5ded4] p-3">
+              <div key={product.id} className="flex gap-3 rounded-lg border border-[var(--c-border)] p-3">
                 <Link
                   href={`/products/${encodeURIComponent(product.id)}`}
                   onClick={onClose}
-                  className="h-20 w-20 shrink-0 overflow-hidden rounded-md bg-[#e9e1d6]"
+                  className="h-20 w-20 shrink-0 overflow-hidden rounded-md bg-[var(--c-border)]"
                 >
                   {product.image ? (
                     <img src={product.image} alt={product.name} className="h-full w-full object-contain drop-shadow-[0_10px_12px_rgba(31,27,25,0.2)]" />
@@ -651,7 +651,7 @@ function FavoritesDrawer({
                   <Link
                     href={`/products/${encodeURIComponent(product.id)}`}
                     onClick={onClose}
-                    className="text-sm font-semibold leading-5 hover:text-[#c84767]"
+                    className="text-sm font-semibold leading-5 hover:text-[var(--c-sale)]"
                   >
                     {product.name}
                   </Link>
@@ -659,13 +659,13 @@ function FavoritesDrawer({
                   <div className="mt-auto flex items-center gap-3 pt-2">
                     <button
                       onClick={() => onAdd(product)}
-                      className="rounded-full bg-[#1f1b19] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#3a322e]"
+                      className="rounded-full bg-[var(--c-button)] px-3 py-1.5 text-xs font-semibold text-[var(--c-button-text)] hover:bg-[var(--c-button-hover)]"
                     >
                       加入購物車
                     </button>
                     <button
                       onClick={() => onRemove(product.id)}
-                      className="text-xs text-[#8a7f72] hover:text-[#c0392b]"
+                      className="text-xs text-[var(--c-muted)] hover:text-[#c0392b]"
                     >
                       移除
                     </button>
@@ -731,17 +731,17 @@ function Footer({ settings, logoUrl, homeHref }: { settings: SiteSettings | null
   ];
 
   return (
-    <footer className="border-t border-[#e5ded4] bg-[#f8f3ec] text-[#2c2826]">
+    <footer className="border-t border-[var(--c-border)] bg-[var(--c-bg)] text-[var(--c-text)]">
       <div className="mx-auto hidden max-w-[88rem] gap-12 px-8 py-11 lg:grid lg:grid-cols-[1fr_minmax(0,4.5fr)_1.35fr]">
         <section className="text-center lg:text-left">
           <Link href={homeHref} aria-label="回首頁" className="inline-flex">
             {logoUrl ? (
-              <img src={logoUrl} alt={STORE_NAME} className="h-10 w-auto object-contain" />
+              <img src={logoUrl} alt={STORE_NAME} className="site-logo h-10 w-auto object-contain" />
             ) : (
               <span className="inline-block h-10 w-32" aria-hidden />
             )}
           </Link>
-          <p className="mt-5 text-sm leading-7 text-[#5f5852]">
+          <p className="mt-5 text-sm leading-7 text-[var(--c-text2)]">
             簡約、質感、日常。
             <br />
             打造屬於你的穿搭風格。
@@ -766,7 +766,7 @@ function Footer({ settings, logoUrl, homeHref }: { settings: SiteSettings | null
           {!savedSections.length && (
             <section className="min-w-0">
               <h2 className="text-sm font-bold tracking-wide">尋找我們 FOLLOW US</h2>
-              <div className="mt-4 space-y-2 text-sm leading-6 text-[#5f5852]">
+              <div className="mt-4 space-y-2 text-sm leading-6 text-[var(--c-text2)]">
                 {settings?.footer_service_hours && <p>服務時間：{settings.footer_service_hours}</p>}
                 {settings?.footer_email && <p>信箱:{settings.footer_email}</p>}
                 {settings?.footer_company_name && <p>公司名稱：{settings.footer_company_name}</p>}
@@ -778,18 +778,18 @@ function Footer({ settings, logoUrl, homeHref }: { settings: SiteSettings | null
 
         <section className="text-center lg:text-left">
           <h2 className="text-sm font-bold tracking-wide">訂閱最新消息</h2>
-          <p className="mt-4 text-sm leading-7 text-[#5f5852]">
+          <p className="mt-4 text-sm leading-7 text-[var(--c-text2)]">
             訂閱收到新品、優惠與穿搭靈感。
           </p>
           <form className="mt-5 space-y-3">
             <input
               type="email"
               placeholder="輸入你的 Email"
-              className="h-12 w-full border border-[#d8cdc1] bg-white px-4 text-sm outline-none focus:border-[#1f1b19]"
+              className="h-12 w-full border border-[#d8cdc1] bg-[var(--c-surface)] px-4 text-sm outline-none focus:border-[var(--c-text)]"
             />
             <button
               type="button"
-              className="h-12 w-full bg-[#1f1b19] text-sm font-semibold text-white transition hover:bg-[#3a322e]"
+              className="h-12 w-full bg-[var(--c-button)] text-sm font-semibold text-[var(--c-button-text)] transition hover:bg-[var(--c-button-hover)]"
             >
               訂閱
             </button>
@@ -797,7 +797,7 @@ function Footer({ settings, logoUrl, homeHref }: { settings: SiteSettings | null
         </section>
       </div>
       <div className="mx-auto max-w-3xl px-8 py-10 lg:hidden">
-        <div className="divide-y divide-[#e1d8cd] border-y border-[#e1d8cd]">
+        <div className="divide-y divide-[var(--c-border)] border-y border-[var(--c-border)]">
           {mobileSections.map((section, index) => (
             <MobileFooterGroup
               key={`${section.title}-${index}`}
@@ -806,21 +806,21 @@ function Footer({ settings, logoUrl, homeHref }: { settings: SiteSettings | null
             />
           ))}
         </div>
-        <div className="grid grid-cols-4 gap-3 border-b border-[#e1d8cd] py-8 text-center text-xs font-semibold text-[#5f5852]">
+        <div className="grid grid-cols-4 gap-3 border-b border-[var(--c-border)] py-8 text-center text-xs font-semibold text-[var(--c-text2)]">
           <FooterFeature icon="shirt" label="質感選品" />
           <FooterFeature icon="box" label="快速出貨" />
           <FooterFeature icon="truck" label="安心購物" />
           <FooterFeature icon="service" label="貼心客服" />
         </div>
-        <section className="border-b border-[#e1d8cd] py-8 text-center">
+        <section className="border-b border-[var(--c-border)] py-8 text-center">
           <Link href={homeHref} aria-label="回首頁" className="inline-flex justify-center">
             {logoUrl ? (
-              <img src={logoUrl} alt={STORE_NAME} className="h-11 w-auto object-contain" />
+              <img src={logoUrl} alt={STORE_NAME} className="site-logo h-11 w-auto object-contain" />
             ) : (
               <span className="inline-block h-11 w-32" aria-hidden />
             )}
           </Link>
-          <p className="mt-5 text-sm leading-7 text-[#5f5852]">
+          <p className="mt-5 text-sm leading-7 text-[var(--c-text2)]">
             簡約 × 質感 × 日常
             <br />
             打造屬於你的穿搭風格。
@@ -834,12 +834,12 @@ function Footer({ settings, logoUrl, homeHref }: { settings: SiteSettings | null
           </div>
         </section>
       </div>
-      <div className="border-t border-[#e5ded4] px-6 py-5 sm:px-8">
-        <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-4 text-xs text-[#6f675f] sm:flex-row">
+      <div className="border-t border-[var(--c-border)] px-6 py-5 sm:px-8">
+        <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-4 text-xs text-[var(--c-text2)] sm:flex-row">
           <p>Copyright © {copyrightStartYear}-{copyrightEndYear} URBANITE-TW. All rights reserved.</p>
           <div className="flex gap-6">
             {footerPolicyLinks.map((link) => (
-              <a key={link.label} href={link.href} className="hover:text-[#1f1b19]">{link.label}</a>
+              <a key={link.label} href={link.href} className="hover:text-[var(--c-text)]">{link.label}</a>
             ))}
           </div>
         </div>
@@ -919,7 +919,7 @@ function FooterGroup({ title, items }: { title: string; items: FooterLinkItem[] 
   return (
     <section className="min-w-0">
       <h2 className="text-sm font-bold leading-5 tracking-wide">{title}</h2>
-      <nav className="mt-4 space-y-2 text-sm leading-6 text-[#5f5852]">
+      <nav className="mt-4 space-y-2 text-sm leading-6 text-[var(--c-text2)]">
         {items.map((item, index) => <FooterLink key={`${item.subtitle}-${index}`} item={item} sectionTitle={title} />)}
       </nav>
     </section>
@@ -933,7 +933,7 @@ function MobileFooterGroup({ title, items }: { title: string; items: FooterLinkI
         <span>{title}</span>
         <span className="text-xl font-light leading-none transition group-open:rotate-180">⌄</span>
       </summary>
-      <nav className="space-y-3 pb-5 text-sm leading-7 text-[#5f5852]">
+      <nav className="space-y-3 pb-5 text-sm leading-7 text-[var(--c-text2)]">
         {items.map((item, index) => (
           item.url || item.content ? (
             <FooterLink key={`${item.subtitle}-${index}`} item={item} sectionTitle={title} />
@@ -949,7 +949,7 @@ function MobileFooterGroup({ title, items }: { title: string; items: FooterLinkI
 function FooterFeature({ icon, label }: { icon: 'box' | 'shirt' | 'truck' | 'service'; label: string }) {
   return (
     <div className="flex min-w-0 flex-col items-center gap-2">
-      <span className="flex h-10 w-10 items-center justify-center text-[#5f5852]">
+      <span className="flex h-10 w-10 items-center justify-center text-[var(--c-text2)]">
         <FooterFeatureIcon icon={icon} />
       </span>
       <span>{label}</span>
@@ -991,7 +991,7 @@ function FooterFeatureIcon({ icon }: { icon: 'box' | 'shirt' | 'truck' | 'servic
 }
 
 function FooterLink({ item, sectionTitle }: { item: FooterLinkItem; sectionTitle: string }) {
-  return <a href={getFooterLinkHref(item, sectionTitle)} className="block hover:text-[#1f1b19] hover:underline">{item.subtitle}</a>;
+  return <a href={getFooterLinkHref(item, sectionTitle)} className="block hover:text-[var(--c-text)] hover:underline">{item.subtitle}</a>;
 }
 
 function getFooterLinkHref(item: FooterLinkItem, sectionTitle: string) {
@@ -1016,7 +1016,7 @@ function SocialLink({ href, label, image, children }: { href?: string; label: st
       aria-label={label}
       target={href.startsWith('http') ? '_blank' : undefined}
       rel={href.startsWith('http') ? 'noreferrer' : undefined}
-      className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full bg-[#1f1b19] text-xs font-bold text-white transition hover:bg-[#3a322e]"
+      className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full bg-[var(--c-button)] text-xs font-bold text-[var(--c-button-text)] transition hover:bg-[var(--c-button-hover)]"
     >
       {content}
     </a>
@@ -1042,8 +1042,8 @@ function ProductCard({
   const soldOut = isProductSoldOut(product);
 
   return (
-    <div className="product-card group flex flex-col overflow-hidden rounded-lg bg-[#f9f8f6] p-3 shadow-sm hover:shadow-md">
-      <div className="relative aspect-[4/5] overflow-hidden rounded-[6px] bg-white">
+    <div className="product-card group flex flex-col overflow-hidden rounded-lg bg-[var(--c-card)] p-3 shadow-sm hover:shadow-md">
+      <div className="relative aspect-[4/5] overflow-hidden rounded-[6px] bg-[var(--c-surface)]">
         <Link href={productHref} aria-label={`查看 ${product.name}`}>
           {product.image ? (
             <img
@@ -1058,7 +1058,7 @@ function ProductCard({
           )}
         </Link>
         {!soldOut && product.status !== '上架中' && (
-          <span className="absolute left-2 top-2 rounded bg-[#1f1b19] px-2 py-1 text-xs font-medium text-white">
+          <span className="absolute left-2 top-2 rounded bg-[var(--c-button)] px-2 py-1 text-xs font-medium text-[var(--c-button-text)]">
             {product.status}
           </span>
         )}
@@ -1072,15 +1072,15 @@ function ProductCard({
         />
       </div>
       <div className="mt-3 flex flex-1 flex-col px-1">
-        <Link href={productHref} className="hover:text-[#c84767]">
-          <h3 className="line-clamp-1 text-sm font-semibold leading-5">{product.name}</h3>
-          <p className="mt-1 line-clamp-1 text-xs text-[#8a7f72]">{plainText(product.tagline)}</p>
+        <Link href={productHref} className="hover:text-[var(--c-sale)]">
+          <h3 className="store-title line-clamp-1 text-sm font-semibold leading-5">{product.name}</h3>
+          <p className="mt-1 line-clamp-1 text-xs text-[var(--c-muted)]">{plainText(product.tagline)}</p>
         </Link>
         <div className="mt-3 flex items-center justify-between">
           <div className="flex items-baseline gap-2">
             <span className="font-semibold tracking-wide">{formatter.format(product.price)}</span>
             {product.original_price ? (
-              <span className="text-xs text-[#b3a897] line-through">
+              <span className="text-xs text-[var(--c-muted)] line-through">
                 {formatter.format(product.original_price)}
               </span>
             ) : null}
@@ -1093,7 +1093,7 @@ function ProductCard({
             <button
               onClick={onAdd}
               aria-label={`將 ${product.name} 加入購物車`}
-              className="flex h-10 w-10 items-center justify-center rounded-full bg-[#1f1b19] text-white transition hover:bg-[#3a322e]"
+              className="flex h-10 w-10 items-center justify-center rounded-full bg-[var(--c-button)] text-[var(--c-button-text)] transition hover:bg-[var(--c-button-hover)]"
             >
               <IconCart />
             </button>
@@ -1132,13 +1132,13 @@ function SideMenu({
         onClick={onClose}
       />
       <aside
-        className={`fixed inset-y-0 left-0 z-50 flex w-full max-w-xs flex-col bg-[#faf7f2] shadow-2xl transition-transform duration-300 ${
+        className={`fixed inset-y-0 left-0 z-50 flex w-full max-w-xs flex-col bg-[var(--c-header)] shadow-2xl transition-transform duration-300 ${
           open ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
-        <div className="flex items-center justify-between border-b border-[#e5ded4] px-5 py-4">
-          <span className="text-sm font-semibold tracking-[0.2em] text-[#8a7f72]">MENU</span>
-          <button onClick={onClose} aria-label="關閉選單" className="rounded-md p-1 hover:bg-[#efe8dd]">
+        <div className="flex items-center justify-between border-b border-[var(--c-border)] px-5 py-4">
+          <span className="text-sm font-semibold tracking-[0.2em] text-[var(--c-muted)]">MENU</span>
+          <button onClick={onClose} aria-label="關閉選單" className="rounded-md p-1 hover:bg-[var(--c-soft)]">
             <IconClose />
           </button>
         </div>
@@ -1148,15 +1148,15 @@ function SideMenu({
             // 子分類預設收合;目前所在的子分類其上層自動展開
             const isOpen = expanded[c.slug] ?? Boolean(c.children?.some((s) => s.slug === current));
             return (
-              <div key={c.slug} className="border-b border-[#efe8dd]">
+              <div key={c.slug} className="border-b border-[var(--c-soft)]">
                 <div className="flex items-center">
                   <button
                     onClick={() => onSelect(c.slug)}
                     className={`block min-w-0 flex-1 py-4 text-left transition ${
-                      current === c.slug ? 'text-[#1f1b19]' : 'text-[#6b6156] hover:text-[#1f1b19]'
+                      current === c.slug ? 'text-[var(--c-text)]' : 'text-[var(--c-text2)] hover:text-[var(--c-text)]'
                     }`}
                   >
-                    <span className="block text-[11px] tracking-[0.2em] text-[#a99e8f]">{c.en}</span>
+                    <span className="block text-[11px] tracking-[0.2em] text-[var(--c-muted)]">{c.en}</span>
                     <span className="mt-0.5 block text-lg font-medium">{c.name}</span>
                   </button>
                   {hasChildren && (
@@ -1164,7 +1164,7 @@ function SideMenu({
                       onClick={() => toggle(c.slug, isOpen)}
                       aria-label={`${isOpen ? '收合' : '展開'}${c.name}`}
                       aria-expanded={isOpen}
-                      className="-mr-2 flex h-11 w-11 shrink-0 items-center justify-center rounded-md text-[#8a7f72] transition hover:bg-[#efe8dd] hover:text-[#1f1b19]"
+                      className="-mr-2 flex h-11 w-11 shrink-0 items-center justify-center rounded-md text-[var(--c-muted)] transition hover:bg-[var(--c-soft)] hover:text-[var(--c-text)]"
                     >
                       <svg
                         width="18"
@@ -1197,7 +1197,7 @@ function SideMenu({
                             tabIndex={isOpen ? 0 : -1}
                             onClick={() => onSelect(s.slug)}
                             className={`block w-full py-2 text-left text-sm transition ${
-                              current === s.slug ? 'font-semibold text-[#1f1b19]' : 'text-[#8a7f72] hover:text-[#1f1b19]'
+                              current === s.slug ? 'font-semibold text-[var(--c-text)]' : 'text-[var(--c-muted)] hover:text-[var(--c-text)]'
                             }`}
                           >
                             {s.name}
@@ -1252,28 +1252,28 @@ function CartDrawer({
         onClick={onClose}
       />
       <aside
-        className={`fixed bottom-0 right-0 top-[72px] z-50 flex w-full max-w-md flex-col bg-white shadow-2xl transition-transform duration-300 sm:top-[80px] ${
+        className={`fixed bottom-0 right-0 top-[72px] z-50 flex w-full max-w-md flex-col bg-[var(--c-surface)] shadow-2xl transition-transform duration-300 sm:top-[80px] ${
           open ? 'translate-x-0' : 'translate-x-full'
         }`}
       >
-        <div className="flex items-center justify-between border-b border-[#e5ded4] px-5 py-4">
+        <div className="flex items-center justify-between border-b border-[var(--c-border)] px-5 py-4">
           <h2 className="text-xl font-semibold">購物車</h2>
-          <button className="rounded-md p-1 hover:bg-[#efe8dd]" onClick={onClose} aria-label="關閉">
+          <button className="rounded-md p-1 hover:bg-[var(--c-soft)]" onClick={onClose} aria-label="關閉">
             <IconClose />
           </button>
         </div>
 
         <div className="flex-1 space-y-4 overflow-auto p-5">
           {cart.length === 0 ? (
-            <p className="rounded-lg bg-[#f6f2ec] p-5 text-[#6b6156]">購物車目前是空的。</p>
+            <p className="rounded-lg bg-[var(--c-bg)] p-5 text-[var(--c-text2)]">購物車目前是空的。</p>
           ) : (
             cart.map((item) => (
-              <div key={item.id} className="flex gap-3 rounded-lg border border-[#e5ded4] p-4">
+              <div key={item.id} className="flex gap-3 rounded-lg border border-[var(--c-border)] p-4">
                 <Link
                   href={`/products/${encodeURIComponent(item.productId)}`}
                   onClick={onClose}
                   aria-label={`查看 ${item.name}`}
-                  className="aspect-[4/5] w-16 shrink-0 self-start overflow-hidden rounded-md bg-[#f6f2ec]"
+                  className="aspect-[4/5] w-16 shrink-0 self-start overflow-hidden rounded-md bg-[var(--c-bg)]"
                 >
                   {imageOf(item) ? (
                     <img src={imageOf(item)} alt="" className="h-full w-full object-cover" />
@@ -1283,21 +1283,21 @@ function CartDrawer({
                 <div className="flex justify-between gap-3">
                   <div className="min-w-0">
                     <h3 className="font-semibold">{item.name}</h3>
-                    <p className="mt-1 text-sm text-[#8a7f72]">{item.variant}</p>
+                    <p className="mt-1 text-sm text-[var(--c-muted)]">{item.variant}</p>
                   </div>
                   <div className="flex flex-col items-end gap-2">
                     <span className="font-semibold">{formatter.format(item.price * item.quantity)}</span>
                     <button
                       onClick={() => onUpdate(item.id, -item.quantity)}
                       aria-label="移除"
-                      className="text-xs text-[#8a7f72] hover:text-[#c0392b]"
+                      className="text-xs text-[var(--c-muted)] hover:text-[#c0392b]"
                     >
                       移除
                     </button>
                   </div>
                 </div>
                 <div className="mt-4 flex items-center gap-3">
-                  <div className="inline-flex items-center rounded-full border border-[#e5ded4]">
+                  <div className="inline-flex items-center rounded-full border border-[var(--c-border)]">
                     <button className="px-3 py-1" onClick={() => onUpdate(item.id, -1)}>
                       -
                     </button>
@@ -1322,14 +1322,14 @@ function CartDrawer({
           {/* 您可能喜歡 */}
           {recommendations.length > 0 && (
             <div className="pt-2">
-              <h3 className="mb-3 text-sm font-semibold text-[#6b6156]">您可能喜歡…</h3>
+              <h3 className="mb-3 text-sm font-semibold text-[var(--c-text2)]">您可能喜歡…</h3>
               <div className="space-y-3">
                 {recommendations.map((product) => (
                   <div key={product.id} className="flex items-center gap-3">
                     <Link
                       href={`/products/${encodeURIComponent(product.id)}`}
                       onClick={onClose}
-                      className="h-14 w-14 shrink-0 overflow-hidden rounded-md bg-[#e9e1d6]"
+                      className="h-14 w-14 shrink-0 overflow-hidden rounded-md bg-[var(--c-border)]"
                     >
                       {product.image ? (
                         <img src={product.image} alt={product.name} className="h-full w-full object-contain drop-shadow-[0_8px_10px_rgba(31,27,25,0.18)]" />
@@ -1339,17 +1339,17 @@ function CartDrawer({
                       <Link
                         href={`/products/${encodeURIComponent(product.id)}`}
                         onClick={onClose}
-                        className="line-clamp-1 text-sm font-medium hover:text-[#c84767]"
+                        className="line-clamp-1 text-sm font-medium hover:text-[var(--c-sale)]"
                       >
                         {product.name}
                       </Link>
-                      <p className="text-sm font-semibold text-[#c84767]">
+                      <p className="text-sm font-semibold text-[var(--c-sale)]">
                         {formatter.format(product.price)}
                       </p>
                     </div>
                     <button
                       onClick={() => onAdd(product)}
-                      className="shrink-0 rounded-full border border-[#1f1b19] px-3 py-1.5 text-xs font-semibold hover:bg-[#1f1b19] hover:text-white"
+                      className="shrink-0 rounded-full border border-[var(--c-text)] px-3 py-1.5 text-xs font-semibold hover:bg-[var(--c-button)] hover:text-white"
                     >
                       加入
                     </button>
@@ -1360,17 +1360,17 @@ function CartDrawer({
           )}
         </div>
 
-        <div className="border-t border-[#e5ded4] p-5">
+        <div className="border-t border-[var(--c-border)] p-5">
           <div className="space-y-2 text-sm">
             <Row label="小計" value={formatter.format(subtotal)} />
-            <div className="flex justify-between text-[#8a7f72]">
+            <div className="flex justify-between text-[var(--c-muted)]">
               <span>運費</span>
               <span className="text-sm">結帳時依配送方式計算</span>
             </div>
             <Row label="總計" value={formatter.format(subtotal)} strong />
           </div>
           <button
-            className="mt-4 w-full rounded-full bg-[#c84767] px-5 py-3 font-semibold text-white disabled:opacity-50"
+            className="mt-4 w-full rounded-full bg-[var(--c-sale)] px-5 py-3 font-semibold text-white disabled:opacity-50"
             onClick={onCheckout}
             disabled={cart.length === 0}
           >
@@ -1384,7 +1384,7 @@ function CartDrawer({
 
 function Row({ label, value, strong = false }: { label: string; value: string; strong?: boolean }) {
   return (
-    <div className={`flex justify-between ${strong ? 'pt-2 text-lg font-semibold' : 'text-[#6b6156]'}`}>
+    <div className={`flex justify-between ${strong ? 'pt-2 text-lg font-semibold' : 'text-[var(--c-text2)]'}`}>
       <span>{label}</span>
       <span>{value}</span>
     </div>
@@ -1397,7 +1397,7 @@ function HeroCarousel({ banners }: { banners: Banner[] }) {
   if (count === 0) return null;
 
   return (
-    <section aria-label="首頁輪播" className="group relative w-full select-none overflow-hidden bg-[#e9e1d6]">
+    <section aria-label="首頁輪播" className="group relative w-full select-none overflow-hidden bg-[var(--c-border)]">
       <div {...trackProps}>
         {slides.map((banner, i) => {
           // 副本與真實張共用同一個「真實序號」,換回真實張時樣式不會閃動
@@ -1416,7 +1416,7 @@ function HeroCarousel({ banners }: { banners: Banner[] }) {
           return (
             <div
               key={`${banner.id}-${i}`}
-              className="relative aspect-[4/5] w-full shrink-0 bg-[#e9e1d6] sm:aspect-[16/7] lg:aspect-[16/5]"
+              className="relative aspect-[4/5] w-full shrink-0 bg-[var(--c-border)] sm:aspect-[16/7] lg:aspect-[16/5]"
             >
               {banner.link ? (
                 <a href={banner.link} target="_blank" rel="noreferrer" className="block h-full w-full">
@@ -1453,7 +1453,7 @@ function HeroCarousel({ banners }: { banners: Banner[] }) {
                 onClick={() => go(i)}
                 aria-label={`第 ${i + 1} 張`}
                 className={`h-2 rounded-full border border-white/80 transition-all ${
-                  i === realIndex ? 'w-2 bg-white' : 'w-2 bg-transparent hover:bg-white/60'
+                  i === realIndex ? 'w-2 bg-[var(--c-surface)]' : 'w-2 bg-transparent hover:bg-[var(--c-surface)]/60'
                 }`}
               />
             ))}
@@ -1540,17 +1540,17 @@ function QuickAddModal({
       onClick={onClose}
     >
       <div
-        className="max-h-[90vh] w-full max-w-lg overflow-auto rounded-t-2xl bg-white p-5 sm:rounded-2xl sm:p-6"
+        className="max-h-[90vh] w-full max-w-lg overflow-auto rounded-t-2xl bg-[var(--c-surface)] p-5 sm:rounded-2xl sm:p-6"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex justify-end">
-          <button onClick={onClose} aria-label="關閉" className="rounded-md p-1 hover:bg-[#efe8dd]">
+          <button onClick={onClose} aria-label="關閉" className="rounded-md p-1 hover:bg-[var(--c-soft)]">
             <IconClose />
           </button>
         </div>
 
         <div className="flex gap-4">
-          <div className="h-40 w-40 shrink-0 overflow-hidden rounded-lg bg-[#e9e1d6]">
+          <div className="h-40 w-40 shrink-0 overflow-hidden rounded-lg bg-[var(--c-border)]">
             {product.image ? (
               <img ref={imgRef} src={product.image} alt={product.name} className="h-full w-full object-contain drop-shadow-[0_12px_14px_rgba(31,27,25,0.2)]" />
             ) : (
@@ -1560,12 +1560,12 @@ function QuickAddModal({
           <div className="min-w-0 flex-1">
             <h2 className="text-lg font-semibold leading-6">{product.name}</h2>
             {product.tagline && (
-              <p className="mt-1 line-clamp-2 text-sm text-[#8a7f72]">{plainText(product.tagline)}</p>
+              <p className="mt-1 line-clamp-2 text-sm text-[var(--c-muted)]">{plainText(product.tagline)}</p>
             )}
             <div className="mt-3 flex items-baseline gap-2">
-              <span className="text-2xl font-bold text-[#c84767]">{formatter.format(product.price)}</span>
+              <span className="text-2xl font-bold text-[var(--c-sale)]">{formatter.format(product.price)}</span>
               {product.original_price ? (
-                <span className="text-sm text-[#b3a897] line-through">
+                <span className="text-sm text-[var(--c-muted)] line-through">
                   {formatter.format(product.original_price)}
                 </span>
               ) : null}
@@ -1577,7 +1577,7 @@ function QuickAddModal({
           <>
             {specs.map((dim, i) => (
               <section key={dim.name} className="mt-4">
-                <p className="mb-2 text-sm text-[#8a8480]">
+                <p className="mb-2 text-sm text-[var(--c-muted)]">
                   {dim.name}：{specSel[i] || '請選擇'}
                 </p>
                 <div className="flex flex-wrap gap-2">
@@ -1592,10 +1592,10 @@ function QuickAddModal({
                         onClick={() => setSpecSel((prev) => prev.map((v, idx) => (idx === i ? opt : v)))}
                         className={`min-w-14 border px-4 py-2 text-sm font-semibold ${
                           grayed
-                            ? 'cursor-not-allowed border-[#e1d9d3] bg-[#f7f5f2] text-[#3d3935] line-through opacity-30'
+                            ? 'cursor-not-allowed border-[var(--c-border)] bg-[var(--c-bg)] text-[var(--c-text)] line-through opacity-30'
                             : selected
-                              ? 'border-[#c84767] text-[#c84767]'
-                              : 'border-[#e1d9d3] bg-[#f7f5f2] text-[#3d3935]'
+                              ? 'border-[var(--c-sale)] text-[var(--c-sale)]'
+                              : 'border-[var(--c-border)] bg-[var(--c-bg)] text-[var(--c-text)]'
                         }`}
                       >
                         {opt}
@@ -1607,11 +1607,11 @@ function QuickAddModal({
             ))}
             <p className="mt-3 text-sm">
               {!allChosen ? (
-                <span className="text-[#8a8480]">請選擇完整規格</span>
+                <span className="text-[var(--c-muted)]">請選擇完整規格</span>
               ) : soldOut ? (
                 <span className="font-semibold text-[#c0392b]">此規格已售完</span>
               ) : (
-                <span className="text-[#8a8480]">庫存：{inv} 件</span>
+                <span className="text-[var(--c-muted)]">庫存：{inv} 件</span>
               )}
             </p>
           </>
@@ -1619,14 +1619,14 @@ function QuickAddModal({
           <>
             {product.colors.length > 0 && (
               <section className="mt-5">
-                <p className="mb-2 text-sm text-[#8a8480]">顏色：{color}</p>
+                <p className="mb-2 text-sm text-[var(--c-muted)]">顏色：{color}</p>
                 <div className="flex flex-wrap gap-2">
                   {product.colors.map((c) => (
                     <button
                       key={c}
                       onClick={() => setColor(c)}
                       className={`min-w-14 border px-4 py-2 text-sm font-semibold ${
-                        color === c ? 'border-[#c84767] text-[#c84767]' : 'border-[#e1d9d3] bg-[#f7f5f2] text-[#3d3935]'
+                        color === c ? 'border-[var(--c-sale)] text-[var(--c-sale)]' : 'border-[var(--c-border)] bg-[var(--c-bg)] text-[var(--c-text)]'
                       }`}
                     >
                       {c}
@@ -1638,14 +1638,14 @@ function QuickAddModal({
 
             {product.sizes.length > 0 && (
               <section className="mt-4">
-                <p className="mb-2 text-sm text-[#8a8480]">尺寸：{size}</p>
+                <p className="mb-2 text-sm text-[var(--c-muted)]">尺寸：{size}</p>
                 <div className="flex flex-wrap gap-2">
                   {product.sizes.map((s) => (
                     <button
                       key={s}
                       onClick={() => setSize(s)}
                       className={`h-11 min-w-14 border text-sm font-semibold ${
-                        size === s ? 'border-2 border-[#c84767] bg-white text-[#2c2826]' : 'border-[#ece7e2] bg-[#f7f5f2] text-[#3d3935]'
+                        size === s ? 'border-2 border-[var(--c-sale)] bg-[var(--c-surface)] text-[var(--c-text)]' : 'border-[#ece7e2] bg-[var(--c-bg)] text-[var(--c-text)]'
                       }`}
                     >
                       {s}
@@ -1658,12 +1658,12 @@ function QuickAddModal({
         )}
 
         <section className="mt-4">
-          <p className="mb-2 text-sm text-[#8a8480]">數量</p>
-          <div className="grid h-11 w-36 grid-cols-[40px_1fr_40px] border border-[#d8d2cc]">
+          <p className="mb-2 text-sm text-[var(--c-muted)]">數量</p>
+          <div className="grid h-11 w-36 grid-cols-[40px_1fr_40px] border border-[var(--c-border)]">
             <button onClick={() => setQuantity((q) => Math.max(1, q - 1))} className="text-xl font-bold">
               -
             </button>
-            <div className="flex items-center justify-center border-x border-[#d8d2cc]">{quantity}</div>
+            <div className="flex items-center justify-center border-x border-[var(--c-border)]">{quantity}</div>
             <button
               onClick={() => setQuantity((q) => Math.min(q + 1, Math.max(1, maxQty)))}
               disabled={quantity >= maxQty}
@@ -1678,7 +1678,7 @@ function QuickAddModal({
           <button
             onClick={() => { onFly?.(product.image, imgRef.current?.getBoundingClientRect() ?? null); onAdd(variantLabel, quantity, false); }}
             disabled={!allChosen || soldOut}
-            className="rounded-full bg-[#c84767] px-4 py-3 font-semibold text-white disabled:opacity-50"
+            className="rounded-full bg-[var(--c-sale)] px-4 py-3 font-semibold text-white disabled:opacity-50"
           >
             {soldOut ? 'SOLD OUT' : '加入購物車'}
           </button>
@@ -1700,9 +1700,9 @@ function QuickAddModal({
           onClick={() => {
             if (favoritesLoaded && !favoritePending) onFavoriteChange(!favorited);
           }}
-          className="mx-auto mt-4 flex min-h-12 items-center justify-center gap-2 rounded-full px-4 text-sm font-semibold text-[#5d5652] transition hover:bg-[#f6f2ec] disabled:opacity-50"
+          className="mx-auto mt-4 flex min-h-12 items-center justify-center gap-2 rounded-full px-4 text-sm font-semibold text-[#5d5652] transition hover:bg-[var(--c-bg)] disabled:opacity-50"
         >
-          <span className={`inline-flex h-7 w-7 items-center justify-center rounded-tr-lg ${favorited ? 'bg-[#702838] text-white' : 'bg-[#F6F2EB] text-[#242321]'}`}>
+          <span className={`inline-flex h-7 w-7 items-center justify-center rounded-tr-lg ${favorited ? 'bg-[var(--c-brand)] text-white' : 'bg-[#F6F2EB] text-[#242321]'}`}>
             <IconHeart filled={favorited} />
           </span>
           {favorited ? '已收藏' : '加入收藏'}

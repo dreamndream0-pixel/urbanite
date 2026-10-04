@@ -15,7 +15,7 @@ export default function BackButton() {
         }
         router.push('/');
       }}
-      className="text-sm font-semibold text-[#6f675f] hover:text-[#1f1b19]"
+      className="text-sm font-semibold text-[var(--c-text2)] hover:text-[var(--c-text)]"
     >
       ← 回上一頁
     </button>

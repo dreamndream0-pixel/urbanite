@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getAdminUser } from '@/lib/supabase/server';
 import type { SiteSettings } from '@/lib/types';
+import { revalidateTag } from 'next/cache';
+import { resolveSiteTheme } from '@/lib/site-theme';
 
 const DEFAULT_SETTINGS: SiteSettings = {
   id: 1,
@@ -77,11 +79,14 @@ export async function PATCH(request: Request) {
     'return_info',
     'coupon_hero_image',
     'member_stamp_image',
+    'site_theme',
   ] as const;
 
   for (const key of keys) {
     if (key in body) update[key] = body[key];
   }
+  // 網站外觀:只保留合法的顏色與選項
+  if ('site_theme' in body) update.site_theme = resolveSiteTheme(body.site_theme);
 
   const supabase = createAdminClient();
   const { data, error } = await supabase
@@ -91,5 +96,6 @@ export async function PATCH(request: Request) {
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  if ('site_theme' in update) revalidateTag('site-theme', { expire: 0 });
   return NextResponse.json({ ...DEFAULT_SETTINGS, ...data } as SiteSettings);
 }

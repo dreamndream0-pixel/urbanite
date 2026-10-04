@@ -35,9 +35,9 @@ export default async function FooterContentPage({ params }: { params: Promise<{ 
   const copyrightEndYear = Math.max(copyrightStartYear, new Date().getFullYear());
 
   return (
-    <main className="min-h-screen bg-[#f8f3ec] text-[#2c2826]">
+    <main className="min-h-screen bg-[var(--c-bg)] text-[var(--c-text)]">
       <ShopHeader logoUrl={settings?.logo_url ?? ''} leftLabel="← 回首頁" />
-      <section className="relative overflow-hidden border-b border-[#e5ded4]">
+      <section className="relative overflow-hidden border-b border-[var(--c-border)]">
         <div className="relative mx-auto max-w-[92rem] px-6 py-8 sm:px-10 lg:min-h-[720px] lg:px-14 lg:py-12">
         <div className="relative z-10 max-w-3xl pb-10 lg:pb-16">
           <p className="mt-8 text-xs font-bold uppercase tracking-[0.28em] text-[#9a8f84]">
@@ -55,7 +55,7 @@ export default async function FooterContentPage({ params }: { params: Promise<{ 
           {content.url && (
             <a
               href={content.url}
-              className="mt-10 inline-flex bg-[#1f1b19] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#3a322e]"
+              className="mt-10 inline-flex bg-[var(--c-button)] px-6 py-3 text-sm font-semibold text-[var(--c-button-text)] transition hover:bg-[var(--c-button-hover)]"
               target={content.url.startsWith('http') ? '_blank' : undefined}
               rel={content.url.startsWith('http') ? 'noreferrer' : undefined}
             >
@@ -64,7 +64,7 @@ export default async function FooterContentPage({ params }: { params: Promise<{ 
           )}
         </div>
 
-        <div className="relative mt-6 min-h-[260px] overflow-hidden rounded-[24px] bg-[#e9e1d6] lg:absolute lg:bottom-10 lg:right-8 lg:top-10 lg:mt-0 lg:w-[58%] lg:rounded-[34px]">
+        <div className="relative mt-6 min-h-[260px] overflow-hidden rounded-[24px] bg-[var(--c-border)] lg:absolute lg:bottom-10 lg:right-8 lg:top-10 lg:mt-0 lg:w-[58%] lg:rounded-[34px]">
           {banner?.image ? (
             <img
               src={banner.image}
@@ -74,14 +74,14 @@ export default async function FooterContentPage({ params }: { params: Promise<{ 
           ) : (
             <div className="absolute inset-0 bg-[linear-gradient(135deg,#e9e1d6,#f8f3ec_48%,#d8cdc1)]" />
           )}
-          <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-[#f8f3ec]/70 via-[#f8f3ec]/18 to-transparent lg:bg-gradient-to-r lg:from-[#f8f3ec] lg:via-[#f8f3ec]/70 lg:to-[#f8f3ec]/10" />
-          <div className="pointer-events-none absolute inset-y-0 left-0 hidden w-2/5 bg-gradient-to-r from-[#f8f3ec] via-[#f8f3ec]/88 to-transparent lg:block" />
-          <div className="pointer-events-none absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-[#f8f3ec] to-transparent lg:hidden" />
+          <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-[var(--c-bg)]/70 via-[var(--c-bg)]/18 to-transparent lg:bg-gradient-to-r lg:from-[var(--c-bg)] lg:via-[var(--c-bg)]/70 lg:to-[var(--c-bg)]/10" />
+          <div className="pointer-events-none absolute inset-y-0 left-0 hidden w-2/5 bg-gradient-to-r from-[var(--c-bg)] via-[var(--c-bg)]/88 to-transparent lg:block" />
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-[var(--c-bg)] to-transparent lg:hidden" />
         </div>
         </div>
       </section>
 
-      <section className="border-y border-[#e5ded4] bg-[#fbf8f4]">
+      <section className="border-y border-[var(--c-border)] bg-[#fbf8f4]">
         <div className="mx-auto grid max-w-7xl gap-5 px-6 py-8 sm:grid-cols-2 sm:px-8 lg:grid-cols-4">
           <FeatureItem icon="box" title="嚴選商品" text="精選日常穿搭與質感單品，注重品質與細節。" />
           <FeatureItem icon="shirt" title="日常實穿" text="舒適剪裁與實用材質，讓穿搭更有型。" />
@@ -90,11 +90,11 @@ export default async function FooterContentPage({ params }: { params: Promise<{ 
         </div>
       </section>
 
-      <footer className="border-t border-[#e5ded4] px-6 py-6 sm:px-8">
-        <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-4 text-xs text-[#6f675f] sm:flex-row">
-          <Link href="/" className="font-bold tracking-wide text-[#1f1b19]">
+      <footer className="border-t border-[var(--c-border)] px-6 py-6 sm:px-8">
+        <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-4 text-xs text-[var(--c-text2)] sm:flex-row">
+          <Link href="/" className="font-bold tracking-wide text-[var(--c-text)]">
             {settings?.logo_url ? (
-              <img src={settings.logo_url} alt="URBANITE" className="h-8 w-auto object-contain" />
+              <img src={settings.logo_url} alt="URBANITE" className="site-logo h-8 w-auto object-contain" />
             ) : (
               <span className="inline-block h-8 w-28" aria-hidden />
             )}
@@ -109,12 +109,12 @@ export default async function FooterContentPage({ params }: { params: Promise<{ 
 function FeatureItem({ icon, title, text }: { icon: 'box' | 'shirt' | 'truck' | 'service'; title: string; text: string }) {
   return (
     <div className="flex items-start gap-4">
-      <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-[#d8cdc1] bg-white text-[#6f675f]">
+      <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-[#d8cdc1] bg-[var(--c-surface)] text-[var(--c-text2)]">
         <FeatureIcon icon={icon} />
       </span>
       <span>
         <strong className="block text-sm font-bold">{title}</strong>
-        <span className="mt-1 block text-xs leading-5 text-[#6f675f]">{text}</span>
+        <span className="mt-1 block text-xs leading-5 text-[var(--c-text2)]">{text}</span>
       </span>
     </div>
   );

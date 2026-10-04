@@ -69,8 +69,8 @@ export default function LoginClient({
   }
 
   return (
-    <main className="min-h-screen bg-white text-[#242830]">
-      <header className="sticky top-0 z-30 border-b border-[#e6e1d8] bg-white">
+    <main className="min-h-screen bg-[var(--c-surface)] text-[#242830]">
+      <header className="sticky top-0 z-30 border-b border-[#e6e1d8] bg-[var(--c-surface)]">
         <nav className="mx-auto grid max-w-4xl grid-cols-[1fr_auto_1fr] items-center px-5 py-4">
           <div className="flex items-center gap-5">
             <Link href="/" aria-label="回首頁選單" className="text-[#717171]">
@@ -82,7 +82,7 @@ export default function LoginClient({
           </div>
           <Link href="/" aria-label="回首頁" className="justify-self-center px-2 text-center">
             {logoUrl ? (
-              <img src={logoUrl} alt={STORE_NAME} className="mx-auto h-8 w-auto object-contain sm:h-10" />
+              <img src={logoUrl} alt={STORE_NAME} className="site-logo mx-auto h-8 w-auto object-contain sm:h-10" />
             ) : (
               <span className="inline-block h-8 w-28 sm:h-10 sm:w-36" aria-hidden />
             )}
@@ -114,7 +114,7 @@ export default function LoginClient({
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="電郵或手機號碼"
                 autoComplete="email"
-                className="w-full border-0 border-b border-[#dedede] px-0 py-3 text-lg outline-none placeholder:text-[#9a9a9a] focus:border-[#b5a66a]"
+                className="w-full border-0 border-b border-[#dedede] px-0 py-3 text-lg outline-none placeholder:text-[#9a9a9a] focus:border-[var(--c-gold)]"
               />
               <div className="relative">
                 <input
@@ -123,7 +123,7 @@ export default function LoginClient({
                   type={showPassword ? 'text' : 'password'}
                   placeholder="密碼"
                   autoComplete="current-password"
-                  className="w-full border-0 border-b border-[#dedede] px-0 py-3 pr-12 text-lg outline-none placeholder:text-[#9a9a9a] focus:border-[#b5a66a]"
+                  className="w-full border-0 border-b border-[#dedede] px-0 py-3 pr-12 text-lg outline-none placeholder:text-[#9a9a9a] focus:border-[var(--c-gold)]"
                 />
                 <button
                   type="button"
@@ -143,7 +143,7 @@ export default function LoginClient({
             <button
               onClick={signInWithPassword}
               disabled={busy !== null || !email || !password}
-              className="mt-8 w-full rounded bg-[#ada265] px-5 py-4 text-lg font-bold text-white transition hover:bg-[#9a9059] disabled:opacity-50"
+              className="mt-8 w-full rounded bg-[var(--c-gold)] px-5 py-4 text-lg font-bold text-white transition hover:bg-[var(--c-gold)] disabled:opacity-50"
             >
               {busy === 'password' ? '登入中...' : '開始購物吧！'}
             </button>
@@ -186,7 +186,7 @@ export default function LoginClient({
                 <h2 className="text-4xl font-bold tracking-wide">還不是會員？</h2>
                 <Link
                   href={registerHref}
-                  className="shrink-0 rounded-full bg-[#ada265] px-3 py-1.5 text-xs font-bold text-white transition hover:bg-[#9a9059]"
+                  className="shrink-0 rounded-full bg-[var(--c-gold)] px-3 py-1.5 text-xs font-bold text-white transition hover:bg-[var(--c-gold)]"
                 >
                   註冊會員
                 </Link>
@@ -230,7 +230,7 @@ function ProviderButton({
       onClick={onClick}
       disabled={disabled}
       aria-label={busy ? `前往 ${label}` : `使用 ${label} 登入`}
-      className="flex h-14 w-14 items-center justify-center rounded-full bg-white shadow-sm ring-1 ring-[#e8e3dc] transition hover:bg-[#f7f5f2] disabled:opacity-50"
+      className="flex h-14 w-14 items-center justify-center rounded-full bg-[var(--c-surface)] shadow-sm ring-1 ring-[#e8e3dc] transition hover:bg-[var(--c-bg)] disabled:opacity-50"
     >
       {children}
     </button>

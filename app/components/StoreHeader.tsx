@@ -37,14 +37,14 @@ export default function StoreHeader({
   onCart: () => void;
 }) {
   return (
-    <header className="sticky top-0 z-30 bg-[#faf7f2]/95 backdrop-blur">
+    <header className="sticky top-0 z-30 bg-[var(--c-header)]/95 backdrop-blur">
       <nav className="mx-auto grid max-w-6xl grid-cols-[1fr_auto_1fr] items-center px-4 py-4 sm:px-6 sm:py-5">
         {/* 左:漢堡選單 + 搜尋 */}
         <div className="flex items-center gap-1 sm:gap-2">
-          <button onClick={onMenu} aria-label="開啟選單" className="rounded-md p-1 text-[#1f1b19] hover:bg-[#efe8dd]">
+          <button onClick={onMenu} aria-label="開啟選單" className="rounded-md p-1 text-[var(--c-text)] hover:bg-[var(--c-soft)]">
             <IconMenu />
           </button>
-          <button onClick={onSearchToggle} aria-label="搜尋" className="rounded-md p-2 hover:bg-[#efe8dd]">
+          <button onClick={onSearchToggle} aria-label="搜尋" className="rounded-md p-2 hover:bg-[var(--c-soft)]">
             <IconSearch />
           </button>
         </div>
@@ -52,7 +52,7 @@ export default function StoreHeader({
         {/* 中:Logo(載入完成前先留白,避免先閃文字再換成 Logo 圖)*/}
         <Link href={homeHref} className="justify-self-center px-2 text-center">
           {logoUrl ? (
-            <img src={logoUrl} alt={STORE_NAME} className="mx-auto h-8 w-auto object-contain sm:h-10" />
+            <img src={logoUrl} alt={STORE_NAME} className="site-logo mx-auto h-8 w-auto object-contain sm:h-10" />
           ) : (
             <span className="inline-block h-8 w-28 sm:h-10 sm:w-36" aria-hidden />
           )}
@@ -70,7 +70,7 @@ export default function StoreHeader({
 
       {/* 搜尋列 */}
       {searchOpen && (
-        <div className="border-t border-[#e5ded4] bg-[#faf7f2]">
+        <div className="border-t border-[var(--c-border)] bg-[var(--c-header)]">
           <form
             className="mx-auto max-w-7xl px-4 py-3 sm:px-6"
             onSubmit={(e) => {
@@ -84,7 +84,7 @@ export default function StoreHeader({
               value={query}
               onChange={(e) => onQueryChange(e.target.value)}
               placeholder="搜尋商品…"
-              className="w-full rounded-full border border-[#e5ded4] bg-white px-5 py-2.5 text-sm outline-none focus:border-[#c9a] "
+              className="w-full rounded-full border border-[var(--c-border)] bg-[var(--c-surface)] px-5 py-2.5 text-sm outline-none focus:border-[#c9a] "
             />
           </form>
         </div>
@@ -115,19 +115,19 @@ export function HeaderIcons({
       <button
         onClick={onFavorites}
         aria-label="收藏清單"
-        className={`relative rounded-md p-2 hover:bg-[#efe8dd] ${heartOn ? 'text-[#c84767]' : ''}`}
+        className={`relative rounded-md p-2 hover:bg-[var(--c-soft)] ${heartOn ? 'text-[var(--c-sale)]' : ''}`}
       >
         <IconHeart filled={heartOn} />
         {favoriteCount > 0 && (
-          <span className="absolute -right-0.5 -top-0.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-[#c84767] px-1 text-[10px] font-semibold text-white transition-opacity duration-150">
+          <span className="absolute -right-0.5 -top-0.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-[var(--c-sale)] px-1 text-[10px] font-semibold text-white transition-opacity duration-150">
             {favoriteCount}
           </span>
         )}
       </button>
-      <button ref={cartIconRef} onClick={onCart} aria-label="購物車" className="relative rounded-md p-2 hover:bg-[#efe8dd]">
+      <button ref={cartIconRef} onClick={onCart} aria-label="購物車" className="relative rounded-md p-2 hover:bg-[var(--c-soft)]">
         <IconBag />
         {cartCount > 0 && (
-          <span className="absolute -right-0.5 -top-0.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-[#c84767] px-1 text-[10px] font-semibold text-white">
+          <span className="absolute -right-0.5 -top-0.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-[var(--c-sale)] px-1 text-[10px] font-semibold text-white">
             {cartCount}
           </span>
         )}

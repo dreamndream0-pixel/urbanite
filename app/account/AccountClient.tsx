@@ -196,7 +196,7 @@ export default function AccountClient({
   }
 
   return (
-    <main className="min-h-screen bg-[#f6f2ec] text-[#1f1b19]">
+    <main className="min-h-screen bg-[var(--c-bg)] text-[var(--c-text)]">
       <ShopHeader
         logoUrl={logoUrl}
         leftLabel="← 回商店"
@@ -207,7 +207,7 @@ export default function AccountClient({
       />
 
       {/* 分頁列 */}
-      <div className="border-b border-[#e5ded4] bg-[#faf7f2]">
+      <div className="border-b border-[var(--c-border)] bg-[var(--c-header)]">
         <div className="mx-auto max-w-4xl overflow-x-auto overflow-y-hidden px-4 pt-2 sm:px-6 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           <div className="flex min-w-max items-end gap-2">
           {TABS.map((t) => (
@@ -216,8 +216,8 @@ export default function AccountClient({
               onClick={() => changeTab(t.key)}
               className={`relative -mb-px shrink-0 whitespace-nowrap border-b-2 px-5 py-3 text-center text-sm font-semibold transition-all duration-200 ${
                 tab === t.key
-                  ? 'rounded-t-2xl border-b-[#8f1f31] bg-white text-[#1f1b19] shadow-[0_-6px_18px_rgba(64,52,43,0.08)]'
-                  : 'border-b-transparent text-[#8a7f72] hover:-translate-y-0.5 hover:bg-white/55 hover:text-[#1f1b19]'
+                  ? 'rounded-t-2xl border-b-[var(--c-brand)] bg-[var(--c-surface)] text-[var(--c-text)] shadow-[0_-6px_18px_rgba(64,52,43,0.08)]'
+                  : 'border-b-transparent text-[var(--c-muted)] hover:-translate-y-0.5 hover:bg-[var(--c-surface)]/55 hover:text-[var(--c-text)]'
               }`}
             >
               {t.label}
@@ -288,7 +288,7 @@ export default function AccountClient({
 
       {toast && (
         <div className="fixed inset-x-0 bottom-6 z-[60] flex justify-center px-4">
-          <div className="rounded-full bg-[#1f1b19] px-5 py-3 text-sm font-semibold text-white shadow-lg">{toast}</div>
+          <div className="rounded-full bg-[var(--c-button)] px-5 py-3 text-sm font-semibold text-[var(--c-button-text)] shadow-lg">{toast}</div>
         </div>
       )}
     </main>
@@ -451,8 +451,8 @@ function ProfileTab({
     }
   }
 
-  const field = 'h-10 w-full min-w-0 rounded-lg border border-[#e5ded4] bg-white px-3 text-sm text-[#2c2826] outline-none transition focus:border-[#8f1f31] sm:h-11';
-  const labelText = 'mb-1.5 block text-xs font-medium text-[#6f665d]';
+  const field = 'h-10 w-full min-w-0 rounded-lg border border-[var(--c-border)] bg-[var(--c-surface)] px-3 text-sm text-[var(--c-text)] outline-none transition focus:border-[var(--c-brand)] sm:h-11';
+  const labelText = 'mb-1.5 block text-xs font-medium text-[var(--c-text2)]';
 
   const homeRecipients = recipients.map((r, i) => ({ r, i })).filter(({ r }) => r.type !== 'store');
   const storeRecipients = recipients.map((r, i) => ({ r, i })).filter(({ r }) => r.type === 'store');
@@ -488,7 +488,7 @@ function ProfileTab({
                     value={r.district}
                     onChange={(e) => updateRecipient(i, { district: e.target.value })}
                     disabled={!r.city}
-                    className={field + ' disabled:bg-[#f6f2ec]'}
+                    className={field + ' disabled:bg-[var(--c-bg)]'}
                   >
                     <option value="">{r.city ? '請選擇行政區' : '請先選縣市'}</option>
                     {(TW_REGIONS[r.city] ?? []).map((d) => (
@@ -500,14 +500,14 @@ function ProfileTab({
             ) : null}
           </div>
           {r.type === 'store' ? (
-            <div className="mt-3 rounded-lg bg-[#faf7f2] px-3 py-2 text-sm text-[#6b6156]">
+            <div className="mt-3 rounded-lg bg-[var(--c-header)] px-3 py-2 text-sm text-[var(--c-text2)]">
               常用取貨門市：{r.store_name || '(未設)'}{r.store_id ? `（${r.store_id}）` : ''}
               {r.store_address ? <span className="block text-xs">{r.store_address}</span> : null}
               <div className="mt-2 flex gap-2">
-                <button type="button" onClick={() => reselectStore(i, '2')} className="rounded-full border border-[#b79ba0] px-3 py-1 text-xs font-semibold text-[#8f1f31]">
+                <button type="button" onClick={() => reselectStore(i, '2')} className="rounded-full border border-[#b79ba0] px-3 py-1 text-xs font-semibold text-[var(--c-brand)]">
                   改選全家門市
                 </button>
-                <button type="button" onClick={() => reselectStore(i, '1')} className="rounded-full border border-[#b79ba0] px-3 py-1 text-xs font-semibold text-[#8f1f31]">
+                <button type="button" onClick={() => reselectStore(i, '1')} className="rounded-full border border-[#b79ba0] px-3 py-1 text-xs font-semibold text-[var(--c-brand)]">
                   改選7-11門市
                 </button>
               </div>
@@ -519,7 +519,7 @@ function ProfileTab({
             </label>
           )}
           <div className="mt-4 flex items-center gap-4">
-            <button type="button" onClick={() => setExpandedRecipient(null)} className="rounded-full bg-[#8f1f31] px-5 py-1.5 text-sm font-semibold text-white">
+            <button type="button" onClick={() => setExpandedRecipient(null)} className="rounded-full bg-[var(--c-brand)] px-5 py-1.5 text-sm font-semibold text-white">
               完成
             </button>
             <button type="button" onClick={() => removeRecipient(i)} className="text-sm font-semibold text-[#c0392b]">
@@ -530,15 +530,15 @@ function ProfileTab({
       ) : (
         <div className="flex items-start justify-between gap-3">
           <div className="flex min-w-0 flex-1 items-center gap-3">
-            <div className="font-serif-tc flex h-12 w-12 shrink-0 items-center justify-center border-r border-[#dccaca] pr-3 text-[#8f1f31]">
+            <div className="font-serif-tc flex h-12 w-12 shrink-0 items-center justify-center border-r border-[#dccaca] pr-3 text-[var(--c-brand)]">
               <span className="text-xs font-semibold tracking-[0.16em]">{r.type === 'store' ? '超取' : '宅配'}</span>
             </div>
             <div className="min-w-0">
             <p className="font-semibold">
               {r.name || '(未填姓名)'}
-              {r.phone ? <span className="ml-2 text-sm font-normal text-[#6f665d]">{r.phone.replace(/^(\d{4})\d+(\d{3})$/, '$1•••$2')}</span> : null}
+              {r.phone ? <span className="ml-2 text-sm font-normal text-[var(--c-text2)]">{r.phone.replace(/^(\d{4})\d+(\d{3})$/, '$1•••$2')}</span> : null}
             </p>
-            <p className="mt-1 truncate text-sm text-[#6f665d]">
+            <p className="mt-1 truncate text-sm text-[var(--c-text2)]">
               {r.type === 'store'
                 ? `超商取貨 · ${r.store_name || r.store_id || '(未設門市)'}`
                 : [r.city, r.district, r.address].filter(Boolean).join(' ') || '(未填地址)'}
@@ -546,10 +546,10 @@ function ProfileTab({
             </div>
           </div>
           <div className="flex shrink-0 gap-2">
-            <button type="button" onClick={() => setExpandedRecipient(i)} aria-label="編輯收件人" className="rounded-full p-2 text-[#6f665d] hover:bg-white/60">
+            <button type="button" onClick={() => setExpandedRecipient(i)} aria-label="編輯收件人" className="rounded-full p-2 text-[var(--c-text2)] hover:bg-[var(--c-surface)]/60">
               <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4 11.5-11.5z" /></svg>
             </button>
-            <button type="button" onClick={() => removeRecipient(i)} aria-label="刪除收件人" className="rounded-full p-2 text-[#6f665d] hover:bg-white/60">
+            <button type="button" onClick={() => removeRecipient(i)} aria-label="刪除收件人" className="rounded-full p-2 text-[var(--c-text2)] hover:bg-[var(--c-surface)]/60">
               <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.7" /><circle cx="12" cy="12" r="1.7" /><circle cx="19" cy="12" r="1.7" /></svg>
             </button>
           </div>
@@ -576,20 +576,20 @@ function ProfileTab({
             }}
           />
         )}
-        <p className="text-[10px] font-semibold tracking-[0.34em] text-[#8f1f31]/70">MEMBER SPACE</p>
-        <h1 className="font-serif-tc mt-3 text-[58px] font-semibold leading-[0.92] tracking-normal text-[#1f1b19] sm:text-[76px]">
+        <p className="text-[10px] font-semibold tracking-[0.34em] text-[var(--c-brand)]/70">MEMBER SPACE</p>
+        <h1 className="font-serif-tc mt-3 text-[58px] font-semibold leading-[0.92] tracking-normal text-[var(--c-text)] sm:text-[76px]">
           Hello,<br />{shortName}。
         </h1>
-        <p className="mt-4 text-base font-semibold tracking-[0.08em] text-[#6f665d]">你的風格，從這裡開始。</p>
+        <p className="mt-4 text-base font-semibold tracking-[0.08em] text-[var(--c-text2)]">你的風格，從這裡開始。</p>
       </section>
 
-      <section className="relative border-l border-[#ded5c8] pl-5 sm:pl-7">
+      <section className="relative border-l border-[var(--c-border)] pl-5 sm:pl-7">
         <div className="mb-4 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <span className="font-serif-tc text-sm font-bold text-[#8f1f31]">01</span>
+            <span className="font-serif-tc text-sm font-bold text-[var(--c-brand)]">01</span>
             <h2 className="font-serif-tc text-2xl font-bold tracking-[0.08em]">關於你</h2>
           </div>
-          <span className="hidden text-[10px] font-semibold tracking-[0.34em] text-[#6f665d] sm:inline">PROFILE</span>
+          <span className="hidden text-[10px] font-semibold tracking-[0.34em] text-[var(--c-text2)] sm:inline">PROFILE</span>
         </div>
         <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-3 sm:gap-4">
           <label className="block min-w-0">
@@ -619,26 +619,26 @@ function ProfileTab({
           </label>
           <label className="col-span-2 block min-w-0">
             <span className={labelText}>Email</span>
-            <input value={email} disabled className={field + ' bg-[#f0ece6] text-[#8a7f72]'} />
+            <input value={email} disabled className={field + ' bg-[#f0ece6] text-[var(--c-muted)]'} />
           </label>
         </div>
-        <p className="mt-3 text-xs text-[#8a7f72]">{provider} 帳號登入</p>
+        <p className="mt-3 text-xs text-[var(--c-muted)]">{provider} 帳號登入</p>
       </section>
 
-      <section className="relative border-l border-[#ded5c8] pl-5 sm:pl-7">
+      <section className="relative border-l border-[var(--c-border)] pl-5 sm:pl-7">
         <div className="mb-4 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <span className="font-serif-tc text-sm font-bold text-[#8f1f31]">02</span>
+            <span className="font-serif-tc text-sm font-bold text-[var(--c-brand)]">02</span>
             <h2 className="font-serif-tc text-2xl font-bold tracking-[0.08em]">收件日常</h2>
           </div>
-          <span className="hidden text-[10px] font-semibold tracking-[0.34em] text-[#6f665d] sm:inline">ADDRESS BOOK</span>
+          <span className="hidden text-[10px] font-semibold tracking-[0.34em] text-[var(--c-text2)] sm:inline">ADDRESS BOOK</span>
         </div>
         <div className="mb-4 flex items-center gap-2">
           <button
             type="button"
             onClick={() => setRecipientView('home')}
             className={`flex h-9 flex-1 items-center justify-center whitespace-nowrap rounded-full px-3 text-sm font-semibold transition ${
-              recipientView === 'home' ? 'bg-[#8f1f31] text-white shadow-sm' : 'bg-white text-[#6f665d]'
+              recipientView === 'home' ? 'bg-[var(--c-brand)] text-white shadow-sm' : 'bg-[var(--c-surface)] text-[var(--c-text2)]'
             }`}
           >
             宅配到府
@@ -647,21 +647,21 @@ function ProfileTab({
             type="button"
             onClick={() => setRecipientView('store')}
             className={`flex h-9 flex-1 items-center justify-center whitespace-nowrap rounded-full px-3 text-sm font-semibold transition ${
-              recipientView === 'store' ? 'bg-[#8f1f31] text-white shadow-sm' : 'bg-white text-[#6f665d]'
+              recipientView === 'store' ? 'bg-[var(--c-brand)] text-white shadow-sm' : 'bg-[var(--c-surface)] text-[var(--c-text2)]'
             }`}
           >
             超商取貨
           </button>
           {recipientView === 'home' ? (
-            <button type="button" onClick={addRecipient} className="inline-flex h-9 shrink-0 items-center gap-1 rounded-full border border-[#b79ba0] px-4 text-sm font-semibold text-[#8f1f31]">
+            <button type="button" onClick={addRecipient} className="inline-flex h-9 shrink-0 items-center gap-1 rounded-full border border-[#b79ba0] px-4 text-sm font-semibold text-[var(--c-brand)]">
               <span className="text-lg leading-none">+</span>新增
             </button>
           ) : (
             <>
-              <button type="button" onClick={() => addStoreRecipient('2')} className="inline-flex h-9 shrink-0 items-center gap-1 rounded-full border border-[#b79ba0] px-3 text-sm font-semibold text-[#8f1f31]">
+              <button type="button" onClick={() => addStoreRecipient('2')} className="inline-flex h-9 shrink-0 items-center gap-1 rounded-full border border-[#b79ba0] px-3 text-sm font-semibold text-[var(--c-brand)]">
                 <span className="text-lg leading-none">+</span>全家
               </button>
-              <button type="button" onClick={() => addStoreRecipient('1')} className="inline-flex h-9 shrink-0 items-center gap-1 rounded-full border border-[#b79ba0] px-3 text-sm font-semibold text-[#8f1f31]">
+              <button type="button" onClick={() => addStoreRecipient('1')} className="inline-flex h-9 shrink-0 items-center gap-1 rounded-full border border-[#b79ba0] px-3 text-sm font-semibold text-[var(--c-brand)]">
                 <span className="text-lg leading-none">+</span>7-11
               </button>
             </>
@@ -669,7 +669,7 @@ function ProfileTab({
         </div>
         <div className="space-y-3">
           {shownRecipients.length === 0 ? (
-            <p className="rounded-lg bg-white p-4 text-sm text-[#a99e8f]">
+            <p className="rounded-lg bg-[var(--c-surface)] p-4 text-sm text-[var(--c-muted)]">
               {recipientView === 'home' ? '尚未設定宅配地址。' : '點選上方「全家」或「7-11」新增常用取貨門市。'}
             </p>
           ) : (
@@ -681,21 +681,21 @@ function ProfileTab({
       <section className="relative -mx-4 bg-[#f4e4e4] px-6 py-3 sm:-mx-6 sm:px-10 sm:py-4">
         <div className="mb-3 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <span className="font-serif-tc text-sm font-bold text-[#8f1f31]">03</span>
+            <span className="font-serif-tc text-sm font-bold text-[var(--c-brand)]">03</span>
             <h2 className="font-serif-tc text-2xl font-bold tracking-[0.08em]">你的偏好</h2>
           </div>
-          <span className="hidden text-[10px] font-semibold tracking-[0.34em] text-[#6f665d] sm:inline">PREFERENCES</span>
+          <span className="hidden text-[10px] font-semibold tracking-[0.34em] text-[var(--c-text2)] sm:inline">PREFERENCES</span>
         </div>
         <div className="space-y-2.5">
           <div>
-            <p className="mb-1.5 text-sm font-semibold text-[#6f665d]">訊息訂閱</p>
+            <p className="mb-1.5 text-sm font-semibold text-[var(--c-text2)]">訊息訂閱</p>
             <div className="space-y-1.5">
               <ToggleRow label="訂閱 Email 電子報" icon="mail" checked={marketing.email} onChange={(v) => setMarketing((m) => ({ ...m, email: v }))} />
               <ToggleRow label="接收簡訊優惠通知" icon="chat" checked={marketing.sms} onChange={(v) => setMarketing((m) => ({ ...m, sms: v }))} />
             </div>
           </div>
           <div className="border-t border-[#decaca] pt-2.5">
-            <p className="mb-1.5 text-sm font-semibold text-[#6f665d]">隱私設定</p>
+            <p className="mb-1.5 text-sm font-semibold text-[var(--c-text2)]">隱私設定</p>
             <div className="space-y-1.5">
               <ToggleRow label="允許依購物紀錄提供個人化推薦" desc="依購物紀錄推薦適合你的單品" icon="star" checked={privacy.personalization} onChange={(v) => setPrivacy((p) => ({ ...p, personalization: v }))} />
               <ToggleRow label="公開我的追蹤清單活動" icon="eye" checked={privacy.show_activity} onChange={(v) => setPrivacy((p) => ({ ...p, show_activity: v }))} />
@@ -712,14 +712,14 @@ function ProfileTab({
         </div>
       )}
       <div className="fixed inset-x-0 bottom-0 z-40 border-t border-[#eadfd4] bg-[#fbf8f3]/95 px-4 pb-[calc(env(safe-area-inset-bottom)+10px)] pt-3 shadow-[0_-10px_24px_rgba(64,52,43,0.08)] backdrop-blur">
-        <button onClick={save} disabled={saving} className="mx-auto flex h-12 w-full max-w-4xl items-center justify-center gap-3 rounded-lg bg-[#8f1f31] px-6 text-sm font-semibold tracking-[0.18em] text-white shadow-[0_10px_24px_rgba(143,31,49,0.22)] disabled:opacity-40">
+        <button onClick={save} disabled={saving} className="mx-auto flex h-12 w-full max-w-4xl items-center justify-center gap-3 rounded-lg bg-[var(--c-brand)] px-6 text-sm font-semibold tracking-[0.18em] text-white shadow-[0_10px_24px_rgba(143,31,49,0.22)] disabled:opacity-40">
           {saving ? '儲存中…' : '儲存變更'}
           <span aria-hidden>→</span>
         </button>
         <div className="mx-auto mt-2 flex max-w-4xl items-center gap-4 text-center text-[#b3a48d]">
-          <span className="h-px flex-1 bg-[#ded5c8]" />
+          <span className="h-px flex-1 bg-[var(--c-border)]" />
           <span className="text-[11px] font-semibold tracking-[0.18em]">讓每一次造訪，都更貼近你。</span>
-          <span className="h-px flex-1 bg-[#ded5c8]" />
+          <span className="h-px flex-1 bg-[var(--c-border)]" />
         </div>
       </div>
     </div>
@@ -729,20 +729,20 @@ function ProfileTab({
 function ToggleRow({ label, desc, icon, checked, onChange }: { label: string; desc?: string; icon?: 'mail' | 'chat' | 'star' | 'eye'; checked: boolean; onChange: (v: boolean) => void }) {
   return (
     <label className="flex min-h-7 items-center justify-between gap-2">
-      <span className="flex min-w-0 items-start gap-2 text-[13px] text-[#3d3935]">
+      <span className="flex min-w-0 items-start gap-2 text-[13px] text-[var(--c-text)]">
         <PreferenceIcon type={icon} />
         <span className="min-w-0">
           <span className="block whitespace-nowrap font-medium">{label}</span>
-          {desc ? <span className="mt-0.5 block text-[11px] leading-tight text-[#8a7f72]">{desc}</span> : null}
+          {desc ? <span className="mt-0.5 block text-[11px] leading-tight text-[var(--c-muted)]">{desc}</span> : null}
         </span>
       </span>
       <button
         type="button"
         onClick={() => onChange(!checked)}
         aria-pressed={checked}
-        className={'relative h-6 w-10 shrink-0 rounded-full transition ' + (checked ? 'bg-[#8f1f31]' : 'bg-[#cfc2b8]')}
+        className={'relative h-6 w-10 shrink-0 rounded-full transition ' + (checked ? 'bg-[var(--c-brand)]' : 'bg-[#cfc2b8]')}
       >
-        <span className={'absolute top-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition ' + (checked ? 'left-[18px]' : 'left-0.5')} />
+        <span className={'absolute top-0.5 h-5 w-5 rounded-full bg-[var(--c-surface)] shadow-sm transition ' + (checked ? 'left-[18px]' : 'left-0.5')} />
       </button>
     </label>
   );
@@ -820,17 +820,17 @@ function CouponsTab({ coupons, heroImage = '' }: { coupons: Discount[]; heroImag
           )}
         </div>
         <div className="relative px-5 pb-5 pt-9 sm:px-8 sm:pb-7 sm:pt-11">
-          <h2 className="font-serif-tc text-[34px] font-semibold leading-none tracking-[0.22em] text-[#2c2826] sm:text-[40px]">我的優惠</h2>
+          <h2 className="font-serif-tc text-[34px] font-semibold leading-none tracking-[0.22em] text-[var(--c-text)] sm:text-[40px]">我的優惠</h2>
           <p className="mt-3 text-[11px] tracking-[0.4em] text-[#a2957f] sm:text-xs">MY COUPONS</p>
-          <p className="mt-3.5 text-sm text-[#6b6156] sm:text-base">收藏喜歡的優惠，享受更好的購物體驗。</p>
+          <p className="mt-3.5 text-sm text-[var(--c-text2)] sm:text-base">收藏喜歡的優惠，享受更好的購物體驗。</p>
 
-          <div className="mt-7 flex items-center gap-4 rounded-[22px] bg-white/55 p-4 shadow-[0_8px_24px_rgba(64,52,43,0.06)] backdrop-blur-[2px] sm:p-5">
-            <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-white/60 text-[#6b6156]">
+          <div className="mt-7 flex items-center gap-4 rounded-[22px] bg-[var(--c-surface)]/55 p-4 shadow-[0_8px_24px_rgba(64,52,43,0.06)] backdrop-blur-[2px] sm:p-5">
+            <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-[var(--c-surface)]/60 text-[var(--c-text2)]">
               <svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M20 12v9H4v-9M2 7h20v5H2zM12 22V7M12 7S9 3 6.5 4.5 8 9 12 7zM12 7s3-4 5.5-2.5S16 9 12 7z" /></svg>
             </span>
             <div className="min-w-0">
               <p className="text-base font-medium text-[#5f564b]">購物金</p>
-              <p className="flex items-center gap-2 text-[34px] font-bold leading-tight text-[#2c2826]">
+              <p className="flex items-center gap-2 text-[34px] font-bold leading-tight text-[var(--c-text)]">
                 {formatter.format(0)}
                 <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#a2957f" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6" /></svg>
               </p>
@@ -846,15 +846,15 @@ function CouponsTab({ coupons, heroImage = '' }: { coupons: Discount[]; heroImag
           <h3 className="font-serif-tc text-[24px] font-bold tracking-[0.06em] sm:text-[26px]">我的優惠券</h3>
           <div className="flex rounded-full bg-[#eae1d4] p-1 text-xs font-medium sm:text-sm">
             {([['available', `可使用 (${availableCount})`], ['used', '已使用'], ['expired', '已過期']] as const).map(([key, label]) => (
-              <button key={key} type="button" onClick={() => setCouponTab(key)} className={`rounded-full px-4 py-1.5 transition sm:px-5 ${couponTab === key ? 'bg-[#2b2723] font-semibold text-white' : 'text-[#8a7f72]'}`}>{label}</button>
+              <button key={key} type="button" onClick={() => setCouponTab(key)} className={`rounded-full px-4 py-1.5 transition sm:px-5 ${couponTab === key ? 'bg-[#2b2723] font-semibold text-white' : 'text-[var(--c-muted)]'}`}>{label}</button>
             ))}
           </div>
         </div>
         {!ready && <p className="mt-3 rounded-lg bg-[#fff8e8] px-4 py-3 text-sm text-[#8a6d2f]">會員領券資料表尚未建立，目前先顯示可輸入的優惠碼。</p>}
         {loading ? (
-          <p className="mt-5 rounded-xl bg-white p-5 text-sm text-[#6b6156]">載入優惠券中…</p>
+          <p className="mt-5 rounded-xl bg-[var(--c-surface)] p-5 text-sm text-[var(--c-text2)]">載入優惠券中…</p>
         ) : ownedShown.length === 0 ? (
-          <p className="mt-5 rounded-xl bg-white p-5 text-sm text-[#6b6156]">目前沒有{couponTab === 'available' ? '可用' : couponTab === 'used' ? '已使用' : '已過期'}的優惠券。</p>
+          <p className="mt-5 rounded-xl bg-[var(--c-surface)] p-5 text-sm text-[var(--c-text2)]">目前沒有{couponTab === 'available' ? '可用' : couponTab === 'used' ? '已使用' : '已過期'}的優惠券。</p>
         ) : (
           <div className="mt-5 space-y-3">
             {ownedShown.map((item) => {
@@ -869,7 +869,7 @@ function CouponsTab({ coupons, heroImage = '' }: { coupons: Discount[]; heroImag
                   tags={[couponScope(c), c.end_at ? `到 ${new Date(c.end_at).toLocaleDateString('zh-TW')}` : '無期限']}
                   dim={item.status !== 'available'}
                   action={
-                    <span className={`inline-flex max-w-full items-center justify-center whitespace-nowrap rounded-full px-2.5 py-1.5 text-center text-xs font-semibold leading-none sm:px-4 sm:py-2 sm:text-sm ${item.status === 'available' ? 'bg-[#2b2723] text-white' : 'bg-[#f0e9dd] text-[#8a7f72]'}`}>
+                    <span className={`inline-flex max-w-full items-center justify-center whitespace-nowrap rounded-full px-2.5 py-1.5 text-center text-xs font-semibold leading-none sm:px-4 sm:py-2 sm:text-sm ${item.status === 'available' ? 'bg-[#2b2723] text-white' : 'bg-[#f0e9dd] text-[var(--c-muted)]'}`}>
                       {item.status === 'used' ? '已使用' : item.status === 'revoked' ? '已撤回' : item.status === 'expired' ? '已過期' : '結帳可用'}
                     </span>
                   }
@@ -880,16 +880,16 @@ function CouponsTab({ coupons, heroImage = '' }: { coupons: Discount[]; heroImag
         )}
       </section>
 
-      <div className="h-px bg-[#ded5c8]" />
+      <div className="h-px bg-[var(--c-border)]" />
 
       {/* 可領取優惠券 */}
       <section>
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h3 className="font-serif-tc text-[24px] font-bold tracking-[0.06em] sm:text-[26px]">可領取優惠券</h3>
-          <p className="text-xs text-[#a99e8f] sm:text-sm">不定期推出優惠活動，記得常回來看看！</p>
+          <p className="text-xs text-[var(--c-muted)] sm:text-sm">不定期推出優惠活動，記得常回來看看！</p>
         </div>
         {claimable.length === 0 ? (
-          <p className="mt-5 rounded-xl bg-white p-5 text-sm text-[#6b6156]">目前沒有可領取的優惠券。</p>
+          <p className="mt-5 rounded-xl bg-[var(--c-surface)] p-5 text-sm text-[var(--c-text2)]">目前沒有可領取的優惠券。</p>
         ) : (
           <div className="mt-5 space-y-3">
             {claimable.map((c) => (
@@ -923,7 +923,7 @@ function CouponsTab({ coupons, heroImage = '' }: { coupons: Discount[]; heroImag
         <p className="font-serif-tc shrink-0 text-[11px] leading-[1.8] tracking-[0.18em] sm:text-xs">
           &quot;A BETTER OUTFIT<br />A BRIGHTER YOU.&quot;
         </p>
-        <span className="h-px flex-1 bg-[#ded5c8]" />
+        <span className="h-px flex-1 bg-[var(--c-border)]" />
         <p className="font-serif-tc shrink-0 text-[11px] tracking-[0.34em] sm:text-xs">URBANITE</p>
       </div>
     </div>
@@ -945,18 +945,18 @@ function CouponTicket({ code, image, desc, tags, action, dim = false, showScript
     <div className={`coupon-ticket-shell relative flex items-stretch drop-shadow-[0_8px_18px_rgba(64,52,43,0.08)] ${dim ? 'opacity-65' : ''}`}>
       {/* 照片票根 */}
       <div
-        className="relative w-[26%] min-w-[104px] shrink-0 self-stretch bg-[#e5ded4] bg-cover bg-center"
+        className="relative w-[26%] min-w-[104px] shrink-0 self-stretch bg-[var(--c-border)] bg-cover bg-center"
         style={couponImageStyle(image, code)}
       >
         <div className="absolute inset-0 bg-black/[0.03]" />
       </div>
       <div className="relative flex min-w-0 flex-1 items-stretch rounded-r-2xl border border-l-0 border-[#eadfd4] bg-[#fffaf5] sm:min-h-[132px]">
         <div className="flex min-w-0 flex-1 flex-col justify-center px-3 py-4 sm:px-6">
-          <p className="font-serif-tc text-[19px] font-bold tracking-[0.08em] text-[#2c2826] sm:text-[23px]">{code}</p>
-          <p className="mt-1 text-[13px] font-medium text-[#6b6156] sm:text-sm">{desc}</p>
+          <p className="font-serif-tc text-[19px] font-bold tracking-[0.08em] text-[var(--c-text)] sm:text-[23px]">{code}</p>
+          <p className="mt-1 text-[13px] font-medium text-[var(--c-text2)] sm:text-sm">{desc}</p>
           <div className="mt-2 flex flex-wrap gap-1.5 sm:mt-3 sm:gap-2">
             {tags.map((t) => (
-              <span key={t} className="rounded-md bg-[#f3ede6] px-2 py-0.5 text-[10px] text-[#8a7f72] sm:px-3 sm:py-1 sm:text-xs">{t}</span>
+              <span key={t} className="rounded-md bg-[#f3ede6] px-2 py-0.5 text-[10px] text-[var(--c-muted)] sm:px-3 sm:py-1 sm:text-xs">{t}</span>
             ))}
           </div>
         </div>
@@ -996,9 +996,9 @@ function OrdersTab({
   const [searchQuery, setSearchQuery] = useState('');
   if (orders.length === 0) {
     return (
-      <p className="rounded-2xl border border-[#e5ded4] bg-white p-8 text-center text-[#6b6156]">
+      <p className="rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface)] p-8 text-center text-[var(--c-text2)]">
         你還沒有訂單。
-        <Link href="/" className="font-semibold text-[#c84767]">
+        <Link href="/" className="font-semibold text-[var(--c-sale)]">
           去逛逛 →
         </Link>
       </p>
@@ -1042,10 +1042,10 @@ function OrdersTab({
     <div className="space-y-5">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="font-serif-tc text-4xl font-semibold tracking-[0.08em] text-[#1f1b19] sm:text-5xl">訂單紀錄</h1>
-          <p className="font-serif-tc mt-1 text-base tracking-[0.12em] text-[#8a7f72]">Your orders.</p>
+          <h1 className="font-serif-tc text-4xl font-semibold tracking-[0.08em] text-[var(--c-text)] sm:text-5xl">訂單紀錄</h1>
+          <p className="font-serif-tc mt-1 text-base tracking-[0.12em] text-[var(--c-muted)]">Your orders.</p>
         </div>
-        <button type="button" onClick={() => setSearchOpen((v) => !v)} aria-label="搜尋訂單" className="mt-2 rounded-full p-2 text-[#1f1b19] hover:bg-white/70">
+        <button type="button" onClick={() => setSearchOpen((v) => !v)} aria-label="搜尋訂單" className="mt-2 rounded-full p-2 text-[var(--c-text)] hover:bg-[var(--c-surface)]/70">
           <IconSearch />
         </button>
       </div>
@@ -1055,13 +1055,13 @@ function OrdersTab({
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           placeholder="搜尋訂單編號、商品名稱"
-          className="h-11 w-full rounded-full border border-[#e5ded4] bg-white px-5 text-sm outline-none transition focus:border-[#8f1f31]"
+          className="h-11 w-full rounded-full border border-[var(--c-border)] bg-[var(--c-surface)] px-5 text-sm outline-none transition focus:border-[var(--c-brand)]"
         />
       ) : null}
 
-      <div className="flex items-center justify-center gap-6 text-[#1f1b19]">
+      <div className="flex items-center justify-center gap-6 text-[var(--c-text)]">
         <div className="text-center">
-          <span className="font-serif-tc text-3xl font-semibold text-[#8f1f31]">{unpaidCount}</span>
+          <span className="font-serif-tc text-3xl font-semibold text-[var(--c-brand)]">{unpaidCount}</span>
           <span className="ml-2 text-sm font-semibold">筆待付款</span>
         </div>
         <span className="h-6 w-px bg-[#d8cfc3]" />
@@ -1080,7 +1080,7 @@ function OrdersTab({
       </div>
 
       {shown.length === 0 ? (
-        <p className="rounded-2xl border border-[#e5ded4] bg-white p-8 text-center text-[#6b6156]">此分類目前沒有訂單。</p>
+        <p className="rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface)] p-8 text-center text-[var(--c-text2)]">此分類目前沒有訂單。</p>
       ) : (
         <div className="space-y-5">
           {monthGroups.map((group, idx) => (
@@ -1088,7 +1088,7 @@ function OrdersTab({
               <div className="flex items-center gap-4">
                 <h2 className="font-serif-tc shrink-0 text-2xl font-semibold tracking-[0.08em]">{group.label}</h2>
                 <span className="h-px flex-1 bg-[#d8cfc3]" />
-                <span className="text-xs font-medium text-[#8a7f72]">{idx === 0 ? '最近訂單' : `${group.orders.length} 筆`}</span>
+                <span className="text-xs font-medium text-[var(--c-muted)]">{idx === 0 ? '最近訂單' : `${group.orders.length} 筆`}</span>
               </div>
               <div className="space-y-3">
                 {group.orders.map((order) => (
@@ -1128,7 +1128,7 @@ function OrderFilterPill({
       className={`inline-flex h-10 items-center justify-center gap-2 whitespace-nowrap rounded-full px-5 text-sm font-semibold transition ${
         active
           ? 'bg-[#9f1735] text-white shadow-[0_7px_18px_rgba(159,23,53,0.22)]'
-          : 'bg-[#f0ebe3] text-[#6f665d] hover:bg-white'
+          : 'bg-[#f0ebe3] text-[var(--c-text2)] hover:bg-[var(--c-surface)]'
       }`}
     >
       <span>{label}</span>
@@ -1171,16 +1171,16 @@ function OrderRecordCard({
           onOpen(order);
         }
       }}
-      className="order-card-tap order-ticket-card relative cursor-pointer overflow-hidden rounded-xl border border-[#eee5da] bg-white shadow-[0_5px_18px_rgba(64,52,43,0.07)] outline-none transition hover:-translate-y-0.5 hover:shadow-[0_10px_24px_rgba(64,52,43,0.1)] focus-visible:ring-2 focus-visible:ring-[#9f1735]/35"
+      className="order-card-tap order-ticket-card relative cursor-pointer overflow-hidden rounded-xl border border-[#eee5da] bg-[var(--c-surface)] shadow-[0_5px_18px_rgba(64,52,43,0.07)] outline-none transition hover:-translate-y-0.5 hover:shadow-[0_10px_24px_rgba(64,52,43,0.1)] focus-visible:ring-2 focus-visible:ring-[#9f1735]/35"
     >
-      {needsAttention ? <span className="pointer-events-none absolute left-0 top-0 z-10 h-[calc(100%-64px)] w-1 rounded-tl-xl bg-[#c84767]" aria-hidden /> : null}
+      {needsAttention ? <span className="pointer-events-none absolute left-0 top-0 z-10 h-[calc(100%-64px)] w-1 rounded-tl-xl bg-[var(--c-sale)]" aria-hidden /> : null}
       <div className="px-5 pb-4 pt-4">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <p className="font-serif-tc text-xl font-semibold tracking-[0.08em] text-[#1f1b19]">{dateText}</p>
-            <p className="mt-0.5 truncate text-xs text-[#8a7f72]">訂單編號　{order.order_no}</p>
+            <p className="font-serif-tc text-xl font-semibold tracking-[0.08em] text-[var(--c-text)]">{dateText}</p>
+            <p className="mt-0.5 truncate text-xs text-[var(--c-muted)]">訂單編號　{order.order_no}</p>
           </div>
-          <span className="inline-flex h-9 shrink-0 items-center gap-2 rounded-full px-1 text-sm font-semibold text-[#6f665d]">
+          <span className="inline-flex h-9 shrink-0 items-center gap-2 rounded-full px-1 text-sm font-semibold text-[var(--c-text2)]">
             訂單詳情 <span aria-hidden>↗</span>
           </span>
         </div>
@@ -1190,15 +1190,15 @@ function OrderRecordCard({
             {img ? <img src={img} alt={firstItem?.name ?? '商品'} className="h-full w-full object-cover" /> : null}
           </div>
           <div className="min-w-0">
-            <p className="truncate text-base font-semibold text-[#1f1b19]">{firstItem?.name ?? '訂單商品'}</p>
-            <p className="mt-2 text-sm text-[#6f665d]">{itemCount} 件商品</p>
+            <p className="truncate text-base font-semibold text-[var(--c-text)]">{firstItem?.name ?? '訂單商品'}</p>
+            <p className="mt-2 text-sm text-[var(--c-text2)]">{itemCount} 件商品</p>
             {order.cancel_status && order.cancel_status !== '' ? (
               <p className="mt-1 text-xs font-semibold text-[#c0392b]">{CANCEL_STATUS_LABEL[order.cancel_status] ?? ''}</p>
             ) : null}
           </div>
           <div className="text-right">
-            <p className="text-xs font-medium tracking-[0.08em] text-[#8a7f72]">訂單金額</p>
-            <p className="font-serif-tc mt-1 whitespace-nowrap text-3xl font-semibold tracking-normal text-[#1f1b19]">
+            <p className="text-xs font-medium tracking-[0.08em] text-[var(--c-muted)]">訂單金額</p>
+            <p className="font-serif-tc mt-1 whitespace-nowrap text-3xl font-semibold tracking-normal text-[var(--c-text)]">
               NT$ {new Intl.NumberFormat('zh-TW').format(order.total)}
             </p>
           </div>
@@ -1208,7 +1208,7 @@ function OrderRecordCard({
       <div className="relative flex min-h-16 items-center gap-3 border-t border-dashed border-[#e6ded4] px-5 py-3">
         <div className="min-w-0 flex-1">
           <OrderListStatusBadge order={order} />
-          <p className="mt-1 truncate text-[11px] font-medium text-[#8a7f72]">{order.payment_method || '未設定付款方式'}</p>
+          <p className="mt-1 truncate text-[11px] font-medium text-[var(--c-muted)]">{order.payment_method || '未設定付款方式'}</p>
         </div>
         <div className="ml-auto flex items-center gap-2">
           {canPayNow(order) ? (
@@ -1250,7 +1250,7 @@ function OrderRecordCard({
                 onCancel(order);
               }}
               aria-label="申請取消訂單"
-              className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-[#f7f3ee] text-[#6f665d]"
+              className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-[#f7f3ee] text-[var(--c-text2)]"
             >
               <IconDots />
             </button>
@@ -1267,7 +1267,7 @@ function OrderListStatusBadge({ order }: { order: Order }) {
     tab === 'unpaid'
       ? { label: '尚未付款', className: 'bg-[#fbf1e6] text-[#9b6b25]', icon: 'clock' as const }
       : tab === 'to_ship'
-        ? { label: '待出貨', className: 'bg-[#f4efe7] text-[#6f665d]', icon: 'box' as const }
+        ? { label: '待出貨', className: 'bg-[#f4efe7] text-[var(--c-text2)]', icon: 'box' as const }
         : tab === 'shipping'
           ? { label: '配送中', className: 'bg-[#eaf1f7] text-[#38617d]', icon: 'truck' as const }
           : tab === 'done'
@@ -1381,12 +1381,12 @@ function OrderModal({
       onClick={onClose}
     >
       <div
-        className="flex max-h-[90dvh] w-full max-w-lg flex-col overflow-hidden rounded-t-2xl bg-white sm:rounded-2xl"
+        className="flex max-h-[90dvh] w-full max-w-lg flex-col overflow-hidden rounded-t-2xl bg-[var(--c-surface)] sm:rounded-2xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex shrink-0 items-center justify-between border-b border-[#e5ded4] bg-white px-5 py-4">
+        <div className="flex shrink-0 items-center justify-between border-b border-[var(--c-border)] bg-[var(--c-surface)] px-5 py-4">
           <h2 className="text-lg font-semibold">合計：{formatter.format(order.total)}</h2>
-          <button onClick={onClose} aria-label="關閉" className="rounded-md p-1 text-2xl leading-none hover:bg-[#efe8dd]">
+          <button onClick={onClose} aria-label="關閉" className="rounded-md p-1 text-2xl leading-none hover:bg-[var(--c-soft)]">
             ×
           </button>
         </div>
@@ -1401,18 +1401,18 @@ function OrderModal({
               const img = it.image || imageByName.get(it.name) || '';
               return (
                 <div key={i} className="flex items-center gap-3">
-                  <div className="h-16 w-16 shrink-0 overflow-hidden rounded-lg bg-[#e9e1d6]">
+                  <div className="h-16 w-16 shrink-0 overflow-hidden rounded-lg bg-[var(--c-border)]">
                     {img ? <img src={img} alt={it.name} className="h-full w-full object-cover" /> : null}
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium">{it.name}</p>
-                    <p className="text-xs text-[#8a7f72]">{it.variant}</p>
-                    <p className="text-xs text-[#8a7f72]">數量：{it.quantity}</p>
+                    <p className="text-xs text-[var(--c-muted)]">{it.variant}</p>
+                    <p className="text-xs text-[var(--c-muted)]">數量：{it.quantity}</p>
                   </div>
                   <div className="text-right">
                     <p className="text-sm font-semibold">{formatter.format(it.price * it.quantity)}</p>
                     {it.original_price && it.original_price > it.price ? (
-                      <p className="text-xs text-[#b3a897] line-through">
+                      <p className="text-xs text-[var(--c-muted)] line-through">
                         {formatter.format(it.original_price * it.quantity)}
                       </p>
                     ) : null}
@@ -1423,7 +1423,7 @@ function OrderModal({
           </div>
 
           {/* 金額 */}
-          <div className="space-y-1.5 border-t border-[#efe8dd] pt-4 text-sm">
+          <div className="space-y-1.5 border-t border-[var(--c-soft)] pt-4 text-sm">
             <Row label="小計" value={formatter.format(order.subtotal)} />
             <Row label="運費" value={order.shipping === 0 ? '免運' : formatter.format(order.shipping)} />
             {order.discount > 0 && (
@@ -1434,7 +1434,7 @@ function OrderModal({
             ) : null}
             <div className="flex justify-between pt-1 text-base font-semibold">
               <span>合計（{order.items.reduce((n, it) => n + it.quantity, 0)} 件）</span>
-              <span className="text-[#c84767]">{formatter.format(order.total)}</span>
+              <span className="text-[var(--c-sale)]">{formatter.format(order.total)}</span>
             </div>
             {order.refund_amount && order.refund_amount > 0 ? (
               <Row label="已退款" value={`-${formatter.format(order.refund_amount)}`} />
@@ -1445,8 +1445,8 @@ function OrderModal({
           {order.cancel_status && order.cancel_status !== '' ? (
             <div className="rounded-xl border border-[#e8d6d0] bg-[#fbf3f0] p-4">
               <p className="text-sm font-semibold text-[#c0392b]">{CANCEL_STATUS_LABEL[order.cancel_status] ?? ''}</p>
-              {order.cancel_reason ? <p className="mt-1 text-xs text-[#8a7f72]">你的原因：{order.cancel_reason}</p> : null}
-              {order.cancel_response ? <p className="mt-1 text-xs text-[#6b6156]">賣家回覆：{order.cancel_response}</p> : null}
+              {order.cancel_reason ? <p className="mt-1 text-xs text-[var(--c-muted)]">你的原因：{order.cancel_reason}</p> : null}
+              {order.cancel_response ? <p className="mt-1 text-xs text-[var(--c-text2)]">賣家回覆：{order.cancel_response}</p> : null}
             </div>
           ) : null}
 
@@ -1461,14 +1461,14 @@ function OrderModal({
               isOnlinePayment(order.payment_method ?? '') ? (
                 <a
                   href={`/api/payment/newebpay/checkout?order=${encodeURIComponent(order.order_no)}`}
-                  className="inline-flex h-9 items-center rounded-full bg-[#ada265] px-4 text-sm font-semibold text-white transition hover:bg-[#9a9059]"
+                  className="inline-flex h-9 items-center rounded-full bg-[var(--c-gold)] px-4 text-sm font-semibold text-white transition hover:bg-[var(--c-gold)]"
                 >
                   立即付款
                 </a>
               ) : (
                 <button
                   onClick={() => onPay(order)}
-                  className="inline-flex h-9 items-center rounded-full bg-[#ada265] px-4 text-sm font-semibold text-white transition hover:bg-[#9a9059]"
+                  className="inline-flex h-9 items-center rounded-full bg-[var(--c-gold)] px-4 text-sm font-semibold text-white transition hover:bg-[var(--c-gold)]"
                 >
                   立即付款 / 回報匯款
                 </button>
@@ -1476,14 +1476,14 @@ function OrderModal({
             ) : null}
             <button
               onClick={onReorder}
-              className="inline-flex h-9 items-center gap-1.5 rounded-full border border-[#d7c9bd] px-4 text-sm font-semibold text-[#6b6156] transition hover:bg-[#efe8dd]"
+              className="inline-flex h-9 items-center gap-1.5 rounded-full border border-[var(--c-border-strong)] px-4 text-sm font-semibold text-[var(--c-text2)] transition hover:bg-[var(--c-soft)]"
             >
               <IconCart /> 再次加入購物車
             </button>
             {canRequestCancel(order) ? (
               <button
                 onClick={() => onCancel(order)}
-                className="inline-flex h-9 items-center rounded-full border border-[#d7c9bd] px-4 text-sm font-semibold text-[#6b6156] transition hover:bg-[#efe8dd]"
+                className="inline-flex h-9 items-center rounded-full border border-[var(--c-border-strong)] px-4 text-sm font-semibold text-[var(--c-text2)] transition hover:bg-[var(--c-soft)]"
               >
                 申請取消
               </button>
@@ -1491,7 +1491,7 @@ function OrderModal({
             {canRequestReturn(order) && !hasActiveReturn ? (
               <button
                 onClick={() => setShowReturn(true)}
-                className="inline-flex h-9 items-center rounded-full border border-[#d7c9bd] px-4 text-sm font-semibold text-[#6b6156] transition hover:bg-[#efe8dd]"
+                className="inline-flex h-9 items-center rounded-full border border-[var(--c-border-strong)] px-4 text-sm font-semibold text-[var(--c-text2)] transition hover:bg-[var(--c-soft)]"
               >
                 申請退貨
               </button>
@@ -1500,48 +1500,48 @@ function OrderModal({
 
           {/* 退貨紀錄 */}
           {returns.length > 0 ? (
-            <div className="space-y-2 rounded-xl border border-[#e5ded4] bg-[#faf7f2] p-4">
+            <div className="space-y-2 rounded-xl border border-[var(--c-border)] bg-[var(--c-header)] p-4">
               <p className="text-sm font-semibold">退貨紀錄</p>
               {returns.map((r) => (
-                <div key={r.id} className="rounded-lg bg-white p-3 text-sm">
+                <div key={r.id} className="rounded-lg bg-[var(--c-surface)] p-3 text-sm">
                   <div className="flex items-center justify-between">
                     <span className="font-medium">{r.return_no}</span>
                     <span className="font-semibold text-[#c0392b]">{RETURN_STATUS_LABEL[r.status] ?? r.status}</span>
                   </div>
-                  <p className="mt-1 text-xs text-[#8a7f72]">
+                  <p className="mt-1 text-xs text-[var(--c-muted)]">
                     {r.items.map((it) => `${it.name}${it.variant ? `(${it.variant})` : ''}×${it.quantity}`).join('、')}
                   </p>
-                  <p className="mt-0.5 text-xs text-[#6b6156]">退款金額 {formatter.format(r.refund_amount)}</p>
-                  {r.response ? <p className="mt-0.5 text-xs text-[#6b6156]">賣家回覆：{r.response}</p> : null}
+                  <p className="mt-0.5 text-xs text-[var(--c-text2)]">退款金額 {formatter.format(r.refund_amount)}</p>
+                  {r.response ? <p className="mt-0.5 text-xs text-[var(--c-text2)]">賣家回覆：{r.response}</p> : null}
                   {r.return_tracking || r.return_carrier ? (
-                    <p className="mt-0.5 text-xs text-[#6b6156]">寄回物流：{r.return_carrier} {r.return_tracking}</p>
+                    <p className="mt-0.5 text-xs text-[var(--c-text2)]">寄回物流：{r.return_carrier} {r.return_tracking}</p>
                   ) : null}
                   {r.status === 'APPROVED' && returnInfo ? (
-                    <div className="mt-2 rounded-lg bg-[#faf6ea] p-2 text-xs">
-                      <p className="font-semibold text-[#8a6d1b]">退貨寄回資訊</p>
-                      <p className="mt-0.5 whitespace-pre-wrap text-[#6b6156]">{returnInfo}</p>
+                    <div className="mt-2 rounded-lg bg-[var(--c-header)] p-2 text-xs">
+                      <p className="font-semibold text-[var(--c-gold)]">退貨寄回資訊</p>
+                      <p className="mt-0.5 whitespace-pre-wrap text-[var(--c-text2)]">{returnInfo}</p>
                     </div>
                   ) : null}
                   {r.status === 'APPROVED' ? (
-                    <div className="mt-2 rounded-lg border border-[#e5ded4] p-2">
-                      <p className="mb-1 text-xs font-semibold text-[#6b6156]">寄回後請回報物流</p>
+                    <div className="mt-2 rounded-lg border border-[var(--c-border)] p-2">
+                      <p className="mb-1 text-xs font-semibold text-[var(--c-text2)]">寄回後請回報物流</p>
                       <div className="flex flex-wrap gap-2">
                         <input
                           value={shipForm.carrier}
                           onChange={(e) => setShipForm({ ...shipForm, carrier: e.target.value })}
                           placeholder="物流公司(例:黑貓)"
-                          className="min-w-0 flex-1 rounded-lg border border-[#e5ded4] px-2 py-1.5 text-xs"
+                          className="min-w-0 flex-1 rounded-lg border border-[var(--c-border)] px-2 py-1.5 text-xs"
                         />
                         <input
                           value={shipForm.tracking}
                           onChange={(e) => setShipForm({ ...shipForm, tracking: e.target.value })}
                           placeholder="物流單號"
-                          className="min-w-0 flex-1 rounded-lg border border-[#e5ded4] px-2 py-1.5 text-xs"
+                          className="min-w-0 flex-1 rounded-lg border border-[var(--c-border)] px-2 py-1.5 text-xs"
                         />
                         <button
                           onClick={() => markShipped(r.id)}
                           disabled={shipBusy}
-                          className="rounded-full bg-[#1f1b19] px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
+                          className="rounded-full bg-[var(--c-button)] px-3 py-1.5 text-xs font-semibold text-[var(--c-button-text)] disabled:opacity-50"
                         >
                           已寄回退貨商品
                         </button>
@@ -1568,7 +1568,7 @@ function OrderModal({
             {order.phone ? <Row label="收件人電話" value={order.phone} /> : null}
             {order.shipping_method ? <Row label="送貨方式" value={order.shipping_method} /> : null}
             {order.address ? <Row label="地址" value={order.address} /> : null}
-            <p className="pt-1 text-xs leading-5 text-[#8a7f72]">送貨方式簡介：{SHIPPING_NOTE}</p>
+            <p className="pt-1 text-xs leading-5 text-[var(--c-muted)]">送貨方式簡介：{SHIPPING_NOTE}</p>
           </Section>
 
           {/* 付款資訊 */}
@@ -1578,11 +1578,11 @@ function OrderModal({
             {order.payment_ref ? <Row label="回報後五碼" value={order.payment_ref} /> : null}
             {order.payment_proof_url ? (
               <div className="flex justify-between gap-3">
-                <span className="shrink-0 text-[#8a7f72]">付款截圖</span>
-                <a href={order.payment_proof_url} target="_blank" rel="noreferrer" className="font-semibold text-[#c84767] underline">已上傳</a>
+                <span className="shrink-0 text-[var(--c-muted)]">付款截圖</span>
+                <a href={order.payment_proof_url} target="_blank" rel="noreferrer" className="font-semibold text-[var(--c-sale)] underline">已上傳</a>
               </div>
             ) : null}
-            <p className="pt-1 text-xs leading-5 text-[#8a7f72]">付款指示：{PAYMENT_NOTE}</p>
+            <p className="pt-1 text-xs leading-5 text-[var(--c-muted)]">付款指示：{PAYMENT_NOTE}</p>
           </Section>
         </div>
       </div>
@@ -1608,20 +1608,20 @@ function OrderModal({
           onClick={() => setHistoryOpen(false)}
         >
           <div
-            className="flex max-h-[80dvh] w-full max-w-md flex-col overflow-hidden rounded-t-2xl bg-white sm:rounded-2xl"
+            className="flex max-h-[80dvh] w-full max-w-md flex-col overflow-hidden rounded-t-2xl bg-[var(--c-surface)] sm:rounded-2xl"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex shrink-0 items-center justify-between border-b border-[#e5ded4] px-5 py-4">
+            <div className="flex shrink-0 items-center justify-between border-b border-[var(--c-border)] px-5 py-4">
               <h3 className="text-base font-semibold">訂單狀態更新紀錄</h3>
-              <button onClick={() => setHistoryOpen(false)} aria-label="關閉" className="rounded-md p-1 hover:bg-[#efe8dd]">
+              <button onClick={() => setHistoryOpen(false)} aria-label="關閉" className="rounded-md p-1 hover:bg-[var(--c-soft)]">
                 <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
               </button>
             </div>
             <div className="flex-1 overflow-y-auto overscroll-contain p-5">
               {history.length === 0 ? (
-                <p className="py-8 text-center text-sm text-[#8a7f72]">目前沒有狀態更新紀錄。</p>
+                <p className="py-8 text-center text-sm text-[var(--c-muted)]">目前沒有狀態更新紀錄。</p>
               ) : (
-                <ol className="relative space-y-4 border-l border-[#e5ded4] pl-5">
+                <ol className="relative space-y-4 border-l border-[var(--c-border)] pl-5">
                   {history.map((h) => {
                     const { tone, label: typeLabel } = historyKind(h);
                     return (
@@ -1629,9 +1629,9 @@ function OrderModal({
                         <span className="absolute -left-[26px] top-1 h-3 w-3 rounded-full ring-2 ring-white" style={{ background: tone }} />
                         <div className="flex items-center gap-2">
                           <span className="rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ background: `${tone}1a`, color: tone }}>{typeLabel}</span>
-                          <span className="text-sm font-medium text-[#2c2826]">{h.note || h.to_status || '狀態更新'}</span>
+                          <span className="text-sm font-medium text-[var(--c-text)]">{h.note || h.to_status || '狀態更新'}</span>
                         </div>
-                        <p className="mt-0.5 text-xs text-[#8a7f72]">{new Date(h.created_at).toLocaleString('zh-TW')}</p>
+                        <p className="mt-0.5 text-xs text-[var(--c-muted)]">{new Date(h.created_at).toLocaleString('zh-TW')}</p>
                       </li>
                     );
                   })}
@@ -1694,26 +1694,26 @@ function ReturnRequestModal({ order, returnInfo, onClose, onDone }: { order: Ord
 
   return (
     <ModalShell title="申請退貨" onClose={onClose}>
-      <p className="mb-3 text-sm text-[#8a7f72]">訂單 {order.order_no}，勾選要退貨的商品與數量。</p>
+      <p className="mb-3 text-sm text-[var(--c-muted)]">訂單 {order.order_no}，勾選要退貨的商品與數量。</p>
       <div className="space-y-2">
         {order.items.map((it, i) => {
           const on = picked[i] != null;
           return (
-            <div key={i} className={`rounded-lg border p-3 ${on ? 'border-[#1f1b19] bg-[#faf7f2]' : 'border-[#e5ded4]'}`}>
+            <div key={i} className={`rounded-lg border p-3 ${on ? 'border-[var(--c-text)] bg-[var(--c-header)]' : 'border-[var(--c-border)]'}`}>
               <label className="flex items-center gap-2">
                 <input type="checkbox" checked={on} onChange={(e) => toggle(i, it.quantity, e.target.checked)} className="h-4 w-4" />
-                <span className="flex-1 text-sm font-medium">{it.name}<span className="ml-1 text-xs text-[#8a7f72]">{it.variant}</span></span>
+                <span className="flex-1 text-sm font-medium">{it.name}<span className="ml-1 text-xs text-[var(--c-muted)]">{it.variant}</span></span>
                 <span className="text-sm">{formatter.format(it.price)}</span>
               </label>
               {on ? (
                 <div className="mt-2 flex items-center gap-2 pl-6 text-sm">
-                  <span className="text-[#8a7f72]">退貨數量</span>
-                  <div className="inline-flex items-center rounded-full border border-[#e5ded4]">
+                  <span className="text-[var(--c-muted)]">退貨數量</span>
+                  <div className="inline-flex items-center rounded-full border border-[var(--c-border)]">
                     <button type="button" className="px-2.5 py-0.5" onClick={() => setQty(i, (picked[i] || 1) - 1, it.quantity)}>-</button>
                     <span className="w-8 text-center">{picked[i]}</span>
                     <button type="button" className="px-2.5 py-0.5" onClick={() => setQty(i, (picked[i] || 1) + 1, it.quantity)}>+</button>
                   </div>
-                  <span className="text-xs text-[#a99e8f]">/ {it.quantity}</span>
+                  <span className="text-xs text-[var(--c-muted)]">/ {it.quantity}</span>
                 </div>
               ) : null}
             </div>
@@ -1722,33 +1722,33 @@ function ReturnRequestModal({ order, returnInfo, onClose, onDone }: { order: Ord
       </div>
 
       <label className="mt-4 block">
-        <span className="mb-1 block text-sm text-[#8a7f72]">退貨原因</span>
-        <select value={reason} onChange={(e) => { setReason(e.target.value); setErr(''); }} className="w-full rounded-lg border border-[#e5ded4] px-3 py-2.5">
+        <span className="mb-1 block text-sm text-[var(--c-muted)]">退貨原因</span>
+        <select value={reason} onChange={(e) => { setReason(e.target.value); setErr(''); }} className="w-full rounded-lg border border-[var(--c-border)] px-3 py-2.5">
           <option value="">請選擇退貨原因…</option>
           {RETURN_REASONS.map((r) => <option key={r} value={r}>{r}</option>)}
         </select>
       </label>
       {reason === '其他' ? (
-        <textarea value={other} onChange={(e) => setOther(e.target.value)} rows={2} placeholder="請輸入退貨原因" className="mt-2 w-full rounded-lg border border-[#e5ded4] px-3 py-2.5 text-sm" />
+        <textarea value={other} onChange={(e) => setOther(e.target.value)} rows={2} placeholder="請輸入退貨原因" className="mt-2 w-full rounded-lg border border-[var(--c-border)] px-3 py-2.5 text-sm" />
       ) : null}
 
       <div className="mt-3 flex justify-between text-sm">
-        <span className="text-[#8a7f72]">預估退款金額</span>
-        <span className="font-semibold text-[#c84767]">{formatter.format(refundAmount)}</span>
+        <span className="text-[var(--c-muted)]">預估退款金額</span>
+        <span className="font-semibold text-[var(--c-sale)]">{formatter.format(refundAmount)}</span>
       </div>
 
       {returnInfo ? (
-        <div className="mt-3 rounded-lg border border-[#d8c7a8] bg-[#faf6ea] p-3">
-          <p className="text-sm font-semibold text-[#8a6d1b]">退貨寄回資訊</p>
-          <p className="mt-1 whitespace-pre-wrap text-xs text-[#6b6156]">{returnInfo}</p>
-          <p className="mt-1 text-xs text-[#a99e8f]">賣家核准後請依此資訊將商品寄回。</p>
+        <div className="mt-3 rounded-lg border border-[#d8c7a8] bg-[var(--c-header)] p-3">
+          <p className="text-sm font-semibold text-[var(--c-gold)]">退貨寄回資訊</p>
+          <p className="mt-1 whitespace-pre-wrap text-xs text-[var(--c-text2)]">{returnInfo}</p>
+          <p className="mt-1 text-xs text-[var(--c-muted)]">賣家核准後請依此資訊將商品寄回。</p>
         </div>
       ) : null}
 
       {err ? <p className="mt-2 text-sm text-[#c0392b]">{err}</p> : null}
       <div className="mt-4 flex gap-2">
-        <button onClick={onClose} className="flex-1 rounded-full border border-[#d7c9bd] px-4 py-3 font-semibold text-[#6b6156] hover:bg-[#efe8dd]">先不要</button>
-        <button onClick={submit} disabled={busy} className="flex-1 rounded-full bg-[#c84767] px-4 py-3 font-semibold text-white disabled:opacity-60">送出退貨申請</button>
+        <button onClick={onClose} className="flex-1 rounded-full border border-[var(--c-border-strong)] px-4 py-3 font-semibold text-[var(--c-text2)] hover:bg-[var(--c-soft)]">先不要</button>
+        <button onClick={submit} disabled={busy} className="flex-1 rounded-full bg-[var(--c-sale)] px-4 py-3 font-semibold text-white disabled:opacity-60">送出退貨申請</button>
       </div>
     </ModalShell>
   );
@@ -1757,10 +1757,10 @@ function ReturnRequestModal({ order, returnInfo, onClose, onDone }: { order: Ord
 function ModalShell({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
   return (
     <div className="fixed inset-0 z-[55] flex items-end justify-center bg-black/40 sm:items-center sm:p-4" onClick={onClose}>
-      <div className="flex max-h-[90dvh] w-full max-w-md flex-col overflow-hidden rounded-t-2xl bg-white sm:rounded-2xl" onClick={(e) => e.stopPropagation()}>
-        <div className="flex shrink-0 items-center justify-between border-b border-[#e5ded4] px-5 py-4">
+      <div className="flex max-h-[90dvh] w-full max-w-md flex-col overflow-hidden rounded-t-2xl bg-[var(--c-surface)] sm:rounded-2xl" onClick={(e) => e.stopPropagation()}>
+        <div className="flex shrink-0 items-center justify-between border-b border-[var(--c-border)] px-5 py-4">
           <h2 className="text-lg font-semibold">{title}</h2>
-          <button onClick={onClose} aria-label="關閉" className="rounded-md p-1 text-2xl leading-none hover:bg-[#efe8dd]">×</button>
+          <button onClick={onClose} aria-label="關閉" className="rounded-md p-1 text-2xl leading-none hover:bg-[var(--c-soft)]">×</button>
         </div>
         <div className="flex-1 overflow-y-auto overscroll-contain p-5">{children}</div>
       </div>
@@ -1798,13 +1798,13 @@ function CancelRequestModal({ order, onClose, onDone }: { order: Order; onClose:
 
   return (
     <ModalShell title="申請取消訂單" onClose={onClose}>
-      <p className="mb-3 text-sm text-[#8a7f72]">訂單 {order.order_no}，送出後由賣家審核。</p>
+      <p className="mb-3 text-sm text-[var(--c-muted)]">訂單 {order.order_no}，送出後由賣家審核。</p>
       <label className="mb-3 block">
-        <span className="mb-1 block text-sm text-[#8a7f72]">取消原因</span>
+        <span className="mb-1 block text-sm text-[var(--c-muted)]">取消原因</span>
         <select
           value={reason}
           onChange={(e) => { setReason(e.target.value); setErr(''); }}
-          className="w-full rounded-lg border border-[#e5ded4] px-3 py-2.5"
+          className="w-full rounded-lg border border-[var(--c-border)] px-3 py-2.5"
         >
           <option value="">請選擇取消原因…</option>
           {CANCEL_REASONS.map((r) => <option key={r} value={r}>{r}</option>)}
@@ -1816,13 +1816,13 @@ function CancelRequestModal({ order, onClose, onDone }: { order: Order; onClose:
           onChange={(e) => setOther(e.target.value)}
           rows={3}
           placeholder="請輸入取消原因"
-          className="mb-3 w-full rounded-lg border border-[#e5ded4] px-3 py-2.5 text-sm"
+          className="mb-3 w-full rounded-lg border border-[var(--c-border)] px-3 py-2.5 text-sm"
         />
       ) : null}
       {err ? <p className="mb-3 text-sm text-[#c0392b]">{err}</p> : null}
       <div className="flex gap-2">
-        <button onClick={onClose} className="flex-1 rounded-full border border-[#d7c9bd] px-4 py-3 font-semibold text-[#6b6156] hover:bg-[#efe8dd]">先不要</button>
-        <button onClick={submit} disabled={busy} className="flex-1 rounded-full bg-[#c84767] px-4 py-3 font-semibold text-white disabled:opacity-60">送出申請</button>
+        <button onClick={onClose} className="flex-1 rounded-full border border-[var(--c-border-strong)] px-4 py-3 font-semibold text-[var(--c-text2)] hover:bg-[var(--c-soft)]">先不要</button>
+        <button onClick={submit} disabled={busy} className="flex-1 rounded-full bg-[var(--c-sale)] px-4 py-3 font-semibold text-white disabled:opacity-60">送出申請</button>
       </div>
     </ModalShell>
   );
@@ -1858,19 +1858,19 @@ function PayTransferModal({ order, account, onClose, onDone }: { order: Order; a
   return (
     <ModalShell title="匯款資訊與回報" onClose={onClose}>
       <div className="space-y-4">
-        <div className="rounded-xl bg-[#faf7f2] p-4 text-sm">
-          <div className="flex justify-between"><span className="text-[#8a7f72]">訂單號碼</span><span className="font-medium">{order.order_no}</span></div>
-          <div className="mt-1 flex justify-between"><span className="text-[#8a7f72]">應付金額</span><span className="font-semibold text-[#c84767]">{formatter.format(order.total)}</span></div>
-          <div className="mt-1 flex justify-between"><span className="text-[#8a7f72]">付款方式</span><span>{order.payment_method}</span></div>
+        <div className="rounded-xl bg-[var(--c-header)] p-4 text-sm">
+          <div className="flex justify-between"><span className="text-[var(--c-muted)]">訂單號碼</span><span className="font-medium">{order.order_no}</span></div>
+          <div className="mt-1 flex justify-between"><span className="text-[var(--c-muted)]">應付金額</span><span className="font-semibold text-[var(--c-sale)]">{formatter.format(order.total)}</span></div>
+          <div className="mt-1 flex justify-between"><span className="text-[var(--c-muted)]">付款方式</span><span>{order.payment_method}</span></div>
         </div>
 
         {account ? (
-          <div className="rounded-xl border border-[#d8c7a8] bg-[#faf6ea] p-4">
-            <p className="text-sm font-semibold text-[#8a6d1b]">{account.name} — 收款帳號</p>
-            <p className="mt-1 whitespace-pre-wrap text-sm text-[#6b6156]">{account.info}</p>
+          <div className="rounded-xl border border-[#d8c7a8] bg-[var(--c-header)] p-4">
+            <p className="text-sm font-semibold text-[var(--c-gold)]">{account.name} — 收款帳號</p>
+            <p className="mt-1 whitespace-pre-wrap text-sm text-[var(--c-text2)]">{account.info}</p>
           </div>
         ) : (
-          <p className="text-sm text-[#8a7f72]">請聯繫賣家取得匯款帳號。</p>
+          <p className="text-sm text-[var(--c-muted)]">請聯繫賣家取得匯款帳號。</p>
         )}
 
         <div className="space-y-2">
@@ -1881,20 +1881,20 @@ function PayTransferModal({ order, account, onClose, onDone }: { order: Order; a
             inputMode="numeric"
             maxLength={20}
             placeholder="轉出帳號後五碼"
-            className="w-full rounded-lg border border-[#e5ded4] px-3 py-2.5 text-sm"
+            className="w-full rounded-lg border border-[var(--c-border)] px-3 py-2.5 text-sm"
           />
           <input
             type="file"
             accept="image/*"
             onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-            className="w-full text-sm text-[#6b6156] file:mr-3 file:rounded-full file:border-0 file:bg-[#efe8dd] file:px-4 file:py-2 file:text-sm file:font-semibold"
+            className="w-full text-sm text-[var(--c-text2)] file:mr-3 file:rounded-full file:border-0 file:bg-[var(--c-soft)] file:px-4 file:py-2 file:text-sm file:font-semibold"
           />
           <textarea
             value={note}
             onChange={(e) => setNote(e.target.value)}
             rows={2}
             placeholder="補充說明(選填,例:匯款時間)"
-            className="w-full rounded-lg border border-[#e5ded4] px-3 py-2.5 text-sm"
+            className="w-full rounded-lg border border-[var(--c-border)] px-3 py-2.5 text-sm"
           />
         </div>
 
@@ -1904,8 +1904,8 @@ function PayTransferModal({ order, account, onClose, onDone }: { order: Order; a
         {err ? <p className="text-sm text-[#c0392b]">{err}</p> : null}
 
         <div className="flex gap-2">
-          <button onClick={onClose} className="flex-1 rounded-full border border-[#d7c9bd] px-4 py-3 font-semibold text-[#6b6156] hover:bg-[#efe8dd]">關閉</button>
-          <button onClick={submit} disabled={busy} className="flex-1 rounded-full bg-[#c84767] px-4 py-3 font-semibold text-white disabled:opacity-60">送出回報</button>
+          <button onClick={onClose} className="flex-1 rounded-full border border-[var(--c-border-strong)] px-4 py-3 font-semibold text-[var(--c-text2)] hover:bg-[var(--c-soft)]">關閉</button>
+          <button onClick={submit} disabled={busy} className="flex-1 rounded-full bg-[var(--c-sale)] px-4 py-3 font-semibold text-white disabled:opacity-60">送出回報</button>
         </div>
       </div>
     </ModalShell>
@@ -1914,9 +1914,9 @@ function PayTransferModal({ order, account, onClose, onDone }: { order: Order; a
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <div className="border-t border-[#efe8dd] pt-4">
+    <div className="border-t border-[var(--c-soft)] pt-4">
       <h3 className="mb-2 font-semibold">{title}</h3>
-      <div className="space-y-1.5 text-sm text-[#6b6156]">{children}</div>
+      <div className="space-y-1.5 text-sm text-[var(--c-text2)]">{children}</div>
     </div>
   );
 }
@@ -1928,7 +1928,7 @@ function OrderProgress({ order, returns = [], onShowHistory }: { order: Order; r
     : buildProgress(order);
   const cancelled = order.status === '取消';
   return (
-    <div className="rounded-xl bg-[#faf7f2] p-4 pb-2">
+    <div className="rounded-xl bg-[var(--c-header)] p-4 pb-2">
       <div className="flex items-start">
         {steps.map((s, i) => {
           const active = s.done || s.current;
@@ -1947,7 +1947,7 @@ function OrderProgress({ order, returns = [], onShowHistory }: { order: Order; r
                 </div>
                 <div className={`h-0.5 flex-1 ${i === steps.length - 1 ? 'opacity-0' : ''}`} style={{ background: steps[i + 1]?.done || steps[i + 1]?.current ? color : '#e5ded4' }} />
               </div>
-              <span className={`mt-1.5 text-center text-[11px] ${active ? 'font-semibold text-[#6b6156]' : 'text-[#a99e8f]'}`}>
+              <span className={`mt-1.5 text-center text-[11px] ${active ? 'font-semibold text-[var(--c-text2)]' : 'text-[var(--c-muted)]'}`}>
                 {s.label}
               </span>
             </div>
@@ -1958,7 +1958,7 @@ function OrderProgress({ order, returns = [], onShowHistory }: { order: Order; r
         <div className="mt-2 text-center">
           <button
             onClick={onShowHistory}
-            className="inline-flex items-center gap-0.5 text-[11px] text-[#a99e8f] underline-offset-2 hover:text-[#6b6156] hover:underline"
+            className="inline-flex items-center gap-0.5 text-[11px] text-[var(--c-muted)] underline-offset-2 hover:text-[var(--c-text2)] hover:underline"
           >
             展開
             <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6" /></svg>
@@ -1981,7 +1981,7 @@ function IconCart() {
 function Row({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex justify-between gap-3">
-      <span className="shrink-0 text-[#8a7f72]">{label}</span>
+      <span className="shrink-0 text-[var(--c-muted)]">{label}</span>
       <span className="min-w-0 break-words text-right">{value}</span>
     </div>
   );
@@ -1991,7 +1991,7 @@ function Row({ label, value }: { label: string; value: string }) {
 function FavoritesTab({ products }: { products: Product[] }) {
   if (products.length === 0) {
     return (
-      <p className="rounded-2xl border border-[#e5ded4] bg-white p-8 text-center text-[#6b6156]">
+      <p className="rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface)] p-8 text-center text-[var(--c-text2)]">
         還沒有收藏商品。到商品頁點愛心即可加入追蹤清單。
       </p>
     );
@@ -2003,9 +2003,9 @@ function FavoritesTab({ products }: { products: Product[] }) {
         <Link
           key={p.id}
           href={`/products/${encodeURIComponent(p.id)}`}
-          className="group flex flex-col overflow-hidden rounded-lg bg-[#f9f8f6] p-3 shadow-sm transition hover:shadow-md"
+          className="group flex flex-col overflow-hidden rounded-lg bg-[var(--c-card)] p-3 shadow-sm transition hover:shadow-md"
         >
-          <div className="aspect-[4/5] overflow-hidden rounded-[6px] bg-white">
+          <div className="aspect-[4/5] overflow-hidden rounded-[6px] bg-[var(--c-surface)]">
             {p.image ? (
               <img
                 src={p.image}
@@ -2017,11 +2017,11 @@ function FavoritesTab({ products }: { products: Product[] }) {
             )}
           </div>
           <div className="mt-3 px-1">
-            <p className="line-clamp-1 text-sm font-semibold leading-5 group-hover:text-[#c84767]">{p.name}</p>
+            <p className="line-clamp-1 text-sm font-semibold leading-5 group-hover:text-[var(--c-sale)]">{p.name}</p>
             <div className="mt-2 flex items-baseline gap-2">
               <span className="font-semibold tracking-wide">{formatter.format(p.price)}</span>
               {p.original_price ? (
-                <span className="text-xs text-[#b3a897] line-through">{formatter.format(p.original_price)}</span>
+                <span className="text-xs text-[var(--c-muted)] line-through">{formatter.format(p.original_price)}</span>
               ) : null}
             </div>
           </div>

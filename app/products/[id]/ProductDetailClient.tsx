@@ -256,7 +256,7 @@ export default function ProductDetailClient({ product, homeHref = '/' }: { produ
   }
 
   return (
-    <main className="min-h-screen bg-white text-[#2c2826]">
+    <main className="min-h-screen bg-[var(--c-surface)] text-[var(--c-text)]">
       <StoreHeader
         homeHref={homeHref}
         logoUrl={logoUrl}
@@ -299,7 +299,7 @@ export default function ProductDetailClient({ product, homeHref = '/' }: { produ
               ))}
             </div>
           ) : (
-            <div className="flex h-full items-center justify-center text-[#8a7f72]">無商品圖片</div>
+            <div className="flex h-full items-center justify-center text-[var(--c-muted)]">無商品圖片</div>
           )}
           {colorImage && (
             <img
@@ -315,7 +315,7 @@ export default function ProductDetailClient({ product, homeHref = '/' }: { produ
                 type="button"
                 onClick={() => carousel.step(-1)}
                 aria-label="上一張照片"
-                className="absolute left-2 top-1/2 flex h-10 w-8 -translate-y-1/2 items-center justify-center text-[#1f1b19]/30 drop-shadow-[0_1px_1px_rgba(255,255,255,0.8)] transition hover:text-[#1f1b19]"
+                className="absolute left-2 top-1/2 flex h-10 w-8 -translate-y-1/2 items-center justify-center text-[var(--c-text)]/30 drop-shadow-[0_1px_1px_rgba(255,255,255,0.8)] transition hover:text-[var(--c-text)]"
               >
                 <IconChevron dir="left" />
               </button>
@@ -323,7 +323,7 @@ export default function ProductDetailClient({ product, homeHref = '/' }: { produ
                 type="button"
                 onClick={() => carousel.step(1)}
                 aria-label="下一張照片"
-                className="absolute right-2 top-1/2 flex h-10 w-8 -translate-y-1/2 items-center justify-center text-[#1f1b19]/30 drop-shadow-[0_1px_1px_rgba(255,255,255,0.8)] transition hover:text-[#1f1b19]"
+                className="absolute right-2 top-1/2 flex h-10 w-8 -translate-y-1/2 items-center justify-center text-[var(--c-text)]/30 drop-shadow-[0_1px_1px_rgba(255,255,255,0.8)] transition hover:text-[var(--c-text)]"
               >
                 <IconChevron dir="right" />
               </button>
@@ -341,7 +341,7 @@ export default function ProductDetailClient({ product, homeHref = '/' }: { produ
                 }}
                 aria-label={`查看圖片 ${index + 1}`}
                 className={`aspect-[4/5] w-12 shrink-0 overflow-hidden rounded-md border-2 bg-[#eee8e1] transition ${
-                  !colorImage && carousel.realIndex === index ? 'border-[#c84767]' : 'border-transparent opacity-70 hover:opacity-100'
+                  !colorImage && carousel.realIndex === index ? 'border-[var(--c-sale)]' : 'border-transparent opacity-70 hover:opacity-100'
                 }`}
               >
                 <img src={url} alt="" className="h-full w-full object-contain drop-shadow-[0_8px_10px_rgba(31,27,25,0.18)]" />
@@ -352,19 +352,19 @@ export default function ProductDetailClient({ product, homeHref = '/' }: { produ
         </div>
 
         <div className="px-1 py-6 sm:px-2 lg:py-0">
-          <p className="mb-3 text-xs font-semibold uppercase tracking-[0.25em] text-[#c84767]">
+          <p className="mb-3 text-xs font-semibold uppercase tracking-[0.25em] text-[var(--c-sale)]">
             {product.category || 'Urbanite'}
           </p>
-          <h1 className="max-w-3xl text-3xl font-medium leading-tight tracking-wide sm:text-4xl">
+          <h1 className="store-title max-w-3xl text-3xl font-medium leading-tight tracking-wide sm:text-4xl">
             {product.name}
           </h1>
           {product.sale_mode && (
-            <span className="mt-3 inline-block rounded-full bg-[#6b6156]/40 px-3 py-1 text-xs font-medium text-white">
+            <span className="mt-3 inline-block rounded-full bg-[var(--c-text2)]/40 px-3 py-1 text-xs font-medium text-white">
               {product.sale_mode}
             </span>
           )}
 
-          <div className="mt-8 border-l-4 border-[#c84767] pl-4 text-sm leading-7 text-[#3d3935]">
+          <div className="mt-8 border-l-4 border-[var(--c-sale)] pl-4 text-sm leading-7 text-[var(--c-text)]">
             {product.available_shipping_methods?.includes('免運') ? (
               <p>此商品免運費</p>
             ) : (
@@ -373,9 +373,9 @@ export default function ProductDetailClient({ product, homeHref = '/' }: { produ
           </div>
 
           <div className="mt-8 flex items-baseline gap-4">
-            <span className="text-3xl font-bold text-[#c84767]">{formatter.format(product.price)}</span>
+            <span className="text-3xl font-bold text-[var(--c-sale)]">{formatter.format(product.price)}</span>
             {product.original_price ? (
-              <span className="text-xl text-[#8a8480] line-through">
+              <span className="text-xl text-[var(--c-muted)] line-through">
                 {formatter.format(product.original_price)}
               </span>
             ) : null}
@@ -385,7 +385,7 @@ export default function ProductDetailClient({ product, homeHref = '/' }: { produ
             <>
               {specs.map((dim, i) => (
                 <section key={dim.name} className="mt-6">
-                  <p className="mb-2 text-sm text-[#8a8480]">
+                  <p className="mb-2 text-sm text-[var(--c-muted)]">
                     {dim.name}：{specSel[i] || '請選擇'}
                   </p>
                   <div className="flex flex-wrap gap-2">
@@ -406,10 +406,10 @@ export default function ProductDetailClient({ product, homeHref = '/' }: { produ
                           }}
                           className={`min-w-16 border px-5 py-3 text-sm font-semibold ${
                             grayed
-                              ? 'cursor-not-allowed border-[#e1d9d3] bg-[#f7f5f2] text-[#3d3935] line-through opacity-30'
+                              ? 'cursor-not-allowed border-[var(--c-border)] bg-[var(--c-bg)] text-[var(--c-text)] line-through opacity-30'
                               : selected
-                                ? 'border-[#c84767] text-[#c84767]'
-                                : 'border-[#e1d9d3] bg-[#f7f5f2] text-[#3d3935]'
+                                ? 'border-[var(--c-sale)] text-[var(--c-sale)]'
+                                : 'border-[var(--c-border)] bg-[var(--c-bg)] text-[var(--c-text)]'
                           }`}
                         >
                           {opt}
@@ -421,11 +421,11 @@ export default function ProductDetailClient({ product, homeHref = '/' }: { produ
               ))}
               <p className="mt-3 text-sm">
                 {!allSpecsChosen ? (
-                  <span className="text-[#8a8480]">請選擇完整規格</span>
+                  <span className="text-[var(--c-muted)]">請選擇完整規格</span>
                 ) : soldOut ? (
                   <span className="font-semibold text-[#c0392b]">此規格已售完</span>
                 ) : (
-                  <span className="text-[#8a8480]">庫存：{variantInventory} 件</span>
+                  <span className="text-[var(--c-muted)]">庫存：{variantInventory} 件</span>
                 )}
               </p>
             </>
@@ -433,7 +433,7 @@ export default function ProductDetailClient({ product, homeHref = '/' }: { produ
             <>
               {product.colors.length > 0 && (
                 <section className="mt-7">
-                  <p className="mb-2 text-sm text-[#8a8480]">顏色: {selectedColor}</p>
+                  <p className="mb-2 text-sm text-[var(--c-muted)]">顏色: {selectedColor}</p>
                   <div className="flex flex-wrap gap-2">
                     {product.colors.map((color) => (
                       <button
@@ -441,8 +441,8 @@ export default function ProductDetailClient({ product, homeHref = '/' }: { produ
                         onClick={() => setSelectedColor(color)}
                         className={`min-w-16 border px-5 py-3 text-sm font-semibold ${
                           selectedColor === color
-                            ? 'border-[#c84767] text-[#c84767]'
-                            : 'border-[#e1d9d3] bg-[#f7f5f2] text-[#3d3935]'
+                            ? 'border-[var(--c-sale)] text-[var(--c-sale)]'
+                            : 'border-[var(--c-border)] bg-[var(--c-bg)] text-[var(--c-text)]'
                         }`}
                       >
                         {color}
@@ -454,7 +454,7 @@ export default function ProductDetailClient({ product, homeHref = '/' }: { produ
 
               {product.sizes.length > 0 && (
                 <section className="mt-6">
-                  <p className="mb-2 text-sm text-[#8a8480]">尺寸: {selectedSize}</p>
+                  <p className="mb-2 text-sm text-[var(--c-muted)]">尺寸: {selectedSize}</p>
                   <div className="flex flex-wrap gap-2">
                     {product.sizes.map((size) => (
                       <button
@@ -462,8 +462,8 @@ export default function ProductDetailClient({ product, homeHref = '/' }: { produ
                         onClick={() => setSelectedSize(size)}
                         className={`h-14 min-w-16 border text-sm font-semibold ${
                           selectedSize === size
-                            ? 'border-2 border-[#c84767] bg-white text-[#2c2826]'
-                            : 'border-[#ece7e2] bg-[#f7f5f2] text-[#3d3935]'
+                            ? 'border-2 border-[var(--c-sale)] bg-[var(--c-surface)] text-[var(--c-text)]'
+                            : 'border-[#ece7e2] bg-[var(--c-bg)] text-[var(--c-text)]'
                         }`}
                       >
                         {size}
@@ -477,12 +477,12 @@ export default function ProductDetailClient({ product, homeHref = '/' }: { produ
 
 
           <section className="mt-6">
-            <p className="mb-2 text-sm text-[#8a8480]">數量</p>
-            <div className="grid h-12 grid-cols-[48px_1fr_48px] border border-[#d8d2cc]">
+            <p className="mb-2 text-sm text-[var(--c-muted)]">數量</p>
+            <div className="grid h-12 grid-cols-[48px_1fr_48px] border border-[var(--c-border)]">
               <button onClick={() => setQuantity((q) => Math.max(1, q - 1))} className="text-2xl font-bold">
                 -
               </button>
-              <div className="flex items-center justify-center border-x border-[#d8d2cc]">{quantity}</div>
+              <div className="flex items-center justify-center border-x border-[var(--c-border)]">{quantity}</div>
               <button
                 onClick={() => setQuantity((q) => Math.min(q + 1, Math.max(1, maxQty)))}
                 disabled={quantity >= maxQty}
@@ -497,7 +497,7 @@ export default function ProductDetailClient({ product, homeHref = '/' }: { produ
             <button
               onClick={() => addToCart('cart')}
               disabled={soldOut}
-              className="bg-[#c84767] px-4 py-3 font-semibold text-white disabled:opacity-50"
+              className="bg-[var(--c-sale)] px-4 py-3 font-semibold text-white disabled:opacity-50"
             >
               {soldOut ? 'SOLD OUT' : '加入購物車'}
             </button>
@@ -515,7 +515,7 @@ export default function ProductDetailClient({ product, homeHref = '/' }: { produ
             disabled={favoritePending}
             aria-pressed={favorite}
             className={`mx-auto mt-6 flex items-center justify-center gap-2 text-sm font-semibold transition ${
-              favorite ? 'text-[#c84767]' : 'text-[#5d5652]'
+              favorite ? 'text-[var(--c-sale)]' : 'text-[#5d5652]'
             }`}
           >
             <IconHeart filled={favorite} /> {favorite ? '已收藏' : '收藏'}
@@ -523,17 +523,17 @@ export default function ProductDetailClient({ product, homeHref = '/' }: { produ
         </div>
         </div>
 
-        <section className="border-t border-[#e5ded4] px-5 pb-16 sm:px-8 lg:mt-12">
-          <div className="grid grid-cols-2 border-b border-[#e5ded4] text-center">
+        <section className="border-t border-[var(--c-border)] px-5 pb-16 sm:px-8 lg:mt-12">
+          <div className="grid grid-cols-2 border-b border-[var(--c-border)] text-center">
             <button
               onClick={() => setTab('description')}
-              className={`py-4 ${tab === 'description' ? 'border-b-4 border-[#c84767] text-[#2c2826]' : 'text-[#8a8480]'}`}
+              className={`py-4 ${tab === 'description' ? 'border-b-4 border-[var(--c-sale)] text-[var(--c-text)]' : 'text-[var(--c-muted)]'}`}
             >
               商品描述
             </button>
             <button
               onClick={() => setTab('shipping')}
-              className={`py-4 ${tab === 'shipping' ? 'border-b-4 border-[#c84767] text-[#2c2826]' : 'text-[#8a8480]'}`}
+              className={`py-4 ${tab === 'shipping' ? 'border-b-4 border-[var(--c-sale)] text-[var(--c-text)]' : 'text-[var(--c-muted)]'}`}
             >
               送貨及付款方式
             </button>
@@ -543,7 +543,7 @@ export default function ProductDetailClient({ product, homeHref = '/' }: { produ
             <div className="mx-auto max-w-2xl py-10 text-center leading-8 text-[#5d5652]">
               {product.tagline ? (
                 <div
-                  className="mx-auto max-w-none text-left leading-8 [&_a]:text-[#c84767] [&_img]:my-4 [&_img]:max-w-full [&_ol]:list-decimal [&_ol]:pl-6 [&_table]:my-4 [&_table]:w-full [&_table]:border-collapse [&_td]:border [&_td]:border-[#e5ded4] [&_td]:p-2 [&_th]:border [&_th]:border-[#e5ded4] [&_th]:bg-[#f6f2ec] [&_th]:p-2 [&_ul]:list-disc [&_ul]:pl-6"
+                  className="mx-auto max-w-none text-left leading-8 [&_a]:text-[var(--c-sale)] [&_img]:my-4 [&_img]:max-w-full [&_ol]:list-decimal [&_ol]:pl-6 [&_table]:my-4 [&_table]:w-full [&_table]:border-collapse [&_td]:border [&_td]:border-[var(--c-border)] [&_td]:p-2 [&_th]:border [&_th]:border-[var(--c-border)] [&_th]:bg-[var(--c-bg)] [&_th]:p-2 [&_ul]:list-disc [&_ul]:pl-6"
                   dangerouslySetInnerHTML={{ __html: product.tagline }}
                 />
               ) : (
@@ -552,19 +552,19 @@ export default function ProductDetailClient({ product, homeHref = '/' }: { produ
             </div>
           ) : (
             <div className="mx-auto max-w-2xl py-10 text-center leading-8 text-[#5d5652]">
-              <h3 className="text-xl font-medium text-[#2c2826]">送貨方式</h3>
+              <h3 className="text-xl font-medium text-[var(--c-text)]">送貨方式</h3>
               <p className="mt-4">
                 超商取貨、宅配到府。
                 <br />
                 實際運送方式以結帳頁顯示為準。
               </p>
-              <h3 className="mt-8 text-xl font-medium text-[#2c2826]">付款方式</h3>
+              <h3 className="mt-8 text-xl font-medium text-[var(--c-text)]">付款方式</h3>
               <p className="mt-4">
                 信用卡、電子支付、銀行轉帳。
                 <br />
                 實際付款方式以結帳頁顯示為準。
               </p>
-              <h3 className="mt-8 text-xl font-medium text-[#2c2826]">退換貨方式</h3>
+              <h3 className="mt-8 text-xl font-medium text-[var(--c-text)]">退換貨方式</h3>
               <p className="mt-4">請參考網站頁尾，退換貨政策說明資訊。</p>
             </div>
           )}
@@ -584,7 +584,7 @@ export default function ProductDetailClient({ product, homeHref = '/' }: { produ
 
       {/* 已加入購物車 提示(停約 3 秒後淡出) */}
       <div
-        className={`pointer-events-none fixed right-4 top-20 z-[70] flex items-center gap-2 rounded-full bg-[#1f1b19] px-4 py-2.5 text-sm font-semibold text-white shadow-lg transition-all duration-500 ${
+        className={`pointer-events-none fixed right-4 top-20 z-[70] flex items-center gap-2 rounded-full bg-[var(--c-button)] px-4 py-2.5 text-sm font-semibold text-white shadow-lg transition-all duration-500 ${
           added ? 'translate-y-0 opacity-100' : '-translate-y-2 opacity-0'
         }`}
       >

@@ -115,13 +115,13 @@ export default function RegisterClient({
   }
 
   return (
-    <main className="min-h-screen bg-white text-[#242830]">
-      <header className="sticky top-0 z-30 border-b border-[#e6e1d8] bg-white">
+    <main className="min-h-screen bg-[var(--c-surface)] text-[#242830]">
+      <header className="sticky top-0 z-30 border-b border-[#e6e1d8] bg-[var(--c-surface)]">
         <nav className="mx-auto grid max-w-4xl grid-cols-[1fr_auto_1fr] items-center px-5 py-4">
           <div />
           <Link href="/" aria-label="回首頁" className="justify-self-center px-2 text-center">
             {logoUrl ? (
-              <img src={logoUrl} alt={STORE_NAME} className="mx-auto h-8 w-auto object-contain sm:h-10" />
+              <img src={logoUrl} alt={STORE_NAME} className="site-logo mx-auto h-8 w-auto object-contain sm:h-10" />
             ) : (
               <span className="inline-block h-8 w-28 sm:h-10 sm:w-36" aria-hidden />
             )}
@@ -149,7 +149,7 @@ export default function RegisterClient({
                   setNotice(null);
                 }}
                 className={`rounded-full py-2.5 text-sm font-semibold transition ${
-                  tab === 'email' ? 'bg-[#ada265] text-white' : 'text-[#8a8a8a]'
+                  tab === 'email' ? 'bg-[var(--c-gold)] text-white' : 'text-[#8a8a8a]'
                 }`}
               >
                 Email 註冊
@@ -161,7 +161,7 @@ export default function RegisterClient({
                   setNotice(null);
                 }}
                 className={`rounded-full py-2.5 text-sm font-semibold transition ${
-                  tab === 'phone' ? 'bg-[#ada265] text-white' : 'text-[#8a8a8a]'
+                  tab === 'phone' ? 'bg-[var(--c-gold)] text-white' : 'text-[#8a8a8a]'
                 }`}
               >
                 手機註冊
@@ -173,7 +173,7 @@ export default function RegisterClient({
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="姓名（選填）"
-                className="w-full border-0 border-b border-[#dedede] px-0 py-3 text-lg outline-none placeholder:text-[#9a9a9a] focus:border-[#b5a66a]"
+                className="w-full border-0 border-b border-[#dedede] px-0 py-3 text-lg outline-none placeholder:text-[#9a9a9a] focus:border-[var(--c-gold)]"
               />
               {tab === 'email' ? (
                 <input
@@ -181,7 +181,7 @@ export default function RegisterClient({
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="電子郵件"
                   autoComplete="email"
-                  className="w-full border-0 border-b border-[#dedede] px-0 py-3 text-lg outline-none placeholder:text-[#9a9a9a] focus:border-[#b5a66a]"
+                  className="w-full border-0 border-b border-[#dedede] px-0 py-3 text-lg outline-none placeholder:text-[#9a9a9a] focus:border-[var(--c-gold)]"
                 />
               ) : (
                 <input
@@ -190,7 +190,7 @@ export default function RegisterClient({
                   placeholder="手機號碼（含國碼，如 +886912345678）"
                   autoComplete="tel"
                   disabled={otpSent}
-                  className="w-full border-0 border-b border-[#dedede] px-0 py-3 text-lg outline-none placeholder:text-[#9a9a9a] focus:border-[#b5a66a] disabled:opacity-60"
+                  className="w-full border-0 border-b border-[#dedede] px-0 py-3 text-lg outline-none placeholder:text-[#9a9a9a] focus:border-[var(--c-gold)] disabled:opacity-60"
                 />
               )}
               <div className="relative">
@@ -201,7 +201,7 @@ export default function RegisterClient({
                   placeholder="設定密碼"
                   autoComplete="new-password"
                   disabled={otpSent}
-                  className="w-full border-0 border-b border-[#dedede] px-0 py-3 pr-12 text-lg outline-none placeholder:text-[#9a9a9a] focus:border-[#b5a66a] disabled:opacity-60"
+                  className="w-full border-0 border-b border-[#dedede] px-0 py-3 pr-12 text-lg outline-none placeholder:text-[#9a9a9a] focus:border-[var(--c-gold)] disabled:opacity-60"
                 />
                 <button
                   type="button"
@@ -218,7 +218,7 @@ export default function RegisterClient({
                   onChange={(e) => setOtp(e.target.value)}
                   placeholder="手機驗證碼"
                   inputMode="numeric"
-                  className="w-full border-0 border-b border-[#dedede] px-0 py-3 text-lg outline-none placeholder:text-[#9a9a9a] focus:border-[#b5a66a]"
+                  className="w-full border-0 border-b border-[#dedede] px-0 py-3 text-lg outline-none placeholder:text-[#9a9a9a] focus:border-[var(--c-gold)]"
                 />
               )}
             </div>
@@ -235,7 +235,7 @@ export default function RegisterClient({
                 tab === 'email' ? registerEmail : otpSent ? verifyPhone : registerPhoneStart
               }
               disabled={busy}
-              className="mt-8 w-full rounded bg-[#ada265] px-5 py-4 text-lg font-bold text-white transition hover:bg-[#9a9059] disabled:opacity-50"
+              className="mt-8 w-full rounded bg-[var(--c-gold)] px-5 py-4 text-lg font-bold text-white transition hover:bg-[var(--c-gold)] disabled:opacity-50"
             >
               {busy
                 ? '處理中...'
@@ -246,7 +246,7 @@ export default function RegisterClient({
 
             <p className="mt-8 text-center text-sm text-[#8a8a8a]">
               已經是會員？{' '}
-              <Link href={loginHref} className="font-semibold text-[#ada265]">
+              <Link href={loginHref} className="font-semibold text-[var(--c-gold)]">
                 前往登入
               </Link>
             </p>

@@ -87,11 +87,11 @@ export default function ShopHeader({
   );
 
   return (
-    <header className="sticky top-0 z-30 border-b border-[#e5ded4] bg-[#faf7f2]/95 backdrop-blur">
+    <header className="sticky top-0 z-30 border-b border-[var(--c-border)] bg-[var(--c-header)]/95 backdrop-blur">
       <nav className="mx-auto grid max-w-6xl grid-cols-[1fr_auto_1fr] items-center px-4 py-4 sm:px-6 sm:py-5">
         <div className="flex min-w-0 items-center">
           {showBack ? (
-            <Link href={backHref} className="truncate text-sm text-[#6b6156] hover:text-[#1f1b19]">
+            <Link href={backHref} className="truncate text-sm text-[var(--c-text2)] hover:text-[var(--c-text)]">
               {leftLabel}
             </Link>
           ) : null}

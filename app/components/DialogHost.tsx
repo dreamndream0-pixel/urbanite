@@ -27,10 +27,10 @@ export default function DialogHost() {
       onClick={() => (current.kind === 'alert' ? done(true) : done(current.kind === 'confirm' ? false : null))}
     >
       <div
-        className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-xl"
+        className="w-full max-w-sm rounded-2xl bg-[var(--c-surface)] p-5 shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
-        {current.title ? <h2 className="mb-1 text-lg font-semibold text-[#1f1b19]">{current.title}</h2> : null}
+        {current.title ? <h2 className="mb-1 text-lg font-semibold text-[var(--c-text)]">{current.title}</h2> : null}
         <p className="whitespace-pre-wrap text-sm leading-6 text-[#3f3a34]">{current.message}</p>
 
         {current.kind === 'prompt' ? (
@@ -40,7 +40,7 @@ export default function DialogHost() {
             onChange={(e) => setValue(e.target.value)}
             placeholder={current.placeholder ?? ''}
             onKeyDown={(e) => { if (e.key === 'Enter') done(value); }}
-            className="mt-3 w-full rounded-lg border border-[#e5ded4] px-3 py-2.5 text-sm"
+            className="mt-3 w-full rounded-lg border border-[var(--c-border)] px-3 py-2.5 text-sm"
           />
         ) : null}
 
@@ -48,7 +48,7 @@ export default function DialogHost() {
           {current.kind !== 'alert' ? (
             <button
               onClick={() => done(current.kind === 'confirm' ? false : null)}
-              className="rounded-full border border-[#d7c9bd] px-4 py-2 text-sm font-semibold text-[#6b6156] hover:bg-[#efe8dd]"
+              className="rounded-full border border-[var(--c-border-strong)] px-4 py-2 text-sm font-semibold text-[var(--c-text2)] hover:bg-[var(--c-soft)]"
             >
               {cancelLabel}
             </button>
@@ -56,7 +56,7 @@ export default function DialogHost() {
           <button
             autoFocus={current.kind !== 'prompt'}
             onClick={() => done(current.kind === 'confirm' ? true : current.kind === 'prompt' ? value : true)}
-            className={`rounded-full px-4 py-2 text-sm font-semibold text-white ${current.danger ? 'bg-[#c0392b] hover:bg-[#a83226]' : 'bg-[#1f1b19] hover:bg-[#000]'}`}
+            className={`rounded-full px-4 py-2 text-sm font-semibold text-white ${current.danger ? 'bg-[#c0392b] hover:bg-[#a83226]' : 'bg-[var(--c-button)] hover:bg-[#000]'}`}
           >
             {confirmLabel}
           </button>

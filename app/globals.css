@@ -1,12 +1,30 @@
 @import 'tailwindcss';
 
 :root {
-  --background: #fff8f4;
-  --foreground: #251b1f;
+  /* 網站配色(後台 系統設定 → 一般設定 可修改,根版面會輸出覆蓋值) */
+  --c-bg: #f6f2ec;
+  --c-header: #faf7f2;
+  --c-surface: #ffffff;
+  --c-card: #f9f8f6;
+  --c-text: #1f1b19;
+  --c-text2: #6b6156;
+  --c-muted: #8a7f72;
+  --c-border: #e5ded4;
+  --c-border-strong: #d7c9bd;
+  --c-soft: #efe8dd;
+  --c-brand: #702838;
+  --c-sale: #c84767;
+  --c-gold: #ada265;
+  --c-button: #1f1b19;
+  --c-button-text: #ffffff;
+  --c-button-hover: color-mix(in srgb, var(--c-button) 84%, var(--c-button-text));
+
+  --background: var(--c-bg);
+  --foreground: var(--c-text);
   --fold-paper: #F6F2EB;
   --fold-paper-back: #E7DFD5;
-  --fold-active: #702838;
-  --fold-active-back: #551D2A;
+  --fold-active: var(--c-brand);
+  --fold-active-back: color-mix(in srgb, var(--c-brand) 76%, black);
   --fold-ink: #C4BFB6;
   --fold-light: #FFFFFF;
   --fold-shadow: rgba(32, 24, 21, .14);
@@ -48,7 +66,7 @@ img {
 }
 
 ::selection {
-  background: #c84767;
+  background: var(--c-sale);
   color: #ffffff;
 }
 
@@ -84,8 +102,8 @@ img {
 
 .store-category-navigation {
   position: relative;
-  background: #faf7f2;
-  border-bottom: 1px solid #e5ded4;
+  background: var(--c-header);
+  border-bottom: 1px solid var(--c-border);
 }
 .store-category-row {
   position: relative;
@@ -108,7 +126,7 @@ img {
   padding: 0 24px;
   border: 0;
   background: transparent;
-  color: #403b36;
+  color: var(--c-text);
   font-size: 14px;
   font-weight: 500;
   white-space: nowrap;
@@ -121,7 +139,7 @@ img {
   top: 50%;
   width: 1px;
   height: 14px;
-  background: #d8cec4;
+  background: var(--c-border);
   transform: translateY(-50%);
 }
 .store-category-button::after {
@@ -141,7 +159,7 @@ img {
 }
 .store-category-button[aria-current='page']::after { transform: scaleX(1); }
 .store-category-button:hover,
-.store-category-button[aria-expanded='true'] { background: #f2ece6; }
+.store-category-button[aria-expanded='true'] { background: var(--c-soft); }
 .store-category-button:focus-visible,
 .store-category-menu button:focus-visible {
   outline: 2px solid var(--fold-active);
@@ -162,9 +180,9 @@ img {
   width: 240px;
   padding: 8px;
   overflow-y: auto;
-  border: 1px solid #e5ded4;
+  border: 1px solid var(--c-border);
   border-radius: 6px;
-  background: #faf7f2;
+  background: var(--c-header);
   box-shadow: 0 12px 28px rgba(36, 35, 33, .12);
   animation: category-menu-open 160ms ease-out;
 }
@@ -176,13 +194,13 @@ img {
   border: 0;
   border-radius: 3px;
   background: transparent;
-  color: #403b36;
+  color: var(--c-text);
   font-size: 14px;
   text-align: left;
 }
-.store-category-menu button:hover { background: #f2ece6; }
+.store-category-menu button:hover { background: var(--c-soft); }
 .store-category-menu button[aria-checked='true'] {
-  background: #eee3e4;
+  background: color-mix(in srgb, var(--c-brand) 10%, var(--c-header));
   color: var(--fold-active);
   font-weight: 600;
 }
@@ -368,3 +386,25 @@ img {
     font-size: 16px;
   }
 }
+
+/* ===== 網站版面配置(後台 系統設定 → 一般設定),由 <html data-*> 切換 ===== */
+/* 商品卡樣式 */
+html[data-card='plain'] .product-card { background: transparent; padding: 0; box-shadow: none; }
+html[data-card='plain'] .product-card:hover { box-shadow: none; }
+html[data-card='bordered'] .product-card { background: var(--c-card); border: 1px solid var(--c-border); box-shadow: none; }
+html[data-card='elevated'] .product-card { background: var(--c-card); box-shadow: 0 10px 28px rgba(0, 0, 0, 0.08); }
+html[data-card='elevated'] .product-card:hover { box-shadow: 0 16px 36px rgba(0, 0, 0, 0.12); }
+/* 圓角 */
+html[data-radius='square'] .product-card,
+html[data-radius='square'] .product-card > div:first-child { border-radius: 0; }
+html[data-radius='round'] .product-card { border-radius: 20px; }
+html[data-radius='round'] .product-card > div:first-child { border-radius: 14px; }
+/* 欄數 */
+html[data-columns='2-3'] .store-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+html[data-columns='1-3'] .store-grid { grid-template-columns: repeat(1, minmax(0, 1fr)); }
+@media (min-width: 640px) {
+  html[data-columns='2-3'] .store-grid,
+  html[data-columns='1-3'] .store-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+/* 標題字體 */
+html[data-heading='serif'] .store-title { font-family: 'Noto Serif TC', 'Songti TC', 'PMingLiU', serif; }

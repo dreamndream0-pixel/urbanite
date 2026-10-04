@@ -1,6 +1,23 @@
 import type { Metadata } from 'next';
 import './globals.css';
 import DialogHost from './components/DialogHost';
+import { unstable_cache } from 'next/cache';
+import { createAdminClient } from '@/lib/supabase/admin';
+import { resolveSiteTheme, siteThemeCss } from '@/lib/site-theme';
+
+// 網站外觀(後台 系統設定 → 一般設定);儲存時會清除快取
+const loadSiteTheme = unstable_cache(
+  async () => {
+    try {
+      const { data } = await createAdminClient().from('site_settings').select('site_theme').eq('id', 1).maybeSingle();
+      return resolveSiteTheme(data?.site_theme);
+    } catch {
+      return resolveSiteTheme(null);
+    }
+  },
+  ['site-theme'],
+  { tags: ['site-theme'], revalidate: 3600 },
+);
 
 const DESCRIPTION = 'Urbanite 線上選品商店,提供流行服飾、配件與會員訂單查詢服務。';
 
@@ -38,14 +55,22 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const theme = await loadSiteTheme();
   return (
-    <html lang="zh-Hant">
+    <html
+      lang="zh-Hant"
+      data-card={theme.layout.card}
+      data-columns={theme.layout.columns}
+      data-radius={theme.layout.radius}
+      data-heading={theme.layout.heading}
+    >
       <head>
+        <style id="site-theme" dangerouslySetInnerHTML={{ __html: siteThemeCss(theme) }} />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link

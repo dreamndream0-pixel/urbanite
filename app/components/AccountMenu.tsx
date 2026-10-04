@@ -68,31 +68,31 @@ export default function AccountMenu({ nextPath = '/account' }: { nextPath?: stri
       <button aria-hidden tabIndex={-1} onClick={() => setOpen(false)} className="fixed inset-0 z-[9998] cursor-default" />
       <div
         style={{ position: 'fixed', top: pos.top, right: pos.right }}
-        className="z-[9999] w-52 rounded-lg border border-[#e5ded4] bg-white p-2 shadow-lg"
+        className="z-[9999] w-52 rounded-lg border border-[var(--c-border)] bg-[var(--c-surface)] p-2 shadow-lg"
       >
         <div className="px-3 py-2">
           {me.name ? <p className="truncate text-sm font-medium">{me.name}</p> : null}
-          <p className="truncate text-xs text-[#8a7f72]">{me.email}</p>
+          <p className="truncate text-xs text-[var(--c-muted)]">{me.email}</p>
           {me.isAdmin && (
-            <span className="mt-1 inline-block rounded-full bg-[#1f1b19] px-2 py-0.5 text-[10px] font-semibold tracking-wide text-white">
+            <span className="mt-1 inline-block rounded-full bg-[var(--c-button)] px-2 py-0.5 text-[10px] font-semibold tracking-wide text-[var(--c-button-text)]">
               主管理員
             </span>
           )}
         </div>
         {me.isAdmin && (
-          <Link href="/admin" onClick={() => setOpen(false)} className="mb-1 block rounded bg-[#f3ede4] px-3 py-2 text-sm font-semibold hover:bg-[#ece2d5]">
+          <Link href="/admin" onClick={() => setOpen(false)} className="mb-1 block rounded bg-[var(--c-soft)] px-3 py-2 text-sm font-semibold hover:bg-[#ece2d5]">
             進入管理後台
           </Link>
         )}
-        <Link href="/account?tab=profile" onClick={() => setOpen(false)} className="block rounded px-3 py-2 text-sm hover:bg-[#f6f2ec]">
+        <Link href="/account?tab=profile" onClick={() => setOpen(false)} className="block rounded px-3 py-2 text-sm hover:bg-[var(--c-bg)]">
           我的帳戶
         </Link>
-        <Link href="/account?tab=orders" onClick={() => setOpen(false)} className="block rounded px-3 py-2 text-sm hover:bg-[#f6f2ec]">
+        <Link href="/account?tab=orders" onClick={() => setOpen(false)} className="block rounded px-3 py-2 text-sm hover:bg-[var(--c-bg)]">
           我的訂單
         </Link>
         <button
           onClick={() => { setOpen(false); signOut(); }}
-          className="block w-full rounded px-3 py-2 text-left text-sm hover:bg-[#f6f2ec]"
+          className="block w-full rounded px-3 py-2 text-left text-sm hover:bg-[var(--c-bg)]"
         >
           登出
         </button>
@@ -106,7 +106,7 @@ export default function AccountMenu({ nextPath = '/account' }: { nextPath?: stri
         ref={btnRef}
         onClick={toggleOpen}
         aria-label="我的帳號"
-        className="rounded-md p-2 hover:bg-[#efe8dd]"
+        className="rounded-md p-2 hover:bg-[var(--c-soft)]"
       >
         <IconUser />
       </button>

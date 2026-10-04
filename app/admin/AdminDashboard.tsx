@@ -37,6 +37,7 @@ import CampaignManager from './CampaignManager';
 import FixedBannerCropModal from './FixedBannerCropModal';
 import IntegrationSettings from './IntegrationSettings';
 import ProfileCardManager from './ProfileCardManager';
+import SiteThemeEditor from './SiteThemeEditor';
 import { isCollectOnDelivery } from '@/lib/payment';
 import { buildReturnSteps, historyKind, isReturnOrder } from '@/lib/return-progress';
 import { getCheckoutLine, HIDDEN_FOOTER_SECTION_TITLES, lineAddFriendUrl, withCheckoutLine } from '@/lib/checkout-line';
@@ -438,17 +439,13 @@ export default function AdminDashboard({
       window.history.replaceState(null, '', url);
     } catch { /* 略過 */ }
   };
-  // 手機:後台不要下拉重新整理、不要平滑捲動(iPhone 捲到頂端前會誤觸重新整理、畫面跑位)
+  // 後台不要平滑捲動(iPhone 捲動時容易跑位)
   useEffect(() => {
     const html = document.documentElement;
-    const prev = { overscroll: html.style.overscrollBehaviorY, bodyOverscroll: document.body.style.overscrollBehaviorY, behavior: html.style.scrollBehavior };
-    html.style.overscrollBehaviorY = 'none';
-    document.body.style.overscrollBehaviorY = 'none';
+    const prev = html.style.scrollBehavior;
     html.style.scrollBehavior = 'auto';
     return () => {
-      html.style.overscrollBehaviorY = prev.overscroll;
-      document.body.style.overscrollBehaviorY = prev.bodyOverscroll;
-      html.style.scrollBehavior = prev.behavior;
+      html.style.scrollBehavior = prev;
     };
   }, []);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -2927,6 +2924,8 @@ export default function AdminDashboard({
                   )}
                 </Card>
               )}
+
+              {settingsTab === 'general' && <SiteThemeEditor initial={initialSettings?.site_theme} />}
 
               {settingsTab === 'general' && (
               <Card title="網站 Logo">

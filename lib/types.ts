@@ -79,6 +79,8 @@ export type SiteSettings = {
   coupon_hero_image?: string;
   // 會員中心右上角的會員印章圖片
   member_stamp_image?: string;
+  // 網站外觀:配色與版面配置(lib/site-theme)
+  site_theme?: unknown;
   updated_at?: string;
 };
 

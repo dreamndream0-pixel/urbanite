@@ -483,40 +483,40 @@ export default function CheckoutPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#f6f2ec] text-[#1f1b19]">
+    <main className="min-h-screen bg-[var(--c-bg)] text-[var(--c-text)]">
       <ShopHeader logoUrl={settings?.logo_url ?? ''} leftLabel="← 回商店" cartCount={cartCount} />
 
       <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6">
         <h1 className="mb-6 text-2xl font-semibold tracking-wide">訂單結帳</h1>
 
         {orderNo ? (
-          <div className="rounded-2xl bg-white p-8 text-center shadow-sm">
+          <div className="rounded-2xl bg-[var(--c-surface)] p-8 text-center shadow-sm">
             <p className="text-lg font-semibold text-[#1f7a44]">訂單成立！</p>
-            <p className="mt-2 text-[#6b6156]">單號：{orderNo}</p>
-            <p className="mt-1 text-sm text-[#8a7f72]">我們會盡快為你備貨，感謝購買。</p>
+            <p className="mt-2 text-[var(--c-text2)]">單號：{orderNo}</p>
+            <p className="mt-1 text-sm text-[var(--c-muted)]">我們會盡快為你備貨，感謝購買。</p>
             {showAccountInfo && paymentAccount ? (
-              <div className="mx-auto mt-5 max-w-sm rounded-xl border border-[#d8c7a8] bg-[#faf6ea] p-4 text-left">
-                <p className="text-sm font-semibold text-[#8a6d1b]">{paymentAccount.name} — 收款資訊</p>
-                <p className="mt-1 whitespace-pre-wrap text-sm text-[#6b6156]">{paymentAccount.info}</p>
-                <p className="mt-2 text-xs text-[#a99e8f]">請完成付款後保留交易明細，方便我們對帳。</p>
+              <div className="mx-auto mt-5 max-w-sm rounded-xl border border-[#d8c7a8] bg-[var(--c-header)] p-4 text-left">
+                <p className="text-sm font-semibold text-[var(--c-gold)]">{paymentAccount.name} — 收款資訊</p>
+                <p className="mt-1 whitespace-pre-wrap text-sm text-[var(--c-text2)]">{paymentAccount.info}</p>
+                <p className="mt-2 text-xs text-[var(--c-muted)]">請完成付款後保留交易明細，方便我們對帳。</p>
               </div>
             ) : null}
             <LineContactCard settings={settings ?? undefined} />
             <Link
               href={shopHome}
-              className="mt-6 inline-block rounded-full bg-[#1f1b19] px-6 py-3 font-semibold text-white"
+              className="mt-6 inline-block rounded-full bg-[var(--c-button)] px-6 py-3 font-semibold text-[var(--c-button-text)]"
             >
               繼續購物
             </Link>
           </div>
         ) : !loaded ? (
-          <p className="py-20 text-center text-[#8a7f72]">載入中…</p>
+          <p className="py-20 text-center text-[var(--c-muted)]">載入中…</p>
         ) : cart.length === 0 ? (
-          <div className="rounded-2xl bg-white p-8 text-center shadow-sm">
-            <p className="text-[#6b6156]">購物車是空的。</p>
+          <div className="rounded-2xl bg-[var(--c-surface)] p-8 text-center shadow-sm">
+            <p className="text-[var(--c-text2)]">購物車是空的。</p>
             <Link
               href={shopHome}
-              className="mt-6 inline-block rounded-full bg-[#1f1b19] px-6 py-3 font-semibold text-white"
+              className="mt-6 inline-block rounded-full bg-[var(--c-button)] px-6 py-3 font-semibold text-[var(--c-button-text)]"
             >
               去逛逛
             </Link>
@@ -524,7 +524,7 @@ export default function CheckoutPage() {
         ) : (
           <div className="space-y-6">
             {/* 購買明細 */}
-            <section className="rounded-2xl bg-white p-5 shadow-sm">
+            <section className="rounded-2xl bg-[var(--c-surface)] p-5 shadow-sm">
               <h2 className="mb-4 font-semibold">購買明細（{cart.length} 件）</h2>
               <div className="space-y-4">
                 {cart.map((item) => {
@@ -534,15 +534,15 @@ export default function CheckoutPage() {
                       <Link
                         href={`/products/${encodeURIComponent(item.productId)}`}
                         aria-label={`查看 ${item.name}`}
-                        className="aspect-[4/5] w-16 shrink-0 overflow-hidden rounded-md bg-[#f6f2ec]"
+                        className="aspect-[4/5] w-16 shrink-0 overflow-hidden rounded-md bg-[var(--c-bg)]"
                       >
                         {image ? <img src={image} alt="" className="h-full w-full object-cover" /> : null}
                       </Link>
                       <div className="min-w-0 flex-1">
                         <h3 className="font-medium">{item.name}</h3>
-                        <p className="text-sm text-[#8a7f72]">{item.variant}</p>
+                        <p className="text-sm text-[var(--c-muted)]">{item.variant}</p>
                         <div className="mt-2 flex items-center justify-between gap-3">
-                          <div className="inline-flex items-center rounded-full border border-[#e5ded4]">
+                          <div className="inline-flex items-center rounded-full border border-[var(--c-border)]">
                             <button className="px-3 py-1" onClick={() => updateQty(item.id, -1)}>
                               -
                             </button>
@@ -563,7 +563,7 @@ export default function CheckoutPage() {
             </section>
 
             {/* 優惠券 */}
-            <section className="rounded-2xl bg-white p-5 shadow-sm">
+            <section className="rounded-2xl bg-[var(--c-surface)] p-5 shadow-sm">
               <h2 className="mb-3 font-semibold">優惠券 / 優惠碼</h2>
               {memberCoupons.length > 0 && (
                 <div className="mb-4 grid gap-2 sm:grid-cols-2">
@@ -579,14 +579,14 @@ export default function CheckoutPage() {
                         disabled={check ? !check.ok : false}
                         className={`rounded-xl border p-3 text-left ${
                           applied?.userCouponId === item.id
-                            ? 'border-[#1f1b19] bg-[#faf7f2]'
+                            ? 'border-[var(--c-text)] bg-[var(--c-header)]'
                             : check?.ok === false
-                              ? 'border-[#e5ded4] bg-[#f6f2ec] opacity-70'
-                              : 'border-[#e5ded4] bg-white'
+                              ? 'border-[var(--c-border)] bg-[var(--c-bg)] opacity-70'
+                              : 'border-[var(--c-border)] bg-[var(--c-surface)]'
                         }`}
                       >
                         <span className="block font-mono font-bold">{coupon.code}</span>
-                        <span className="mt-1 block text-xs text-[#8a7f72]">
+                        <span className="mt-1 block text-xs text-[var(--c-muted)]">
                           {coupon.type === 'free_shipping' ? '免運' : coupon.type === 'percent' ? `${coupon.value}% 折扣` : `折抵 ${formatter.format(coupon.value)}`}
                           {coupon.min_spend > 0 ? ` / 滿 ${formatter.format(coupon.min_spend)}` : ''}
                         </span>
@@ -603,11 +603,11 @@ export default function CheckoutPage() {
                   value={discountInput}
                   onChange={(e) => setDiscountInput(e.target.value)}
                   placeholder="輸入優惠代碼"
-                  className="flex-1 rounded-lg border border-[#e5ded4] px-4 py-2.5 text-sm"
+                  className="flex-1 rounded-lg border border-[var(--c-border)] px-4 py-2.5 text-sm"
                 />
                 <button
                   onClick={() => applyDiscount()}
-                  className="rounded-lg border border-[#1f1b19] px-5 py-2.5 text-sm font-semibold"
+                  className="rounded-lg border border-[var(--c-text)] px-5 py-2.5 text-sm font-semibold"
                 >
                   套用
                 </button>
@@ -618,15 +618,15 @@ export default function CheckoutPage() {
             </section>
 
             {/* 付款與送貨方式 */}
-            <section className="rounded-2xl bg-white p-5 shadow-sm">
+            <section className="rounded-2xl bg-[var(--c-surface)] p-5 shadow-sm">
               <h2 className="mb-4 font-semibold">付款與送貨方式</h2>
               <div className="grid gap-4">
                 <label className="block">
-                  <span className="mb-1 block text-sm text-[#8a7f72]">送貨方式</span>
+                  <span className="mb-1 block text-sm text-[var(--c-muted)]">送貨方式</span>
                   <select
                     value={selectedShippingMethod}
                     onChange={(e) => setShippingMethod(e.target.value)}
-                    className="w-full rounded-lg border border-[#e5ded4] px-3 py-2.5"
+                    className="w-full rounded-lg border border-[var(--c-border)] px-3 py-2.5"
                   >
                     {availableShippingMethods.map((m) => (
                       <option key={m} value={m}>
@@ -636,12 +636,12 @@ export default function CheckoutPage() {
                   </select>
                 </label>
                 {needsPickupStore ? (
-                  <div className="rounded-xl border border-[#e5ded4] bg-[#faf7f2] p-4">
+                  <div className="rounded-xl border border-[var(--c-border)] bg-[var(--c-header)] p-4">
                     <div className="flex flex-wrap items-center justify-between gap-3">
                       <div>
-                        <p className="text-sm font-semibold text-[#1f1b19]">取貨門市</p>
+                        <p className="text-sm font-semibold text-[var(--c-text)]">取貨門市</p>
                         {pickupStore ? (
-                          <div className="mt-1 text-sm leading-6 text-[#6b6156]">
+                          <div className="mt-1 text-sm leading-6 text-[var(--c-text2)]">
                             <p>{pickupStore.store_name}（{pickupStore.store_id}）</p>
                             <p>{pickupStore.store_address}</p>
                             {pickupStore.store_phone ? <p>{pickupStore.store_phone}</p> : null}
@@ -653,7 +653,7 @@ export default function CheckoutPage() {
                       <button
                         type="button"
                         onClick={() => openStoreMap(shipTypeFromCheckout(selectedShippingMethod))}
-                        className="rounded-full bg-[#1f1b19] px-4 py-2 text-sm font-semibold text-white"
+                        className="rounded-full bg-[var(--c-button)] px-4 py-2 text-sm font-semibold text-[var(--c-button-text)]"
                       >
                         {pickupStore ? '重新選擇' : '選擇門市'}
                       </button>
@@ -661,17 +661,17 @@ export default function CheckoutPage() {
                   </div>
                 ) : null}
                 {codPickup ? (
-                  <div className="rounded-xl border border-[#e5ded4] bg-[#faf7f2] p-4 text-sm">
-                    <p className="font-semibold text-[#1f1b19]">付款方式：門市取貨付款</p>
-                    <p className="mt-1 text-[#6b6156]">此方式為到門市取貨時付款（藍新代收），下單後不需線上付款。</p>
+                  <div className="rounded-xl border border-[var(--c-border)] bg-[var(--c-header)] p-4 text-sm">
+                    <p className="font-semibold text-[var(--c-text)]">付款方式：門市取貨付款</p>
+                    <p className="mt-1 text-[var(--c-text2)]">此方式為到門市取貨時付款（藍新代收），下單後不需線上付款。</p>
                   </div>
                 ) : (
                   <label className="block">
-                    <span className="mb-1 block text-sm text-[#8a7f72]">付款方式</span>
+                    <span className="mb-1 block text-sm text-[var(--c-muted)]">付款方式</span>
                     <select
                       value={selectedPaymentMethod}
                       onChange={(e) => setPaymentMethod(e.target.value)}
-                      className="w-full rounded-lg border border-[#e5ded4] px-3 py-2.5"
+                      className="w-full rounded-lg border border-[var(--c-border)] px-3 py-2.5"
                     >
                       {availablePaymentMethods.map((m) => (
                         <option key={m} value={m}>
@@ -685,15 +685,15 @@ export default function CheckoutPage() {
             </section>
 
             {/* 收件資料 */}
-            <section className="rounded-2xl bg-white p-5 shadow-sm">
+            <section className="rounded-2xl bg-[var(--c-surface)] p-5 shadow-sm">
               <h2 className="mb-4 font-semibold">收件資料</h2>
               {visibleRecipients.length > 0 ? (
                 <label className="mb-3 block">
-                  <span className="mb-1 block text-sm text-[#8a7f72]">{needsPickupStore ? '常用取貨門市' : '常用收件人'}</span>
+                  <span className="mb-1 block text-sm text-[var(--c-muted)]">{needsPickupStore ? '常用取貨門市' : '常用收件人'}</span>
                   <select
                     value=""
                     onChange={(e) => { if (e.target.value !== '') fillRecipient(Number(e.target.value)); }}
-                    className="w-full rounded-lg border border-[#e5ded4] px-3 py-2.5"
+                    className="w-full rounded-lg border border-[var(--c-border)] px-3 py-2.5"
                   >
                     <option value="">{needsPickupStore ? '選擇常用取貨門市自動帶入…' : '選擇常用收件人自動帶入…'}</option>
                     {visibleRecipients.map(({ r, i }) => (
@@ -709,13 +709,13 @@ export default function CheckoutPage() {
               <div className="grid gap-3">
                 <div className="grid grid-cols-2 gap-3">
                   <input
-                    className="rounded-lg border border-[#e5ded4] px-4 py-3"
+                    className="rounded-lg border border-[var(--c-border)] px-4 py-3"
                     placeholder="收件人姓名(本名)"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                   />
                   <input
-                    className="rounded-lg border border-[#e5ded4] px-4 py-3"
+                    className="rounded-lg border border-[var(--c-border)] px-4 py-3"
                     placeholder="收件人電話"
                     inputMode="tel"
                     value={phone}
@@ -723,21 +723,21 @@ export default function CheckoutPage() {
                   />
                 </div>
                 <input
-                  className="rounded-lg border border-[#e5ded4] px-4 py-3"
+                  className="rounded-lg border border-[var(--c-border)] px-4 py-3"
                   placeholder="Email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                 />
 
                 {needsPickupStore ? (
-                  <p className="rounded-lg bg-[#faf7f2] px-4 py-3 text-sm text-[#8a7f72]">
+                  <p className="rounded-lg bg-[var(--c-header)] px-4 py-3 text-sm text-[var(--c-muted)]">
                     超商取貨免填地址，取貨門市請於上方「選擇門市」設定。
                   </p>
                 ) : (
                   <>
                     <div className="grid grid-cols-2 gap-3">
                       <select
-                        className="rounded-lg border border-[#e5ded4] px-3 py-3"
+                        className="rounded-lg border border-[var(--c-border)] px-3 py-3"
                         value={city}
                         onChange={(e) => { setCity(e.target.value); setDistrict(''); }}
                       >
@@ -747,7 +747,7 @@ export default function CheckoutPage() {
                         ))}
                       </select>
                       <select
-                        className="rounded-lg border border-[#e5ded4] px-3 py-3 disabled:bg-[#f6f2ec]"
+                        className="rounded-lg border border-[var(--c-border)] px-3 py-3 disabled:bg-[var(--c-bg)]"
                         value={district}
                         onChange={(e) => setDistrict(e.target.value)}
                         disabled={!city}
@@ -759,7 +759,7 @@ export default function CheckoutPage() {
                       </select>
                     </div>
                     <input
-                      className="rounded-lg border border-[#e5ded4] px-4 py-3"
+                      className="rounded-lg border border-[var(--c-border)] px-4 py-3"
                       placeholder="詳細地址(路/街、門牌號)"
                       value={address}
                       onChange={(e) => setAddress(e.target.value)}
@@ -772,14 +772,14 @@ export default function CheckoutPage() {
                     type="button"
                     onClick={saveRecipient}
                     disabled={savingRecipient}
-                    className="justify-self-start rounded-full border border-[#1f1b19] px-4 py-2 text-sm font-semibold text-[#1f1b19] hover:bg-[#1f1b19] hover:text-white disabled:opacity-50"
+                    className="justify-self-start rounded-full border border-[var(--c-text)] px-4 py-2 text-sm font-semibold text-[var(--c-text)] hover:bg-[var(--c-button)] hover:text-white disabled:opacity-50"
                   >
                     ＋ {needsPickupStore ? '加入常用取貨人' : '加入常用收件人'}
                   </button>
                 ) : null}
 
                 <textarea
-                  className="rounded-lg border border-[#e5ded4] px-4 py-3"
+                  className="rounded-lg border border-[var(--c-border)] px-4 py-3"
                   placeholder="訂單備註(選填)"
                   rows={2}
                   value={note}
@@ -789,14 +789,14 @@ export default function CheckoutPage() {
             </section>
 
             {/* 訂單資訊 */}
-            <section className="rounded-2xl bg-white p-5 shadow-sm">
+            <section className="rounded-2xl bg-[var(--c-surface)] p-5 shadow-sm">
               <h2 className="mb-4 font-semibold">訂單資訊</h2>
               <div className="space-y-2 text-sm">
-                <div className="flex justify-between text-[#6b6156]">
+                <div className="flex justify-between text-[var(--c-text2)]">
                   <span>小計</span>
                   <span>{formatter.format(subtotal)}</span>
                 </div>
-                <div className="flex justify-between text-[#6b6156]">
+                <div className="flex justify-between text-[var(--c-text2)]">
                   <span>運費</span>
                   <span>{shipping === 0 ? '免運' : formatter.format(shipping)}</span>
                 </div>
@@ -808,41 +808,41 @@ export default function CheckoutPage() {
                 )}
                 <div className="flex justify-between pt-2 text-lg font-semibold">
                   <span>合計</span>
-                  <span className="text-[#c84767]">{formatter.format(total)}</span>
+                  <span className="text-[var(--c-sale)]">{formatter.format(total)}</span>
                 </div>
               </div>
 
               {/* 轉帳匯款:開合式面板,展開訂單明細 + 收件資訊 + 賣家匯款帳號 */}
               {showAccountInfo && paymentAccount ? (
-                <div className="mt-4 overflow-hidden rounded-xl border border-[#d8c7a8] bg-[#faf6ea]">
+                <div className="mt-4 overflow-hidden rounded-xl border border-[#d8c7a8] bg-[var(--c-header)]">
                   <button
                     type="button"
                     onClick={() => setTransferOpen((v) => !v)}
                     className="flex w-full items-center justify-between px-4 py-3 text-left"
                   >
-                    <span className="text-sm font-semibold text-[#8a6d1b]">匯款資訊與訂單明細</span>
-                    <span className="text-[#8a6d1b]">{transferOpen ? '▲' : '▼'}</span>
+                    <span className="text-sm font-semibold text-[var(--c-gold)]">匯款資訊與訂單明細</span>
+                    <span className="text-[var(--c-gold)]">{transferOpen ? '▲' : '▼'}</span>
                   </button>
                   {transferOpen ? (
                     <div className="space-y-3 border-t border-[#e8d9b6] px-4 py-3 text-sm">
                       <div>
-                        <p className="mb-1 font-semibold text-[#8a6d1b]">賣家收款帳號</p>
-                        <p className="whitespace-pre-wrap text-[#6b6156]">{paymentAccount.info}</p>
+                        <p className="mb-1 font-semibold text-[var(--c-gold)]">賣家收款帳號</p>
+                        <p className="whitespace-pre-wrap text-[var(--c-text2)]">{paymentAccount.info}</p>
                       </div>
                       <div className="border-t border-[#e8d9b6] pt-2">
-                        <p className="mb-1 font-semibold text-[#8a6d1b]">訂單金額</p>
-                        <div className="flex justify-between text-[#6b6156]"><span>小計</span><span>{formatter.format(subtotal)}</span></div>
-                        <div className="flex justify-between text-[#6b6156]"><span>運費</span><span>{shipping === 0 ? '免運' : formatter.format(shipping)}</span></div>
+                        <p className="mb-1 font-semibold text-[var(--c-gold)]">訂單金額</p>
+                        <div className="flex justify-between text-[var(--c-text2)]"><span>小計</span><span>{formatter.format(subtotal)}</span></div>
+                        <div className="flex justify-between text-[var(--c-text2)]"><span>運費</span><span>{shipping === 0 ? '免運' : formatter.format(shipping)}</span></div>
                         {applied ? <div className="flex justify-between text-[#1f7a44]"><span>折扣 {applied.code}</span><span>-{formatter.format(applied.amount)}</span></div> : null}
-                        <div className="flex justify-between pt-1 font-semibold"><span>應付總額</span><span className="text-[#c84767]">{formatter.format(total)}</span></div>
+                        <div className="flex justify-between pt-1 font-semibold"><span>應付總額</span><span className="text-[var(--c-sale)]">{formatter.format(total)}</span></div>
                       </div>
                       <div className="border-t border-[#e8d9b6] pt-2">
-                        <p className="mb-1 font-semibold text-[#8a6d1b]">收件資訊</p>
-                        <p className="text-[#6b6156]">{name || '(未填姓名)'}｜{phone || '(未填電話)'}</p>
-                        <p className="text-[#6b6156]">{finalAddress || '(未填地址)'}</p>
-                        <p className="text-[#6b6156]">{selectedShippingMethod}</p>
+                        <p className="mb-1 font-semibold text-[var(--c-gold)]">收件資訊</p>
+                        <p className="text-[var(--c-text2)]">{name || '(未填姓名)'}｜{phone || '(未填電話)'}</p>
+                        <p className="text-[var(--c-text2)]">{finalAddress || '(未填地址)'}</p>
+                        <p className="text-[var(--c-text2)]">{selectedShippingMethod}</p>
                       </div>
-                      <p className="text-xs text-[#a99e8f]">請依上方帳號完成匯款,並保留交易明細;送出訂單後也可於「我的訂單 → 立即付款」回報帳號後五碼或上傳截圖。</p>
+                      <p className="text-xs text-[var(--c-muted)]">請依上方帳號完成匯款,並保留交易明細;送出訂單後也可於「我的訂單 → 立即付款」回報帳號後五碼或上傳截圖。</p>
                     </div>
                   ) : null}
                 </div>
@@ -859,7 +859,7 @@ export default function CheckoutPage() {
               )}
 
               <button
-                className="mt-5 w-full rounded-full bg-[#c84767] px-5 py-3.5 font-semibold text-white disabled:opacity-60"
+                className="mt-5 w-full rounded-full bg-[var(--c-sale)] px-5 py-3.5 font-semibold text-white disabled:opacity-60"
                 onClick={submitOrder}
                 disabled={submitting}
               >
@@ -880,7 +880,7 @@ export default function CheckoutPage() {
           toast ? 'translate-y-0 opacity-100' : 'translate-y-2 opacity-0'
         }`}
       >
-        <div className="flex items-center gap-2 rounded-full bg-[#1f1b19] px-5 py-3 text-sm font-semibold text-white shadow-lg">
+        <div className="flex items-center gap-2 rounded-full bg-[var(--c-button)] px-5 py-3 text-sm font-semibold text-[var(--c-button-text)] shadow-lg">
           <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#1f7a44] text-white"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M5 13l4 4L19 7" /></svg></span>
           {toast}
         </div>
