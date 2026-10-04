@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import LineBindingCard from './LineBindingCard';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import type { Customer, Discount, Order, OrderStatusHistory, Product, Recipient, ReturnRequest, SiteSettings, UserCoupon } from '@/lib/types';
@@ -240,6 +241,7 @@ export default function AccountClient({
             onSaved={() => router.refresh()}
           />
         )}
+        {tab === 'profile' && <LineBindingCard />}
 
         {tab === 'coupons' && <CouponsTab coupons={coupons} heroImage={couponHero} />}
 

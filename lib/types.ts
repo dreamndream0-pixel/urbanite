@@ -125,6 +125,9 @@ export type Recipient = {
 export type Customer = {
   id: string;
   user_id: string;
+  // 綁定的官方 LINE(Messaging API userId)
+  line_user_id?: string | null;
+  line_display_name?: string | null;
   email: string;
   phone?: string;
   name: string;

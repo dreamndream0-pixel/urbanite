@@ -592,6 +592,7 @@ export default function AdminDashboard({
         phone: c.phone ?? '',
         address: c.address ?? '',
         joined: c.created_at ?? '',
+        line: c.line_user_id ? c.line_display_name || 'LINE' : '',
         ...(stat.get(c.user_id) ?? { count: 0, total: 0, last: '' }),
       }))
       .sort((a, b) => b.total - a.total);
@@ -2335,7 +2336,10 @@ export default function AdminDashboard({
                               onClick={() => setExpandedUser(isOpen ? null : c.user_id)}
                             >
                               <td className="py-3 pr-4">
-                                <p className="font-semibold">{c.name}</p>
+                                <p className="flex items-center gap-1.5 font-semibold">
+                                  {c.name}
+                                  {c.line ? <span title={`LINE:${c.line}`} className="rounded-full bg-[#e9f7ee] px-1.5 py-0.5 text-[10px] font-semibold text-[#1f7a44]">LINE 已綁定</span> : null}
+                                </p>
                                 <p className="text-xs text-[#8a7f72]">{c.email}</p>
                               </td>
                               <td className="py-3 pr-4 text-[#6b6156]">{c.phone || '-'}</td>
