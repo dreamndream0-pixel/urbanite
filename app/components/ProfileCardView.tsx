@@ -130,7 +130,6 @@ export default function ProfileCardView({
   };
   const layout = theme.layout ?? 'classic';
   const name = card.display_name || card.slug;
-  const avatarRound = theme.avatarShape === 'circle' ? 'rounded-full' : 'rounded-2xl';
   // 照片型版面:大頭照為主,關閉大頭照時改用封面照
   const photo = showAvatar ? card.avatar_url : theme.coverImage;
   // 白色卡片上的文字(深色主題時改深色字)
@@ -210,17 +209,35 @@ export default function ProfileCardView({
   );
   const paperShadow = '0 10px 26px rgba(0,0,0,0.14)';
 
+  // 頭像形狀與文字排列:每個版面都套用
+  const shape = theme.avatarShape;
+  const al: 'left' | 'center' = theme.align === 'left' ? 'left' : 'center';
+  const isLeft = al === 'left';
+  const items = isLeft ? 'items-start' : 'items-center';
+  const textAl = isLeft ? 'text-left' : 'text-center';
+  const round = shape === 'circle' ? 'rounded-full' : 'rounded-2xl';
+  const aspect = shape === 'portrait' ? 'aspect-[4/5]' : 'aspect-square';
+  const avatarBox = (w: string) => `${w} ${aspect} ${round}`;
+  const ringStyle: CSSProperties = { border: '6px solid #ffffff', boxShadow: '0 4px 14px rgba(0,0,0,0.12)' };
+  // 大照片:方形 / 直式為滿版,圓形改成置中(或靠左)的大圓
+  const bigPhoto = (fullClass: string) =>
+    !photo ? null : shape === 'circle' ? (
+      <div className={`flex px-5 pt-8 ${isLeft ? 'justify-start' : 'justify-center'}`}>{photoImg('aspect-square w-[72%] rounded-full', ringStyle)}</div>
+    ) : (
+      <div className={fullClass}>{photoImg(`${aspect} w-full`)}</div>
+    );
+
   let header: ReactNode;
   if (layout === 'hero') {
     // 滿版封面:封面照(沒有時用大頭照)延伸到簡介,文字疊在底部漸層上
     const image = theme.coverImage || (showAvatar ? card.avatar_url : '');
-    const p = info({ align: 'center', light: true });
+    const p = info({ align: al, light: true });
     header = (
       <div className="relative -mx-5 flex flex-col justify-end self-stretch overflow-hidden" style={{ aspectRatio: '4 / 5', background: theme.bandColor }}>
         {image ? <img src={image} alt="" className="absolute inset-0 h-full w-full object-cover" /> : null}
         <div className="absolute inset-0" style={{ background: 'linear-gradient(180deg, rgba(0,0,0,0) 30%, rgba(0,0,0,0.3) 55%, rgba(0,0,0,0.8) 100%)' }} />
-        <div className="relative flex flex-col items-center px-6 pb-7 pt-32 text-center text-white">
-          {showAvatar && theme.coverImage ? avatar('h-16 w-16 rounded-full', { border: '2px solid rgba(255,255,255,0.9)' }) : null}
+        <div className={`relative flex flex-col px-6 pb-7 pt-32 text-white ${items} ${textAl}`}>
+          {showAvatar && theme.coverImage ? avatar(avatarBox('w-16'), { border: '2px solid rgba(255,255,255,0.9)' }) : null}
           <h1 className="mt-3 text-[26px] font-bold tracking-[0.06em]">{name}</h1>
           {p.bio}
           {p.email}
@@ -231,14 +248,14 @@ export default function ProfileCardView({
     );
   } else if (layout === 'polaroid') {
     // 拍立得:斜放的照片+迴紋針+旗幟標籤,下方格紋紙卡
-    const p = info({ align: 'center', text: theme.accentColor, muted: theme.mutedColor });
+    const p = info({ align: al, text: theme.accentColor, muted: theme.mutedColor });
     header = (
       <div className="relative w-full pt-10">
         <div className="relative z-10 mx-auto w-[74%] -rotate-[5deg] rounded-xl bg-white p-2.5" style={{ boxShadow: paperShadow }}>
           <svg width="26" height="54" viewBox="0 0 26 54" className="absolute -top-6 left-1/2 -translate-x-1/2 rotate-[12deg]" fill="none" stroke="#8a8a8a" strokeWidth="2.4" strokeLinecap="round" aria-hidden="true">
             <path d="M8 40V12a5 5 0 0 1 10 0v32a8 8 0 0 1-16 0V16" />
           </svg>
-          {photoImg('aspect-square rounded-lg') ?? <div className="aspect-square rounded-lg bg-[#eeeeee]" />}
+          {photoImg(`${aspect} ${shape === 'circle' ? 'rounded-full' : 'rounded-lg'}`) ?? <div className={`${aspect} rounded-lg bg-[#eeeeee]`} />}
         </div>
         {card.show_tags && card.tags.length > 0 ? (
           <div className="absolute right-0 top-14 z-20 flex flex-col items-end gap-2">
@@ -248,7 +265,7 @@ export default function ProfileCardView({
           </div>
         ) : null}
         <div
-          className="-mt-12 rounded-2xl px-5 pb-6 pt-16 text-center"
+          className={`-mt-12 rounded-2xl px-5 pb-6 pt-16 ${textAl}`}
           style={{
             background: '#ffffff',
             backgroundImage: `linear-gradient(${tint(theme.accentColor, 14)} 1px, transparent 1px), linear-gradient(90deg, ${tint(theme.accentColor, 14)} 1px, transparent 1px)`,
@@ -265,11 +282,11 @@ export default function ProfileCardView({
     );
   } else if (layout === 'label') {
     // 斜角名牌:大照片,名稱放在斜切色塊上
-    const p = info({ align: 'left' });
+    const p = info({ align: al });
     header = (
       <div className="w-full">
-        <div className="relative -mx-5">
-          {photoImg('aspect-square w-full') ?? <div className="h-40" style={{ background: theme.bandColor }} />}
+        <div className="relative -mx-5 pb-1">
+          {bigPhoto('') ?? <div className="h-40" style={{ background: theme.bandColor }} />}
           <div
             className="absolute bottom-5 left-0 py-2 pl-5 pr-10 text-xl font-bold tracking-[0.06em] text-white"
             style={{ background: theme.accentColor, clipPath: 'polygon(0 0, 100% 0, calc(100% - 22px) 100%, 0 100%)' }}
@@ -277,21 +294,27 @@ export default function ProfileCardView({
             {name}
           </div>
         </div>
-        {p.tags}
-        {p.socials}
-        {p.bio}
-        {p.email}
+        <div className={`flex flex-col ${items}`}>
+          {p.tags}
+          {p.socials}
+          {p.bio}
+          {p.email}
+        </div>
       </div>
     );
   } else if (layout === 'arch') {
     // 弧形照片:照片底部是弧線
-    const p = info({ align: 'center' });
+    const p = info({ align: al });
     header = (
-      <div className="flex w-full flex-col items-center">
-        <div className="-mx-5 self-stretch" style={{ clipPath: 'ellipse(85% 100% at 50% 0)' }}>
-          {photoImg('aspect-square w-full') ?? <div className="h-48" style={{ background: theme.bandColor }} />}
-        </div>
-        <h1 className="mt-5 text-[24px] font-bold tracking-[0.06em]" style={{ color: theme.accentColor }}>{name}</h1>
+      <div className={`flex w-full flex-col ${items}`}>
+        {shape === 'circle' ? (
+          <div className="-mx-5 self-stretch">{bigPhoto('')}</div>
+        ) : (
+          <div className="-mx-5 self-stretch" style={{ clipPath: 'ellipse(85% 100% at 50% 0)' }}>
+            {photoImg(`${aspect} w-full`) ?? <div className="h-48" style={{ background: theme.bandColor }} />}
+          </div>
+        )}
+        <h1 className={`mt-5 text-[24px] font-bold tracking-[0.06em] ${textAl}`} style={{ color: theme.accentColor }}>{name}</h1>
         {p.tags}
         {p.bio}
         {p.email}
@@ -299,32 +322,40 @@ export default function ProfileCardView({
       </div>
     );
   } else if (layout === 'floating') {
-    // 浮動名片:白色資料卡,圓形頭像壓在右上角
-    const p = info({ align: 'left', text: ink, muted: inkMuted, tagStyle: theme.tagStyle === 'solid' ? 'solid' : 'outline' });
+    // 浮動名片:白色資料卡,頭像壓在右上角(置中時壓在正上方)
+    const p = info({ align: al, text: ink, muted: inkMuted, tagStyle: theme.tagStyle === 'solid' ? 'solid' : 'outline' });
     header = (
       <div className="w-full">
         {coverBand('h-32')}
         <div className="relative -mt-20">
-          <div className="rounded-3xl bg-white px-5 pb-5 pt-5 text-left" style={{ boxShadow: paperShadow, color: ink }}>
-            <h1 className={`text-[22px] font-bold tracking-[0.04em] ${showAvatar ? 'pr-24' : ''}`}>{name}</h1>
+          <div className={`flex flex-col rounded-3xl bg-white px-5 pb-5 ${items} ${textAl} ${showAvatar && !isLeft ? 'pt-14' : 'pt-5'}`} style={{ boxShadow: paperShadow, color: ink }}>
+            <h1 className={`text-[22px] font-bold tracking-[0.04em] ${showAvatar && isLeft ? 'pr-24' : ''}`}>{name}</h1>
             {p.tags}
             {p.bio}
             {p.email}
             {p.socials}
           </div>
-          {showAvatar ? avatar('absolute -top-6 right-4 h-20 w-20 rounded-full', { border: '4px solid #ffffff', boxShadow: '0 4px 12px rgba(0,0,0,0.12)' }) : null}
+          {showAvatar
+            ? avatar(`absolute ${isLeft ? '-top-6 right-4' : '-top-10 left-1/2 -translate-x-1/2'} ${avatarBox('w-20')}`, { border: '4px solid #ffffff', boxShadow: '0 4px 12px rgba(0,0,0,0.12)' })
+            : null}
         </div>
       </div>
     );
   } else if (layout === 'side') {
     // 半版照片:左半照片,右半資料
-    const p = info({ align: 'left' });
+    const p = info({ align: al });
     header = (
       <div className="-mx-5 flex self-stretch" style={{ minHeight: 300 }}>
-        {photo ? photoImg('w-1/2 shrink-0') : null}
-        <div className={`flex flex-col justify-between py-6 ${photo ? 'w-1/2 px-4' : 'w-full px-5'}`}>
+        {photo ? (
+          shape === 'circle' ? (
+            <div className="flex w-1/2 shrink-0 items-center justify-center p-3">{photoImg('aspect-square w-full rounded-full', ringStyle)}</div>
+          ) : (
+            photoImg('w-1/2 shrink-0')
+          )
+        ) : null}
+        <div className={`flex flex-col justify-between py-6 ${items} ${textAl} ${photo ? 'w-1/2 px-4' : 'w-full px-5'}`}>
           <h1 className="text-[22px] font-semibold leading-7 tracking-[0.04em]">{name}</h1>
-          <div>
+          <div className={`flex flex-col ${items}`}>
             {p.tags}
             {p.bio}
             {p.email}
@@ -334,14 +365,17 @@ export default function ProfileCardView({
       </div>
     );
   } else if (layout === 'blob') {
-    // 花邊相框:不規則外框的照片
-    const p = info({ align: 'center' });
+    // 花邊相框:圓形為不規則花邊,方形 / 直式為圓角相框
+    const p = info({ align: al });
+    const frameRadius = shape === 'circle' ? '42% 58% 63% 37% / 41% 44% 56% 59%' : '28px';
+    const ringRadius = shape === 'circle' ? '58% 42% 52% 48% / 46% 58% 42% 54%' : '34px';
+    const size = shape === 'portrait' ? 'w-40 aspect-[4/5]' : 'w-44 aspect-square';
     header = (
-      <div className="flex w-full flex-col items-center pt-10">
-        <h1 className="text-[22px] font-bold tracking-[0.08em]" style={{ color: theme.accentColor }}>{name}</h1>
-        <div className="relative mt-5">
-          <div className="absolute -inset-3 border-2" style={{ borderColor: tint(theme.textColor, 45), borderRadius: '58% 42% 52% 48% / 46% 58% 42% 54%' }} />
-          {photoImg('relative h-44 w-44', { borderRadius: '42% 58% 63% 37% / 41% 44% 56% 59%', border: '6px solid #ffffff' }) ?? <div className="h-44 w-44 bg-white/80" style={{ borderRadius: '42% 58% 63% 37% / 41% 44% 56% 59%' }} />}
+      <div className={`flex w-full flex-col pt-10 ${items}`}>
+        <h1 className={`text-[22px] font-bold tracking-[0.08em] ${textAl}`} style={{ color: theme.accentColor }}>{name}</h1>
+        <div className="relative mx-3 mt-5">
+          <div className="absolute -inset-3 border-2" style={{ borderColor: tint(theme.textColor, 45), borderRadius: ringRadius }} />
+          {photoImg(`relative ${size}`, { borderRadius: frameRadius, border: '6px solid #ffffff' }) ?? <div className={`${size} bg-white/80`} style={{ borderRadius: frameRadius }} />}
         </div>
         <div className="mt-4">{p.email}</div>
         {p.socials}
@@ -351,14 +385,15 @@ export default function ProfileCardView({
     );
   } else if (layout === 'sticker') {
     // 側欄標籤:社群直排在左,名稱放在色塊標籤
-    const p = info({ align: 'left', vertical: true });
+    const p = info({ align: al, vertical: true });
+    const frameRadius = shape === 'circle' ? '48% 52% 45% 55% / 52% 46% 54% 48%' : '28px';
     header = (
-      <div className="w-full pt-8">
-        <div className="relative">
+      <div className={`flex w-full flex-col pt-8 ${items}`}>
+        <div className="relative w-full">
           <span className="absolute -left-2 top-2 h-16 w-16 rounded-full" style={{ background: tint(theme.accentColor, 30) }} />
           <span className="absolute bottom-6 right-2 h-12 w-12 rounded-full" style={{ background: tint(theme.accentColor, 25) }} />
           <div className="relative ml-10 mr-4">
-            {photoImg('aspect-square w-full', { borderRadius: '48% 52% 45% 55% / 52% 46% 54% 48%' }) ?? <div className="aspect-square w-full rounded-full bg-white/80" />}
+            {photoImg(`${aspect} w-full`, { borderRadius: frameRadius }) ?? <div className={`${aspect} w-full bg-white/80`} style={{ borderRadius: frameRadius }} />}
           </div>
           {p.socials ? <div className="absolute bottom-4 left-0">{p.socials}</div> : null}
         </div>
@@ -371,24 +406,25 @@ export default function ProfileCardView({
   } else if (layout === 'news') {
     // 報紙:報頭、#標籤條、文字欄+照片、鋸齒邊
     const zig = 'conic-gradient(from -45deg at bottom, #0000, #000 1deg 89deg, #0000 90deg) 50% / 14px 100%';
+    const hasBio = card.show_bio && card.bio;
     header = (
       <div className="w-full pt-8">
-        <div className="bg-white px-4 pb-6 pt-3" style={{ color: theme.accentColor, WebkitMask: zig, mask: zig }}>
+        <div className={`bg-white px-4 pb-6 pt-3 ${textAl}`} style={{ color: theme.accentColor, WebkitMask: zig, mask: zig }}>
           <p className="text-[11px] font-black italic tracking-wide">DAILY NEWS!</p>
           <h1 className="text-[30px] font-black leading-tight tracking-[0.02em]">{name}</h1>
           {card.show_tags && card.tags.length > 0 ? (
-            <div className="mt-2 flex gap-3 overflow-hidden whitespace-nowrap px-2 py-1 text-[11px] font-bold text-white" style={{ background: theme.accentColor }}>
+            <div className={`mt-2 flex gap-3 overflow-hidden whitespace-nowrap px-2 py-1 text-[11px] font-bold text-white ${isLeft ? '' : 'justify-center'}`} style={{ background: theme.accentColor }}>
               {card.tags.map((t) => <span key={t}>#{t}</span>)}
             </div>
           ) : null}
           <div className="mt-1 h-0.5 w-full" style={{ background: theme.accentColor }} />
-          <div className="mt-3 flex gap-3">
-            {card.show_bio && card.bio ? <p className="min-w-0 flex-1 whitespace-pre-line text-sm font-bold leading-6">{card.bio}</p> : null}
-            {photoImg(`aspect-[4/5] ${card.show_bio && card.bio ? 'w-[46%]' : 'w-full'} shrink-0`)}
+          <div className={`mt-3 flex gap-3 ${isLeft ? '' : 'flex-col items-center'}`}>
+            {hasBio ? <p className={`min-w-0 flex-1 whitespace-pre-line text-sm font-bold leading-6 ${textAl}`}>{card.bio}</p> : null}
+            {photoImg(`${aspect} ${shape === 'circle' ? 'rounded-full' : ''} ${hasBio && isLeft ? 'w-[46%]' : 'w-[70%]'} shrink-0`)}
           </div>
           <div className="mt-3 border-t-2 pt-2" style={{ borderColor: theme.accentColor }}>
             {socials.length > 0 ? (
-              <div className="flex gap-2">
+              <div className={`flex gap-2 ${isLeft ? '' : 'justify-center'}`}>
                 {socials.map((sc, i) => (
                   <a key={`${sc.type}-${i}`} href={socialUrl(sc)} target="_blank" rel="noreferrer" aria-label={sc.type} className="transition hover:opacity-70"><SocialIcon type={sc.type} size={18} /></a>
                 ))}
@@ -400,13 +436,12 @@ export default function ProfileCardView({
       </div>
     );
   } else if (layout === 'framed') {
-    // 相框:名稱在上,方形照片加白框
-    const center = theme.align !== 'left';
-    const p = info({ align: center ? 'center' : 'left' });
+    // 相框:名稱在上,照片加白框
+    const p = info({ align: al });
     header = (
-      <div className={`flex w-full flex-col pt-10 ${center ? 'items-center' : 'items-start'}`}>
-        <h1 className="text-[22px] font-bold tracking-[0.06em]">{name}</h1>
-        {photoImg('mt-4 aspect-square w-[58%]', { border: '6px solid #ffffff', boxShadow: '0 4px 14px rgba(0,0,0,0.1)', borderRadius: 4 })}
+      <div className={`flex w-full flex-col pt-10 ${items}`}>
+        <h1 className={`text-[22px] font-bold tracking-[0.06em] ${textAl}`}>{name}</h1>
+        {photoImg(`mt-4 ${aspect} w-[58%] ${shape === 'circle' ? 'rounded-full' : ''}`, { ...ringStyle, borderRadius: shape === 'circle' ? undefined : 4 })}
         {p.email}
         {p.tags}
         {p.socials}
@@ -415,11 +450,11 @@ export default function ProfileCardView({
     );
   } else if (layout === 'boxed') {
     // 卡片:所有資料包在一張卡片裡
-    const p = info({ align: 'center', text: theme.accentColor, muted: inkMuted });
+    const p = info({ align: al, text: theme.accentColor, muted: inkMuted });
     header = (
-      <div className="mt-8 w-full rounded-2xl bg-white p-4 text-center" style={{ boxShadow: paperShadow }}>
+      <div className={`mt-8 flex w-full flex-col rounded-2xl bg-white p-4 ${items} ${textAl}`} style={{ boxShadow: paperShadow }}>
         <h1 className="text-[22px] font-bold tracking-[0.06em]" style={{ color: theme.accentColor }}>{name}</h1>
-        {photoImg('mt-3 aspect-[4/3] w-full rounded-xl')}
+        {shape === 'circle' ? photoImg('mt-3 aspect-square w-40 rounded-full') : photoImg(`mt-3 ${aspect} w-full rounded-xl`)}
         {p.bio}
         {p.socials}
         {p.tags}
@@ -428,14 +463,14 @@ export default function ProfileCardView({
     );
   } else if (layout === 'search') {
     // 搜尋列:名稱放在搜尋框裡
-    const p = info({ align: 'center' });
+    const p = info({ align: al });
     header = (
-      <div className="w-full pt-8">
-        <div className="flex items-center gap-2 rounded-full px-4 py-2.5" style={{ background: tint(theme.accentColor, 16) }}>
+      <div className={`flex w-full flex-col pt-8 ${items}`}>
+        <div className="flex items-center gap-2 self-stretch rounded-full px-4 py-2.5" style={{ background: tint(theme.accentColor, 16) }}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5" /><path d="M16 16l4 4" /></svg>
           <h1 className="truncate text-base font-bold tracking-[0.04em]">{name}</h1>
         </div>
-        <div className="-mx-5 mt-4">{photoImg('aspect-square w-full')}</div>
+        <div className="-mx-5 mt-4 self-stretch">{bigPhoto('')}</div>
         <div className="mt-3 font-bold italic">{p.email}</div>
         {p.bio}
         {p.tags}
@@ -444,15 +479,15 @@ export default function ProfileCardView({
     );
   } else if (layout === 'card') {
     // 名片卡:頂部封面/色塊+浮起的資料卡
-    const p = info({ align: 'center' });
+    const p = info({ align: al });
     header = (
       <>
         {coverBand('h-40')}
         <div
-          className="relative -mt-20 flex w-full flex-col items-center rounded-3xl px-5 pb-6 pt-5 text-center"
+          className={`relative -mt-20 flex w-full flex-col rounded-3xl px-5 pb-6 pt-5 ${items} ${textAl}`}
           style={{ background: dark ? `color-mix(in srgb, ${theme.bgColor} 90%, white)` : '#ffffff', border: `1px solid ${tint(theme.textColor, 8)}`, boxShadow: '0 12px 32px rgba(0,0,0,0.1)' }}
         >
-          {showAvatar ? avatar(`-mt-14 h-20 w-20 ${avatarRound}`, { border: `3px solid ${dark ? theme.bgColor : '#ffffff'}` }) : null}
+          {showAvatar ? avatar(`-mt-14 ${avatarBox('w-20')}`, { border: `3px solid ${dark ? theme.bgColor : '#ffffff'}` }) : null}
           <h1 className={`${showAvatar ? 'mt-3' : 'mt-1'} text-[21px] font-semibold tracking-[0.04em]`}>{name}</h1>
           {p.tags}
           {p.bio}
@@ -462,14 +497,14 @@ export default function ProfileCardView({
       </>
     );
   } else if (layout === 'split') {
-    // 左右並排:大頭照在左、名稱與標籤在右
+    // 左右並排:大頭照在左、名稱與標籤在右(置中時上下排列)
     const cover = Boolean(theme.coverImage || theme.headerBand);
-    const p = info({ align: 'left' });
+    const p = info({ align: al });
     header = (
-      <div className="w-full">
+      <div className={`flex w-full flex-col ${items}`}>
         {cover ? coverBand('aspect-[3/1]') : null}
-        <div className={`flex items-center gap-4 ${cover ? '' : 'pt-12'}`}>
-          {showAvatar ? avatar(`h-24 w-24 ${avatarRound} ${cover ? '-mt-10' : ''}`, cover ? { border: `3px solid ${theme.bgColor}` } : undefined) : null}
+        <div className={`${isLeft ? 'flex items-center gap-4 self-stretch' : 'flex flex-col items-center gap-3 text-center'} ${cover ? '' : 'pt-12'}`}>
+          {showAvatar ? avatar(`${avatarBox('w-24')} ${cover ? '-mt-10' : ''}`, cover ? { border: `3px solid ${theme.bgColor}` } : undefined) : null}
           <div className={`min-w-0 flex-1 ${!showAvatar && cover ? 'pt-5' : ''}`}>
             <h1 className="text-[22px] font-semibold leading-7 tracking-[0.03em]">{name}</h1>
             {p.tags ? <div className="-mt-1">{p.tags}</div> : null}
@@ -481,15 +516,15 @@ export default function ProfileCardView({
       </div>
     );
   } else if (layout === 'magazine') {
-    // 雜誌大圖:大字名稱+直式大照片
+    // 雜誌大圖:大字名稱+大照片
     const image = theme.coverImage || (showAvatar ? card.avatar_url : '');
-    const p = info({ align: 'left' });
+    const p = info({ align: al });
     header = (
-      <div className="w-full pt-12">
-        <h1 className="text-[34px] font-bold leading-[1.12] tracking-[0.02em]">{name}</h1>
+      <div className={`flex w-full flex-col pt-12 ${items}`}>
+        <h1 className={`text-[34px] font-bold leading-[1.12] tracking-[0.02em] ${textAl}`}>{name}</h1>
         {p.tags}
         {image ? (
-          <div className="mt-5 aspect-[4/5] w-full overflow-hidden" style={{ borderRadius: Math.min(radius, 24) }}>
+          <div className={`mt-5 ${aspect} ${shape === 'circle' ? 'w-[80%] rounded-full' : 'w-full'} overflow-hidden`} style={shape === 'circle' ? undefined : { borderRadius: Math.min(radius, 24) }}>
             <img src={image} alt="" className="h-full w-full object-cover" />
           </div>
         ) : null}
@@ -499,17 +534,17 @@ export default function ProfileCardView({
       </div>
     );
   } else if (layout === 'minimal') {
-    // 極簡:小頭像與名稱同一行,細線分隔
-    const p = info({ align: 'left' });
+    // 極簡:小頭像與名稱同一行(置中時上下排列),細線分隔
+    const p = info({ align: al });
     header = (
-      <div className="w-full pt-14">
+      <div className={`flex w-full flex-col pt-14 ${items}`}>
         {theme.coverImage ? (
           <div className="mb-6 aspect-[3/1] w-full overflow-hidden" style={{ borderRadius: Math.min(radius, 18) }}>
             <img src={theme.coverImage} alt="" className="h-full w-full object-cover" />
           </div>
         ) : null}
-        <div className="flex items-center gap-3">
-          {showAvatar ? avatar(`h-14 w-14 ${avatarRound}`) : null}
+        <div className={isLeft ? 'flex items-center gap-3 self-stretch' : 'flex flex-col items-center gap-2 text-center'}>
+          {showAvatar ? avatar(avatarBox('w-14')) : null}
           <div className="min-w-0">
             <h1 className="text-xl font-semibold tracking-[0.03em]">{name}</h1>
             {p.email ? <div className="-mt-1">{p.email}</div> : null}
@@ -522,16 +557,14 @@ export default function ProfileCardView({
       </div>
     );
   } else {
-    // 經典置中(可在簡介樣式改成靠左)
+    // 經典置中
     const cover = Boolean(theme.coverImage || theme.headerBand);
-    const p = info({ align: left ? 'left' : 'center' });
-    const avatarClass =
-      theme.avatarShape === 'portrait' ? 'aspect-[4/5] w-28 rounded-2xl' : theme.avatarShape === 'square' ? 'h-24 w-24 rounded-2xl' : 'h-24 w-24 rounded-full';
+    const p = info({ align: al });
     header = (
-      <div className={`flex w-full flex-col ${left ? 'items-start' : 'items-center'} ${cover ? '' : 'pt-12'}`}>
+      <div className={`flex w-full flex-col ${items} ${cover ? '' : 'pt-12'}`}>
         {cover ? coverBand('aspect-[5/2]') : null}
-        {showAvatar ? avatar(`relative ${avatarClass} ${cover ? '-mt-12' : ''}`, cover ? { border: `3px solid ${theme.bgColor}` } : undefined) : null}
-        <h1 className={`${showAvatar || !cover ? 'mt-4' : 'mt-6'} text-[22px] font-semibold tracking-[0.04em] ${left ? 'text-left' : 'text-center'}`}>{name}</h1>
+        {showAvatar ? avatar(`relative ${avatarBox(shape === 'portrait' ? 'w-28' : 'w-24')} ${cover ? '-mt-12' : ''}`, cover ? { border: `3px solid ${theme.bgColor}` } : undefined) : null}
+        <h1 className={`${showAvatar || !cover ? 'mt-4' : 'mt-6'} text-[22px] font-semibold tracking-[0.04em] ${textAl}`}>{name}</h1>
         {p.tags}
         {p.socials}
         {p.bio}
@@ -630,7 +663,7 @@ export default function ProfileCardView({
 
   return (
     <div className={fullScreen ? 'min-h-screen' : 'min-h-full'} style={pageStyle}>
-      <div className={`mx-auto flex max-w-[440px] flex-col px-5 pb-10 ${left && layout === 'classic' ? 'items-start' : 'items-center'}`}>
+      <div className={`mx-auto flex max-w-[440px] flex-col px-5 pb-10 ${left ? 'items-start' : 'items-center'}`}>
         {header}
         {theme.divider === 'wave' ? (
           <svg viewBox="0 0 200 10" preserveAspectRatio="none" className="mt-6 h-2.5 w-full" aria-hidden="true">

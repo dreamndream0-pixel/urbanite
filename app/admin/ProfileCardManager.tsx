@@ -1331,11 +1331,11 @@ function StyleEditor({
             {theme.layout === 'hero' ? <p className="mt-2 text-[11px] text-[#a99e8f]">封面照片會延伸到名稱與簡述後方;沒有封面時改用大頭照。</p> : null}
           </div>
           <div>
-            <p className="mb-2 text-xs text-[#8a7f72]">頭像形狀</p>
+            <p className="mb-2 text-xs text-[#8a7f72]">頭像形狀(主照片)</p>
             <Pills value={theme.avatarShape} options={[{ key: 'circle', label: '圓形' }, { key: 'square', label: '方形' }, { key: 'portrait', label: '直式 4:5' }]} onChange={(v) => setTheme({ avatarShape: v })} />
           </div>
           <div>
-            <p className="mb-2 text-xs text-[#8a7f72]">文字排列(經典置中版面)</p>
+            <p className="mb-2 text-xs text-[#8a7f72]">文字排列</p>
             <Pills value={theme.align} options={[{ key: 'center', label: '置中' }, { key: 'left', label: '靠左' }]} onChange={(v) => setTheme({ align: v })} />
           </div>
           <div>
