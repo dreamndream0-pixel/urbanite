@@ -14,6 +14,13 @@ export const metadata: Metadata = {
     template: '%s | Urbanite',
   },
   description: DESCRIPTION,
+  icons: {
+    icon: [
+      { url: '/favicon.ico', sizes: 'any' },
+      { url: '/favicon.png', type: 'image/png' },
+    ],
+    apple: '/apple-touch-icon.png',
+  },
   openGraph: {
     title: 'Urbanite',
     description: DESCRIPTION,
