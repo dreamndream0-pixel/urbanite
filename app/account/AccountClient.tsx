@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
-import LineBindingCard from './LineBindingCard';
+import LineBindingRow from './LineBindingCard';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import type { Customer, Discount, Order, OrderStatusHistory, Product, Recipient, ReturnRequest, SiteSettings, UserCoupon } from '@/lib/types';
@@ -241,7 +241,6 @@ export default function AccountClient({
             onSaved={() => router.refresh()}
           />
         )}
-        {tab === 'profile' && <LineBindingCard />}
 
         {tab === 'coupons' && <CouponsTab coupons={coupons} heroImage={couponHero} />}
 
@@ -561,7 +560,7 @@ function ProfileTab({
   );
 
   return (
-    <div className="space-y-8 pb-24">
+    <div className="space-y-8 pb-[calc(env(safe-area-inset-bottom)+160px)]">
       <section className="relative -mx-4 -mt-8 overflow-hidden border-b border-[#eadfd4] bg-[#fbf8f3] px-6 pb-7 pt-6 sm:-mx-6 sm:px-10">
         {/* 等系統設定載入、圖片下載完成後才淡入,不會先閃出其他圖 */}
         {stampImage !== null && (
@@ -625,6 +624,7 @@ function ProfileTab({
           </label>
         </div>
         <p className="mt-3 text-xs text-[var(--c-muted)]">{provider} 帳號登入</p>
+        <LineBindingRow />
       </section>
 
       <section className="relative border-l border-[var(--c-border)] pl-5 sm:pl-7">
@@ -713,7 +713,7 @@ function ProfileTab({
           </div>
         </div>
       )}
-      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-[#eadfd4] bg-[#fbf8f3]/95 px-4 pb-[calc(env(safe-area-inset-bottom)+10px)] pt-3 shadow-[0_-10px_24px_rgba(64,52,43,0.08)] backdrop-blur">
+      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-[#eadfd4] bg-[#fbf8f3] px-4 pb-[calc(env(safe-area-inset-bottom)+10px)] pt-3 shadow-[0_-10px_24px_rgba(64,52,43,0.08)]">
         <button onClick={save} disabled={saving} className="mx-auto flex h-12 w-full max-w-4xl items-center justify-center gap-3 rounded-lg bg-[var(--c-brand)] px-6 text-sm font-semibold tracking-[0.18em] text-white shadow-[0_10px_24px_rgba(143,31,49,0.22)] disabled:opacity-40">
           {saving ? '儲存中…' : '儲存變更'}
           <span aria-hidden>→</span>

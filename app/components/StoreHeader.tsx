@@ -37,7 +37,7 @@ export default function StoreHeader({
   onCart: () => void;
 }) {
   return (
-    <header className="sticky top-0 z-30 bg-[var(--c-header)]/95 backdrop-blur">
+    <header className="sticky top-0 z-30 bg-[var(--c-header)]">
       <nav className="mx-auto grid max-w-6xl grid-cols-[1fr_auto_1fr] items-center px-4 py-4 sm:px-6 sm:py-5">
         {/* 左:漢堡選單 + 搜尋 */}
         <div className="flex items-center gap-1 sm:gap-2">
