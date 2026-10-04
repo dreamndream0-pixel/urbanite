@@ -6,6 +6,7 @@ import SocialIcon from '@/app/components/SocialIcon';
 import ProfileImageBlock from '@/app/components/ProfileImageBlock';
 import LinkIcon, { isIconImage } from '@/app/components/LinkIcon';
 import {
+  coverSpec,
   detectSource,
   FONT_OPTIONS,
   isBlockComplete,
@@ -206,9 +207,10 @@ export default function ProfileCardView({
     };
   };
 
-  const coverBand = (className: string) => (
-    <div className={`-mx-5 self-stretch overflow-hidden ${className}`} style={{ background: theme.bandColor }}>
-      {theme.coverImage ? <img src={theme.coverImage} alt="" className="h-full w-full object-cover" style={{ objectPosition: 'center 22%' }} /> : null}
+  const spec = coverSpec(layout, theme.avatarShape);
+  const coverBand = (className = '') => (
+    <div className={`-mx-5 self-stretch overflow-hidden ${className}`} style={{ background: theme.bandColor, aspectRatio: spec.aspect ? String(spec.aspect) : undefined }}>
+      {theme.coverImage ? <img src={theme.coverImage} alt="" className="h-full w-full object-cover" style={{ objectPosition: spec.position }} /> : null}
     </div>
   );
   const paperShadow = '0 10px 26px rgba(0,0,0,0.14)';
@@ -343,7 +345,7 @@ export default function ProfileCardView({
     const p = info({ align: al, text: ink, muted: inkMuted, tagStyle: theme.tagStyle === 'solid' ? 'solid' : 'outline' });
     header = (
       <div className="w-full">
-        {coverBand('h-32')}
+        {coverBand()}
         <div className="relative -mt-20">
           <div className={`flex flex-col rounded-3xl bg-white px-5 pb-5 ${items} ${textAl} ${showAvatar && !isLeft ? 'pt-14' : 'pt-5'}`} style={{ boxShadow: paperShadow, color: ink }}>
             <h1 className={`text-[22px] font-bold tracking-[0.04em] ${showAvatar && isLeft ? 'pr-24' : ''}`}>{name}</h1>
@@ -504,7 +506,7 @@ export default function ProfileCardView({
     const p = info({ align: al });
     header = (
       <>
-        {coverBand('h-40')}
+        {coverBand()}
         <div
           className={`relative -mt-20 flex w-full flex-col rounded-3xl px-5 pb-6 pt-5 ${items} ${textAl}`}
           style={{ background: dark ? `color-mix(in srgb, ${theme.bgColor} 90%, white)` : '#ffffff', border: `1px solid ${tint(theme.textColor, 8)}`, boxShadow: '0 12px 32px rgba(0,0,0,0.1)' }}
@@ -524,7 +526,7 @@ export default function ProfileCardView({
     const p = info({ align: al });
     header = (
       <div className={`flex w-full flex-col ${items}`}>
-        {cover ? coverBand('aspect-[3/1]') : null}
+        {cover ? coverBand() : null}
         <div className={`${isLeft ? 'flex items-center gap-4 self-stretch' : 'flex flex-col items-center gap-3 text-center'} ${cover ? '' : 'pt-12'}`}>
           {showAvatar ? avatar(`${avatarBox('w-24')} ${cover ? '-mt-10' : ''}`, cover ? { border: `3px solid ${theme.bgColor}` } : undefined) : null}
           <div className={`min-w-0 flex-1 ${!showAvatar && cover ? 'pt-5' : ''}`}>
@@ -561,8 +563,8 @@ export default function ProfileCardView({
     header = (
       <div className={`flex w-full flex-col pt-14 ${items}`}>
         {theme.coverImage ? (
-          <div className="mb-6 aspect-[3/1] w-full overflow-hidden" style={{ borderRadius: Math.min(radius, 18) }}>
-            <img src={theme.coverImage} alt="" className="h-full w-full object-cover" />
+          <div className="mb-6 w-full overflow-hidden" style={{ borderRadius: Math.min(radius, 18), aspectRatio: String(spec.aspect) }}>
+            <img src={theme.coverImage} alt="" className="h-full w-full object-cover" style={{ objectPosition: spec.position }} />
           </div>
         ) : null}
         <div className={isLeft ? 'flex items-center gap-3 self-stretch' : 'flex flex-col items-center gap-2 text-center'}>
@@ -584,7 +586,7 @@ export default function ProfileCardView({
     const p = info({ align: al });
     header = (
       <div className={`flex w-full flex-col ${items} ${cover ? '' : 'pt-12'}`}>
-        {cover ? coverBand('aspect-[5/2]') : null}
+        {cover ? coverBand() : null}
         {showAvatar ? avatar(`relative ${avatarBox(shape === 'portrait' ? 'w-28' : 'w-24')} ${cover ? '-mt-12' : ''}`, cover ? { border: `3px solid ${theme.bgColor}` } : undefined) : null}
         <h1 className={`${showAvatar || !cover ? 'mt-4' : 'mt-6'} text-[22px] font-semibold tracking-[0.04em] ${textAl}`}>{name}</h1>
         {p.tags}
@@ -599,7 +601,7 @@ export default function ProfileCardView({
   if (cover && ['polaroid', 'framed', 'blob', 'sticker', 'news', 'boxed'].includes(layout)) {
     header = (
       <>
-        {coverBand('aspect-[5/2]')}
+        {coverBand()}
         {header}
       </>
     );

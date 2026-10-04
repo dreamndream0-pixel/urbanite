@@ -148,6 +148,47 @@ export function isDarkColor(hex: string) {
   return 0.299 * r + 0.587 * g + 0.114 * b < 110;
 }
 
+// ---------- 封面照片顯示規格 ----------
+export type CoverSpec = {
+  aspect: number | null; // 寬/高;null = 依原圖比例完整顯示
+  position: string; // 裁切對齊位置(object-position)
+  where: string; // 顯示位置說明
+  ratio: string; // 顯示比例
+  size: string; // 建議上傳尺寸
+  round?: boolean; // 圓形裁切
+  arch?: boolean; // 底部弧形
+};
+
+export const COVER_BAND_POSITION = 'center 22%'; // 頂部橫幅:直式照片優先保留上半部
+
+const BAND_5_2: CoverSpec = { aspect: 5 / 2, position: COVER_BAND_POSITION, where: '最上方橫幅', ratio: '5:2 橫式', size: '1500×600' };
+const BAND_3_1: CoverSpec = { aspect: 3, position: COVER_BAND_POSITION, where: '最上方橫幅', ratio: '3:1 橫式', size: '1500×500' };
+const NATURAL: CoverSpec = { aspect: null, position: 'center', where: '大照片(完整顯示,不裁切)', ratio: '依原圖比例', size: '1080×1350 直式或 1080×1080 方形' };
+
+export function coverSpec(layout: ProfileLayout, shape: CardTheme['avatarShape'] = 'circle'): CoverSpec {
+  switch (layout) {
+    case 'hero':
+      return { aspect: 4 / 5, position: 'center', where: '滿版背景(延伸到名稱與簡述後方)', ratio: '4:5 直式', size: '1080×1350' };
+    case 'magazine':
+      return shape === 'portrait'
+        ? { aspect: 4 / 5, position: 'center', where: '名稱下方大照片', ratio: '4:5 直式', size: '1080×1350' }
+        : { aspect: 1, position: 'center', where: '名稱下方大照片', ratio: shape === 'circle' ? '1:1 圓形' : '1:1 方形', size: '1080×1080', round: shape === 'circle' };
+    case 'label':
+    case 'search':
+      return NATURAL;
+    case 'arch':
+      return { ...NATURAL, where: '大照片(完整顯示,底部弧形)', arch: true };
+    case 'side':
+      return { aspect: 3 / 4, position: 'center', where: '左半邊照片', ratio: '約 3:4 直式', size: '1080×1440' };
+    case 'floating':
+    case 'split':
+    case 'minimal':
+      return BAND_3_1;
+    default:
+      return BAND_5_2; // classic、card,以及相框類版面(拍立得、相框、花邊、側欄、報紙、卡片)
+  }
+}
+
 export function resolveTheme(theme: unknown): CardTheme {
   const t = (theme && typeof theme === 'object' ? theme : {}) as Partial<CardTheme>;
   return { ...DEFAULT_THEME, ...t };

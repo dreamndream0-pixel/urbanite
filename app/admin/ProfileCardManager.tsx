@@ -18,6 +18,7 @@ import {
   PROFILE_LAYOUTS,
   CARD_TEMPLATES,
   cardPath,
+  coverSpec,
   FONT_OPTIONS,
   isBlockComplete,
   isBlockInWindow,
@@ -1072,6 +1073,75 @@ function Section({ title, children, defaultOpen = true }: { title: string; child
   );
 }
 
+// 封面照片:目前版面的顯示位置、比例、建議尺寸
+function CoverSizeInfo({ layout, shape }: { layout: CardTheme['layout']; shape: CardTheme['avatarShape'] }) {
+  const spec = coverSpec(layout, shape);
+  const name = PROFILE_LAYOUTS.find((l) => l.key === layout)?.label ?? '';
+  return (
+    <div className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 rounded-xl bg-[#faf7f2] px-3.5 py-3 text-xs leading-5">
+      <span className="text-[#a99e8f]">目前版面</span>
+      <span className="font-medium text-[#1f1b19]">{name}</span>
+      <span className="text-[#a99e8f]">顯示位置</span>
+      <span className="text-[#5f5852]">{spec.where}</span>
+      <span className="text-[#a99e8f]">顯示比例</span>
+      <span className="text-[#5f5852]">{spec.ratio}</span>
+      <span className="text-[#a99e8f]">建議尺寸</span>
+      <span className="font-medium text-[#702838]">{spec.size} px</span>
+    </div>
+  );
+}
+
+// 封面縮圖預覽:比例、裁切位置、圓形 / 弧形都與名片頁相同
+function CoverPreview({ image, layout, shape }: { image: string; layout: CardTheme['layout']; shape: CardTheme['avatarShape'] }) {
+  const spec = coverSpec(layout, shape);
+  const tall = spec.aspect === null || spec.aspect < 1;
+  return (
+    <div className={tall ? 'mx-auto w-full max-w-[240px]' : 'w-full'}>
+      <div
+        className={`relative overflow-hidden border border-dashed border-[#c9bcad] bg-[#faf7f2] ${spec.round ? 'rounded-full' : 'rounded-xl'}`}
+        style={{
+          aspectRatio: spec.aspect ? String(spec.aspect) : image ? undefined : '4 / 5',
+          clipPath: spec.arch && image ? 'ellipse(85% 100% at 50% 0)' : undefined,
+        }}
+      >
+        {image ? (
+          <img src={image} alt="" className={spec.aspect ? 'h-full w-full object-cover' : 'block h-auto w-full'} style={{ objectPosition: spec.position }} />
+        ) : (
+          <span className="absolute inset-0 flex items-center justify-center px-3 text-center text-xs text-[#a99e8f]">{spec.ratio} 封面預覽</span>
+        )}
+      </div>
+      <p className="mt-1 text-center text-[11px] text-[#a99e8f]">名片頁實際顯示範圍</p>
+    </div>
+  );
+}
+
+// 各版面封面尺寸一覽(收合)
+function CoverSizeTable({ shape, current }: { shape: CardTheme['avatarShape']; current: CardTheme['layout'] }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="rounded-xl border border-[#efe8dd]">
+      <button type="button" onClick={() => setOpen(!open)} className="flex w-full items-center justify-between px-3.5 py-2.5 text-xs text-[#6b6156]">
+        各版面封面尺寸一覽
+        <Icon size={14}><path d={open ? 'M6 15l6-6 6 6' : 'M6 9l6 6 6-6'} /></Icon>
+      </button>
+      {open ? (
+        <div className="divide-y divide-[#f3eee7] border-t border-[#efe8dd] text-xs">
+          {PROFILE_LAYOUTS.map((l) => {
+            const spec = coverSpec(l.key, shape);
+            return (
+              <div key={l.key} className={`grid grid-cols-[5.5rem_minmax(0,1fr)_auto] items-center gap-2 px-3.5 py-2 ${l.key === current ? 'bg-[#faf7f2] font-medium' : ''}`}>
+                <span className="text-[#1f1b19]">{l.label}</span>
+                <span className="truncate text-[#8a7f72]">{spec.ratio}</span>
+                <span className="text-right text-[#5f5852]">{spec.size}</span>
+              </div>
+            );
+          })}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function ProfileEditor({ draft, setDraft }: { draft: ProfileCard; setDraft: (c: ProfileCard) => void }) {
   const [uploading, setUploading] = useState(false);
   const [coverUploading, setCoverUploading] = useState(false);
@@ -1125,21 +1195,17 @@ function ProfileEditor({ draft, setDraft }: { draft: ProfileCard; setDraft: (c: 
   return (
     <div className="space-y-4">
       <Section title="封面照片">
-        <div className="relative aspect-[5/2] overflow-hidden rounded-xl border border-dashed border-[#c9bcad] bg-[#faf7f2]">
-          {theme.coverImage ? (
-            <img src={theme.coverImage} alt="" className="h-full w-full object-cover" />
-          ) : (
-            <span className="absolute inset-0 flex items-center justify-center text-xs text-[#a99e8f]">名片最上方的封面照片</span>
-          )}
-        </div>
+        <CoverSizeInfo layout={theme.layout} shape={theme.avatarShape} />
+        <CoverPreview image={theme.coverImage} layout={theme.layout} shape={theme.avatarShape} />
         <div className="flex flex-wrap items-center gap-3">
           <label className="cursor-pointer rounded-full border border-[#d7c9bd] px-4 py-1.5 text-xs font-medium hover:bg-[#f6f2ec]">
             {coverUploading ? '上傳中…' : theme.coverImage ? '更換封面' : '上傳封面'}
             <input type="file" accept="image/png,image/jpeg,image/webp" className="hidden" disabled={coverUploading} onChange={(e) => { void uploadCover(e.target.files?.[0]); e.target.value = ''; }} />
           </label>
           {theme.coverImage ? <button type="button" onClick={() => setTheme({ coverImage: '' })} className="text-xs text-[#8a7f72]">移除</button> : null}
-          <span className="text-[11px] text-[#a99e8f]">單張上限 10MB。選「滿版封面」版面時,封面會延伸到簡介後方(建議直式 1080×1350)</span>
+          <span className="text-[11px] text-[#a99e8f]">單張上限 10MB</span>
         </div>
+        <CoverSizeTable shape={theme.avatarShape} current={theme.layout} />
       </Section>
 
       <Section title="大頭照及名稱">
