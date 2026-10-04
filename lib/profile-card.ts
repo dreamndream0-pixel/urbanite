@@ -114,7 +114,52 @@ export type ProfileCardBlock = {
   clicks: number;
   start_at: string | null;
   end_at: string | null;
+  items?: BlockItem[];
+  options?: BlockOptions;
 };
+
+// ---------- 圖文連結 ----------
+export type BlockItem = { image: string; title: string; url: string };
+export type ImageLayout =
+  | 'banner' | 'overlay' | 'top' | 'tall' | 'square' | 'card' | 'card-right'
+  | 'grid2' | 'grid3' | 'circle3' | 'mosaic' | 'mosaic5' | 'scroll';
+export type BlockOptions = { layout?: ImageLayout; captionMode?: 'link' | 'custom'; autoplay?: boolean };
+
+export const IMAGE_LIMIT = 10;
+export const LINK_TITLE_LIMIT = 80;
+
+// single:一次顯示一張,多張時自動變成可左右滑動的輪播
+export const IMAGE_LAYOUTS: { key: ImageLayout; label: string; single: boolean }[] = [
+  { key: 'banner', label: '標題在下', single: true },
+  { key: 'top', label: '標題在上', single: true },
+  { key: 'overlay', label: '標題疊圖', single: true },
+  { key: 'tall', label: '直式 4:5', single: true },
+  { key: 'square', label: '方形 1:1', single: true },
+  { key: 'card', label: '卡片・左圖', single: true },
+  { key: 'card-right', label: '卡片・右圖', single: true },
+  { key: 'scroll', label: '橫向滑動', single: false },
+  { key: 'grid2', label: '兩欄', single: false },
+  { key: 'grid3', label: '三欄方格', single: false },
+  { key: 'circle3', label: '三個圓形', single: false },
+  { key: 'mosaic', label: '一大兩小', single: false },
+  { key: 'mosaic5', label: '一大四小', single: false },
+];
+
+// 舊資料只有 image 欄位:當成一張圖
+export function blockItems(block: Pick<ProfileCardBlock, 'image' | 'items'>): BlockItem[] {
+  const items = Array.isArray(block.items) ? block.items.filter((i) => i && i.image) : [];
+  if (items.length) return items;
+  return block.image ? [{ image: block.image, title: '', url: '' }] : [];
+}
+
+export function blockOptions(block: Pick<ProfileCardBlock, 'options'>): Required<BlockOptions> {
+  const o = (block.options && typeof block.options === 'object' ? block.options : {}) as BlockOptions;
+  return {
+    layout: IMAGE_LAYOUTS.some((l) => l.key === o.layout) ? (o.layout as ImageLayout) : 'banner',
+    captionMode: o.captionMode === 'custom' ? 'custom' : 'link',
+    autoplay: Boolean(o.autoplay),
+  };
+}
 
 export const SLUG_PATTERN = /^[a-z0-9](?:[a-z0-9._-]{0,28}[a-z0-9])?$/;
 export const MAX_TAGS = 3;
@@ -123,7 +168,7 @@ export const BIO_LIMIT = 80;
 export const BLOCK_TYPES: { type: BlockType; label: string; hint: string }[] = [
   { type: 'link', label: '連結按鈕', hint: '標題＋網址,可加縮圖' },
   { type: 'text', label: '文字標題', hint: '分隔標題或一段公告' },
-  { type: 'image', label: '圖片', hint: '橫幅圖片,可設連結' },
+  { type: 'image', label: '圖文連結', hint: '多張圖片,多種版型' },
   { type: 'product', label: '商品卡', hint: '選擇網站上的商品' },
   { type: 'video', label: '影片', hint: 'YouTube 影片網址' },
   { type: 'line', label: 'LINE 加好友', hint: '一鍵加入官方 LINE' },
@@ -173,11 +218,11 @@ export function videoEmbedUrl(url: string) {
 }
 
 // 內容不完整的區塊視為草稿,前台不顯示
-export function isBlockComplete(block: Pick<ProfileCardBlock, 'type' | 'title' | 'url' | 'image' | 'product_id'>) {
+export function isBlockComplete(block: Pick<ProfileCardBlock, 'type' | 'title' | 'url' | 'image' | 'product_id' | 'items'>) {
   switch (block.type) {
     case 'link': return Boolean(block.title.trim() && block.url.trim());
     case 'text': return Boolean(block.title.trim());
-    case 'image': return Boolean(block.image.trim());
+    case 'image': return Boolean(block.url.trim() && blockItems(block).length);
     case 'product': return Boolean(block.product_id.trim());
     case 'video': return Boolean(videoEmbedUrl(block.url));
     case 'line':

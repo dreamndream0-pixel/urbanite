@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getAdminUser } from '@/lib/supabase/server';
-import type { ProfileCardBlock } from '@/lib/profile-card';
+import { blockOptions, IMAGE_LIMIT, LINK_TITLE_LIMIT, type ProfileCardBlock } from '@/lib/profile-card';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,7 +14,21 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   for (const key of ['title', 'url', 'image', 'product_id'] as const) {
     if (typeof body[key] === 'string') update[key] = body[key].trim();
   }
+  if (typeof update.title === 'string') update.title = (update.title as string).slice(0, LINK_TITLE_LIMIT);
   if (typeof body.enabled === 'boolean') update.enabled = body.enabled;
+  // 圖文連結:多張圖片與版型
+  if (Array.isArray(body.items)) {
+    update.items = body.items
+      .filter((i: unknown) => i && typeof i === 'object' && typeof (i as { image?: unknown }).image === 'string' && (i as { image: string }).image)
+      .slice(0, IMAGE_LIMIT)
+      .map((i: { image: string; title?: unknown; url?: unknown }) => ({
+        image: i.image.trim(),
+        title: typeof i.title === 'string' ? i.title.trim().slice(0, LINK_TITLE_LIMIT) : '',
+        url: typeof i.url === 'string' ? i.url.trim() : '',
+      }));
+    update.image = (update.items as { image: string }[])[0]?.image ?? '';
+  }
+  if (body.options && typeof body.options === 'object') update.options = blockOptions({ options: body.options });
   // 限時顯示:空值代表不限
   for (const key of ['start_at', 'end_at'] as const) {
     if (!(key in body)) continue;

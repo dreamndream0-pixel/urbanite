@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, type CSSProperties } from 'react';
 import Link from 'next/link';
 import SocialIcon from '@/app/components/SocialIcon';
+import ProfileImageBlock from '@/app/components/ProfileImageBlock';
 import {
   detectSource,
   FONT_OPTIONS,
@@ -201,12 +202,7 @@ export default function ProfileCardView({
               );
             }
             if (b.type === 'image') {
-              const img = <img src={b.image} alt={b.title} className="block w-full object-cover" style={{ borderRadius: Math.min(radius, 18), border: `1px solid ${tint(theme.textColor, 12)}` }} />;
-              return b.url ? (
-                <a key={b.id} href={normalizeUrl(b.url)} target="_blank" rel="noreferrer" onClick={() => track(b.id)} className="block">{img}</a>
-              ) : (
-                <div key={b.id}>{img}</div>
-              );
+              return <ProfileImageBlock key={b.id} block={b} radius={radius} colors={theme} onOpen={() => track(b.id)} />;
             }
             if (b.type === 'product') {
               const p = products[b.product_id];

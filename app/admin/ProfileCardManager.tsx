@@ -3,10 +3,16 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import QRCode from 'qrcode';
 import ProfileCardView, { type CardProduct } from '@/app/components/ProfileCardView';
+import { LayoutThumb } from '@/app/components/ProfileImageBlock';
 import SocialIcon from '@/app/components/SocialIcon';
 import {
   BIO_LIMIT,
   BLOCK_TYPES,
+  blockItems,
+  blockOptions,
+  IMAGE_LAYOUTS,
+  IMAGE_LIMIT,
+  LINK_TITLE_LIMIT,
   CARD_TEMPLATES,
   cardPath,
   FONT_OPTIONS,
@@ -19,6 +25,8 @@ import {
   SOURCE_LABELS,
   TAG_SUGGESTIONS,
   videoEmbedUrl,
+  type BlockItem,
+  type BlockOptions,
   type BlockType,
   type CardTheme,
   type ProfileCard,
@@ -527,6 +535,7 @@ function BlockRow({
   const [uploading, setUploading] = useState(false);
   const [search, setSearch] = useState('');
   const [timed, setTimed] = useState(Boolean(block.start_at || block.end_at));
+  const [dirty, setDirty] = useState(false); // 圖文連結:按「完成」才儲存
   const complete = isBlockComplete(block);
   const inWindow = isBlockInWindow(block);
   const typeLabel = BLOCK_TYPES.find((t) => t.type === block.type)?.label ?? '';
@@ -567,8 +576,41 @@ function BlockRow({
     : [];
 
   let status: ReactNode;
-  if (!complete) status = <span className="shrink-0 text-xs text-[#c84767]">草稿</span>;
+  if (dirty) status = <span className="shrink-0 text-xs text-[#b07a2a]">未儲存</span>;
+  else if (!complete) status = <span className="shrink-0 text-xs text-[#c84767]">草稿</span>;
   else status = <Toggle on={block.enabled} onChange={(v) => onPatch({ enabled: v })} label="顯示" />;
+
+  const timedPanel = (
+    <>
+            {/* 限時顯示 */}
+            <div className="rounded-xl bg-[#faf7f2] p-3">
+              <div className="flex items-center gap-3">
+                <span className="text-sm">限時顯示</span>
+                <Toggle
+                  on={timed}
+                  label="限時顯示"
+                  onChange={(v) => {
+                    setTimed(v);
+                    if (!v && (block.start_at || block.end_at)) onPatch({ start_at: null, end_at: null });
+                  }}
+                />
+                <span className="ml-auto text-[11px] text-[#a99e8f]">時間外自動隱藏</span>
+              </div>
+              {timed ? (
+                <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                  <label className="block">
+                    <span className="mb-1 block text-xs text-[#8a7f72]">開始</span>
+                    <input type="datetime-local" value={toLocalInput(block.start_at)} onChange={(e) => onPatch({ start_at: e.target.value ? new Date(e.target.value).toISOString() : null })} className={inputClass} />
+                  </label>
+                  <label className="block">
+                    <span className="mb-1 block text-xs text-[#8a7f72]">結束</span>
+                    <input type="datetime-local" value={toLocalInput(block.end_at)} onChange={(e) => onPatch({ end_at: e.target.value ? new Date(e.target.value).toISOString() : null })} className={inputClass} />
+                  </label>
+                </div>
+              ) : null}
+            </div>
+    </>
+  );
 
   return (
     <div className="flex overflow-hidden rounded-2xl border border-[#ebe4da] bg-white">
@@ -576,8 +618,8 @@ function BlockRow({
       <div className="min-w-0 flex-1">
         <div className="flex cursor-pointer items-center gap-3 p-3.5" onClick={onToggleOpen}>
           <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#f6f2ec] text-[#6b6156]">
-            {block.type === 'image' && block.image ? (
-              <img src={block.image} alt="" className="h-9 w-9 rounded-xl object-cover" />
+            {block.type === 'image' && blockItems(block)[0] ? (
+              <img src={blockItems(block)[0].image} alt="" className="h-9 w-9 rounded-xl object-cover" />
             ) : (
               <Icon size={17}>{BLOCK_ICON[block.type]}</Icon>
             )}
@@ -593,7 +635,22 @@ function BlockRow({
           {status}
         </div>
 
-        {open ? (
+        {open && block.type === 'image' ? (
+          <ImageBlockEditor
+            block={block}
+            timed={timed}
+            setTimed={setTimed}
+            timedPanel={timedPanel}
+            onEdit={(patch) => { onLocalChange(patch); setDirty(true); }}
+            onDone={() => {
+              onPatch({ title: block.title, url: block.url, items: blockItems(block), options: blockOptions(block) });
+              setDirty(false);
+              if (block.url.trim()) onToggleOpen(); // 網址未填:留在編輯畫面提示
+            }}
+            onCollapse={onToggleOpen}
+            onDelete={onDelete}
+          />
+        ) : open ? (
           <div className="space-y-3 border-t border-[#f3eee7] px-3.5 pb-3.5 pt-3">
             {block.type === 'link' && (
               <>
@@ -602,12 +659,6 @@ function BlockRow({
               </>
             )}
             {block.type === 'text' && field('title', '文字', '例如:本週新品')}
-            {block.type === 'image' && (
-              <>
-                {field('url', '點擊後前往(選填)', 'urbanite.com.tw/promo/…')}
-                {field('title', '圖片說明(選填)', '例如:秋季新品')}
-              </>
-            )}
             {block.type === 'video' && (
               <>
                 {field('url', 'YouTube 影片網址', 'https://youtu.be/…')}
@@ -660,52 +711,278 @@ function BlockRow({
               </div>
             )}
 
-            {(block.type === 'link' || block.type === 'image') && (
+            {block.type === 'link' && (
               <div className="flex items-center gap-3">
                 {block.image ? <img src={block.image} alt="" className="h-12 w-12 rounded-xl border border-[#efe8dd] object-cover" /> : null}
                 <label className="cursor-pointer rounded-full border border-[#d7c9bd] px-3.5 py-1.5 text-xs font-medium text-[#1f1b19] hover:bg-[#f6f2ec]">
-                  {uploading ? '上傳中…' : block.image ? '更換圖片' : block.type === 'link' ? '加上縮圖(選填)' : '上傳圖片'}
+                  {uploading ? '上傳中…' : block.image ? '更換圖片' : '加上縮圖(選填)'}
                   <input type="file" accept="image/png,image/jpeg,image/webp" className="hidden" disabled={uploading} onChange={(e) => { void upload(e.target.files?.[0]); e.target.value = ''; }} />
                 </label>
-                {block.image && block.type === 'link' ? (
+                {block.image ? (
                   <button type="button" onClick={() => onPatch({ image: '' })} className="text-xs text-[#8a7f72]">移除縮圖</button>
                 ) : null}
               </div>
             )}
 
-            {/* 限時顯示 */}
-            <div className="rounded-xl bg-[#faf7f2] p-3">
-              <div className="flex items-center gap-3">
-                <span className="text-sm">限時顯示</span>
-                <Toggle
-                  on={timed}
-                  label="限時顯示"
-                  onChange={(v) => {
-                    setTimed(v);
-                    if (!v && (block.start_at || block.end_at)) onPatch({ start_at: null, end_at: null });
-                  }}
-                />
-                <span className="ml-auto text-[11px] text-[#a99e8f]">時間外自動隱藏</span>
-              </div>
-              {timed ? (
-                <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                  <label className="block">
-                    <span className="mb-1 block text-xs text-[#8a7f72]">開始</span>
-                    <input type="datetime-local" value={toLocalInput(block.start_at)} onChange={(e) => onPatch({ start_at: e.target.value ? new Date(e.target.value).toISOString() : null })} className={inputClass} />
-                  </label>
-                  <label className="block">
-                    <span className="mb-1 block text-xs text-[#8a7f72]">結束</span>
-                    <input type="datetime-local" value={toLocalInput(block.end_at)} onChange={(e) => onPatch({ end_at: e.target.value ? new Date(e.target.value).toISOString() : null })} className={inputClass} />
-                  </label>
-                </div>
-              ) : null}
-            </div>
+            {timedPanel}
 
             <div className="flex justify-end pt-1">
               <button type="button" onClick={onDelete} className="text-xs text-[#c0392b] hover:underline">刪除區塊</button>
             </div>
           </div>
         ) : null}
+      </div>
+    </div>
+  );
+}
+
+// 圖文連結編輯器(LINKGOODS 風格):網址自動帶出標題圖片、多張圖片、圖文版型、自動輪播、版型選擇
+function ImageBlockEditor({
+  block,
+  timed,
+  setTimed,
+  timedPanel,
+  onEdit,
+  onDone,
+  onCollapse,
+  onDelete,
+}: {
+  block: ProfileCardBlock;
+  timed: boolean;
+  setTimed: (v: boolean) => void;
+  timedPanel: ReactNode;
+  onEdit: (patch: Partial<ProfileCardBlock>) => void;
+  onDone: () => void;
+  onCollapse: () => void;
+  onDelete: () => void;
+}) {
+  const items = blockItems(block);
+  const options = blockOptions(block);
+  const [uploading, setUploading] = useState(0);
+  const [fetching, setFetching] = useState(false);
+  const [urlError, setUrlError] = useState('');
+  const [showRequired, setShowRequired] = useState(false);
+  const lastFetched = useRef(block.url.trim());
+  const itemsRef = useRef(items);
+  useEffect(() => {
+    itemsRef.current = items;
+  });
+  const layoutInfo = IMAGE_LAYOUTS.find((l) => l.key === options.layout);
+  const canAutoplay = Boolean(layoutInfo?.single) && items.length > 1;
+
+  const setItems = (next: BlockItem[]) => onEdit({ items: next, image: next[0]?.image ?? '' });
+  const setOptions = (patch: BlockOptions) => onEdit({ options: { ...options, ...patch } });
+
+  async function autoFill(raw: string) {
+    const url = raw.trim();
+    if (!url || url === lastFetched.current) return;
+    lastFetched.current = url;
+    setUrlError('');
+    setFetching(true);
+    try {
+      const res = await fetch(`/api/profile-card/og?url=${encodeURIComponent(url)}`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? '無法讀取這個網址');
+      const patch: Partial<ProfileCardBlock> = {};
+      if (data.title && !block.title.trim()) patch.title = String(data.title).slice(0, LINK_TITLE_LIMIT);
+      if (data.image && itemsRef.current.length === 0) {
+        patch.items = [{ image: String(data.image), title: '', url: '' }];
+        patch.image = String(data.image);
+      }
+      if (Object.keys(patch).length) onEdit(patch);
+    } catch (e) {
+      setUrlError(e instanceof Error ? e.message : '無法讀取這個網址');
+    } finally {
+      setFetching(false);
+    }
+  }
+
+  async function addFiles(files: FileList | null) {
+    if (!files?.length) return;
+    const list = Array.from(files).slice(0, IMAGE_LIMIT - items.length);
+    if (list.some((file) => file.size > 10 * 1024 * 1024)) return void uiAlert('單張圖片請小於 10MB');
+    setUploading(list.length);
+    try {
+      for (const file of list) {
+        const image = await uploadImage(file);
+        setItems([...itemsRef.current, { image, title: '', url: '' }]);
+        itemsRef.current = [...itemsRef.current, { image, title: '', url: '' }];
+        setUploading((n) => Math.max(n - 1, 0));
+      }
+    } catch (e) {
+      void uiAlert(e instanceof Error ? e.message : '上傳失敗');
+    } finally {
+      setUploading(0);
+    }
+  }
+
+  function moveItem(i: number, delta: number) {
+    const j = i + delta;
+    if (j < 0 || j >= items.length) return;
+    const next = [...items];
+    [next[i], next[j]] = [next[j], next[i]];
+    setItems(next);
+  }
+
+  const label = (text: string, required = false, extra?: ReactNode) => (
+    <span className="mb-1.5 flex items-center gap-1 text-sm font-medium text-[#1f1b19]">
+      {text}
+      {required ? <span className="text-[#c84767]">*</span> : null}
+      {extra ? <span className="ml-auto text-xs font-normal text-[#a99e8f]">{extra}</span> : null}
+    </span>
+  );
+
+  return (
+    <div className="space-y-5 border-t border-[#f3eee7] px-3.5 pb-3.5 pt-3">
+      <div className="-mb-2 flex items-center justify-end gap-1">
+        <button
+          type="button"
+          onClick={() => setTimed(!timed)}
+          aria-label="限時顯示"
+          className={`rounded-full p-2 transition ${timed || block.start_at || block.end_at ? 'bg-[#f6f2ec] text-[#1f1b19]' : 'text-[#8a7f72] hover:bg-[#f6f2ec]'}`}
+        >
+          <Icon size={17}><circle cx="12" cy="12" r="8.5" /><path d="M12 7.5V12l3 2" /></Icon>
+        </button>
+        <button type="button" onClick={onDelete} aria-label="刪除" className="rounded-full p-2 text-[#8a7f72] transition hover:bg-[#f6f2ec] hover:text-[#c0392b]">
+          <Icon size={17}><path d="M4.5 7h15M9.5 7V4.8h5V7M6.5 7l.8 12.2h9.4L17.5 7M10.3 10.5v5.5M13.7 10.5v5.5" /></Icon>
+        </button>
+      </div>
+      {timed ? timedPanel : null}
+
+      <label className="block">
+        {label('圖文連結網址', true, fetching ? '讀取中…' : undefined)}
+        <input
+          value={block.url}
+          onChange={(e) => onEdit({ url: e.target.value })}
+          onBlur={(e) => void autoFill(e.target.value)}
+          onPaste={(e) => {
+            const text = e.clipboardData.getData('text');
+            if (text) window.setTimeout(() => void autoFill(text), 0);
+          }}
+          placeholder="輸入或貼上網址,標題圖片等資訊將自動帶出"
+          className={`${inputClass} ${showRequired && !block.url.trim() ? 'border-[#c84767]' : ''}`}
+        />
+        {urlError ? <span className="mt-1 block text-xs text-[#c0392b]">{urlError}</span> : null}
+        {showRequired && !block.url.trim() ? <span className="mt-1 block text-xs text-[#c84767]">請填寫圖文連結網址,未填寫前會以草稿保存</span> : null}
+      </label>
+
+      <label className="block">
+        {label('連結標題', false, `${block.title.length}/${LINK_TITLE_LIMIT}`)}
+        <input value={block.title} maxLength={LINK_TITLE_LIMIT} onChange={(e) => onEdit({ title: e.target.value })} placeholder="輸入連結標題" className={inputClass} />
+      </label>
+
+      <div>
+        {label('圖片素材', false, `單張上限 10MB · ${items.length}/${IMAGE_LIMIT}`)}
+        <div className="grid grid-cols-4 gap-2 sm:grid-cols-5">
+          {items.map((item, i) => (
+            <div key={`${item.image}-${i}`} className="relative aspect-square overflow-hidden rounded-xl border border-[#efe8dd] bg-[#f6f2ec]">
+              <img src={item.image} alt="" className="h-full w-full object-cover" />
+              <button type="button" onClick={() => setItems(items.filter((_, j) => j !== i))} aria-label="移除圖片" className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-black/55 text-white">
+                <Icon size={12}><path d="M6 6l12 12M18 6L6 18" /></Icon>
+              </button>
+              {i > 0 ? (
+                <button type="button" onClick={() => moveItem(i, -1)} aria-label="往前移" className="absolute bottom-1 left-1 flex h-6 w-6 items-center justify-center rounded-full bg-black/55 text-white">
+                  <Icon size={12}><path d="M14.5 6l-6 6 6 6" /></Icon>
+                </button>
+              ) : items.length > 1 ? (
+                <span className="absolute bottom-1 left-1 rounded-full bg-black/55 px-1.5 py-0.5 text-[10px] text-white">封面</span>
+              ) : null}
+            </div>
+          ))}
+          {items.length < IMAGE_LIMIT ? (
+            <label className="flex aspect-square cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-[#c9bcad] text-[#8a7f72] transition hover:bg-[#faf7f2]">
+              {uploading ? <span className="text-xs">上傳中…</span> : <Icon size={22}><path d="M12 5v14M5 12h14" /></Icon>}
+              <input type="file" multiple accept="image/png,image/jpeg,image/webp" className="hidden" disabled={uploading > 0} onChange={(e) => { void addFiles(e.target.files); e.target.value = ''; }} />
+            </label>
+          ) : null}
+        </div>
+      </div>
+
+      <div>
+        {label('圖文版型')}
+        <div className="flex flex-wrap gap-5">
+          {([['link', '連結標題'], ['custom', '圖片自訂標題']] as const).map(([key, text]) => (
+            <label key={key} className="flex cursor-pointer items-center gap-2 text-sm">
+              <span className={`flex h-[18px] w-[18px] items-center justify-center rounded-full border ${options.captionMode === key ? 'border-[#1f1b19]' : 'border-[#c9bcad]'}`}>
+                {options.captionMode === key ? <span className="h-2.5 w-2.5 rounded-full bg-[#1f1b19]" /> : null}
+              </span>
+              <input type="radio" className="sr-only" checked={options.captionMode === key} onChange={() => setOptions({ captionMode: key })} />
+              {text}
+            </label>
+          ))}
+        </div>
+        {options.captionMode === 'custom' ? (
+          items.length === 0 ? (
+            <p className="mt-2 text-xs text-[#a99e8f]">上傳圖片後,可替每張圖片設定標題與連結。</p>
+          ) : (
+            <div className="mt-3 space-y-2">
+              {items.map((item, i) => (
+                <div key={`${item.image}-${i}`} className="flex gap-2.5 rounded-xl border border-[#efe8dd] p-2">
+                  <img src={item.image} alt="" className="h-[68px] w-[68px] shrink-0 rounded-lg object-cover" />
+                  <div className="min-w-0 flex-1 space-y-1.5">
+                    <input
+                      value={item.title}
+                      maxLength={LINK_TITLE_LIMIT}
+                      onChange={(e) => setItems(items.map((x, j) => (j === i ? { ...x, title: e.target.value } : x)))}
+                      placeholder="圖片標題"
+                      className="w-full rounded-lg border border-[#e5ded4] px-2.5 py-1.5 text-sm outline-none focus:border-[#1f1b19]/40"
+                    />
+                    <input
+                      value={item.url}
+                      onChange={(e) => setItems(items.map((x, j) => (j === i ? { ...x, url: e.target.value } : x)))}
+                      placeholder="連結網址(選填,預設為上方網址)"
+                      className="w-full rounded-lg border border-[#e5ded4] px-2.5 py-1.5 text-xs outline-none focus:border-[#1f1b19]/40"
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )
+        ) : null}
+      </div>
+
+      <div className="flex flex-wrap items-center gap-3">
+        <span className="text-sm font-medium">開啟自動輪播</span>
+        <span className={canAutoplay ? '' : 'pointer-events-none opacity-40'}>
+          <Toggle on={options.autoplay && canAutoplay} onChange={(v) => setOptions({ autoplay: v })} label="開啟自動輪播" />
+        </span>
+        {!canAutoplay ? <span className="text-[11px] text-[#a99e8f]">單張式版型且有 2 張以上圖片時可輪播</span> : null}
+      </div>
+
+      <div>
+        {label('版型')}
+        <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+          {IMAGE_LAYOUTS.map((l) => (
+            <button
+              key={l.key}
+              type="button"
+              onClick={() => setOptions({ layout: l.key })}
+              className={`flex flex-col items-center gap-2 rounded-xl border p-2.5 transition ${options.layout === l.key ? 'border-[#1f1b19] bg-[#faf7f2] text-[#1f1b19]' : 'border-[#efe8dd] text-[#8a7f72] hover:border-[#1f1b19]/30'}`}
+            >
+              <span className="flex h-9 w-full items-center px-1"><LayoutThumb layout={l.key} /></span>
+              <span className="text-[11px] leading-4">{l.label}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="flex items-center gap-3 border-t border-[#f3eee7] pt-3">
+        <button type="button" onClick={onCollapse} className="flex items-center gap-1 text-xs text-[#8a7f72]">
+          <Icon size={14}><path d="M6 15l6-6 6 6" /></Icon>
+          收合
+        </button>
+        <span className="ml-auto text-[11px] text-[#a99e8f]">請記得按下完成按鈕</span>
+        <button
+          type="button"
+          onClick={() => {
+            if (!block.url.trim()) setShowRequired(true);
+            onDone();
+          }}
+          disabled={uploading > 0}
+          className="rounded-full bg-[#1f1b19] px-5 py-2 text-xs font-semibold text-white disabled:opacity-40"
+        >
+          完成
+        </button>
       </div>
     </div>
   );
