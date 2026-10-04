@@ -254,20 +254,21 @@ export const IMAGE_LIMIT = 10;
 export const LINK_TITLE_LIMIT = 80;
 
 // single:一次顯示一張,多張時自動變成可左右滑動的輪播
-export const IMAGE_LAYOUTS: { key: ImageLayout; label: string; single: boolean }[] = [
-  { key: 'banner', label: '標題在下', single: true },
-  { key: 'top', label: '標題在上', single: true },
-  { key: 'overlay', label: '標題疊圖', single: true },
-  { key: 'tall', label: '直式 4:5', single: true },
-  { key: 'square', label: '方形 1:1', single: true },
-  { key: 'card', label: '卡片・左圖', single: true },
-  { key: 'card-right', label: '卡片・右圖', single: true },
-  { key: 'scroll', label: '橫向滑動', single: false },
-  { key: 'grid2', label: '兩欄', single: false },
-  { key: 'grid3', label: '三欄方格', single: false },
-  { key: 'circle3', label: '三個圓形', single: false },
-  { key: 'mosaic', label: '一大兩小', single: false },
-  { key: 'mosaic5', label: '一大四小', single: false },
+// ratio / size:名片頁實際顯示的圖片比例與建議上傳尺寸(與 ProfileImageBlock 的版面一致)
+export const IMAGE_LAYOUTS: { key: ImageLayout; label: string; single: boolean; ratio: string; size: string }[] = [
+  { key: 'banner', label: '標題在下', single: true, ratio: '1 張原比例・多張 16:9', size: '1600×900' },
+  { key: 'top', label: '標題在上', single: true, ratio: '1 張原比例・多張 16:9', size: '1600×900' },
+  { key: 'overlay', label: '標題疊圖', single: true, ratio: '1 張原比例・多張 16:9', size: '1600×900' },
+  { key: 'tall', label: '直式 4:5', single: true, ratio: '4:5 直式', size: '1080×1350' },
+  { key: 'square', label: '方形 1:1', single: true, ratio: '1:1 方形', size: '1080×1080' },
+  { key: 'card', label: '卡片・左圖', single: true, ratio: '1:1 小縮圖', size: '600×600' },
+  { key: 'card-right', label: '卡片・右圖', single: true, ratio: '1:1 小縮圖', size: '600×600' },
+  { key: 'scroll', label: '橫向滑動', single: false, ratio: '4:5 直式', size: '1080×1350' },
+  { key: 'grid2', label: '兩欄', single: false, ratio: '1:1 方形', size: '1080×1080' },
+  { key: 'grid3', label: '三欄方格', single: false, ratio: '1:1 方形', size: '800×800' },
+  { key: 'circle3', label: '三個圓形', single: false, ratio: '1:1 圓形裁切', size: '800×800(主體置中)' },
+  { key: 'mosaic', label: '一大兩小', single: false, ratio: '大圖約 3:4・小圖 3:2', size: '大圖 1080×1440・小圖 1200×800' },
+  { key: 'mosaic5', label: '一大四小', single: false, ratio: '1:1 方形', size: '大圖 1080×1080・小圖 600×600' },
 ];
 
 // 舊資料只有 image 欄位:當成一張圖

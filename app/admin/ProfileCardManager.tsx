@@ -868,7 +868,7 @@ function ImageBlockEditor({
       </label>
 
       <div>
-        {label('圖片素材', false, `單張上限 10MB · ${items.length}/${IMAGE_LIMIT}`)}
+        {label('圖片素材', false, `建議 ${layoutInfo?.size ?? ''} · 單張上限 10MB · ${items.length}/${IMAGE_LIMIT}`)}
         <div className="grid grid-cols-4 gap-2 sm:grid-cols-5">
           {items.map((item, i) => (
             <div key={`${item.image}-${i}`} className="relative aspect-square overflow-hidden rounded-xl border border-[#efe8dd] bg-[#f6f2ec]">
@@ -947,6 +947,16 @@ function ImageBlockEditor({
 
       <div>
         {label('版型')}
+        {layoutInfo ? (
+          <div className="mb-2.5 grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 rounded-xl bg-[#faf7f2] px-3.5 py-2.5 text-xs leading-5">
+            <span className="text-[#a99e8f]">目前版型</span>
+            <span className="font-medium text-[#1f1b19]">{layoutInfo.label}</span>
+            <span className="text-[#a99e8f]">圖片比例</span>
+            <span className="text-[#5f5852]">{layoutInfo.ratio}</span>
+            <span className="text-[#a99e8f]">建議尺寸</span>
+            <span className="font-medium text-[#702838]">{layoutInfo.size} px</span>
+          </div>
+        ) : null}
         <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
           {IMAGE_LAYOUTS.map((l) => (
             <button
@@ -957,6 +967,7 @@ function ImageBlockEditor({
             >
               <span className="flex h-9 w-full items-center px-1"><LayoutThumb layout={l.key} /></span>
               <span className="text-[11px] leading-4">{l.label}</span>
+              <span className="-mt-1.5 text-center text-[10px] leading-3.5 text-[#b3a897]">{l.ratio}</span>
             </button>
           ))}
         </div>
