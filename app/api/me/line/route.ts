@@ -8,8 +8,10 @@ import { createLinkToken, getLineLoginConfig } from '@/lib/line-login';
 export const dynamic = 'force-dynamic';
 
 // GET /api/me/line — 目前會員的 LINE 綁定狀態(與加入官方 LINE 的連結)
-export async function GET() {
+export async function GET(request: Request) {
   const user = await getSessionUser();
+  const nextParam = new URL(request.url).searchParams.get('next') ?? '/account';
+  const next = nextParam.startsWith('/') && !nextParam.startsWith('//') ? nextParam : '/account';
   if (!user) return NextResponse.json({ error: '請先登入' }, { status: 401 });
   const supabase = createAdminClient();
   const [{ data: customer }, { data: settings }] = await Promise.all([
@@ -20,8 +22,8 @@ export async function GET() {
   // 「加入 LINE」專屬連結:LINE 授權途中切換到 LINE App / 內建瀏覽器也能完成綁定
   const { channelSecret: loginSecret } = await getLineLoginConfig();
   const linkUrl = loginSecret
-    ? `/auth/line/start?mode=link&next=/account&u=${encodeURIComponent(createLinkToken(user.id, loginSecret))}`
-    : '/auth/line/start?mode=link&next=/account';
+    ? `/auth/line/start?mode=link&next=${encodeURIComponent(next)}&u=${encodeURIComponent(createLinkToken(user.id, loginSecret))}`
+    : `/auth/line/start?mode=link&next=${encodeURIComponent(next)}`;
   return NextResponse.json({
     linkUrl,
     bound: Boolean(customer?.line_user_id),

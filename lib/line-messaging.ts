@@ -171,6 +171,13 @@ export async function creditText() {
   return `購物金餘額:${formatter.format(0)}\n\n消費與活動累積的購物金會顯示在這裡。`;
 }
 
+// 個資遮蔽:0989****58、dr****@gmail.com
+const maskPhone = (p: string) => (p.length >= 7 ? `${p.slice(0, 4)}****${p.slice(-2)}` : '****');
+const maskEmail = (e: string) => {
+  const [name, domain] = e.split('@');
+  return domain ? `${name.slice(0, 2)}****@${domain}` : '****';
+};
+
 export async function memberText(customer: BoundCustomer) {
   const supabase = createAdminClient();
   const [{ count: orderCount }, { count: couponCount }] = await Promise.all([
@@ -180,8 +187,8 @@ export async function memberText(customer: BoundCustomer) {
   const email = customer.email && !customer.email.endsWith('@line.urbanite.com.tw') ? customer.email : '';
   return [
     `👤 ${customer.name || customer.line_display_name || '會員'}`,
-    email ? `Email:${email}` : '',
-    customer.phone ? `手機:${customer.phone}` : '',
+    email ? `Email:${maskEmail(email)}` : '',
+    customer.phone ? `手機:${maskPhone(customer.phone)}` : '',
     `訂單:${orderCount ?? 0} 筆`,
     `可用優惠券:${couponCount ?? 0} 張`,
     `購物金:${formatter.format(0)}`,

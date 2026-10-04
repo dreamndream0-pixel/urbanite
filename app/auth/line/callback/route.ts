@@ -70,9 +70,17 @@ export async function GET(request: Request) {
     // iPhone 授權會跳到 LINE App,回來時常在 LINE 內建瀏覽器開啟、沒有官網登入狀態,所以不依賴 session。
     if (lineState.mode === 'link' && lineState.uid) {
       const linked = new URL('/line/linked', redirectOrigin);
+      linked.searchParams.set('next', next);
       try {
-        const { data: member } = await createAdminClient().auth.admin.getUserById(lineState.uid);
+        const admin = createAdminClient();
+        const { data: member } = await admin.auth.admin.getUserById(lineState.uid);
         if (!member.user) throw new Error('找不到會員帳號,請重新操作');
+        // 一次性:這個連結發出後帳號已經綁定過,代表連結用過了(避免連結被轉傳重複使用)
+        const { data: row } = await admin.from('customers').select('line_bound_at').eq('user_id', lineState.uid).maybeSingle();
+        const since = lineState.since ?? lineState.issuedAt;
+        if (row?.line_bound_at && new Date(row.line_bound_at).getTime() > since) {
+          throw new Error('這個綁定連結已使用過,請回到官網重新點「加入 LINE」');
+        }
         // LINE 授權已證明是本人的 LINE:若綁在本人的其他帳號,轉到這個帳號
         await bindLineToUser(member.user.id, member.user.email ?? '', profile.userId, profile, { transfer: true });
         linked.searchParams.set('ok', '1');

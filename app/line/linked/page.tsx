@@ -5,8 +5,9 @@ export const dynamic = 'force-dynamic';
 export const metadata: Metadata = { title: 'LINE 綁定', robots: { index: false } };
 
 // LINE 授權綁定完成頁:不需要登入(授權回來時可能在 LINE 內建瀏覽器開啟)
-export default async function LineLinkedPage({ searchParams }: { searchParams: Promise<{ ok?: string; error?: string }> }) {
-  const { ok, error } = await searchParams;
+export default async function LineLinkedPage({ searchParams }: { searchParams: Promise<{ ok?: string; error?: string; next?: string }> }) {
+  const { ok, error, next: nextParam } = await searchParams;
+  const next = nextParam && nextParam.startsWith('/') && !nextParam.startsWith('//') ? nextParam : '/account';
   const success = ok === '1' && !error;
   return (
     <main className="flex min-h-screen items-center justify-center bg-[var(--c-bg)] px-5 py-12 text-[var(--c-text)]">
@@ -24,8 +25,8 @@ export default async function LineLinkedPage({ searchParams }: { searchParams: P
             ? '回到官方 LINE 輸入「訂單查詢」「優惠券」「購物金」「會員資料」即可查詢。'
             : `${error || '請回到會員中心重新操作'}`}
         </p>
-        <Link href="/account" className="mt-5 block rounded-full bg-[var(--c-button)] py-3 text-sm font-semibold text-[var(--c-button-text)]">
-          前往會員中心
+        <Link href={next} className="mt-5 block rounded-full bg-[var(--c-button)] py-3 text-sm font-semibold text-[var(--c-button-text)]">
+          {next.startsWith('/account') ? '前往會員中心' : '返回'}
         </Link>
         <p className="mt-3 text-[11px] text-[var(--c-muted)]">若是在 LINE 裡開啟此頁,可直接關閉回到聊天室</p>
       </div>

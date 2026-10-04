@@ -24,8 +24,9 @@ export async function GET(request: Request) {
 
   // 會員中心「加入 LINE」:專屬連結(u=簽章)或目前登入的會員,連結自己的 LINE(同時加入官方帳號好友)
   const { channelId: cfgId, channelSecret: cfgSecret } = await getLineLoginConfig();
-  const tokenUid = linkMode && cfgSecret ? verifyLinkToken(url.searchParams.get('u') ?? '', cfgSecret) : null;
-  const linkUser = linkMode ? (tokenUid ? { id: tokenUid } : await getSessionUser()) : null;
+  const token = linkMode && cfgSecret ? verifyLinkToken(url.searchParams.get('u') ?? '', cfgSecret) : null;
+  const sessionUser = linkMode && !token ? await getSessionUser() : null;
+  const linkUser = token ? { id: token.uid, since: token.issuedAt } : sessionUser ? { id: sessionUser.id, since: Date.now() } : null;
   if (linkMode && !linkUser) {
     // 登入後自動接回 LINE 授權
     return NextResponse.redirect(`${redirectOrigin}/login?next=${encodeURIComponent(`/auth/line/start?mode=link&next=${next}`)}`);
@@ -40,7 +41,7 @@ export async function GET(request: Request) {
     return NextResponse.redirect(loginUrl);
   }
 
-  const state = createLineState(next, channelSecret, linkUser ? { uid: linkUser.id } : undefined);
+  const state = createLineState(next, channelSecret, linkUser ? { uid: linkUser.id, since: linkUser.since } : undefined);
   const lineUrl = new URL('https://access.line.me/oauth2/v2.1/authorize');
   lineUrl.searchParams.set('response_type', 'code');
   lineUrl.searchParams.set('client_id', channelId);

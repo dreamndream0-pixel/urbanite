@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import LineBindingRow from './LineBindingCard';
+import LineCouponBanner from './LineCouponBanner';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import type { Customer, Discount, Order, OrderStatusHistory, Product, Recipient, ReturnRequest, SiteSettings, UserCoupon } from '@/lib/types';
@@ -846,6 +847,8 @@ function CouponsTab({ coupons, heroImage = '' }: { coupons: Discount[]; heroImag
           </div>
         </div>
       </section>
+
+      <LineCouponBanner />
 
       {/* 我的優惠券 */}
       <section>

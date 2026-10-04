@@ -14,9 +14,10 @@ type LineStatePayload = {
   next: string;
   nonce: string;
   issuedAt: number;
-  // link:已登入的會員連結 LINE(不重新登入),uid 為發起連結的會員
+  // link:已登入的會員連結 LINE(不重新登入),uid 為發起連結的會員,since 為連結發出時間
   mode?: 'link';
   uid?: string;
+  since?: number;
 };
 
 function toBase64Url(input: string) {
@@ -54,12 +55,12 @@ export function getLineSyntheticPassword(lineUserId: string, channelSecret: stri
   return `${digest}Aa1!`;
 }
 
-export function createLineState(next: string, channelSecret: string, link?: { uid: string }) {
+export function createLineState(next: string, channelSecret: string, link?: { uid: string; since: number }) {
   const payload = toBase64Url(JSON.stringify({
     next,
     nonce: crypto.randomBytes(16).toString('hex'),
     issuedAt: Date.now(),
-    ...(link ? { mode: 'link' as const, uid: link.uid } : {}),
+    ...(link ? { mode: 'link' as const, uid: link.uid, since: link.since } : {}),
   } satisfies LineStatePayload));
   const signature = signLineState(payload, channelSecret);
   return `${payload}.${signature}`;
@@ -79,7 +80,7 @@ export function verifyLinkToken(token: string, channelSecret: string) {
   if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) return null;
   const data = JSON.parse(fromBase64Url(payload)) as { u?: string; t?: number };
   if (!data.u || !data.t || Date.now() - data.t > 10 * 60 * 1000) return null;
-  return data.u;
+  return { uid: data.u, issuedAt: data.t };
 }
 
 export function verifyLineState(state: string, channelSecret: string) {
