@@ -2,6 +2,80 @@
 
 export type SocialLink = { type: string; value: string };
 
+// ---------- 外觀 ----------
+export type CardTheme = {
+  template: string;
+  bgType: 'color' | 'image' | 'grid';
+  bgColor: string;
+  bgImage: string;
+  textColor: string;
+  mutedColor: string;
+  accentColor: string;
+  avatarShape: 'circle' | 'square' | 'portrait';
+  align: 'center' | 'left';
+  buttonShape: 'pill' | 'rounded' | 'square';
+  buttonFill: 'solid' | 'outline' | 'soft';
+  buttonColor: string;
+  buttonTextColor: string;
+  buttonShadow: boolean;
+  font: 'sans' | 'serif' | 'classic';
+};
+
+export const DEFAULT_THEME: CardTheme = {
+  template: 'ivory',
+  bgType: 'color',
+  bgColor: '#f6f2ec',
+  bgImage: '',
+  textColor: '#1f1b19',
+  mutedColor: '#6b6156',
+  accentColor: '#702838',
+  avatarShape: 'circle',
+  align: 'center',
+  buttonShape: 'pill',
+  buttonFill: 'solid',
+  buttonColor: '#1f1b19',
+  buttonTextColor: '#ffffff',
+  buttonShadow: false,
+  font: 'sans',
+};
+
+// 預設樣板:套用後仍可再微調
+export const CARD_TEMPLATES: { key: string; name: string; theme: Partial<CardTheme> }[] = [
+  { key: 'ivory', name: '經典米白', theme: { ...DEFAULT_THEME } },
+  {
+    key: 'burgundy',
+    name: '酒紅質感',
+    theme: { bgType: 'color', bgColor: '#f4ece6', textColor: '#3a1820', mutedColor: '#7a5a60', accentColor: '#702838', buttonFill: 'solid', buttonColor: '#702838', buttonTextColor: '#ffffff', buttonShape: 'pill', font: 'serif', avatarShape: 'circle', align: 'center', buttonShadow: false },
+  },
+  {
+    key: 'mono',
+    name: '黑白時尚',
+    theme: { bgType: 'color', bgColor: '#ffffff', textColor: '#111111', mutedColor: '#666666', accentColor: '#111111', buttonFill: 'outline', buttonColor: '#111111', buttonTextColor: '#111111', buttonShape: 'square', font: 'classic', avatarShape: 'portrait', align: 'left', buttonShadow: false },
+  },
+  {
+    key: 'notebook',
+    name: '手帳格紋',
+    theme: { bgType: 'grid', bgColor: '#f3f6ee', textColor: '#2f3b2a', mutedColor: '#66735f', accentColor: '#5b7a4a', buttonFill: 'soft', buttonColor: '#dfe8d6', buttonTextColor: '#2f3b2a', buttonShape: 'rounded', font: 'sans', avatarShape: 'square', align: 'center', buttonShadow: true },
+  },
+  {
+    key: 'mist',
+    name: '柔霧灰藍',
+    theme: { bgType: 'color', bgColor: '#e9edf1', textColor: '#26313b', mutedColor: '#5d6b78', accentColor: '#3f5c78', buttonFill: 'solid', buttonColor: '#ffffff', buttonTextColor: '#26313b', buttonShape: 'rounded', font: 'sans', avatarShape: 'circle', align: 'center', buttonShadow: true },
+  },
+];
+
+export function resolveTheme(theme: unknown): CardTheme {
+  const t = (theme && typeof theme === 'object' ? theme : {}) as Partial<CardTheme>;
+  return { ...DEFAULT_THEME, ...t };
+}
+
+export const FONT_OPTIONS: { key: CardTheme['font']; label: string; css: string }[] = [
+  { key: 'sans', label: '黑體', css: 'system-ui, -apple-system, "PingFang TC", "Microsoft JhengHei", sans-serif' },
+  { key: 'serif', label: '明體', css: '"Noto Serif TC", "Songti TC", "PMingLiU", serif' },
+  { key: 'classic', label: '英文襯線', css: 'Georgia, "Times New Roman", "Noto Serif TC", serif' },
+];
+
+// ---------- 資料 ----------
 export type ProfileCard = {
   id: string;
   slug: string;
@@ -15,13 +89,17 @@ export type ProfileCard = {
   show_socials: boolean;
   tags: string[];
   show_tags: boolean;
-  theme: Record<string, unknown>;
+  theme: Partial<CardTheme>;
   published: boolean;
+  seo_title: string;
+  seo_description: string;
+  seo_image: string;
+  show_footer_logo: boolean;
   created_at?: string;
   updated_at?: string;
 };
 
-export type BlockType = 'link' | 'text' | 'image' | 'product';
+export type BlockType = 'link' | 'text' | 'image' | 'product' | 'video' | 'line' | 'divider';
 
 export type ProfileCardBlock = {
   id: string;
@@ -34,6 +112,8 @@ export type ProfileCardBlock = {
   enabled: boolean;
   sort_order: number;
   clicks: number;
+  start_at: string | null;
+  end_at: string | null;
 };
 
 export const SLUG_PATTERN = /^[a-z0-9](?:[a-z0-9._-]{0,28}[a-z0-9])?$/;
@@ -45,6 +125,9 @@ export const BLOCK_TYPES: { type: BlockType; label: string; hint: string }[] = [
   { type: 'text', label: '文字標題', hint: '分隔標題或一段公告' },
   { type: 'image', label: '圖片', hint: '橫幅圖片,可設連結' },
   { type: 'product', label: '商品卡', hint: '選擇網站上的商品' },
+  { type: 'video', label: '影片', hint: 'YouTube 影片網址' },
+  { type: 'line', label: 'LINE 加好友', hint: '一鍵加入官方 LINE' },
+  { type: 'divider', label: '分隔線', hint: '純排版用' },
 ];
 
 export const TAG_SUGGESTIONS = ['印花 T', '客製團服', '日常穿搭', '質感選品', '情侶裝', '親子裝', '機能服飾', '配件'];
@@ -79,15 +162,73 @@ export function normalizeUrl(url: string) {
   return `https://${v}`;
 }
 
+// YouTube 網址 → 嵌入網址
+export function videoEmbedUrl(url: string) {
+  const v = url.trim();
+  const yt = v.match(/(?:youtube\.com\/(?:watch\?v=|shorts\/|embed\/|live\/)|youtu\.be\/)([\w-]{11})/i);
+  if (yt) return `https://www.youtube-nocookie.com/embed/${yt[1]}`;
+  const vimeo = v.match(/vimeo\.com\/(?:video\/)?(\d+)/i);
+  if (vimeo) return `https://player.vimeo.com/video/${vimeo[1]}`;
+  return '';
+}
+
 // 內容不完整的區塊視為草稿,前台不顯示
 export function isBlockComplete(block: Pick<ProfileCardBlock, 'type' | 'title' | 'url' | 'image' | 'product_id'>) {
-  if (block.type === 'link') return Boolean(block.title.trim() && block.url.trim());
-  if (block.type === 'text') return Boolean(block.title.trim());
-  if (block.type === 'image') return Boolean(block.image.trim());
-  if (block.type === 'product') return Boolean(block.product_id.trim());
-  return false;
+  switch (block.type) {
+    case 'link': return Boolean(block.title.trim() && block.url.trim());
+    case 'text': return Boolean(block.title.trim());
+    case 'image': return Boolean(block.image.trim());
+    case 'product': return Boolean(block.product_id.trim());
+    case 'video': return Boolean(videoEmbedUrl(block.url));
+    case 'line':
+    case 'divider': return true;
+    default: return false;
+  }
+}
+
+// 限時區塊:未到開始時間或已過結束時間就不顯示
+export function isBlockInWindow(block: Pick<ProfileCardBlock, 'start_at' | 'end_at'>, now = Date.now()) {
+  if (block.start_at && new Date(block.start_at).getTime() > now) return false;
+  if (block.end_at && new Date(block.end_at).getTime() < now) return false;
+  return true;
 }
 
 export function cardPath(slug: string) {
   return `/@${slug}`;
+}
+
+// 流量來源(依 utm / 瀏覽器 / 來源網址判斷,不記個資)
+export const SOURCE_LABELS: Record<string, string> = {
+  instagram: 'Instagram',
+  line: 'LINE',
+  facebook: 'Facebook',
+  threads: 'Threads',
+  tiktok: 'TikTok',
+  google: 'Google',
+  site: '官網',
+  other: '其他網站',
+  direct: '直接開啟',
+};
+
+export function detectSource(ua: string, referrer: string, utm: string | null) {
+  const u = (utm || '').toLowerCase();
+  if (u) {
+    const hit = Object.keys(SOURCE_LABELS).find((k) => u.includes(k) || (k === 'instagram' && u === 'ig') || (k === 'facebook' && u === 'fb'));
+    if (hit) return hit;
+  }
+  if (/Instagram/i.test(ua)) return 'instagram';
+  if (/\bLine\//i.test(ua)) return 'line';
+  if (/FBAN|FBAV|FB_IAB/i.test(ua)) return 'facebook';
+  if (/Barcelona/i.test(ua)) return 'threads';
+  if (/musical_ly|TikTok|BytedanceWebview/i.test(ua)) return 'tiktok';
+  const r = referrer.toLowerCase();
+  if (!r) return 'direct';
+  if (r.includes('instagram')) return 'instagram';
+  if (r.includes('line.me')) return 'line';
+  if (r.includes('facebook') || r.includes('fb.')) return 'facebook';
+  if (r.includes('threads')) return 'threads';
+  if (r.includes('tiktok')) return 'tiktok';
+  if (r.includes('google')) return 'google';
+  if (r.includes('urbanite')) return 'site';
+  return 'other';
 }

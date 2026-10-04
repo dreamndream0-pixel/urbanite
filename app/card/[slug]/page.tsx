@@ -4,6 +4,8 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { getAdminUser } from '@/lib/supabase/server';
 import ProfileCardView, { type CardProduct } from '@/app/components/ProfileCardView';
 import type { ProfileCard, ProfileCardBlock } from '@/lib/profile-card';
+import type { SiteSettings } from '@/lib/types';
+import { getCheckoutLine, lineAddFriendUrl } from '@/lib/checkout-line';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,7 +16,7 @@ async function load(slug: string) {
   if (!card) return null;
   const [{ data: blocks }, { data: settings }] = await Promise.all([
     supabase.from('profile_card_blocks').select('*').eq('card_id', card.id).order('sort_order'),
-    supabase.from('site_settings').select('logo_url').eq('id', 1).maybeSingle(),
+    supabase.from('site_settings').select('logo_url, footer_sections').eq('id', 1).maybeSingle(),
   ]);
   const productIds = [...new Set((blocks ?? []).filter((b) => b.type === 'product' && b.product_id).map((b) => b.product_id as string))];
   const { data: rows } = productIds.length
@@ -25,7 +27,9 @@ async function load(slug: string) {
     if (p.status === '已下架') continue;
     products[p.id] = { id: p.id, name: p.name, price: p.price, original_price: p.original_price, image: p.image || p.images?.[0] || '' };
   }
-  return { card: card as ProfileCard, blocks: (blocks ?? []) as ProfileCardBlock[], products, logoUrl: settings?.logo_url ?? '' };
+  // LINE 區塊未填網址時,沿用後台「結帳頁 LINE 設定」
+  const lineUrl = lineAddFriendUrl(getCheckoutLine(settings as Pick<SiteSettings, 'footer_sections'> | null));
+  return { card: card as ProfileCard, blocks: (blocks ?? []) as ProfileCardBlock[], products, logoUrl: settings?.logo_url ?? '', lineUrl };
 }
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
@@ -33,10 +37,15 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   const data = await load(slug);
   if (!data) return { title: '找不到頁面' };
   const { card } = data;
+  // 分享預覽卡:後台「設定」的分享標題 / 說明 / 圖片優先
+  const title = card.seo_title || card.display_name || card.slug;
+  const description = card.seo_description || card.bio || undefined;
+  const image = card.seo_image || card.avatar_url;
   return {
-    title: card.display_name || card.slug,
-    description: card.bio || undefined,
-    openGraph: { title: card.display_name || card.slug, description: card.bio || undefined, images: card.avatar_url ? [{ url: card.avatar_url }] : undefined },
+    title,
+    description,
+    openGraph: { title, description, images: image ? [{ url: image }] : undefined },
+    twitter: { card: 'summary_large_image', title, description, images: image ? [image] : undefined },
   };
 }
 
@@ -53,8 +62,8 @@ export default async function CardPage({ params }: { params: Promise<{ slug: str
     );
   }
   return (
-    <main className="min-h-screen bg-[#f6f2ec]">
-      <ProfileCardView card={data.card} blocks={data.blocks} products={data.products} logoUrl={data.logoUrl} />
+    <main>
+      <ProfileCardView card={data.card} blocks={data.blocks} products={data.products} logoUrl={data.logoUrl} lineUrl={data.lineUrl} fullScreen />
     </main>
   );
 }

@@ -15,6 +15,12 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     if (typeof body[key] === 'string') update[key] = body[key].trim();
   }
   if (typeof body.enabled === 'boolean') update.enabled = body.enabled;
+  // 限時顯示:空值代表不限
+  for (const key of ['start_at', 'end_at'] as const) {
+    if (!(key in body)) continue;
+    const date = body[key] ? new Date(String(body[key])) : null;
+    update[key] = date && !Number.isNaN(date.getTime()) ? date.toISOString() : null;
+  }
   const { data, error } = await createAdminClient().from('profile_card_blocks').update(update).eq('id', id).select().single();
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
   return NextResponse.json(data as ProfileCardBlock);

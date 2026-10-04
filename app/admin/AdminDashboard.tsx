@@ -39,7 +39,7 @@ import IntegrationSettings from './IntegrationSettings';
 import ProfileCardManager from './ProfileCardManager';
 import { isCollectOnDelivery } from '@/lib/payment';
 import { buildReturnSteps, historyKind, isReturnOrder } from '@/lib/return-progress';
-import { getCheckoutLine, HIDDEN_FOOTER_SECTION_TITLES, withCheckoutLine } from '@/lib/checkout-line';
+import { getCheckoutLine, HIDDEN_FOOTER_SECTION_TITLES, lineAddFriendUrl, withCheckoutLine } from '@/lib/checkout-line';
 import { ADMIN_PRODUCT_TABS, adminProductTab, UNLISTED_STATUS, type AdminProductTab } from '@/lib/product-status';
 
 const formatter = new Intl.NumberFormat('zh-TW', {
@@ -2716,7 +2716,7 @@ export default function AdminDashboard({
           )}
 
           {/* ===== 報表及分析 ===== */}
-          {section === 'profile-card' && <ProfileCardManager products={products} />}
+          {section === 'profile-card' && <ProfileCardManager products={products} lineUrl={lineAddFriendUrl(getCheckoutLine(initialSettings))} />}
 
           {section === 'campaign-pages' && (
             <CampaignManager

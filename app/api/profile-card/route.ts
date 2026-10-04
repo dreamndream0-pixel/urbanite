@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getAdminUser } from '@/lib/supabase/server';
-import { BIO_LIMIT, MAX_TAGS, SLUG_PATTERN, type ProfileCard, type ProfileCardBlock, type SocialLink } from '@/lib/profile-card';
+import { BIO_LIMIT, DEFAULT_THEME, MAX_TAGS, SLUG_PATTERN, type ProfileCard, type ProfileCardBlock, type SocialLink } from '@/lib/profile-card';
 
 export const dynamic = 'force-dynamic';
 
@@ -72,17 +72,26 @@ export async function PATCH(request: Request) {
     }
     update.slug = slug;
   }
-  for (const key of ['display_name', 'avatar_url', 'email'] as const) {
+  for (const key of ['display_name', 'avatar_url', 'email', 'seo_title', 'seo_description', 'seo_image'] as const) {
     if (typeof body[key] === 'string') update[key] = body[key].trim();
   }
   if (typeof body.bio === 'string') update.bio = body.bio.trim().slice(0, BIO_LIMIT);
-  for (const key of ['show_email', 'show_bio', 'show_socials', 'show_tags', 'published'] as const) {
+  for (const key of ['show_email', 'show_bio', 'show_socials', 'show_tags', 'published', 'show_footer_logo'] as const) {
     if (typeof body[key] === 'boolean') update[key] = body[key];
   }
   if (Array.isArray(body.socials)) {
     update.socials = (body.socials as SocialLink[])
       .filter((s) => s && typeof s.type === 'string')
       .map((s) => ({ type: s.type, value: String(s.value ?? '').trim() }));
+  }
+  // 外觀:只保留已知欄位
+  if (body.theme && typeof body.theme === 'object') {
+    const theme: Record<string, unknown> = {};
+    for (const key of Object.keys(DEFAULT_THEME) as (keyof typeof DEFAULT_THEME)[]) {
+      const value = (body.theme as Record<string, unknown>)[key];
+      if (typeof value === typeof DEFAULT_THEME[key]) theme[key] = value;
+    }
+    update.theme = theme;
   }
   if (Array.isArray(body.tags)) {
     update.tags = (body.tags as unknown[]).map((t) => String(t).trim()).filter(Boolean).slice(0, MAX_TAGS);
