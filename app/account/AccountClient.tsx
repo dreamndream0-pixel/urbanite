@@ -28,6 +28,8 @@ const formatter = new Intl.NumberFormat('zh-TW', {
   maximumFractionDigits: 0,
 });
 
+const PROVIDER_LABEL: Record<string, string> = { google: 'Google', line: 'LINE', facebook: 'Facebook', email: 'Email' };
+
 type TabKey = 'profile' | 'coupons' | 'orders' | 'favorites';
 const TABS: { key: TabKey; label: string }[] = [
   { key: 'profile', label: '個人資訊' },
@@ -622,9 +624,12 @@ function ProfileTab({
             <span className={labelText}>Email</span>
             <input value={email} disabled className={field + ' bg-[#f0ece6] text-[var(--c-muted)]'} />
           </label>
+          <div className="col-span-2 min-w-0">
+            <span className={labelText}>登入方式</span>
+            <div className={field + ' flex items-center bg-[#f0ece6] text-[var(--c-muted)]'}>{PROVIDER_LABEL[provider.toLowerCase()] ?? provider} 帳號登入</div>
+          </div>
+          <LineBindingRow />
         </div>
-        <p className="mt-3 text-xs text-[var(--c-muted)]">{provider} 帳號登入</p>
-        <LineBindingRow />
       </section>
 
       <section className="relative border-l border-[var(--c-border)] pl-5 sm:pl-7">
