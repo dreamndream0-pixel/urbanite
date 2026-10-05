@@ -202,7 +202,7 @@ function PlusCorner({ size = 18 }: { size?: number }) {
   );
 }
 
-function ProLock({ title, desc }: { title: string; desc: string }) {
+function ProLock({ title, desc, image }: { title: string; desc: string; image?: string }) {
   const { upgradeHref } = usePlan();
   return (
     <div className="relative rounded-2xl border border-[#e5ded4] bg-white px-5 py-6 text-center">
@@ -210,6 +210,7 @@ function ProLock({ title, desc }: { title: string; desc: string }) {
       <ProBadge />
       <p className="mt-2 text-sm font-semibold text-[#1f1b19]">{title}</p>
       <p className="mx-auto mt-1 max-w-sm text-xs leading-5 text-[#8a7f72]">{desc}</p>
+      {image ? <img src={image} alt="" loading="lazy" className="mx-auto mt-4 w-full max-w-md rounded-xl border border-[#efe8dd]" /> : null}
       <a href={upgradeHref} className="mt-4 inline-block rounded-full bg-[#1f1b19] px-5 py-2 text-xs font-semibold text-white">升級 U Plus</a>
     </div>
   );
@@ -1799,7 +1800,7 @@ function SettingsEditor({ draft, setDraft }: { draft: ProfileCard; setDraft: (c:
         </div>
       </Section>
       ) : (
-        <ProLock title="自訂分享預覽是 U Plus 功能" desc="名片貼到 LINE、Facebook、Threads 時顯示的標題、說明與圖片。免費版會使用你的名稱、簡述與頭像。" />
+        <ProLock title="自訂分享預覽是 U Plus 功能" desc="名片貼到 LINE、Facebook、Threads 時顯示的標題、說明與圖片。免費版會使用你的名稱、簡述與頭像。" image="/brand/uplus-share-preview.webp" />
       )}
 
       <ReferralSection />
