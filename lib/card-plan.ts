@@ -94,4 +94,4 @@ export const TIER_FEATURES: { group: string; rows: { label: string; values: [str
 ];
 
 // 代稱不能用的字(與網站頁面衝突)
-export const RESERVED_SLUGS = ['admin', 'api', 'card', 'mycard', 'login', 'register', 'account', 'checkout', 'products', 'promo', 'line', 'auth', 'www', 'help', 'about', 'pricing', 'settings', 'shop', 'store', 'mail'];
+export const RESERVED_SLUGS = ['admin', 'business', 'api', 'card', 'mycard', 'login', 'register', 'account', 'checkout', 'products', 'promo', 'line', 'auth', 'www', 'help', 'about', 'pricing', 'settings', 'shop', 'store', 'mail'];

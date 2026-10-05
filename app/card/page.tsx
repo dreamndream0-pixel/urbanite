@@ -82,11 +82,12 @@ function Arrow() {
   return <span aria-hidden="true">→</span>;
 }
 
-function FeatureCard({ title, body, children }: { title: string; body: string; children: React.ReactNode }) {
+function FeatureCard({ title, body, link, children }: { title: string; body: string; link?: { href: string; label: string }; children: React.ReactNode }) {
   return (
     <div className="flex flex-col overflow-hidden rounded-2xl border border-[#ece9e3] bg-white p-5">
       <p className="text-[15px] font-bold">{title}</p>
       <p className="mt-1.5 text-xs leading-5 text-[#77716b]">{body}</p>
+      {link ? <Link href={link.href} className="mt-2 text-xs font-semibold text-[#1f1b19] underline underline-offset-4">{link.label} →</Link> : null}
       <div className="mt-4 flex flex-1 items-end">{children}</div>
     </div>
   );
@@ -111,6 +112,7 @@ export default async function CardServicePage() {
           <nav className="hidden items-center gap-7 text-[13px] text-[#4a4540] md:flex">
             <a href="#features" className="hover:text-[#1f1b19]">功能介紹</a>
             <a href="#pricing" className="hover:text-[#1f1b19]">方案價格</a>
+            <Link href="/card/business" className="hover:text-[#1f1b19]">品牌官網</Link>
             <a href="#cases" className="hover:text-[#1f1b19]">作品案例</a>
             <a href="#faq" className="hover:text-[#1f1b19]">常見問題</a>
           </nav>
@@ -270,7 +272,7 @@ export default async function CardServicePage() {
               </div>
             </FeatureCard>
 
-            <FeatureCard title="更多實用功能" body="社群追蹤卡片、影片、LINE 加好友、商品卡⋯從一張名片,延伸成完整的品牌官網。">
+            <FeatureCard title="更多實用功能" body="社群追蹤卡片、影片、LINE 加好友、商品卡⋯從一張名片,延伸成完整的品牌官網。" link={{ href: '/card/business', label: '看品牌官網方案' }}>
               <div className="grid w-full grid-cols-3 gap-2">
                 {[
                   <path key="l" d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1" />,
@@ -398,7 +400,10 @@ export default async function CardServicePage() {
                       ) : t.available ? (
                         <Link href={upgradeHref} className="flex items-center justify-center gap-1.5 rounded-md py-2.5 text-xs font-bold text-[#1f1b19]" style={{ background: LIME }}>立即升級 <Arrow /></Link>
                       ) : (
-                        <a href={CONTACT_LINE_URL} target="_blank" rel="noreferrer" className="flex items-center justify-center gap-1.5 rounded-md border border-[#1f1b19] py-2.5 text-xs font-semibold">聯繫專員 <Arrow /></a>
+                        <>
+                          <Link href="/card/business" className="mb-2 block text-center text-xs text-[#55504a] underline underline-offset-4">了解官網系統 →</Link>
+                          <a href={CONTACT_LINE_URL} target="_blank" rel="noreferrer" className="flex items-center justify-center gap-1.5 rounded-md border border-[#1f1b19] py-2.5 text-xs font-semibold">聯繫專員 <Arrow /></a>
+                        </>
                       )}
                     </div>
                   </div>
@@ -473,6 +478,7 @@ export default async function CardServicePage() {
           <nav className="flex flex-wrap gap-x-6 gap-y-2 text-xs text-[#55504a] sm:mx-auto">
             <a href="#features">功能介紹</a>
             <a href="#pricing">方案價格</a>
+            <Link href="/card/business">品牌官網</Link>
             <a href="#cases">作品案例</a>
             <a href="#faq">常見問題</a>
             <a href={CONTACT_LINE_URL} target="_blank" rel="noreferrer">聯絡我們</a>
