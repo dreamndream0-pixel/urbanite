@@ -1,5 +1,5 @@
 import { createAdminClient } from '@/lib/supabase/admin';
-import { PLAN_PRICES, type CardPeriod } from '@/lib/card-plan';
+import { PERIODS, tierRank, type CardPeriod, type CardTier } from '@/lib/card-plan';
 
 // 名片 Pro 方案付款(藍新):單號 CP 開頭,和商店訂單共用藍新的 Notify,入帳時依單號分流
 
@@ -34,10 +34,15 @@ export async function settleCardPayment(payload: Payload): Promise<{ ok: boolean
     .select('id');
   if (!claimed?.length) return { ok: true, orderNo };
 
-  const days = PLAN_PRICES[pay.period as CardPeriod]?.days ?? 31;
-  const { data: sub } = await supabase.from('card_subscriptions').select('expires_at').eq('user_id', pay.user_id).maybeSingle();
-  const from = Math.max(Date.now(), sub?.expires_at ? new Date(sub.expires_at).getTime() : 0);
+  const days = PERIODS[pay.period as CardPeriod]?.days ?? 31;
+  const tier = (pay.tier || 'plus') as CardTier;
+  const { data: sub } = await supabase.from('card_subscriptions').select('plan, expires_at').eq('user_id', pay.user_id).maybeSingle();
+  const stillActive = sub?.expires_at && new Date(sub.expires_at).getTime() > Date.now();
+  // 同等級續約:接在原到期日之後;換等級(升級):從今天起算,等級取較高者
+  const sameTier = stillActive && sub?.plan === tier;
+  const from = sameTier ? new Date(sub!.expires_at).getTime() : Date.now();
+  const plan = stillActive && tierRank(sub!.plan as CardTier) > tierRank(tier) ? sub!.plan : tier;
   const expiresAt = new Date(from + days * 24 * 3600 * 1000).toISOString();
-  await supabase.from('card_subscriptions').upsert({ user_id: pay.user_id, plan: 'pro', expires_at: expiresAt, updated_at: new Date().toISOString() });
+  await supabase.from('card_subscriptions').upsert({ user_id: pay.user_id, plan, expires_at: expiresAt, updated_at: new Date().toISOString() });
   return { ok: true, orderNo };
 }

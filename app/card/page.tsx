@@ -3,9 +3,10 @@ import Link from 'next/link';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getSessionUser } from '@/lib/supabase/server';
 import { CARD_TEMPLATES, type ProfileCard, type ProfileCardBlock } from '@/lib/profile-card';
-import { PLAN_FEATURES, PLAN_PRICES } from '@/lib/card-plan';
+import { TIERS } from '@/lib/card-plan';
 import CardServiceHeader from './CardServiceHeader';
 import DemoPhone from './DemoPhone';
+import TierTable from './TierTable';
 
 export const dynamic = 'force-dynamic';
 export const metadata: Metadata = {
@@ -64,8 +65,9 @@ const FEATURES = [
 ];
 
 const FAQ = [
-  { q: '真的免費嗎?', a: '免費版可以一直用,不會到期。需要更多樣板、自訂樣式或完整數據時再升級 Pro。' },
-  { q: 'Pro 會自動續約扣款嗎?', a: '不會。Pro 是預付制,月付或年付一次,到期前會在後台提醒,到期後自動回到免費版,名片和資料都會保留。' },
+  { q: '真的免費嗎?', a: 'U Free 可以一直用,不會到期。需要更多樣板、自訂樣式或完整數據時,再升級 U Plus。' },
+  { q: 'U Pro 和 U Max 什麼時候開放?', a: '正在開發中。U Pro 會加上子網域官網、商品上架與結帳;U Max 開放全部功能,包含會員、物流、LINE 機器人與自訂網域。' },
+  { q: '付費方案會自動續約扣款嗎?', a: '不會。付費方案都是預付制,月付或年付一次,到期前會在後台提醒,到期後自動回到 U Free,名片和資料都會保留。' },
   { q: '網址代稱可以改嗎?', a: '可以,在「個人簡介」隨時修改。改了之後舊網址就會失效,記得更新你貼出去的地方。' },
   { q: '可以用哪些方式付款?', a: '信用卡、ATM 轉帳、超商代碼等,依付款頁顯示的方式為準。' },
 ];
@@ -133,36 +135,39 @@ export default async function CardServicePage() {
 
       {/* 方案 */}
       <section id="pricing" className="scroll-mt-20 border-t border-[#e5ded4] bg-white">
-        <div className="mx-auto max-w-4xl px-4 py-16 sm:px-6">
-          <h2 className="font-serif-tc text-center text-2xl font-bold tracking-[0.06em] sm:text-3xl">方案</h2>
-          <p className="mt-2 text-center text-sm text-[#8a7f72]">先免費用,需要時再升級。Pro 為預付制,不會自動扣款。</p>
-          <div className="mt-8 grid gap-4 sm:grid-cols-2">
-            <div className="rounded-2xl border border-[#e5ded4] p-6">
-              <p className="text-sm font-semibold">免費</p>
-              <p className="mt-2 text-3xl font-bold">NT$0</p>
-              <p className="mt-1 text-xs text-[#a99e8f]">一直免費</p>
-              <Link href={start} className="mt-5 block rounded-full border border-[#1f1b19] py-2.5 text-center text-sm font-medium">開始使用</Link>
-            </div>
-            <div className="rounded-2xl border-2 border-[#1f1b19] p-6">
-              <p className="flex items-center gap-2 text-sm font-semibold">Pro <span className="rounded-full bg-[#1f1b19] px-2 py-0.5 text-[10px] text-white">推薦</span></p>
-              <p className="mt-2 text-3xl font-bold">NT${PLAN_PRICES.month.amount}<span className="text-sm font-normal text-[#8a7f72]"> / 月</span></p>
-              <p className="mt-1 text-xs text-[#a99e8f]">或 {PLAN_PRICES.year.note}</p>
-              <Link href={user ? '/mycard/upgrade' : '/login?next=/mycard/upgrade'} className="mt-5 block rounded-full bg-[#1f1b19] py-2.5 text-center text-sm font-semibold text-white">升級 Pro</Link>
-            </div>
+        <div className="mx-auto max-w-5xl px-4 py-16 sm:px-6">
+          <h2 className="font-serif-tc text-center text-2xl font-bold tracking-[0.06em] sm:text-3xl">四個等級,從名片到官網</h2>
+          <p className="mt-2 text-center text-sm text-[#8a7f72]">先免費用,需要時再升級。付費方案都是預付制,不會自動扣款。</p>
+          <div className="mt-8 grid grid-cols-2 gap-3 lg:grid-cols-4">
+            {TIERS.map((t) => {
+              const highlight = t.key === 'plus';
+              const href = t.key === 'free' ? start : user ? '/mycard/upgrade' : '/login?next=/mycard/upgrade';
+              return (
+                <div key={t.key} className={`flex flex-col rounded-2xl p-5 ${highlight ? 'border-2 border-[#1f1b19]' : 'border border-[#e5ded4]'}`}>
+                  <p className="flex items-center gap-1.5 text-sm font-semibold">
+                    {t.name}
+                    {highlight ? <span className="rounded-full bg-[#1f1b19] px-1.5 py-0.5 text-[10px] text-white">推薦</span> : null}
+                  </p>
+                  <p className="mt-1 text-xs text-[#8a7f72]">{t.tagline}</p>
+                  <p className="mt-3 text-2xl font-bold">
+                    {t.prices ? <>NT${t.prices.month}<span className="text-xs font-normal text-[#8a7f72]"> / 月</span></> : 'NT$0'}
+                  </p>
+                  <p className="mt-0.5 text-[11px] text-[#a99e8f]">{t.prices ? `年付 NT$${t.prices.year.toLocaleString()}` : '一直免費'}</p>
+                  <div className="mt-auto pt-4">
+                    {t.available ? (
+                      <Link href={href} className={`block rounded-full py-2 text-center text-xs font-semibold ${highlight ? 'bg-[#1f1b19] text-white' : 'border border-[#1f1b19]'}`}>
+                        {t.key === 'free' ? '開始使用' : `升級 ${t.name}`}
+                      </Link>
+                    ) : (
+                      <span className="block rounded-full bg-[#f3eee7] py-2 text-center text-xs text-[#8a7f72]">即將開放</span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
           </div>
-          <div className="mt-6 overflow-hidden rounded-2xl border border-[#e5ded4]">
-            <div className="grid grid-cols-[1.4fr_1fr_1fr] bg-[#faf7f2] px-4 py-2.5 text-xs font-semibold text-[#6b6156]">
-              <span>功能</span>
-              <span>免費</span>
-              <span>Pro</span>
-            </div>
-            {PLAN_FEATURES.map((f) => (
-              <div key={f.label} className="grid grid-cols-[1.4fr_1fr_1fr] border-t border-[#efe8dd] px-4 py-3 text-sm">
-                <span className="text-[#1f1b19]">{f.label}</span>
-                <span className="text-[#6b6156]">{f.free}</span>
-                <span className="font-medium text-[#1f1b19]">{f.pro}</span>
-              </div>
-            ))}
+          <div className="mt-6">
+            <TierTable />
           </div>
         </div>
       </section>

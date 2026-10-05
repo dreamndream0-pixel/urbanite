@@ -18,7 +18,7 @@ export async function POST(request: Request) {
   const supabase = createAdminClient();
   const { count } = await supabase.from('profile_card_blocks').select('id', { count: 'exact', head: true }).eq('card_id', cardId);
   if ((count ?? 0) >= owner.plan.limits.maxBlocks) {
-    return NextResponse.json({ error: `免費版最多 ${owner.plan.limits.maxBlocks} 個區塊,升級 Pro 即可不限數量`, upgrade: true }, { status: 403 });
+    return NextResponse.json({ error: `免費版最多 ${owner.plan.limits.maxBlocks} 個區塊,升級 U Plus 即可不限數量`, upgrade: true }, { status: 403 });
   }
   const { data: first } = await supabase
     .from('profile_card_blocks')

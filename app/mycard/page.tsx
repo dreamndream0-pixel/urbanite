@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getSessionUser } from '@/lib/supabase/server';
 import { getPlanInfo } from '@/lib/card-access';
+import { tierInfo } from '@/lib/card-plan';
 import ProfileCardManager from '@/app/admin/ProfileCardManager';
 import CardServiceHeader from '@/app/card/CardServiceHeader';
 
@@ -30,7 +31,7 @@ export default async function MyCardPage() {
       <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6">
         {!plan.isAdmin && plan.pro && days !== null && days <= 7 ? (
           <p className="mb-4 rounded-xl border border-[#f0d9b5] bg-[#fff8ec] px-4 py-3 text-sm text-[#8a5a1c]">
-            Pro 還有 {days} 天到期,到期後會回到免費版。<a href="/mycard/upgrade" className="ml-1 font-semibold underline underline-offset-2">續約</a>
+            {tierInfo(plan.tier).name} 還有 {days} 天到期,到期後會回到 U Free。<a href="/mycard/upgrade" className="ml-1 font-semibold underline underline-offset-2">續約</a>
           </p>
         ) : null}
         <ProfileCardManager products={[]} upgradeHref="/mycard/upgrade" />

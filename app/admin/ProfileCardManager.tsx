@@ -164,12 +164,12 @@ const MAIN_TABS: { key: MainTab; label: string; icon: ReactNode }[] = [
 ];
 
 // ---------- 方案(免費 / Pro) ----------
-const ADMIN_PLAN: CardPlanInfo = { pro: true, isAdmin: true, expiresAt: null, limits: PRO_LIMITS };
+const ADMIN_PLAN: CardPlanInfo = { tier: 'max', pro: true, isAdmin: true, expiresAt: null, limits: PRO_LIMITS };
 const PlanCtx = createContext<{ plan: CardPlanInfo; upgradeHref: string }>({ plan: ADMIN_PLAN, upgradeHref: '/mycard/upgrade' });
 const usePlan = () => useContext(PlanCtx);
 
 function ProBadge() {
-  return <span className="inline-flex rounded-full bg-[#1f1b19] px-1.5 py-0.5 text-[9px] font-semibold tracking-wider text-white">PRO</span>;
+  return <span className="inline-flex rounded-full bg-[#1f1b19] px-1.5 py-0.5 text-[9px] font-semibold tracking-wider text-white">U PLUS</span>;
 }
 
 function ProLock({ title, desc }: { title: string; desc: string }) {
@@ -179,13 +179,13 @@ function ProLock({ title, desc }: { title: string; desc: string }) {
       <ProBadge />
       <p className="mt-2 text-sm font-semibold text-[#1f1b19]">{title}</p>
       <p className="mx-auto mt-1 max-w-sm text-xs leading-5 text-[#8a7f72]">{desc}</p>
-      <a href={upgradeHref} className="mt-4 inline-block rounded-full bg-[#1f1b19] px-5 py-2 text-xs font-semibold text-white">升級 Pro</a>
+      <a href={upgradeHref} className="mt-4 inline-block rounded-full bg-[#1f1b19] px-5 py-2 text-xs font-semibold text-white">升級 U Plus</a>
     </div>
   );
 }
 
 async function askUpgrade(message: string, href: string) {
-  if (await uiConfirm(`${message}\n\n要現在升級 Pro 嗎?`)) window.location.href = href;
+  if (await uiConfirm(`${message}\n\n要現在升級 U Plus 嗎?`)) window.location.href = href;
 }
 
 // 「個人名片」編輯器:後台(店家)與會員「我的名片」共用;最上方網址+複製;我的內容 / 外觀風格 / 數據分析 / 設定;即時預覽
@@ -1457,7 +1457,7 @@ function StyleEditor({
                 <button
                   key={tpl.key}
                   type="button"
-                  onClick={() => (locked ? void askUpgrade(`「${tpl.name}」是 Pro 樣板。`, upgradeHref) : setTheme({ ...tpl.theme, template: tpl.key }))}
+                  onClick={() => (locked ? void askUpgrade(`「${tpl.name}」是 U Plus 樣板。`, upgradeHref) : setTheme({ ...tpl.theme, template: tpl.key }))}
                   className={`overflow-hidden rounded-2xl border text-left transition ${selected ? 'border-[#1f1b19] ring-2 ring-[#1f1b19]/15' : 'border-[#e5ded4] hover:border-[#1f1b19]/30'}`}
                 >
                   <MiniPreview card={{ ...draft, theme: { ...theme, ...tpl.theme } }} blocks={sampleBlocks} productMap={productMap} lineUrl={lineUrl} />
@@ -1473,7 +1473,7 @@ function StyleEditor({
       ) : null}
 
       {tab !== 'template' && !plan.limits.customStyle ? (
-        <ProLock title="自訂樣式是 Pro 功能" desc="升級後可以自由調整背景、文字顏色、版面配置、頭像形狀與按鈕樣式。免費版可直接套用 8 款樣板。" />
+        <ProLock title="自訂樣式是 U Plus 功能" desc="升級後可以自由調整背景、文字顏色、版面配置、頭像形狀與按鈕樣式。免費版可直接套用 8 款樣板。" />
       ) : null}
 
       {tab === 'background' && plan.limits.customStyle ? (
@@ -1620,7 +1620,7 @@ function StatsPanel({ cardId, url, blocks, productMap }: { cardId: string; url: 
 
   return (
     <div className="space-y-4">
-      <Pills value={String(days) as '7' | '30'} options={[{ key: '7', label: '近 7 天' }, { key: '30', label: '近 30 天' }]} onChange={(v) => (v === '30' && plan.limits.statsDays < 30 ? void askUpgrade('近 30 天的數據是 Pro 功能。', upgradeHref) : setDays(v === '30' ? 30 : 7))} />
+      <Pills value={String(days) as '7' | '30'} options={[{ key: '7', label: '近 7 天' }, { key: '30', label: '近 30 天' }]} onChange={(v) => (v === '30' && plan.limits.statsDays < 30 ? void askUpgrade('近 30 天的數據是 U Plus 功能。', upgradeHref) : setDays(v === '30' ? 30 : 7))} />
 
       <div className="grid grid-cols-3 gap-2">
         {[
@@ -1681,7 +1681,7 @@ function StatsPanel({ cardId, url, blocks, productMap }: { cardId: string; url: 
         <p className="mb-3 flex items-center gap-2 text-sm font-semibold">流量來源{plan.limits.sources ? null : <ProBadge />}</p>
         {!plan.limits.sources ? (
           <p className="text-sm leading-6 text-[#a99e8f]">
-            升級 Pro 可以看到訪客來自 Instagram、LINE、Facebook、Threads 等哪個平台。
+            升級 U Plus 可以看到訪客來自 Instagram、LINE、Facebook、Threads 等哪個平台。
             <a href={upgradeHref} className="ml-1 text-[#1f1b19] underline underline-offset-2">升級</a>
           </p>
         ) : sources.length === 0 ? (
@@ -1760,7 +1760,7 @@ function SettingsEditor({ draft, setDraft }: { draft: ProfileCard; setDraft: (c:
         </div>
       </Section>
       ) : (
-        <ProLock title="自訂分享預覽是 Pro 功能" desc="名片貼到 LINE、Facebook、Threads 時顯示的標題、說明與圖片。免費版會使用你的名稱、簡述與頭像。" />
+        <ProLock title="自訂分享預覽是 U Plus 功能" desc="名片貼到 LINE、Facebook、Threads 時顯示的標題、說明與圖片。免費版會使用你的名稱、簡述與頭像。" />
       )}
 
       <Section title="頁面">

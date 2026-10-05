@@ -2,7 +2,7 @@ import type { User } from '@supabase/supabase-js';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getSessionUser } from '@/lib/supabase/server';
 import { getAdminEmails } from '@/lib/integrations';
-import { FREE_LIMITS, PRO_LIMITS, RESERVED_SLUGS, type CardPlanInfo } from '@/lib/card-plan';
+import { FREE_LIMITS, PRO_LIMITS, RESERVED_SLUGS, type CardPlanInfo, type CardTier } from '@/lib/card-plan';
 import { SLUG_PATTERN, type ProfileCard } from '@/lib/profile-card';
 
 // 名片服務:誰可以編輯哪張名片、目前方案
@@ -10,10 +10,13 @@ import { SLUG_PATTERN, type ProfileCard } from '@/lib/profile-card';
 export async function getPlanInfo(user: User): Promise<CardPlanInfo> {
   const admins = await getAdminEmails();
   const isAdmin = admins.includes((user.email ?? '').toLowerCase());
-  const { data } = await createAdminClient().from('card_subscriptions').select('expires_at').eq('user_id', user.id).maybeSingle();
+  const { data } = await createAdminClient().from('card_subscriptions').select('plan, expires_at').eq('user_id', user.id).maybeSingle();
   const expiresAt = data?.expires_at ?? null;
-  const pro = isAdmin || Boolean(expiresAt && new Date(expiresAt).getTime() > Date.now());
-  return { pro, isAdmin, expiresAt, limits: pro ? PRO_LIMITS : FREE_LIMITS };
+  const active = Boolean(expiresAt && new Date(expiresAt).getTime() > Date.now());
+  // 管理員(店家)= U Max;付費且未到期 = 購買的等級;其餘 U Free
+  const tier: CardTier = isAdmin ? 'max' : active ? ((['plus', 'pro', 'max'].includes(data?.plan) ? data!.plan : 'plus') as CardTier) : 'free';
+  const pro = tier !== 'free';
+  return { tier, pro, isAdmin, expiresAt: isAdmin ? null : expiresAt, limits: pro ? PRO_LIMITS : FREE_LIMITS };
 }
 
 // 由 Email 產生預設代稱(英數字),重複時加數字
