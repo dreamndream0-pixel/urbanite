@@ -1,5 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import SystemEffects from './SystemEffects';
+import SystemModuleExplorer from './SystemModuleExplorer';
 import { CONTACT_LINE_URL, SERVICE_LOGO } from '@/lib/card-plan';
 import styles from './system.module.css';
 
@@ -23,37 +25,27 @@ const adminFeatures = [
   ['促銷與售後', '優惠券、活動頁、取消、退貨及退款流程皆有對應介面。'],
 ];
 
-const capabilities = [
-  ['商品管理', '分類、多規格、預購、加購、上下架'],
-  ['庫存管理', '規格庫存、安全庫存、異動紀錄、CSV'],
-  ['會員系統', 'Google／LINE 登入、資料、收藏、地址'],
-  ['訂單管理', '付款、出貨、取消、退貨、狀態歷程'],
-  ['金流工具', '藍新金流、信用卡、轉帳、付款回報'],
-  ['物流工具', '7-ELEVEN、全家、宅配、物流貨態'],
-  ['促銷工具', '折扣碼、會員券、免運、指定商品'],
-  ['活動專頁', '獨立網址、商品、分類、搜尋與庫存'],
-  ['系統設定', '品牌 Logo、首頁輪播、頁尾與付款方式'],
-];
-
 export default function SystemIntroductionPage() {
   return (
-    <main className={styles.page}>
+    <main className={styles.page} data-system-page>
+      <SystemEffects />
+      <span className={styles.scrollProgress} aria-hidden />
       <header className={styles.header}>
         <Link href="/card" className={styles.brand} aria-label="回 URBANLINKS 首頁">
           <img src={SERVICE_LOGO} alt="URBANLINKS" style={{ height: 16, width: 'auto' }} />
           <span><small>品牌官網・U PRO / U MAX</small></span>
         </Link>
         <nav className={styles.nav} aria-label="頁面導覽">
-          <a href="#experience">前台體驗</a>
-          <a href="#operations">營運後台</a>
-          <a href="#modules">功能模組</a>
-          <a href="#delivery">導入方式</a>
+          <a href="#experience" data-section-link>前台體驗</a>
+          <a href="#operations" data-section-link>營運後台</a>
+          <a href="#modules" data-section-link>功能模組</a>
+          <a href="#delivery" data-section-link>導入方式</a>
         </nav>
         <a className={styles.headerCta} href="#contact"><span className={styles.headerCtaLabel}>預約系統展示</span><span aria-hidden>→</span></a>
       </header>
 
       <section className={styles.hero}>
-        <div className={styles.heroCopy}>
+        <div className={styles.heroCopy} data-reveal data-visible="true">
           <p className={styles.eyebrow}>BRAND COMMERCE, BUILT AS ONE</p>
           <h1>品牌電商<br />網站系統</h1>
           <p className={styles.heroLead}>
@@ -70,7 +62,8 @@ export default function SystemIntroductionPage() {
           </div>
         </div>
 
-        <div className={styles.heroVisual} aria-label="電商營運後台預覽">
+        <div className={styles.heroVisual} aria-label="電商營運後台預覽" data-tilt data-reveal data-visible="true">
+          <span className={styles.visualSheen} aria-hidden />
           <div className={styles.browserBar}>
             <span className={styles.browserDots}><i /><i /><i /></span>
             <span className={styles.browserAddress}>commerce.yourbrand.com/admin</span>
@@ -110,14 +103,14 @@ export default function SystemIntroductionPage() {
         </div>
       </section>
 
-      <section className={styles.proofBar} aria-label="核心價值">
+      <section className={styles.proofBar} aria-label="核心價值" data-reveal>
         <span><b>01</b> 自有品牌與網域</span>
         <span><b>02</b> 前後台資料同步</span>
         <span><b>03</b> 金流物流可串接</span>
         <span><b>04</b> 可持續客製擴充</span>
       </section>
 
-      <section className={styles.introBand}>
+      <section className={styles.introBand} data-reveal>
         <p className={styles.sectionIndex}>01 / SYSTEM VALUE</p>
         <div className={styles.introGrid}>
           <h2>不是只有漂亮的模板，<br />而是完整的營運工具。</h2>
@@ -129,11 +122,11 @@ export default function SystemIntroductionPage() {
       </section>
 
       <section className={styles.experience} id="experience">
-        <div className={styles.sectionHeading}>
+        <div className={styles.sectionHeading} data-reveal>
           <div><p className={styles.sectionIndex}>02 / STOREFRONT</p><h2>讓品牌被看見，<br />也讓購買自然完成。</h2></div>
           <p>前台不是套版賣場，而是能依品牌視覺調整的購物體驗。從首頁探索到會員售後，每個流程都針對手機操作設計。</p>
         </div>
-        <div className={styles.featureLayout}>
+        <div className={styles.featureLayout} data-reveal>
           <div className={styles.phoneVisual}>
             <div className={styles.phoneTop}><span>9:41</span><i /><i /><i /></div>
             <div className={styles.storeHeader}><span>☰</span><b>urbanite<small>CUSTOM WEAR</small></b><span>♡　⌑</span></div>
@@ -156,39 +149,31 @@ export default function SystemIntroductionPage() {
       </section>
 
       <section className={styles.operations} id="operations">
-        <div className={styles.sectionHeading}>
+        <div className={styles.sectionHeading} data-reveal>
           <div><p className={styles.sectionIndex}>03 / OPERATIONS</p><h2>每一筆訂單，<br />都有清楚的下一步。</h2></div>
           <p>把日常營運需要查看和操作的資訊放在同一套後台，狀態清楚、操作集中，也保留必要的處理紀錄。</p>
         </div>
-        <div className={styles.operationsBoard}>
+        <div className={styles.operationsBoard} data-reveal>
           <div className={styles.operationsTabs}><b>訂單管理</b><span>全部 328</span><span>尚未付款 7</span><span className={styles.operationsTabActive}>待出貨 8</span><span>已處理 12</span></div>
           <div className={styles.operationsOrders}>
             <div><span className={styles.statusDot} /><b>UR202610050018</b><small>全家取貨付款 · 台北信義店</small><strong>NT$ 2,480</strong><button type="button">建立出貨單</button></div>
             <div><span className={styles.statusDot} /><b>UR202610050014</b><small>7-ELEVEN 純取貨 · 富陽門市</small><strong>NT$ 1,380</strong><button type="button">查看訂單</button></div>
           </div>
         </div>
-        <div className={styles.adminFeatureGrid}>
+        <div className={styles.adminFeatureGrid} data-reveal>
           {adminFeatures.map(([title, text]) => <article key={title}><h3>{title}</h3><p>{text}</p><span aria-hidden>↗</span></article>)}
         </div>
       </section>
 
       <section className={styles.modules} id="modules">
-        <div className={styles.sectionHeading}>
+        <div className={styles.sectionHeading} data-reveal>
           <div><p className={styles.sectionIndex}>04 / MODULES</p><h2>一套系統，涵蓋<br />品牌電商的核心工作。</h2></div>
           <p>先以完整基礎模組上線，再依品牌流程加入發票、通知、會員分級或其他第三方服務。</p>
         </div>
-        <div className={styles.moduleTable}>
-          {capabilities.map(([title, text], index) => (
-            <article key={title}>
-              <span>{String(index + 1).padStart(2, '0')}</span>
-              <h3>{title}</h3>
-              <p>{text}</p>
-            </article>
-          ))}
-        </div>
+        <SystemModuleExplorer />
       </section>
 
-      <section className={styles.campaignBand}>
+      <section className={styles.campaignBand} data-reveal>
         <div>
           <p className={styles.sectionIndex}>BUILT-IN CAMPAIGN PAGES</p>
           <h2>廣告活動不必再另外架站。</h2>
@@ -202,11 +187,11 @@ export default function SystemIntroductionPage() {
       </section>
 
       <section className={styles.delivery} id="delivery">
-        <div className={styles.sectionHeading}>
+        <div className={styles.sectionHeading} data-reveal>
           <div><p className={styles.sectionIndex}>05 / DELIVERY</p><h2>從品牌資料到正式上線，<br />每一步都看得見。</h2></div>
           <p>導入內容依實際品牌需求確認，保留清楚的範圍與驗收標準，避免上線後才發現流程不符合使用情境。</p>
         </div>
-        <ol className={styles.steps}>
+        <ol className={styles.steps} data-reveal>
           <li><span>01</span><div><h3>需求盤點</h3><p>確認品牌、商品、付款、物流與營運流程。</p></div></li>
           <li><span>02</span><div><h3>視覺設定</h3><p>套用 Logo、品牌色、首頁內容與網站資訊。</p></div></li>
           <li><span>03</span><div><h3>系統串接</h3><p>設定網域、資料庫、金流、物流與會員登入。</p></div></li>
@@ -214,7 +199,7 @@ export default function SystemIntroductionPage() {
         </ol>
       </section>
 
-      <section className={styles.contact} id="contact">
+      <section className={styles.contact} id="contact" data-reveal>
         <p className={styles.sectionIndex}>START YOUR COMMERCE</p>
         <h2>把品牌官網，變成真正能營運的系統。</h2>
         <p>預約系統展示，我們會依商品數量、付款物流方式與需要的客製功能提供導入建議。</p>
