@@ -49,7 +49,8 @@ export const FREE_LIMITS: PlanLimits = { maxBlocks: 8, allTemplates: false, cust
 export const PRO_LIMITS: PlanLimits = { maxBlocks: 100, allTemplates: true, customStyle: true, timed: true, seo: true, hideFooter: true, statsDays: 30, sources: true };
 
 // 免費版可用的樣板
-export const FREE_TEMPLATE_KEYS = ['ivory', 'gray-note', 'hero-sun', 'polaroid-green', 'label-sand', 'float-latte', 'framed-wood', 'mag-mono'];
+// ivory 是新名片的預設值(不在樣板列表);實際可選 8 款
+export const FREE_TEMPLATE_KEYS = ['ivory', 'gray-note', 'hero-sun', 'polaroid-green', 'label-sand', 'float-latte', 'framed-wood', 'mag-mono', 'news'];
 
 // pro:名片付費功能是否開啟(U Plus 以上)
 export type CardPlanInfo = { tier: CardTier; pro: boolean; isAdmin: boolean; expiresAt: string | null; limits: PlanLimits };

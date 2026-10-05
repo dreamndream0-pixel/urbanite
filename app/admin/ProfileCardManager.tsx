@@ -28,7 +28,6 @@ import {
   SOCIAL_PLATFORMS,
   SOURCE_LABELS,
   TAG_SUGGESTIONS,
-  TEMPLATE_CATEGORIES,
   videoEmbedUrl,
   type BlockItem,
   type BlockOptions,
@@ -168,6 +167,21 @@ const MAIN_TABS: { key: MainTab; label: string; icon: ReactNode }[] = [
 const ADMIN_PLAN: CardPlanInfo = { tier: 'max', pro: true, isAdmin: true, expiresAt: null, limits: PRO_LIMITS };
 const PlanCtx = createContext<{ plan: CardPlanInfo; upgradeHref: string }>({ plan: ADMIN_PLAN, upgradeHref: '/mycard/upgrade' });
 const usePlan = () => useContext(PlanCtx);
+
+// 樣板分類:全部 / 免費 / U Plus / 其他(之後的專屬樣板)
+type TemplateFilter = 'all' | 'free' | 'plus' | 'other';
+const TEMPLATE_FILTERS: { key: TemplateFilter; label: string }[] = [
+  { key: 'all', label: '全部' },
+  { key: 'free', label: '免費' },
+  { key: 'plus', label: 'U Plus' },
+  { key: 'other', label: '其他' },
+];
+function templateIn(filter: TemplateFilter, key: string) {
+  if (filter === 'all') return true;
+  if (filter === 'free') return FREE_TEMPLATE_KEYS.includes(key);
+  if (filter === 'plus') return !FREE_TEMPLATE_KEYS.includes(key);
+  return false;
+}
 
 // U Plus 膠囊(行內文字標示)
 function ProBadge() {
@@ -1416,7 +1430,7 @@ function StyleEditor({
 }) {
   const [tab, setTab] = useState<'template' | 'background' | 'profile' | 'button'>('template');
   const { plan, upgradeHref } = usePlan();
-  const [category, setCategory] = useState<(typeof TEMPLATE_CATEGORIES)[number]['key']>('all');
+  const [category, setCategory] = useState<TemplateFilter>('all');
   // 樣板縮圖只放前幾個區塊,輪播不自動播放
   const sampleBlocks = useMemo(
     () => blocks.slice(0, 5).map((b) => (b.options ? { ...b, options: { ...b.options, autoplay: false } } : b)),
@@ -1453,23 +1467,26 @@ function StyleEditor({
       {tab === 'template' ? (
         <section className="rounded-2xl border border-[#ebe4da] bg-white p-4">
           <p className="text-sm leading-6 text-[#6b6156]">挑一個樣板快速套用,之後還能在「背景」「簡介樣式」「連結樣式」再微調。封面照片與大頭照不會被樣板覆蓋。</p>
-          <div className="mt-3 flex flex-wrap gap-2">
-            {TEMPLATE_CATEGORIES.map((c) => {
-              const count = c.key === 'all' ? CARD_TEMPLATES.length : CARD_TEMPLATES.filter((t) => t.category === c.key).length;
+          <div className="mt-3 grid grid-cols-4 gap-2">
+            {TEMPLATE_FILTERS.map((c) => {
+              const count = CARD_TEMPLATES.filter((t) => templateIn(c.key, t.key)).length;
               return (
                 <button
                   key={c.key}
                   type="button"
                   onClick={() => setCategory(c.key)}
-                  className={`rounded-full px-4 py-1.5 text-sm transition ${category === c.key ? 'bg-[#1f1b19] text-white' : 'border border-[#e5ded4] text-[#5f5852] hover:border-[#1f1b19]/30'}`}
+                  className={`whitespace-nowrap rounded-full px-1 py-1.5 text-[13px] transition sm:text-sm ${category === c.key ? 'bg-[#1f1b19] text-white' : 'border border-[#e5ded4] text-[#5f5852] hover:border-[#1f1b19]/30'}`}
                 >
                   {c.label}({count})
                 </button>
               );
             })}
           </div>
+          {category === 'other' ? (
+            <p className="mt-4 rounded-xl bg-[#faf7f2] px-4 py-6 text-center text-sm leading-6 text-[#8a7f72]">更多樣板陸續推出,U Pro、U Max 專屬樣板也會放在這裡。</p>
+          ) : null}
           <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
-            {CARD_TEMPLATES.filter((t) => category === 'all' || t.category === category).map((tpl) => {
+            {CARD_TEMPLATES.filter((t) => templateIn(category, t.key)).map((tpl) => {
               const selected = theme.template === tpl.key;
               const locked = !plan.limits.allTemplates && !FREE_TEMPLATE_KEYS.includes(tpl.key);
               return (
