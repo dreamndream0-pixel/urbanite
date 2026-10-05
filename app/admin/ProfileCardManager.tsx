@@ -169,21 +169,31 @@ const ADMIN_PLAN: CardPlanInfo = { tier: 'max', pro: true, isAdmin: true, expire
 const PlanCtx = createContext<{ plan: CardPlanInfo; upgradeHref: string }>({ plan: ADMIN_PLAN, upgradeHref: '/mycard/upgrade' });
 const usePlan = () => useContext(PlanCtx);
 
-// U Plus 功能標誌(行內)
-function ProBadge({ size = 16 }: { size?: number }) {
-  return <img src="/brand/uplus-mark.png" alt="U Plus" title="U Plus 功能" width={size} height={size} className="inline-block shrink-0 object-contain" style={{ width: size, height: size }} />;
+// U Plus 膠囊(行內文字標示)
+function ProBadge() {
+  return <span className="inline-flex shrink-0 rounded-full bg-[#1f1b19] px-1.5 py-0.5 text-[9px] font-semibold tracking-wider text-white">U PLUS</span>;
 }
 
-// U Plus 功能標誌(貼在元件右上角,父層需 relative)
-function PlusCorner() {
-  return <img src="/brand/uplus-mark.png" alt="U Plus" title="U Plus 功能" className="pointer-events-none absolute -right-1 -top-1.5 z-10 h-4 w-4 object-contain drop-shadow-sm" />;
+// U Plus 圓形徽章:壓在邊框右上角(父層需 relative,且不能 overflow-hidden)
+function PlusCorner({ size = 18 }: { size?: number }) {
+  const offset = -Math.round(size * 0.38);
+  return (
+    <img
+      src="/brand/uplus-badge.png"
+      alt="U Plus"
+      title="U Plus 功能"
+      className="pointer-events-none absolute z-10 rounded-full shadow-[0_2px_6px_rgba(18,27,51,0.35)]"
+      style={{ width: size, height: size, right: offset, top: offset }}
+    />
+  );
 }
 
 function ProLock({ title, desc }: { title: string; desc: string }) {
   const { upgradeHref } = usePlan();
   return (
     <div className="relative rounded-2xl border border-[#e5ded4] bg-white px-5 py-6 text-center">
-      <ProBadge size={28} />
+      <PlusCorner size={30} />
+      <ProBadge />
       <p className="mt-2 text-sm font-semibold text-[#1f1b19]">{title}</p>
       <p className="mx-auto mt-1 max-w-sm text-xs leading-5 text-[#8a7f72]">{desc}</p>
       <a href={upgradeHref} className="mt-4 inline-block rounded-full bg-[#1f1b19] px-5 py-2 text-xs font-semibold text-white">升級 U Plus</a>
@@ -658,7 +668,8 @@ function BlockRow({
   const timedPanel = plan.limits.timed ? (
     timedPanelPro
   ) : (
-    <div className="flex items-center gap-2 rounded-xl bg-[#faf7f2] p-3 text-sm">
+    <div className="relative flex items-center gap-2 rounded-xl border border-[#efe8dd] bg-[#faf7f2] p-3 text-sm">
+      <PlusCorner size={22} />
       <span>限時顯示</span>
       <ProBadge />
       <a href={upgradeHref} className="ml-auto text-xs text-[#6b6156] underline underline-offset-2">升級解鎖</a>
@@ -1429,7 +1440,7 @@ function StyleEditor({
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-2 -mt-2 overflow-x-auto pr-1 pt-2 [scrollbar-width:none]">
+      <div className="flex items-center gap-2 -mt-2 overflow-x-auto pr-2 pt-2 [scrollbar-width:none]">
         {([['template', '樣板'], ['background', '背景'], ['profile', '簡介樣式'], ['button', '連結樣式']] as const).map(([key, label]) => (
           <button key={key} type="button" onClick={() => setTab(key)} className={`relative shrink-0 rounded-full px-4 py-2 text-sm transition ${tab === key ? 'bg-[#efe8dd] font-medium text-[#1f1b19]' : 'text-[#8a7f72] hover:bg-[#f6f2ec]'}`}>
             {label}
@@ -1466,13 +1477,15 @@ function StyleEditor({
                   key={tpl.key}
                   type="button"
                   onClick={() => (locked ? void askUpgrade(`「${tpl.name}」是 U Plus 樣板。`, upgradeHref) : setTheme({ ...tpl.theme, template: tpl.key }))}
-                  className={`relative overflow-hidden rounded-2xl border text-left transition ${selected ? 'border-[#1f1b19] ring-2 ring-[#1f1b19]/15' : 'border-[#e5ded4] hover:border-[#1f1b19]/30'}`}
+                  className={`relative rounded-2xl border text-left transition ${selected ? 'border-[#1f1b19] ring-2 ring-[#1f1b19]/15' : 'border-[#e5ded4] hover:border-[#1f1b19]/30'}`}
                 >
-                  {locked ? <img src="/brand/uplus-mark.png" alt="U Plus" title="U Plus 樣板" className="pointer-events-none absolute right-2 top-2 z-10 h-5 w-5 object-contain drop-shadow" /> : null}
-                  <MiniPreview card={{ ...draft, theme: { ...theme, ...tpl.theme } }} blocks={sampleBlocks} productMap={productMap} lineUrl={lineUrl} />
-                  <div className="flex items-center justify-between border-t border-[#efe8dd] bg-white px-3 py-2">
-                    <span className="text-sm">{tpl.name}</span>
-                    {selected ? <span className="text-xs text-[#1f7a44]">使用中</span> : null}
+                  {locked ? <PlusCorner size={30} /> : null}
+                  <div className="overflow-hidden rounded-[15px]">
+                    <MiniPreview card={{ ...draft, theme: { ...theme, ...tpl.theme } }} blocks={sampleBlocks} productMap={productMap} lineUrl={lineUrl} />
+                    <div className="flex items-center justify-between border-t border-[#efe8dd] bg-white px-3 py-2">
+                      <span className="text-sm">{tpl.name}</span>
+                      {selected ? <span className="text-xs text-[#1f7a44]">使用中</span> : locked ? <ProBadge /> : null}
+                    </div>
                   </div>
                 </button>
               );
@@ -1822,7 +1835,7 @@ function ReferralSection() {
   return (
     <Section title="分享推薦連結">
       <div className="flex gap-3 rounded-xl bg-[#f6f2ec] p-3.5">
-        <img src="/brand/uplus-mark.png" alt="U Plus" className="mt-0.5 h-7 w-7 shrink-0 object-contain" />
+        <img src="/brand/uplus-badge.png" alt="U Plus" className="mt-0.5 h-8 w-8 shrink-0 rounded-full" />
         <div className="text-xs leading-5 text-[#6b6156]">
           <p className="text-sm font-semibold text-[#1f1b19]">推薦 5 位朋友,送你 1 個月 U Plus</p>
           <p className="mt-0.5">朋友點你的連結註冊並完成設定,就算推薦成功。每滿 5 位自動送 1 個月,已經是付費方案會接在到期日之後。</p>

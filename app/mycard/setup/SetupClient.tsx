@@ -131,7 +131,7 @@ export default function SetupClient({ name: initialName, slug: initialSlug, refe
         </label>
 
         <div className="flex gap-3 rounded-xl bg-[#f6f2ec] p-3.5">
-          <img src="/brand/uplus-mark.png" alt="U Plus" className="mt-0.5 h-7 w-7 shrink-0 object-contain" />
+          <img src="/brand/uplus-badge.png" alt="U Plus" className="mt-0.5 h-8 w-8 shrink-0 rounded-full" />
           <div className="text-xs leading-5 text-[#6b6156]">
             <p className="text-sm font-semibold text-[#1f1b19]">推薦 5 位朋友,送你 1 個月 U Plus</p>
             <p className="mt-0.5">朋友用你的推薦連結註冊 URBANLINKS,每滿 5 位就送 1 個月 U Plus,推薦越多送越多。</p>
