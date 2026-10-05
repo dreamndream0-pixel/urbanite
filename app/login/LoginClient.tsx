@@ -13,12 +13,16 @@ export default function LoginClient({
   nextPath,
   logoUrl = '',
   initialError = '',
+  brand = 'store',
 }: {
   configured: boolean;
   nextPath: string;
   logoUrl?: string;
   initialError?: string;
+  brand?: 'store' | 'card'; // card = URBANLINKS 名片服務(同版型,換 Logo 與文案)
 }) {
+  const isCard = brand === 'card';
+  const homeHref = isCard ? '/card' : '/';
   const [error, setError] = useState<string | null>(initialError || null);
   const [busy, setBusy] = useState<string | null>(null);
   const [email, setEmail] = useState('');
@@ -73,30 +77,38 @@ export default function LoginClient({
       <header className="sticky top-0 z-30 border-b border-[#e6e1d8] bg-[var(--c-surface)]">
         <nav className="mx-auto grid max-w-4xl grid-cols-[1fr_auto_1fr] items-center px-5 py-4">
           <div className="flex items-center gap-5">
-            <Link href="/" aria-label="回首頁選單" className="text-[#717171]">
-              <IconMenu />
-            </Link>
-            <Link href="/" aria-label="搜尋" className="text-[#717171]">
-              <IconSearch />
-            </Link>
+            {isCard ? null : (
+              <>
+                <Link href="/" aria-label="回首頁選單" className="text-[#717171]">
+                  <IconMenu />
+                </Link>
+                <Link href="/" aria-label="搜尋" className="text-[#717171]">
+                  <IconSearch />
+                </Link>
+              </>
+            )}
           </div>
-          <Link href="/" aria-label="回首頁" className="justify-self-center px-2 text-center">
+          <Link href={homeHref} aria-label="回首頁" className="justify-self-center px-2 text-center">
             {logoUrl ? (
-              <img src={logoUrl} alt={STORE_NAME} className="site-logo mx-auto h-8 w-auto object-contain sm:h-10" />
+              <img src={logoUrl} alt={isCard ? 'URBANLINKS' : STORE_NAME} className={`${isCard ? '' : 'site-logo '}mx-auto h-8 w-auto object-contain sm:h-10`} />
             ) : (
               <span className="inline-block h-8 w-28 sm:h-10 sm:w-36" aria-hidden />
             )}
           </Link>
           <div className="flex items-center justify-end gap-5 text-[#717171]">
-            <IconUser />
-            <IconBag />
+            {isCard ? null : (
+              <>
+                <IconUser />
+                <IconBag />
+              </>
+            )}
           </div>
         </nav>
       </header>
 
       <div className="mx-auto max-w-md px-8 py-10">
         <div className="relative">
-          <Link href="/" aria-label="回首頁" className="absolute left-0 top-1 text-2xl leading-none text-[#717171]">
+          <Link href={homeHref} aria-label="回首頁" className="absolute left-0 top-1 text-2xl leading-none text-[#717171]">
             ←
           </Link>
           <h1 className="text-center text-4xl font-bold tracking-wide">登入</h1>
@@ -145,7 +157,7 @@ export default function LoginClient({
               disabled={busy !== null || !email || !password}
               className="mt-8 w-full rounded bg-[var(--c-gold)] px-5 py-4 text-lg font-bold text-white transition hover:bg-[var(--c-gold)] disabled:opacity-50"
             >
-              {busy === 'password' ? '登入中...' : '開始購物吧！'}
+              {busy === 'password' ? '登入中...' : isCard ? '開始建立名片' : '開始購物吧！'}
             </button>
 
             <div className="mt-10 flex items-center gap-3 text-sm text-[#7d7d7d]">
@@ -191,14 +203,26 @@ export default function LoginClient({
                   註冊會員
                 </Link>
               </div>
-              <div className="mt-9 text-lg leading-8 text-[#8a8a8a]">
-                <p>加入會員即可享：</p>
-                <ul className="mt-3 list-disc space-y-1 pl-6">
-                  <li>每年生日購物金</li>
-                  <li>會員專屬折扣</li>
-                  <li>其他不定期優惠與驚喜</li>
-                </ul>
-              </div>
+              {isCard ? (
+                <div className="mt-9 text-lg leading-8 text-[#8a8a8a]">
+                  <p>加入 URBANLINKS 即可：</p>
+                  <ul className="mt-3 list-disc space-y-1 pl-6">
+                    <li>免費建立你的個人名片</li>
+                    <li>一個網址放進 IG、LINE、作品與商品</li>
+                    <li>推薦 5 位朋友,送 1 個月 U Plus</li>
+                  </ul>
+                  <p className="mt-4 text-sm leading-6">用 LINE、Google 登入會自動建立帳號;已經是 URBANITE 會員,用同一個帳號登入就可以。</p>
+                </div>
+              ) : (
+                <div className="mt-9 text-lg leading-8 text-[#8a8a8a]">
+                  <p>加入會員即可享：</p>
+                  <ul className="mt-3 list-disc space-y-1 pl-6">
+                    <li>每年生日購物金</li>
+                    <li>會員專屬折扣</li>
+                    <li>其他不定期優惠與驚喜</li>
+                  </ul>
+                </div>
+              )}
             </section>
           </>
         )}

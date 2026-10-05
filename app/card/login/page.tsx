@@ -1,8 +1,7 @@
 import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import { getSessionUser } from '@/lib/supabase/server';
-import CardServiceHeader from '../CardServiceHeader';
-import CardLoginClient from './CardLoginClient';
+import LoginClient from '@/app/login/LoginClient';
 
 export const dynamic = 'force-dynamic';
 export const metadata: Metadata = { title: { absolute: '登入 | URBANLINKS' }, robots: { index: false } };
@@ -14,17 +13,12 @@ function normalizeNext(value: string | string[] | undefined) {
   return next;
 }
 
-// 名片服務自己的登入頁(與官網 /login 分開,帳號共用)
+// 名片服務的登入頁:與官網同版型,Logo 換成 URBANLINKS 的 U(帳號共用)
 export default async function CardLoginPage({ searchParams }: { searchParams: Promise<{ next?: string | string[]; error?: string | string[] }> }) {
   const params = await searchParams;
   const nextPath = normalizeNext(params.next);
   if (await getSessionUser()) redirect(nextPath);
   const error = Array.isArray(params.error) ? params.error[0] : params.error;
-
-  return (
-    <main className="min-h-screen bg-[#f6f2ec] text-[#1f1b19]">
-      <CardServiceHeader loggedIn={false} current="login" />
-      <CardLoginClient nextPath={nextPath} initialError={error ?? ''} />
-    </main>
-  );
+  const configured = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
+  return <LoginClient brand="card" configured={configured} nextPath={nextPath} logoUrl="/brand/u-logo.png" initialError={error ?? ''} />;
 }
