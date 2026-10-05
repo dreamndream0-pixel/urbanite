@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import QRCode from 'qrcode';
 import ProfileCardView, { type CardProduct } from '@/app/components/ProfileCardView';
 import { LayoutThumb } from '@/app/components/ProfileImageBlock';
@@ -38,6 +38,7 @@ import {
   type ProfileCardBlock,
 } from '@/lib/profile-card';
 import type { Product } from '@/lib/types';
+import { FREE_TEMPLATE_KEYS, PRO_LIMITS, type CardPlanInfo } from '@/lib/card-plan';
 import { uiAlert, uiConfirm } from '@/lib/ui-dialog';
 
 const formatter = new Intl.NumberFormat('zh-TW', { style: 'currency', currency: 'TWD', maximumFractionDigits: 0 });
@@ -77,7 +78,7 @@ async function uploadImage(file: File, square = false) {
   form.append('file', new File([blob], blob.type === 'image/png' ? 'image.png' : 'image.jpg', { type: blob.type }));
   form.append('productId', 'card');
   form.append('folder', 'profile-card');
-  const res = await fetch('/api/products/image', { method: 'POST', body: form });
+  const res = await fetch('/api/profile-card/upload', { method: 'POST', body: form });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error ?? '上傳失敗');
   return String(data.image_url);
@@ -162,8 +163,34 @@ const MAIN_TABS: { key: MainTab; label: string; icon: ReactNode }[] = [
   { key: 'settings', label: '設定', icon: <><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" /></> },
 ];
 
-// 後台「個人名片」:最上方網址+複製;我的內容 / 外觀風格 / 數據分析 / 設定;即時預覽
-export default function ProfileCardManager({ products, lineUrl = '' }: { products: Product[]; lineUrl?: string }) {
+// ---------- 方案(免費 / Pro) ----------
+const ADMIN_PLAN: CardPlanInfo = { pro: true, isAdmin: true, expiresAt: null, limits: PRO_LIMITS };
+const PlanCtx = createContext<{ plan: CardPlanInfo; upgradeHref: string }>({ plan: ADMIN_PLAN, upgradeHref: '/mycard/upgrade' });
+const usePlan = () => useContext(PlanCtx);
+
+function ProBadge() {
+  return <span className="inline-flex rounded-full bg-[#1f1b19] px-1.5 py-0.5 text-[9px] font-semibold tracking-wider text-white">PRO</span>;
+}
+
+function ProLock({ title, desc }: { title: string; desc: string }) {
+  const { upgradeHref } = usePlan();
+  return (
+    <div className="rounded-2xl border border-[#e5ded4] bg-white px-5 py-6 text-center">
+      <ProBadge />
+      <p className="mt-2 text-sm font-semibold text-[#1f1b19]">{title}</p>
+      <p className="mx-auto mt-1 max-w-sm text-xs leading-5 text-[#8a7f72]">{desc}</p>
+      <a href={upgradeHref} className="mt-4 inline-block rounded-full bg-[#1f1b19] px-5 py-2 text-xs font-semibold text-white">升級 Pro</a>
+    </div>
+  );
+}
+
+async function askUpgrade(message: string, href: string) {
+  if (await uiConfirm(`${message}\n\n要現在升級 Pro 嗎?`)) window.location.href = href;
+}
+
+// 「個人名片」編輯器:後台(店家)與會員「我的名片」共用;最上方網址+複製;我的內容 / 外觀風格 / 數據分析 / 設定;即時預覽
+export default function ProfileCardManager({ products, lineUrl = '', upgradeHref = '/mycard/upgrade' }: { products: Product[]; lineUrl?: string; upgradeHref?: string }) {
+  const [plan, setPlan] = useState<CardPlanInfo>(ADMIN_PLAN);
   const [card, setCard] = useState<ProfileCard | null>(null);
   const [draft, setDraft] = useState<ProfileCard | null>(null);
   const [blocks, setBlocks] = useState<ProfileCardBlock[]>([]);
@@ -187,6 +214,7 @@ export default function ProfileCardManager({ products, lineUrl = '' }: { product
         setCard(data.card);
         setDraft(data.card);
         setBlocks(data.blocks);
+        if (data.plan) setPlan(data.plan);
       })
       .catch((e) => setLoadError(e instanceof Error ? e.message : '讀取失敗'));
   }, []);
@@ -232,7 +260,7 @@ export default function ProfileCardManager({ products, lineUrl = '' }: { product
       body: JSON.stringify({ card_id: card!.id, type }),
     });
     const data = await res.json();
-    if (!res.ok) return void uiAlert(data.error ?? '新增失敗');
+    if (!res.ok) return void (data.upgrade ? askUpgrade(data.error, upgradeHref) : uiAlert(data.error ?? '新增失敗'));
     setBlocks((list) => [data as ProfileCardBlock, ...list]);
     setOpenId(data.id);
   }
@@ -289,6 +317,7 @@ export default function ProfileCardManager({ products, lineUrl = '' }: { product
   const preview = <ProfileCardView card={draft} blocks={blocks} products={productMap} lineUrl={lineUrl} preview />;
 
   return (
+    <PlanCtx.Provider value={{ plan, upgradeHref }}>
     <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start lg:gap-6">
       <div className="space-y-4 pb-20">
         {/* 網址 */}
@@ -345,7 +374,7 @@ export default function ProfileCardManager({ products, lineUrl = '' }: { product
                       <button type="button" onClick={() => setPicker(false)} className="text-xs text-[#8a7f72]">取消</button>
                     </div>
                     <div className="grid grid-cols-2 gap-2">
-                      {BLOCK_TYPES.map((t) => (
+                      {BLOCK_TYPES.filter((t) => plan.isAdmin || t.type !== 'product').map((t) => (
                         <button key={t.type} type="button" onClick={() => addBlock(t.type)} className="flex items-start gap-2.5 rounded-xl border border-[#efe8dd] p-3 text-left transition hover:border-[#1f1b19]/30 hover:bg-[#faf7f2]">
                           <span className="mt-0.5 text-[#6b6156]"><Icon>{BLOCK_ICON[t.type]}</Icon></span>
                           <span>
@@ -358,7 +387,7 @@ export default function ProfileCardManager({ products, lineUrl = '' }: { product
                   </div>
                 ) : (
                   <button type="button" onClick={() => setPicker(true)} className="w-full rounded-2xl border border-dashed border-[#c9bcad] bg-white/60 py-3 text-sm font-medium text-[#1f1b19] transition hover:bg-white">
-                    ＋ 新增區塊
+                    ＋ 新增區塊{plan.pro ? '' : `(${blocks.length}/${plan.limits.maxBlocks})`}
                   </button>
                 )}
                 {blocks.length === 0 ? (
@@ -439,6 +468,7 @@ export default function ProfileCardManager({ products, lineUrl = '' }: { product
         </div>
       ) : null}
     </div>
+    </PlanCtx.Provider>
   );
 }
 
@@ -585,7 +615,8 @@ function BlockRow({
   else if (!complete) status = <span className="shrink-0 text-xs text-[#c84767]">草稿</span>;
   else status = <Toggle on={block.enabled} onChange={(v) => onPatch({ enabled: v })} label="顯示" />;
 
-  const timedPanel = (
+  const { plan, upgradeHref } = usePlan();
+  const timedPanelPro = (
     <>
             {/* 限時顯示 */}
             <div className="rounded-xl bg-[#faf7f2] p-3">
@@ -615,6 +646,16 @@ function BlockRow({
               ) : null}
             </div>
     </>
+  );
+
+  const timedPanel = plan.limits.timed ? (
+    timedPanelPro
+  ) : (
+    <div className="flex items-center gap-2 rounded-xl bg-[#faf7f2] p-3 text-sm">
+      <span>限時顯示</span>
+      <ProBadge />
+      <a href={upgradeHref} className="ml-auto text-xs text-[#6b6156] underline underline-offset-2">升級解鎖</a>
+    </div>
   );
 
   return (
@@ -676,7 +717,7 @@ function BlockRow({
                 {field('title', '按鈕文字(選填)', '加入官方 LINE')}
                 {field('url', 'LINE 加好友網址(選填)', lineUrl || 'https://lin.ee/…')}
                 <p className="text-[11px] leading-5 text-[#a99e8f]">
-                  {lineUrl ? '留空會使用「系統設定 → 頁尾 → 結帳頁 LINE 設定」的連結。' : '尚未設定官方 LINE,請填網址,或到「系統設定 → 頁尾 → 結帳頁 LINE 設定」設定。'}
+                  {!plan.isAdmin ? '填入你的 LINE 加好友網址(例如 https://lin.ee/…)或 https://line.me/ti/p/~你的ID' : lineUrl ? '留空會使用「系統設定 → 頁尾 → 結帳頁 LINE 設定」的連結。' : '尚未設定官方 LINE,請填網址,或到「系統設定 → 頁尾 → 結帳頁 LINE 設定」設定。'}
                 </p>
               </>
             )}
@@ -1356,6 +1397,7 @@ function StyleEditor({
   lineUrl: string;
 }) {
   const [tab, setTab] = useState<'template' | 'background' | 'profile' | 'button'>('template');
+  const { plan, upgradeHref } = usePlan();
   const [category, setCategory] = useState<(typeof TEMPLATE_CATEGORIES)[number]['key']>('all');
   // 樣板縮圖只放前幾個區塊,輪播不自動播放
   const sampleBlocks = useMemo(
@@ -1410,17 +1452,18 @@ function StyleEditor({
           <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
             {CARD_TEMPLATES.filter((t) => category === 'all' || t.category === category).map((tpl) => {
               const selected = theme.template === tpl.key;
+              const locked = !plan.limits.allTemplates && !FREE_TEMPLATE_KEYS.includes(tpl.key);
               return (
                 <button
                   key={tpl.key}
                   type="button"
-                  onClick={() => setTheme({ ...tpl.theme, template: tpl.key })}
+                  onClick={() => (locked ? void askUpgrade(`「${tpl.name}」是 Pro 樣板。`, upgradeHref) : setTheme({ ...tpl.theme, template: tpl.key }))}
                   className={`overflow-hidden rounded-2xl border text-left transition ${selected ? 'border-[#1f1b19] ring-2 ring-[#1f1b19]/15' : 'border-[#e5ded4] hover:border-[#1f1b19]/30'}`}
                 >
                   <MiniPreview card={{ ...draft, theme: { ...theme, ...tpl.theme } }} blocks={sampleBlocks} productMap={productMap} lineUrl={lineUrl} />
                   <div className="flex items-center justify-between border-t border-[#efe8dd] bg-white px-3 py-2">
                     <span className="text-sm">{tpl.name}</span>
-                    {selected ? <span className="text-xs text-[#1f7a44]">使用中</span> : null}
+                    {selected ? <span className="text-xs text-[#1f7a44]">使用中</span> : locked ? <ProBadge /> : null}
                   </div>
                 </button>
               );
@@ -1429,7 +1472,11 @@ function StyleEditor({
         </section>
       ) : null}
 
-      {tab === 'background' ? (
+      {tab !== 'template' && !plan.limits.customStyle ? (
+        <ProLock title="自訂樣式是 Pro 功能" desc="升級後可以自由調整背景、文字顏色、版面配置、頭像形狀與按鈕樣式。免費版可直接套用 8 款樣板。" />
+      ) : null}
+
+      {tab === 'background' && plan.limits.customStyle ? (
         <Section title="背景">
           <Pills
             value={theme.bgType}
@@ -1466,7 +1513,7 @@ function StyleEditor({
         </Section>
       ) : null}
 
-      {tab === 'profile' ? (
+      {tab === 'profile' && plan.limits.customStyle ? (
         <Section title="簡介樣式">
           <div>
             <p className="mb-2 text-xs text-[#8a7f72]">版面配置</p>
@@ -1488,7 +1535,7 @@ function StyleEditor({
         </Section>
       ) : null}
 
-      {tab === 'button' ? (
+      {tab === 'button' && plan.limits.customStyle ? (
         <Section title="連結樣式">
           <div>
             <p className="mb-2 text-xs text-[#8a7f72]">排列方式</p>
@@ -1542,6 +1589,7 @@ type Stats = { days: number; views: number; clicks: number; daily: { day: string
 
 function StatsPanel({ cardId, url, blocks, productMap }: { cardId: string; url: string; blocks: ProfileCardBlock[]; productMap: Record<string, CardProduct> }) {
   const [days, setDays] = useState<7 | 30>(7);
+  const { plan, upgradeHref } = usePlan();
   const [stats, setStats] = useState<Stats | null>(null);
   const [error, setError] = useState('');
 
@@ -1572,7 +1620,7 @@ function StatsPanel({ cardId, url, blocks, productMap }: { cardId: string; url: 
 
   return (
     <div className="space-y-4">
-      <Pills value={String(days) as '7' | '30'} options={[{ key: '7', label: '近 7 天' }, { key: '30', label: '近 30 天' }]} onChange={(v) => setDays(v === '30' ? 30 : 7)} />
+      <Pills value={String(days) as '7' | '30'} options={[{ key: '7', label: '近 7 天' }, { key: '30', label: '近 30 天' }]} onChange={(v) => (v === '30' && plan.limits.statsDays < 30 ? void askUpgrade('近 30 天的數據是 Pro 功能。', upgradeHref) : setDays(v === '30' ? 30 : 7))} />
 
       <div className="grid grid-cols-3 gap-2">
         {[
@@ -1630,8 +1678,13 @@ function StatsPanel({ cardId, url, blocks, productMap }: { cardId: string; url: 
       </section>
 
       <section className="rounded-2xl border border-[#ebe4da] bg-white p-4">
-        <p className="mb-3 text-sm font-semibold">流量來源</p>
-        {sources.length === 0 ? (
+        <p className="mb-3 flex items-center gap-2 text-sm font-semibold">流量來源{plan.limits.sources ? null : <ProBadge />}</p>
+        {!plan.limits.sources ? (
+          <p className="text-sm leading-6 text-[#a99e8f]">
+            升級 Pro 可以看到訪客來自 Instagram、LINE、Facebook、Threads 等哪個平台。
+            <a href={upgradeHref} className="ml-1 text-[#1f1b19] underline underline-offset-2">升級</a>
+          </p>
+        ) : sources.length === 0 ? (
           <p className="text-sm text-[#a99e8f]">這段期間還沒有瀏覽紀錄。</p>
         ) : (
           <div className="space-y-2">
@@ -1656,6 +1709,7 @@ function StatsPanel({ cardId, url, blocks, productMap }: { cardId: string; url: 
 
 // ---------- 設定 ----------
 function SettingsEditor({ draft, setDraft }: { draft: ProfileCard; setDraft: (c: ProfileCard) => void }) {
+  const { plan } = usePlan();
   const [uploading, setUploading] = useState(false);
   const set = <K extends keyof ProfileCard>(key: K, value: ProfileCard[K]) => setDraft({ ...draft, [key]: value });
 
@@ -1677,6 +1731,7 @@ function SettingsEditor({ draft, setDraft }: { draft: ProfileCard; setDraft: (c:
 
   return (
     <div className="space-y-4">
+      {plan.limits.seo ? (
       <Section title="分享預覽卡">
         <p className="text-xs leading-5 text-[#a99e8f]">貼到 LINE、Facebook、Threads 時顯示的標題、說明與圖片。留空會使用名稱、簡述與頭像。</p>
         <label className="block">
@@ -1704,16 +1759,23 @@ function SettingsEditor({ draft, setDraft }: { draft: ProfileCard; setDraft: (c:
           </div>
         </div>
       </Section>
+      ) : (
+        <ProLock title="自訂分享預覽是 Pro 功能" desc="名片貼到 LINE、Facebook、Threads 時顯示的標題、說明與圖片。免費版會使用你的名稱、簡述與頭像。" />
+      )}
 
       <Section title="頁面">
         <div className="flex items-center gap-3">
           <span className="text-sm">公開名片頁</span>
           <Toggle on={draft.published} onChange={(v) => set('published', v)} label="公開名片頁" />
         </div>
-        <p className="-mt-2 text-xs leading-5 text-[#a99e8f]">關閉後,訪客會看到「這個頁面暫停中」,管理員仍可預覽。</p>
+        <p className="-mt-2 text-xs leading-5 text-[#a99e8f]">關閉後,訪客會看到「這個頁面暫停中」,你登入後仍可預覽。</p>
         <div className="flex items-center gap-3">
           <span className="text-sm">頁尾顯示 URBANITE Logo</span>
-          <Toggle on={draft.show_footer_logo !== false} onChange={(v) => set('show_footer_logo', v)} label="頁尾 Logo" />
+          {plan.limits.hideFooter ? (
+            <Toggle on={draft.show_footer_logo !== false} onChange={(v) => set('show_footer_logo', v)} label="頁尾 Logo" />
+          ) : (
+            <span className="flex items-center gap-1.5 text-xs text-[#a99e8f]"><ProBadge />升級後可隱藏</span>
+          )}
         </div>
       </Section>
     </div>

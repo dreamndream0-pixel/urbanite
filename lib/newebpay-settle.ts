@@ -1,4 +1,5 @@
 import { createAdminClient } from '@/lib/supabase/admin';
+import { isCardOrderNo, settleCardPayment } from '@/lib/card-payment';
 
 type NewebpayPayload = {
   Status?: string;
@@ -14,6 +15,8 @@ export async function settleNewebpayPayment(payload: NewebpayPayload): Promise<{
   const result = payload.Result ?? {};
   const orderNo = String(result.MerchantOrderNo ?? '').trim();
   if (!orderNo) return { ok: false, orderNo: '', reason: '缺少訂單編號' };
+  // 名片 Pro 方案付款(CP 開頭)另外處理
+  if (isCardOrderNo(orderNo)) return settleCardPayment(payload);
   if (payload.Status !== 'SUCCESS') return { ok: false, orderNo, reason: payload.Message || '付款未成功' };
 
   const supabase = createAdminClient();

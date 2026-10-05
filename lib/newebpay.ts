@@ -67,6 +67,10 @@ export async function buildMPGParams(order: {
   total: number;
   email?: string;
   items: { name: string; variant?: string; quantity: number }[];
+  // 名片方案等非商店訂單:自訂回傳網址與商品描述
+  returnUrl?: string;
+  clientBackUrl?: string;
+  itemDesc?: string;
 }): Promise<{ params: Record<string, string>; action: string }> {
   const cfg = await getNewebpayConfig();
   const trade: Record<string, string> = {
@@ -76,11 +80,11 @@ export async function buildMPGParams(order: {
     Version: '2.0',
     MerchantOrderNo: order.order_no,
     Amt: String(Math.max(1, Math.round(order.total))),
-    ItemDesc: buildItemDesc(order.items),
+    ItemDesc: order.itemDesc ?? buildItemDesc(order.items),
     Email: order.email || '',
     NotifyURL: `${cfg.siteUrl}/api/payment/newebpay/notify`,
-    ReturnURL: `${cfg.siteUrl}/api/payment/newebpay/return`,
-    ClientBackURL: `${cfg.siteUrl}/checkout/complete?order_no=${encodeURIComponent(order.order_no)}`,
+    ReturnURL: order.returnUrl ?? `${cfg.siteUrl}/api/payment/newebpay/return`,
+    ClientBackURL: order.clientBackUrl ?? `${cfg.siteUrl}/checkout/complete?order_no=${encodeURIComponent(order.order_no)}`,
     // 不在 API 指定支付方式 → 依藍新後台【商店設定】已開通的方式顯示
     // (信用卡 / WebATM / ATM 轉帳 / 超商代碼 / 超商條碼 / LINE Pay 等)
     // 超商取貨物流由本站自行串接(自家選門市),關閉藍新金流頁的「超商取貨」區塊,

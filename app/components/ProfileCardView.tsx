@@ -41,6 +41,7 @@ export default function ProfileCardView({
   lineUrl = '',
   preview = false,
   fullScreen = false,
+  serviceFooter = false,
 }: {
   card: ProfileCard;
   blocks: ProfileCardBlock[];
@@ -49,6 +50,7 @@ export default function ProfileCardView({
   lineUrl?: string;
   preview?: boolean;
   fullScreen?: boolean;
+  serviceFooter?: boolean; // 會員的名片:頁尾改為「用 URBANITE 建立你的名片」
 }) {
   const theme = resolveTheme(card.theme);
   const left = theme.align === 'left';
@@ -789,7 +791,12 @@ export default function ProfileCardView({
           })}
         </div>
 
-        {card.show_footer_logo !== false ? (
+        {card.show_footer_logo !== false && serviceFooter ? (
+          <Link href="/card" className="mt-12 flex w-full flex-col items-center gap-1 opacity-70 transition hover:opacity-100">
+            {logoUrl ? <img src={logoUrl} alt="URBANITE" className="site-logo h-4 w-auto object-contain" /> : <span className="text-xs tracking-[0.3em]">URBANITE</span>}
+            <span className="text-[11px]" style={{ color: theme.mutedColor }}>建立你的個人名片</span>
+          </Link>
+        ) : card.show_footer_logo !== false ? (
           <Link href="/" className="mt-12 flex w-full justify-center opacity-70 transition hover:opacity-100">
             {logoUrl ? <img src={logoUrl} alt="URBANITE" className="h-5 w-auto object-contain" /> : <span className="text-xs tracking-[0.3em]">URBANITE</span>}
           </Link>

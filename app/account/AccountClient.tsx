@@ -630,6 +630,13 @@ function ProfileTab({
             <div className={field + ' flex items-center bg-[#f0ece6] text-[var(--c-muted)]'}>{PROVIDER_LABEL[provider.toLowerCase()] ?? provider} 帳號登入</div>
           </div>
           <LineBindingRow />
+          <div className="col-span-2 min-w-0">
+            <span className={labelText}>個人名片</span>
+            <a href="/mycard" className="flex min-h-10 w-full items-center gap-3 rounded-lg border border-[var(--c-border)] bg-[var(--c-surface)] px-3 py-2 text-sm transition hover:bg-[var(--c-soft)] sm:min-h-11">
+              <span className="min-w-0 flex-1 text-xs leading-5 text-[var(--c-text2)]">把 IG、LINE、作品連結整理成一頁,免費建立</span>
+              <span className="shrink-0 text-xs font-semibold text-[var(--c-text)]">我的名片 →</span>
+            </a>
+          </div>
         </div>
       </section>
 

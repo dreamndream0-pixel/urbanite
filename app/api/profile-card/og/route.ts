@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { lookup } from 'node:dns/promises';
 import { isIP } from 'node:net';
-import { getAdminUser } from '@/lib/supabase/server';
+import { getSessionUser } from '@/lib/supabase/server';
 
 export const dynamic = 'force-dynamic';
 
@@ -64,7 +64,7 @@ async function readLimited(res: Response) {
 
 // GET /api/profile-card/og?url= — 貼上網址後自動帶出標題與圖片
 export async function GET(request: Request) {
-  if (!(await getAdminUser())) return NextResponse.json({ error: '未授權' }, { status: 401 });
+  if (!(await getSessionUser())) return NextResponse.json({ error: '請先登入' }, { status: 401 });
   const raw = new URL(request.url).searchParams.get('url')?.trim() ?? '';
   if (!raw) return NextResponse.json({ error: '請輸入網址' }, { status: 400 });
   try {

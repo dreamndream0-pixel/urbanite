@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { getAdminUser } from '@/lib/supabase/server';
+import { requireCardOwner } from '@/lib/card-access';
 
 export const dynamic = 'force-dynamic';
 
@@ -11,10 +11,11 @@ function twDay(iso: string | number) {
 
 // GET /api/profile-card/stats?card_id=&days=7|30 — 數據分析(限管理員)
 export async function GET(request: NextRequest) {
-  if (!(await getAdminUser())) return NextResponse.json({ error: '未授權' }, { status: 401 });
-  const cardId = request.nextUrl.searchParams.get('card_id') ?? '';
-  const days = request.nextUrl.searchParams.get('days') === '30' ? 30 : 7;
-  if (!cardId) return NextResponse.json({ error: '缺少 card_id' }, { status: 400 });
+  const owner = await requireCardOwner();
+  if (!owner) return NextResponse.json({ error: '請先登入' }, { status: 401 });
+  const cardId = owner.card.id;
+  // 免費版只看近 7 天
+  const days = request.nextUrl.searchParams.get('days') === '30' && owner.plan.limits.statsDays >= 30 ? 30 : 7;
 
   const since = new Date(Date.now() - days * 24 * 3600 * 1000).toISOString();
   const { data, error } = await createAdminClient()
@@ -44,7 +45,7 @@ export async function GET(request: NextRequest) {
     }
   }
   return NextResponse.json(
-    { days, views, clicks, daily: [...daily.values()], blocks, sources },
+    { days, views, clicks, daily: [...daily.values()], blocks, sources: owner.plan.limits.sources ? sources : {}, sourcesLocked: !owner.plan.limits.sources },
     { headers: { 'Cache-Control': 'no-store' } },
   );
 }

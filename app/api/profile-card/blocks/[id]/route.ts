@@ -1,14 +1,23 @@
 import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { getAdminUser } from '@/lib/supabase/server';
+import { requireCardOwner } from '@/lib/card-access';
 import { blockOptions, IMAGE_LIMIT, LINK_TITLE_LIMIT, type ProfileCardBlock } from '@/lib/profile-card';
 
 export const dynamic = 'force-dynamic';
 
 // PATCH /api/profile-card/blocks/[id] — 編輯區塊內容 / 開關
+// 只能動自己名片的區塊
+async function ownBlock(id: string) {
+  const owner = await requireCardOwner();
+  if (!owner) return null;
+  const { data } = await createAdminClient().from('profile_card_blocks').select('id').eq('id', id).eq('card_id', owner.card.id).maybeSingle();
+  return data ? owner : null;
+}
+
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  if (!(await getAdminUser())) return NextResponse.json({ error: '未授權' }, { status: 401 });
   const { id } = await params;
+  const owner = await ownBlock(id);
+  if (!owner) return NextResponse.json({ error: '未授權' }, { status: 401 });
   const body = await request.json().catch(() => ({}));
   const update: Record<string, unknown> = { updated_at: new Date().toISOString() };
   for (const key of ['title', 'url', 'image', 'product_id'] as const) {
@@ -31,7 +40,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   if (body.options && typeof body.options === 'object') update.options = blockOptions({ options: body.options });
   // 限時顯示:空值代表不限
   for (const key of ['start_at', 'end_at'] as const) {
-    if (!(key in body)) continue;
+    if (!(key in body) || !owner.plan.limits.timed) continue; // 限時顯示:Pro
     const date = body[key] ? new Date(String(body[key])) : null;
     update[key] = date && !Number.isNaN(date.getTime()) ? date.toISOString() : null;
   }
@@ -42,8 +51,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
 // DELETE /api/profile-card/blocks/[id]
 export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
-  if (!(await getAdminUser())) return NextResponse.json({ error: '未授權' }, { status: 401 });
   const { id } = await params;
+  if (!(await ownBlock(id))) return NextResponse.json({ error: '未授權' }, { status: 401 });
   const { error } = await createAdminClient().from('profile_card_blocks').delete().eq('id', id);
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
   return NextResponse.json({ ok: true });
