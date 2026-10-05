@@ -7,10 +7,6 @@ import { CARD_TEMPLATES, type ProfileCard, type ProfileCardBlock } from '@/lib/p
 import { CONTACT_LINE_URL, SERVICE_LOGO, TIERS, type CardTier } from '@/lib/card-plan';
 import DemoPhone from './DemoPhone';
 import ShowcaseCarousel, { type ShowcaseItem } from './ShowcaseCarousel';
-import { createAdminClient } from '@/lib/supabase/admin';
-import { getCheckoutLine, lineAddFriendUrl } from '@/lib/checkout-line';
-import type { CardProduct } from '@/app/components/ProfileCardView';
-import type { SiteSettings } from '@/lib/types';
 import TierTable from './TierTable';
 import RefCapture from './RefCapture';
 
@@ -44,37 +40,13 @@ function demoCard(template: string, name: string, bio: string, avatarUrl: string
   };
 }
 
-// 作品案例:實際的 @urbanite 名片,套上不同樣板
-const SHOWCASE_TEMPLATES = ['label-sand', 'polaroid-green', 'hero-sun', 'side-noir', 'mag-mono', 'arch-aurora', 'news', 'float-dark', 'framed-wood'];
-
-async function loadShowcase() {
-  const supabase = createAdminClient();
-  const { data: card } = await supabase.from('profile_cards').select('*').eq('slug', 'urbanite').maybeSingle();
-  if (!card) return null;
-  const [{ data: blocks }, { data: settings }] = await Promise.all([
-    supabase.from('profile_card_blocks').select('*').eq('card_id', card.id).order('sort_order'),
-    supabase.from('site_settings').select('footer_sections').eq('id', 1).maybeSingle(),
-  ]);
-  const ids = [...new Set((blocks ?? []).filter((x) => x.type === 'product' && x.product_id).map((x) => x.product_id as string))];
-  const { data: rows } = ids.length ? await supabase.from('products').select('id,name,price,original_price,image,images,status').in('id', ids) : { data: [] };
-  const products: Record<string, CardProduct> = {};
-  for (const p of rows ?? []) {
-    if (p.status !== '已下架') products[p.id] = { id: p.id, name: p.name, price: p.price, original_price: p.original_price, image: p.image || p.images?.[0] || '' };
-  }
-  const base = card as ProfileCard;
-  const theme = (base.theme ?? {}) as Partial<ProfileCard['theme']>;
-  const items: ShowcaseItem[] = SHOWCASE_TEMPLATES.flatMap((key) => {
-    const t = CARD_TEMPLATES.find((x) => x.key === key);
-    if (!t) return [];
-    return [{ key, label: t.name, card: { ...base, theme: { ...t.theme, template: key, coverImage: theme.coverImage ?? '', showAvatar: theme.showAvatar ?? true } } }];
-  });
-  return {
-    items,
-    blocks: (blocks ?? []) as ProfileCardBlock[],
-    products,
-    lineUrl: lineAddFriendUrl(getCheckoutLine(settings as Pick<SiteSettings, 'footer_sections'> | null)),
-  };
-}
+// 作品案例:@urbanite 名片套用不同樣板的截圖(public/showcase/*.webp)
+const SHOWCASE: ShowcaseItem[] = ['label-sand', 'polaroid-green', 'hero-sun', 'side-noir', 'mag-mono', 'arch-aurora', 'news', 'float-dark', 'framed-wood'].map((key) => ({
+  key,
+  label: CARD_TEMPLATES.find((t) => t.key === key)?.name ?? key,
+  image: `/showcase/${key}.webp`,
+  href: '/@urbanite',
+}));
 
 const STEPS = [
   { n: '01', title: '登入', body: '使用 Google 或 LINE,不用再記一組新的帳號密碼。' },
@@ -124,7 +96,6 @@ export default async function CardServicePage() {
   const user = await getSessionUser();
   const start = user ? '/mycard' : '/card/login';
   const upgradeHref = user ? '/mycard/upgrade' : '/card/login?next=/mycard/upgrade';
-  const showcase = await loadShowcase();
   const qr = await QRCode.toString('https://www.urbanite.com.tw/@yourname', { type: 'svg', margin: 0, color: { dark: '#1f1b19', light: '#0000' } });
 
   return (
@@ -186,7 +157,7 @@ export default async function CardServicePage() {
           </div>
 
           <div id="cases" className="min-w-0 scroll-mt-20">
-            {showcase ? <ShowcaseCarousel items={showcase.items} blocks={showcase.blocks} products={showcase.products} lineUrl={showcase.lineUrl} /> : null}
+            <ShowcaseCarousel items={SHOWCASE} />
             <p className="-mt-1 -rotate-2 text-xs tracking-[0.1em] text-[#8a847d]">同一張名片,換個樣板就是不同風格。三分鐘,完成專屬頁面!</p>
           </div>
         </div>

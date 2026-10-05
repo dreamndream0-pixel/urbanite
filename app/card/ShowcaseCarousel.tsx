@@ -1,14 +1,11 @@
 'use client';
 
 import { useRef } from 'react';
-import DemoPhone from './DemoPhone';
-import type { CardProduct } from '@/app/components/ProfileCardView';
-import type { ProfileCard, ProfileCardBlock } from '@/lib/profile-card';
 
-export type ShowcaseItem = { key: string; label: string; card: ProfileCard };
+export type ShowcaseItem = { key: string; label: string; image: string; href: string };
 
-// 作品案例:同一張名片套不同樣板,左右滑動(桌機有左右箭頭)
-export default function ShowcaseCarousel({ items, blocks, products, lineUrl }: { items: ShowcaseItem[]; blocks: ProfileCardBlock[]; products: Record<string, CardProduct>; lineUrl: string }) {
+// 作品案例:名片截圖,左右滑動(桌機有左右箭頭)
+export default function ShowcaseCarousel({ items }: { items: ShowcaseItem[] }) {
   const ref = useRef<HTMLDivElement>(null);
   const scroll = (dir: 1 | -1) => {
     const el = ref.current;
@@ -33,13 +30,13 @@ export default function ShowcaseCarousel({ items, blocks, products, lineUrl }: {
         ref={ref}
         className="-mx-4 mt-4 flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 pb-6 pt-2 [scrollbar-width:none] sm:mx-0 sm:px-1 [&::-webkit-scrollbar]:hidden"
       >
-        {items.map((item) => (
-          <div key={item.key} className="w-[44%] max-w-[200px] shrink-0 snap-start sm:w-[190px]">
-            <div className="overflow-hidden rounded-[24px] border-[5px] border-[#1f1b19] bg-white shadow-[0_16px_32px_rgba(31,27,25,0.16)]">
-              <DemoPhone card={item.card} blocks={blocks} products={products} lineUrl={lineUrl} />
-            </div>
-            <a href={`/@${item.card.slug}`} target="_blank" rel="noreferrer" className="mt-2.5 block text-center text-xs text-[#55504a] hover:underline">{item.label}</a>
-          </div>
+        {items.map((item, i) => (
+          <a key={item.key} href={item.href} target="_blank" rel="noreferrer" className="w-[44%] max-w-[200px] shrink-0 snap-start sm:w-[190px]">
+            <span className="block overflow-hidden rounded-[24px] border-[5px] border-[#1f1b19] bg-white shadow-[0_16px_32px_rgba(31,27,25,0.16)]">
+              <img src={item.image} alt={`${item.label} 樣板範例`} loading={i < 3 ? 'eager' : 'lazy'} className="block aspect-[390/844] w-full object-cover object-top" />
+            </span>
+            <span className="mt-2.5 block text-center text-xs text-[#55504a]">{item.label}</span>
+          </a>
         ))}
       </div>
     </div>

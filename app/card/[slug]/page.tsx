@@ -78,7 +78,7 @@ export default async function CardPage({ params }: { params: Promise<{ slug: str
   return (
     <main>
       {data.free ? (
-        <a href={`/card?ref=${encodeURIComponent(data.card.slug)}`} className="flex h-10 items-center justify-center gap-2 bg-[#121b33] px-4 text-[13px] text-white">
+        <a href={`/card?ref=${encodeURIComponent(data.card.slug)}`} className="sticky top-0 z-50 flex h-10 items-center justify-center gap-2 bg-[#121b33] px-4 text-[13px] text-white shadow-[0_2px_8px_rgba(0,0,0,0.15)]">
           <img src="/brand/uplus-badge.png" alt="" className="h-6 w-6 shrink-0 rounded-full" />
           <span className="truncate">加入 URBANLINKS,免費建立你的名片</span>
           <span className="shrink-0 rounded-full bg-[#dcbc84] px-2.5 py-0.5 text-[11px] font-semibold text-[#121b33]">立即建立</span>

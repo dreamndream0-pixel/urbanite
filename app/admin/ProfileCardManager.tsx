@@ -73,8 +73,8 @@ function resizeImage(file: File, max: number, square: boolean): Promise<Blob> {
   });
 }
 
-async function uploadImage(file: File, square = false) {
-  const blob = await resizeImage(file, square ? 600 : 1600, square);
+async function uploadImage(file: File, square = false, max = 1600) {
+  const blob = await resizeImage(file, square ? 600 : max, square);
   const form = new FormData();
   form.append('file', new File([blob], blob.type === 'image/png' ? 'image.png' : 'image.jpg', { type: blob.type }));
   form.append('productId', 'card');
@@ -1523,7 +1523,7 @@ function StyleEditor({
     if (!file) return;
     setUploading(true);
     try {
-      setTheme({ bgType: 'image', bgImage: await uploadImage(file) });
+      setTheme({ bgType: 'image', bgImage: await uploadImage(file, false, 1920) });
     } catch (e) {
       void uiAlert(e instanceof Error ? e.message : '上傳失敗');
     } finally {
@@ -1610,15 +1610,30 @@ function StyleEditor({
           />
           <ColorField label={theme.bgType === 'gradient' ? '漸層上方' : '背景色'} value={theme.bgColor} onChange={(v) => setTheme({ bgColor: v })} />
           {theme.bgType === 'gradient' ? <ColorField label="漸層下方" value={theme.bgColor2} onChange={(v) => setTheme({ bgColor2: v })} /> : null}
-          {theme.bgType === 'image' ? (
-            <div className="flex items-center gap-3">
-              {theme.bgImage ? <img src={theme.bgImage} alt="" className="h-20 w-16 rounded-xl border border-[#efe8dd] object-cover" /> : null}
-              <label className="cursor-pointer rounded-full border border-[#d7c9bd] px-4 py-1.5 text-xs font-medium hover:bg-[#f6f2ec]">
-                {uploading ? '上傳中…' : theme.bgImage ? '更換背景圖' : '上傳背景圖'}
-                <input type="file" accept="image/png,image/jpeg,image/webp" className="hidden" disabled={uploading} onChange={(e) => { void uploadBg(e.target.files?.[0]); e.target.value = ''; }} />
-              </label>
+          {/* 背景圖片:整個手機畫面的底圖,上傳後自動切換成「圖片」 */}
+          <div className="flex gap-4 rounded-xl border border-[#efe8dd] bg-[#fcfaf7] p-3">
+            <span className="flex aspect-[9/16] w-16 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-[#e5ded4] bg-white text-[10px] text-[#b3a897]">
+              {theme.bgType === 'image' && theme.bgImage ? <img src={theme.bgImage} alt="" className="h-full w-full object-cover" /> : '9:16'}
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium">背景圖片</p>
+              <p className="mt-1 text-[11px] leading-5 text-[#8a7f72]">
+                整個手機畫面的底圖,捲動時固定不動。
+                <br />
+                建議尺寸 1080 × 1920 px(9:16 直式),主體放在中間,檔案 5MB 以內。
+              </p>
+              <div className="mt-2 flex items-center gap-3">
+                <label className="cursor-pointer rounded-full border border-[#d7c9bd] bg-white px-4 py-1.5 text-xs font-medium hover:bg-[#f6f2ec]">
+                  {uploading ? '上傳中…' : theme.bgType === 'image' && theme.bgImage ? '更換背景圖' : '上傳背景圖'}
+                  <input type="file" accept="image/png,image/jpeg,image/webp" className="hidden" disabled={uploading} onChange={(e) => { void uploadBg(e.target.files?.[0]); e.target.value = ''; }} />
+                </label>
+                {theme.bgType === 'image' && theme.bgImage ? (
+                  <button type="button" onClick={() => setTheme({ bgType: 'color', bgImage: '' })} className="text-xs text-[#8a7f72]">移除</button>
+                ) : null}
+              </div>
+              {theme.bgType === 'image' && theme.bgImage ? <p className="mt-2 text-[11px] leading-5 text-[#a99e8f]">圖片偏深時,把下面的「文字顏色」改成淺色比較好閱讀。</p> : null}
             </div>
-          ) : null}
+          </div>
           <ColorField label="文字顏色" value={theme.textColor} onChange={(v) => setTheme({ textColor: v })} />
           <ColorField label="次要文字" value={theme.mutedColor} onChange={(v) => setTheme({ mutedColor: v })} />
           <ColorField label="重點色(價格等)" value={theme.accentColor} onChange={(v) => setTheme({ accentColor: v })} />

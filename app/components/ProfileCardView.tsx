@@ -102,12 +102,17 @@ export default function ProfileCardView({
   }
 
   // ---------- 樣式 ----------
+  // 背景圖片:全螢幕時用固定圖層鋪滿整個手機畫面(iOS 不支援 background-attachment: fixed)
+  const bgPhoto = theme.bgType === 'image' && theme.bgImage ? theme.bgImage : '';
+  const fixedBg = Boolean(bgPhoto && fullScreen);
   const pageStyle: CSSProperties = {
     color: theme.textColor,
     backgroundColor: theme.bgColor,
     fontFamily: FONT_OPTIONS.find((f) => f.key === theme.font)?.css,
-    ...(theme.bgType === 'image' && theme.bgImage
-      ? { backgroundImage: `url(${theme.bgImage})`, backgroundSize: 'cover', backgroundPosition: 'center' }
+    ...(bgPhoto
+      ? fixedBg
+        ? {}
+        : { backgroundImage: `url(${bgPhoto})`, backgroundSize: 'cover', backgroundPosition: 'center top' }
       : theme.bgType === 'grid'
         ? {
             backgroundImage: `linear-gradient(${tint(theme.textColor, 7)} 1px, transparent 1px), linear-gradient(90deg, ${tint(theme.textColor, 7)} 1px, transparent 1px)`,
@@ -709,8 +714,9 @@ export default function ProfileCardView({
   }
 
   return (
-    <div className={fullScreen ? 'min-h-screen' : 'min-h-full'} style={pageStyle}>
-      <div className={`mx-auto flex max-w-[440px] flex-col px-5 pb-10 ${left ? 'items-start' : 'items-center'}`}>
+    <div className={fullScreen ? 'relative min-h-screen' : 'min-h-full'} style={pageStyle}>
+      {fixedBg ? <div aria-hidden="true" className="pointer-events-none fixed inset-0" style={{ backgroundImage: `url(${bgPhoto})`, backgroundSize: 'cover', backgroundPosition: 'center' }} /> : null}
+      <div className={`relative mx-auto flex max-w-[440px] flex-col px-5 pb-10 ${left ? 'items-start' : 'items-center'}`}>
         {header}
         {theme.divider === 'wave' ? (
           <svg viewBox="0 0 200 10" preserveAspectRatio="none" className="mt-6 h-2.5 w-full" aria-hidden="true">
