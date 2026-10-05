@@ -1151,7 +1151,7 @@ function ImageBlockEditor({
 const ICON_ROWS_SHOWN = 16;
 // 社群圖示(PNG,public/icons/social):四種樣式
 const SOCIAL_BRANDS: [string, string][] = [
-  ['instagram', 'Instagram'], ['facebook', 'Facebook'], ['threads', 'Threads'], ['tiktok', 'TikTok'], ['youtube', 'YouTube'], ['x', 'X'], ['linkedin', 'LinkedIn'],
+  ['instagram', 'Instagram'], ['facebook', 'Facebook'], ['threads', 'Threads'], ['tiktok', 'TikTok'], ['youtube', 'YouTube'], ['shopee', '蝦皮購物'], ['x', 'X'], ['linkedin', 'LinkedIn'],
   ['pinterest', 'Pinterest'], ['whatsapp', 'WhatsApp'], ['telegram', 'Telegram'], ['messenger', 'Messenger'], ['discord', 'Discord'], ['twitch', 'Twitch'], ['snapchat', 'Snapchat'],
 ];
 const SOCIAL_UTILS: [string, string][] = [
