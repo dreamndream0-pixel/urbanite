@@ -8,6 +8,7 @@ import CardServiceHeader from './CardServiceHeader';
 import DemoPhone from './DemoPhone';
 import TierTable from './TierTable';
 import ContactLineButton from './ContactLineButton';
+import RefCapture from './RefCapture';
 
 export const dynamic = 'force-dynamic';
 export const metadata: Metadata = {
@@ -82,6 +83,7 @@ export default async function CardServicePage() {
   return (
     <main className="min-h-screen bg-[#f6f2ec] text-[#1f1b19]">
       <CardServiceHeader logoUrl={logoUrl} loggedIn={Boolean(user)} />
+      <RefCapture />
 
       {/* 主視覺 */}
       <section className="mx-auto grid max-w-6xl items-center gap-10 px-4 pb-16 pt-12 sm:px-6 lg:grid-cols-[1fr_1.1fr] lg:pt-20">

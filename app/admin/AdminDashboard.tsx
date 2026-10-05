@@ -37,6 +37,7 @@ import CampaignManager from './CampaignManager';
 import FixedBannerCropModal from './FixedBannerCropModal';
 import IntegrationSettings from './IntegrationSettings';
 import ProfileCardManager from './ProfileCardManager';
+import CardMembersManager from './CardMembersManager';
 import SiteThemeEditor from './SiteThemeEditor';
 import LineBotManager from './line-bot/LineBotManager';
 import { isCollectOnDelivery } from '@/lib/payment';
@@ -92,6 +93,7 @@ const NAV = [
   { key: 'promotions', label: '促銷管理', Icon: IconGift },
   { key: 'campaign-pages', label: '一頁式促銷頁', Icon: IconGrid },
   { key: 'profile-card', label: '個人名片', Icon: IconIdCard },
+  { key: 'card-members', label: '名片會員', Icon: IconUsers },
   { key: 'line-bot', label: 'LINE 機器人', Icon: IconChat },
   { key: 'reports', label: '報表及分析', Icon: IconChart },
   { key: 'settings', label: '系統設定', Icon: IconGear },
@@ -2733,6 +2735,7 @@ export default function AdminDashboard({
 
           {/* ===== 報表及分析 ===== */}
           {section === 'line-bot' && <LineBotManager products={products} coupons={discounts} logoUrl={logoUrl} />}
+          {section === 'card-members' && <CardMembersManager />}
           {section === 'profile-card' && <ProfileCardManager products={products} lineUrl={lineAddFriendUrl(getCheckoutLine(initialSettings))} />}
 
           {section === 'campaign-pages' && (

@@ -8,11 +8,11 @@ type Check = { state: 'idle' | 'checking' | 'ok' | 'bad'; message: string };
 
 const inputBox = 'flex items-center rounded-xl border bg-white transition focus-within:border-[#1f1b19]/50';
 
-export default function SetupClient({ name: initialName, slug: initialSlug }: { name: string; slug: string }) {
+export default function SetupClient({ name: initialName, slug: initialSlug, referrer: initialRef = '' }: { name: string; slug: string; referrer?: string }) {
   const router = useRouter();
   const [name, setName] = useState(initialName);
   const [slug, setSlug] = useState(initialSlug);
-  const [referrer, setReferrer] = useState('');
+  const [referrer, setReferrer] = useState(initialRef);
   const [check, setCheck] = useState<Check>({ state: 'idle', message: '' });
   const [errors, setErrors] = useState<{ name?: string; slug?: string; ref?: string; form?: string }>({});
   const [busy, setBusy] = useState(false);
@@ -129,6 +129,15 @@ export default function SetupClient({ name: initialName, slug: initialSlug }: { 
           </div>
           {errors.ref ? <span className="mt-1 block text-xs text-[#d9534f]">{errors.ref}</span> : null}
         </label>
+
+        <div className="flex gap-3 rounded-xl bg-[#f6f2ec] p-3.5">
+          <img src="/brand/uplus-mark.png" alt="U Plus" className="mt-0.5 h-7 w-7 shrink-0 object-contain" />
+          <div className="text-xs leading-5 text-[#6b6156]">
+            <p className="text-sm font-semibold text-[#1f1b19]">推薦 5 位朋友,送你 1 個月 U Plus</p>
+            <p className="mt-0.5">朋友用你的推薦連結註冊 URBANLINKS,每滿 5 位就送 1 個月 U Plus,推薦越多送越多。</p>
+            <p className="mt-0.5 text-[#a99e8f]">設定完成後,到「名片設定」就能複製你的專屬推薦連結。</p>
+          </div>
+        </div>
 
         {errors.form ? <p className="text-sm text-[#d9534f]">{errors.form}</p> : null}
 

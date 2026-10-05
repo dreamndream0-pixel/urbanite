@@ -117,7 +117,7 @@ function Toggle({ on, onChange, label }: { on: boolean; onChange: (v: boolean) =
   );
 }
 
-function Pills<T extends string>({ value, options, onChange }: { value: T; options: { key: T; label: string }[]; onChange: (v: T) => void }) {
+function Pills<T extends string>({ value, options, onChange, plus = [] }: { value: T; options: { key: T; label: string }[]; onChange: (v: T) => void; plus?: T[] }) {
   return (
     <div className="flex flex-wrap gap-2">
       {options.map((o) => (
@@ -125,9 +125,10 @@ function Pills<T extends string>({ value, options, onChange }: { value: T; optio
           key={o.key}
           type="button"
           onClick={() => onChange(o.key)}
-          className={`rounded-full px-4 py-2 text-sm transition ${value === o.key ? 'bg-[#1f1b19] text-white' : 'border border-[#e5ded4] bg-white text-[#5f5852] hover:border-[#1f1b19]/30'}`}
+          className={`relative rounded-full px-4 py-2 text-sm transition ${value === o.key ? 'bg-[#1f1b19] text-white' : 'border border-[#e5ded4] bg-white text-[#5f5852] hover:border-[#1f1b19]/30'}`}
         >
           {o.label}
+          {plus.includes(o.key) ? <PlusCorner /> : null}
         </button>
       ))}
     </div>
@@ -168,15 +169,21 @@ const ADMIN_PLAN: CardPlanInfo = { tier: 'max', pro: true, isAdmin: true, expire
 const PlanCtx = createContext<{ plan: CardPlanInfo; upgradeHref: string }>({ plan: ADMIN_PLAN, upgradeHref: '/mycard/upgrade' });
 const usePlan = () => useContext(PlanCtx);
 
-function ProBadge() {
-  return <span className="inline-flex rounded-full bg-[#1f1b19] px-1.5 py-0.5 text-[9px] font-semibold tracking-wider text-white">U PLUS</span>;
+// U Plus 功能標誌(行內)
+function ProBadge({ size = 16 }: { size?: number }) {
+  return <img src="/brand/uplus-mark.png" alt="U Plus" title="U Plus 功能" width={size} height={size} className="inline-block shrink-0 object-contain" style={{ width: size, height: size }} />;
+}
+
+// U Plus 功能標誌(貼在元件右上角,父層需 relative)
+function PlusCorner() {
+  return <img src="/brand/uplus-mark.png" alt="U Plus" title="U Plus 功能" className="pointer-events-none absolute -right-1 -top-1.5 z-10 h-4 w-4 object-contain drop-shadow-sm" />;
 }
 
 function ProLock({ title, desc }: { title: string; desc: string }) {
   const { upgradeHref } = usePlan();
   return (
-    <div className="rounded-2xl border border-[#e5ded4] bg-white px-5 py-6 text-center">
-      <ProBadge />
+    <div className="relative rounded-2xl border border-[#e5ded4] bg-white px-5 py-6 text-center">
+      <ProBadge size={28} />
       <p className="mt-2 text-sm font-semibold text-[#1f1b19]">{title}</p>
       <p className="mx-auto mt-1 max-w-sm text-xs leading-5 text-[#8a7f72]">{desc}</p>
       <a href={upgradeHref} className="mt-4 inline-block rounded-full bg-[#1f1b19] px-5 py-2 text-xs font-semibold text-white">升級 U Plus</a>
@@ -1422,10 +1429,11 @@ function StyleEditor({
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-2 overflow-x-auto [scrollbar-width:none]">
+      <div className="flex items-center gap-2 -mt-2 overflow-x-auto pr-1 pt-2 [scrollbar-width:none]">
         {([['template', '樣板'], ['background', '背景'], ['profile', '簡介樣式'], ['button', '連結樣式']] as const).map(([key, label]) => (
-          <button key={key} type="button" onClick={() => setTab(key)} className={`shrink-0 rounded-full px-4 py-2 text-sm transition ${tab === key ? 'bg-[#efe8dd] font-medium text-[#1f1b19]' : 'text-[#8a7f72] hover:bg-[#f6f2ec]'}`}>
+          <button key={key} type="button" onClick={() => setTab(key)} className={`relative shrink-0 rounded-full px-4 py-2 text-sm transition ${tab === key ? 'bg-[#efe8dd] font-medium text-[#1f1b19]' : 'text-[#8a7f72] hover:bg-[#f6f2ec]'}`}>
             {label}
+            {key !== 'template' && !plan.limits.customStyle ? <PlusCorner /> : null}
           </button>
         ))}
         <button type="button" onClick={onPreview} className="ml-auto shrink-0 rounded-full border border-[#d7c9bd] bg-white px-4 py-2 text-sm text-[#6b6156] lg:hidden">預覽</button>
@@ -1458,12 +1466,13 @@ function StyleEditor({
                   key={tpl.key}
                   type="button"
                   onClick={() => (locked ? void askUpgrade(`「${tpl.name}」是 U Plus 樣板。`, upgradeHref) : setTheme({ ...tpl.theme, template: tpl.key }))}
-                  className={`overflow-hidden rounded-2xl border text-left transition ${selected ? 'border-[#1f1b19] ring-2 ring-[#1f1b19]/15' : 'border-[#e5ded4] hover:border-[#1f1b19]/30'}`}
+                  className={`relative overflow-hidden rounded-2xl border text-left transition ${selected ? 'border-[#1f1b19] ring-2 ring-[#1f1b19]/15' : 'border-[#e5ded4] hover:border-[#1f1b19]/30'}`}
                 >
+                  {locked ? <img src="/brand/uplus-mark.png" alt="U Plus" title="U Plus 樣板" className="pointer-events-none absolute right-2 top-2 z-10 h-5 w-5 object-contain drop-shadow" /> : null}
                   <MiniPreview card={{ ...draft, theme: { ...theme, ...tpl.theme } }} blocks={sampleBlocks} productMap={productMap} lineUrl={lineUrl} />
                   <div className="flex items-center justify-between border-t border-[#efe8dd] bg-white px-3 py-2">
                     <span className="text-sm">{tpl.name}</span>
-                    {selected ? <span className="text-xs text-[#1f7a44]">使用中</span> : locked ? <ProBadge /> : null}
+                    {selected ? <span className="text-xs text-[#1f7a44]">使用中</span> : null}
                   </div>
                 </button>
               );
@@ -1620,7 +1629,7 @@ function StatsPanel({ cardId, url, blocks, productMap }: { cardId: string; url: 
 
   return (
     <div className="space-y-4">
-      <Pills value={String(days) as '7' | '30'} options={[{ key: '7', label: '近 7 天' }, { key: '30', label: '近 30 天' }]} onChange={(v) => (v === '30' && plan.limits.statsDays < 30 ? void askUpgrade('近 30 天的數據是 U Plus 功能。', upgradeHref) : setDays(v === '30' ? 30 : 7))} />
+      <Pills value={String(days) as '7' | '30'} options={[{ key: '7', label: '近 7 天' }, { key: '30', label: '近 30 天' }]} plus={plan.limits.statsDays < 30 ? ['30'] : []} onChange={(v) => (v === '30' && plan.limits.statsDays < 30 ? void askUpgrade('近 30 天的數據是 U Plus 功能。', upgradeHref) : setDays(v === '30' ? 30 : 7))} />
 
       <div className="grid grid-cols-3 gap-2">
         {[
@@ -1763,6 +1772,8 @@ function SettingsEditor({ draft, setDraft }: { draft: ProfileCard; setDraft: (c:
         <ProLock title="自訂分享預覽是 U Plus 功能" desc="名片貼到 LINE、Facebook、Threads 時顯示的標題、說明與圖片。免費版會使用你的名稱、簡述與頭像。" />
       )}
 
+      <ReferralSection />
+
       <Section title="頁面">
         <div className="flex items-center gap-3">
           <span className="text-sm">公開名片頁</span>
@@ -1779,6 +1790,63 @@ function SettingsEditor({ draft, setDraft }: { draft: ProfileCard; setDraft: (c:
         </div>
       </Section>
     </div>
+  );
+}
+
+// 推薦好友:每滿 5 位送 1 個月 U Plus
+function ReferralSection() {
+  const [data, setData] = useState<{ slug: string; count: number; rewards: number; progress: number; goal: number } | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    fetch('/api/profile-card/referral')
+      .then((r) => (r.ok ? r.json() : null))
+      .then(setData)
+      .catch(() => {});
+  }, []);
+
+  if (!data) return null;
+  const url = `${window.location.origin}/card?ref=${data.slug}`;
+  const left = data.goal - data.progress;
+
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1600);
+    } catch {
+      void uiAlert(url);
+    }
+  }
+
+  return (
+    <Section title="分享推薦連結">
+      <div className="flex gap-3 rounded-xl bg-[#f6f2ec] p-3.5">
+        <img src="/brand/uplus-mark.png" alt="U Plus" className="mt-0.5 h-7 w-7 shrink-0 object-contain" />
+        <div className="text-xs leading-5 text-[#6b6156]">
+          <p className="text-sm font-semibold text-[#1f1b19]">推薦 5 位朋友,送你 1 個月 U Plus</p>
+          <p className="mt-0.5">朋友點你的連結註冊並完成設定,就算推薦成功。每滿 5 位自動送 1 個月,已經是付費方案會接在到期日之後。</p>
+        </div>
+      </div>
+      <div className="flex items-center gap-2">
+        <input readOnly value={url} onFocus={(e) => e.target.select()} className={`${inputClass} min-w-0 flex-1 text-[#6b6156]`} />
+        <button type="button" onClick={copy} className="shrink-0 rounded-full bg-[#1f1b19] px-4 py-2.5 text-sm font-medium text-white">
+          {copied ? '已複製' : '複製'}
+        </button>
+      </div>
+      <div>
+        <div className="flex items-baseline justify-between text-sm">
+          <span>這一輪 {data.progress} / {data.goal} 位</span>
+          <span className="text-xs text-[#a99e8f]">再 {left} 位就送 1 個月</span>
+        </div>
+        <div className="mt-2 flex gap-1">
+          {Array.from({ length: data.goal }, (_, i) => (
+            <span key={i} className={`h-1.5 flex-1 rounded-full ${i < data.progress ? 'bg-[#1f1b19]' : 'bg-[#e5ded4]'}`} />
+          ))}
+        </div>
+        <p className="mt-2 text-xs text-[#a99e8f]">累計推薦 {data.count} 位,已獲得 {data.rewards} 個月 U Plus</p>
+      </div>
+    </Section>
   );
 }
 

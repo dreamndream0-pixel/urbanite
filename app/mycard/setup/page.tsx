@@ -1,5 +1,7 @@
 import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
+import { cookies } from 'next/headers';
+import { REFERRAL_COOKIE } from '@/lib/card-referral';
 import { getSessionUser } from '@/lib/supabase/server';
 import { getOwnedCard } from '@/lib/card-access';
 import CardServiceHeader from '@/app/card/CardServiceHeader';
@@ -18,7 +20,7 @@ export default async function CardSetupPage() {
   return (
     <main className="min-h-screen bg-[#f6f2ec] text-[#1f1b19]">
       <CardServiceHeader loggedIn />
-      <SetupClient name={card.display_name} slug={card.slug} />
+      <SetupClient name={card.display_name} slug={card.slug} referrer={(await cookies()).get(REFERRAL_COOKIE)?.value ?? ''} />
     </main>
   );
 }

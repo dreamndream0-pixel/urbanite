@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { requireCardOwner, slugProblem } from '@/lib/card-access';
+import { grantReferralRewards } from '@/lib/card-referral';
 
 // 第一次使用名片:設定暱稱、網址、推薦人
 
@@ -30,7 +31,7 @@ export async function POST(request: Request) {
   if (ref) {
     const { data } = await supabase.from('profile_cards').select('id, slug').eq('slug', ref).maybeSingle();
     if (!data || data.id === owner.card.id) return NextResponse.json({ error: '找不到這位推薦人,可以留空', field: 'ref' }, { status: 400 });
-    referredBy = data.slug;
+    referredBy = data.id;
   }
 
   const { error } = await supabase
@@ -41,5 +42,7 @@ export async function POST(request: Request) {
     const taken = /duplicate|unique/i.test(error.message);
     return NextResponse.json({ error: taken ? '這個網址已經有人使用了' : error.message, field: taken ? 'slug' : undefined }, { status: 400 });
   }
+  // 推薦人滿 5 位就送 1 個月 U Plus
+  if (referredBy) await grantReferralRewards(referredBy).catch(() => {});
   return NextResponse.json({ ok: true, slug });
 }
