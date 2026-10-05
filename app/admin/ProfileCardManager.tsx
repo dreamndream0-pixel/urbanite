@@ -650,6 +650,28 @@ function BlockList({
   );
 }
 
+// 區塊列表左側縮圖:有設定圖片/圖示就顯示,否則顯示區塊類型圖示
+function BlockThumb({ block, productImage }: { block: ProfileCardBlock; productImage?: string }) {
+  const img = (src: string, contain = false) => <img src={src} alt="" className={`h-full w-full ${contain ? 'object-contain p-1' : 'object-cover'}`} />;
+  if (block.type === 'link' && block.image) {
+    if (isIconImage(block.image)) return <span className="text-[#1f1b19]"><LinkIcon value={block.image} size={18} /></span>;
+    return img(block.image, /\.png(\?|$)/i.test(block.image));
+  }
+  if (block.type === 'image' && blockItems(block)[0]) return img(blockItems(block)[0].image);
+  if (block.type === 'product' && productImage) return img(productImage);
+  if (block.type === 'social') {
+    if (block.image) return img(block.image);
+    const p = followPlatform(blockOptions(block).platform);
+    return <span className="flex h-full w-full items-center justify-center text-white" style={{ background: p.color }}><SocialIcon type={p.key} size={17} /></span>;
+  }
+  if (block.type === 'video') {
+    const id = videoEmbedUrl(block.url).match(/embed\/([\w-]{11})/)?.[1];
+    if (id) return img(`https://i.ytimg.com/vi/${id}/mqdefault.jpg`);
+  }
+  if (block.type === 'line') return <span className="flex h-full w-full items-center justify-center bg-[#06C755] text-white"><SocialIcon type="line" size={18} /></span>;
+  return <Icon size={17}>{BLOCK_ICON[block.type]}</Icon>;
+}
+
 function BlockRow({
   block,
   handle,
@@ -771,12 +793,8 @@ function BlockRow({
       <div className="flex items-stretch border-r border-[#f3eee7] bg-[#fcfaf7] px-1.5">{handle}</div>
       <div className="min-w-0 flex-1">
         <div className="flex cursor-pointer items-center gap-3 p-3.5" onClick={onToggleOpen}>
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#f6f2ec] text-[#6b6156]">
-            {block.type === 'image' && blockItems(block)[0] ? (
-              <img src={blockItems(block)[0].image} alt="" className="h-9 w-9 rounded-xl object-cover" />
-            ) : (
-              <Icon size={17}>{BLOCK_ICON[block.type]}</Icon>
-            )}
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-[#f6f2ec] text-[#6b6156]">
+            <BlockThumb block={block} productImage={product?.image} />
           </span>
           <div className="min-w-0 flex-1">
             <p className={`truncate text-sm ${title ? 'text-[#1f1b19]' : 'text-[#b3a897]'}`}>{title || `未命名的${typeLabel}`}</p>
