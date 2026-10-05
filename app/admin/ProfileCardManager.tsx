@@ -1149,6 +1149,60 @@ function ImageBlockEditor({
 
 // 連結按鈕縮圖:上傳圖片(PNG 透明背景會保留)或選內建圖示(預設顯示 2 排,其餘收合)
 const ICON_ROWS_SHOWN = 16;
+// 社群圖示(PNG,public/icons/social):四種樣式
+const SOCIAL_BRANDS: [string, string][] = [
+  ['instagram', 'Instagram'], ['facebook', 'Facebook'], ['threads', 'Threads'], ['tiktok', 'TikTok'], ['youtube', 'YouTube'], ['x', 'X'], ['linkedin', 'LinkedIn'],
+  ['pinterest', 'Pinterest'], ['whatsapp', 'WhatsApp'], ['telegram', 'Telegram'], ['messenger', 'Messenger'], ['discord', 'Discord'], ['twitch', 'Twitch'], ['snapchat', 'Snapchat'],
+];
+const SOCIAL_UTILS: [string, string][] = [
+  ['user', '個人'], ['phone', '電話'], ['home', '首頁'], ['mail', 'Email'], ['location', '地點'], ['globe', '網站'], ['click', '點擊'],
+  ['heart', '喜歡'], ['like', '讚'], ['plus', '新增'], ['send', '傳送'], ['search', '搜尋'], ['bookmark', '收藏'], ['chat', '聊天'],
+];
+const SOCIAL_ICON_SETS: { key: string; label: string; items: { src: string; label: string }[] }[] = [
+  { key: 'color', label: '彩色圓形', items: SOCIAL_BRANDS.map(([k, l]) => ({ src: `/icons/social/${k}-color.png`, label: l })) },
+  { key: 'logo', label: '彩色', items: SOCIAL_BRANDS.map(([k, l]) => ({ src: `/icons/social/${k}-logo.png`, label: l })) },
+  { key: 'black', label: '黑色圓形', items: SOCIAL_BRANDS.map(([k, l]) => ({ src: `/icons/social/${k}-black.png`, label: l })) },
+  { key: 'util', label: '常用圖示', items: SOCIAL_UTILS.map(([k, l]) => ({ src: `/icons/social/${k}-color.png`, label: l })) },
+];
+
+function SocialIconPicker({ value, onChange }: { value: string; onChange: (image: string) => void }) {
+  const current = SOCIAL_ICON_SETS.find((s) => s.items.some((i) => i.src === value));
+  const [set, setSet] = useState(current?.key ?? 'color');
+  const items = SOCIAL_ICON_SETS.find((s) => s.key === set)?.items ?? [];
+  return (
+    <div className="space-y-2 border-t border-[#efe8dd] pt-2.5">
+      <div className="space-y-1.5">
+        <p className="text-xs font-medium text-[#6b6156]">社群圖示</p>
+        <div className="flex flex-wrap gap-1">
+          {SOCIAL_ICON_SETS.map((s) => (
+            <button key={s.key} type="button" onClick={() => setSet(s.key)} className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] transition ${set === s.key ? 'bg-[#1f1b19] text-white' : 'text-[#8a7f72] hover:bg-white'}`}>
+              {s.label}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="grid grid-cols-7 gap-1.5">
+        {items.map((i) => {
+          const selected = i.src === value;
+          return (
+            <button
+              key={i.src}
+              type="button"
+              title={i.label}
+              aria-label={i.label}
+              aria-pressed={selected}
+              onClick={() => onChange(selected ? '' : i.src)}
+              className={`flex aspect-square items-center justify-center rounded-lg border bg-white p-1.5 transition ${selected ? 'border-[#1f1b19] ring-2 ring-[#1f1b19]/20' : 'border-[#efe8dd] hover:border-[#1f1b19]/30'}`}
+            >
+              <img src={i.src} alt="" loading="lazy" className="h-full w-full object-contain" />
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function LinkThumbPicker({
   value,
   uploading,
@@ -1217,6 +1271,7 @@ function LinkThumbPicker({
           <Icon size={14}><path d={open ? 'M6 15l6-6 6 6' : 'M6 9l6 6 6-6'} /></Icon>
         </button>
       ) : null}
+      <SocialIconPicker value={value} onChange={onChange} />
     </div>
   );
 }
