@@ -19,6 +19,11 @@ export default async function LoginPage({
   const params = await searchParams;
   const nextPath = normalizeNext(params.next);
   const authError = Array.isArray(params.error) ? params.error[0] : params.error;
+  if (nextPath.startsWith('/mycard')) {
+    const q = new URLSearchParams({ next: nextPath });
+    if (authError) q.set('error', authError);
+    redirect(`/card/login?${q}`);
+  }
   const configured = Boolean(
     process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
   );

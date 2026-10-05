@@ -14,7 +14,7 @@ export const metadata: Metadata = { title: { absolute: '方案 | URBANLINKS' }, 
 // 名片服務方案:目前等級、付款紀錄、選擇等級與月付 / 年付
 export default async function UpgradePage({ searchParams }: { searchParams: Promise<{ result?: string }> }) {
   const user = await getSessionUser();
-  if (!user) redirect('/login?next=/mycard/upgrade');
+  if (!user) redirect('/card/login?next=/mycard/upgrade');
   const { result } = await searchParams;
   const supabase = createAdminClient();
   const [{ data: settings }, plan, { data: payments }] = await Promise.all([

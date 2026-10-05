@@ -78,7 +78,7 @@ export default async function CardServicePage() {
   const user = await getSessionUser();
   const { data: settings } = await createAdminClient().from('site_settings').select('logo_url').eq('id', 1).maybeSingle();
   const logoUrl = settings?.logo_url ?? '';
-  const start = user ? '/mycard' : '/login?next=/mycard';
+  const start = user ? '/mycard' : '/card/login';
 
   return (
     <main className="min-h-screen bg-[#f6f2ec] text-[#1f1b19]">
@@ -144,7 +144,7 @@ export default async function CardServicePage() {
           <div className="mt-8 grid grid-cols-2 gap-3 lg:grid-cols-4">
             {TIERS.map((t) => {
               const highlight = t.key === 'plus';
-              const href = t.key === 'free' ? start : user ? '/mycard/upgrade' : '/login?next=/mycard/upgrade';
+              const href = t.key === 'free' ? start : user ? '/mycard/upgrade' : '/card/login?next=/mycard/upgrade';
               return (
                 <div key={t.key} className={`flex flex-col rounded-2xl p-5 ${highlight ? 'border-2 border-[#1f1b19]' : 'border border-[#e5ded4]'}`}>
                   <p className="flex items-center gap-1.5 text-sm font-semibold">

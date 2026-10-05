@@ -18,7 +18,7 @@ function daysLeft(iso: string | null) {
 // 會員自己的名片編輯頁(Google / LINE 等任何方式登入)
 export default async function MyCardPage() {
   const user = await getSessionUser();
-  if (!user) redirect('/login?next=/mycard');
+  if (!user) redirect('/card/login');
   // 第一次使用:先設定暱稱與網址
   const card = await getOwnedCard(user);
   if (card && card.onboarded === false) redirect('/mycard/setup');

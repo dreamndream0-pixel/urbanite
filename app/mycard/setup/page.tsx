@@ -13,7 +13,7 @@ export const metadata: Metadata = { title: { absolute: '設定你的個人網址
 // 第一次登入名片服務:暱稱+自訂網址
 export default async function CardSetupPage() {
   const user = await getSessionUser();
-  if (!user) redirect('/login?next=/mycard');
+  if (!user) redirect('/card/login');
   const card = await getOwnedCard(user);
   if (!card || card.onboarded !== false) redirect('/mycard');
 
