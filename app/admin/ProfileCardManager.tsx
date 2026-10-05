@@ -1770,7 +1770,7 @@ function SettingsEditor({ draft, setDraft }: { draft: ProfileCard; setDraft: (c:
         </div>
         <p className="-mt-2 text-xs leading-5 text-[#a99e8f]">關閉後,訪客會看到「這個頁面暫停中」,你登入後仍可預覽。</p>
         <div className="flex items-center gap-3">
-          <span className="text-sm">頁尾顯示 URBANITE Logo</span>
+          <span className="text-sm">頁尾顯示 {plan.isAdmin ? 'URBANITE' : 'URBANLINKS'} Logo</span>
           {plan.limits.hideFooter ? (
             <Toggle on={draft.show_footer_logo !== false} onChange={(v) => set('show_footer_logo', v)} label="頁尾 Logo" />
           ) : (

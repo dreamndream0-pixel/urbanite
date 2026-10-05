@@ -29,7 +29,7 @@ export async function POST(request: Request) {
     total: price.amount,
     email: user.email?.endsWith('@line.urbanite.com.tw') ? '' : user.email ?? '',
     items: [],
-    itemDesc: `URBANITE ${price.label}`,
+    itemDesc: `URBANLINKS ${price.label}`,
     returnUrl: `${cfg.siteUrl}/api/card-plan/return`,
     clientBackUrl: `${cfg.siteUrl}/mycard/upgrade`,
   });

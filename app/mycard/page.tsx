@@ -8,7 +8,7 @@ import ProfileCardManager from '@/app/admin/ProfileCardManager';
 import CardServiceHeader from '@/app/card/CardServiceHeader';
 
 export const dynamic = 'force-dynamic';
-export const metadata: Metadata = { title: '我的名片', robots: { index: false } };
+export const metadata: Metadata = { title: { absolute: '我的名片 | URBANLINKS' }, robots: { index: false } };
 
 // Pro 剩餘天數
 function daysLeft(iso: string | null) {

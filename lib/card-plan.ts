@@ -23,6 +23,10 @@ export const TIERS: {
   { key: 'max', name: 'U Max', tagline: '全功能品牌官網', prices: { month: 699, year: 6990 }, available: false },
 ];
 
+// 名片服務品牌(與商店 URBANITE 分開)
+export const SERVICE_NAME = 'URBANLINKS';
+export const SERVICE_LOGO = '/brand/urbanlinks-logo.png';
+
 // U Pro / U Max「聯繫專員」的 LINE(與結帳頁官方 LINE 分開)
 export const CONTACT_LINE_URL = 'https://lin.ee/TcCrcXY';
 
@@ -35,7 +39,7 @@ export type PlanLimits = {
   customStyle: boolean; // 背景、簡介樣式、連結樣式自訂
   timed: boolean; // 限時顯示
   seo: boolean; // 自訂分享預覽
-  hideFooter: boolean; // 隱藏頁尾 Urbanite 標誌
+  hideFooter: boolean; // 隱藏頁尾 URBANLINKS 標誌
   statsDays: number;
   sources: boolean; // 流量來源
 };
@@ -60,7 +64,7 @@ export const TIER_FEATURES: { group: string; rows: { label: string; values: [str
       { label: '樣板', values: ['8 款', '24 款', '24 款', '24 款'] },
       { label: '自訂背景、文字、按鈕樣式', values: ['—', '✓', '✓', '✓'] },
       { label: '限時顯示、自訂分享預覽', values: ['—', '✓', '✓', '✓'] },
-      { label: '隱藏頁尾 Urbanite 標誌', values: ['—', '✓', '✓', '✓'] },
+      { label: '隱藏頁尾 URBANLINKS 標誌', values: ['—', '✓', '✓', '✓'] },
       { label: '數據分析', values: ['7 天', '30 天+來源', '30 天+來源', '30 天+來源'] },
     ],
   },
@@ -83,7 +87,7 @@ export const TIER_FEATURES: { group: string; rows: { label: string; values: [str
       { label: 'LINE 機器人與推播', values: ['—', '—', '—', '✓'] },
       { label: '一頁式促銷頁', values: ['—', '—', '—', '✓'] },
       { label: '自訂網域', values: ['—', '—', '—', '✓'] },
-      { label: '移除所有 Urbanite 標示', values: ['—', '—', '—', '✓'] },
+      { label: '移除所有 URBANLINKS 標示', values: ['—', '—', '—', '✓'] },
     ],
   },
 ];

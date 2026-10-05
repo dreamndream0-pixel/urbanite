@@ -42,13 +42,14 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   const { slug } = await params;
   const data = await load(slug);
   if (!data) return { title: '找不到頁面' };
-  const { card } = data;
+  const { card, isStore } = data;
   // 分享預覽卡:後台「設定」的分享標題 / 說明 / 圖片優先
   const title = card.seo_title || card.display_name || card.slug;
   const description = card.seo_description || card.bio || undefined;
   const image = card.seo_image || card.avatar_url;
   return {
-    title,
+    // 店家名片沿用 | Urbanite;會員名片用 URBANLINKS
+    title: isStore ? title : { absolute: `${title} | URBANLINKS` },
     description,
     openGraph: { title, description, images: image ? [{ url: image }] : undefined },
     twitter: { card: 'summary_large_image', title, description, images: image ? [image] : undefined },

@@ -9,7 +9,7 @@ import TierTable from '@/app/card/TierTable';
 import { CONTACT_LINE_URL } from '@/lib/card-plan';
 
 export const dynamic = 'force-dynamic';
-export const metadata: Metadata = { title: '名片方案', robots: { index: false } };
+export const metadata: Metadata = { title: { absolute: '方案 | URBANLINKS' }, robots: { index: false } };
 
 // 名片服務方案:目前等級、付款紀錄、選擇等級與月付 / 年付
 export default async function UpgradePage({ searchParams }: { searchParams: Promise<{ result?: string }> }) {

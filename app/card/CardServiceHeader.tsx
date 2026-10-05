@@ -1,13 +1,13 @@
 import Link from 'next/link';
+import { SERVICE_LOGO, SERVICE_NAME } from '@/lib/card-plan';
 
-// 名片服務的頁首(介紹頁、我的名片、升級頁共用)
-export default function CardServiceHeader({ logoUrl, loggedIn, current }: { logoUrl: string; loggedIn: boolean; current?: 'mycard' | 'upgrade' }) {
+// 名片服務的頁首(介紹頁、我的名片、升級頁共用);品牌 URBANLINKS,與商店 Logo 分開
+export default function CardServiceHeader({ loggedIn, current }: { logoUrl?: string; loggedIn: boolean; current?: 'mycard' | 'upgrade' }) {
   return (
     <header className="sticky top-0 z-30 border-b border-[#e5ded4] bg-[#faf7f2]">
       <div className="mx-auto flex h-14 max-w-6xl items-center gap-3 px-4 sm:px-6">
         <Link href="/card" className="flex items-center gap-2">
-          {logoUrl ? <img src={logoUrl} alt="URBANITE" className="h-6 w-auto object-contain" /> : <span className="text-sm font-bold tracking-[0.2em]">URBANITE</span>}
-          <span className="border-l border-[#d7c9bd] pl-2 text-xs tracking-[0.2em] text-[#6b6156]">名片</span>
+          <img src={SERVICE_LOGO} alt={SERVICE_NAME} className="h-[18px] w-auto object-contain sm:h-5" />
         </Link>
         <nav className="ml-auto flex items-center gap-1 text-sm">
           {loggedIn ? (

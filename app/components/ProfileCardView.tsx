@@ -793,7 +793,7 @@ export default function ProfileCardView({
 
         {card.show_footer_logo !== false && serviceFooter ? (
           <Link href="/card" className="mt-12 flex w-full flex-col items-center gap-1 opacity-70 transition hover:opacity-100">
-            {logoUrl ? <img src={logoUrl} alt="URBANITE" className="site-logo h-4 w-auto object-contain" /> : <span className="text-xs tracking-[0.3em]">URBANITE</span>}
+            <img src="/brand/urbanlinks-logo.png" alt="URBANLINKS" className="h-3.5 w-auto object-contain" style={dark ? { filter: 'brightness(0) invert(1)' } : undefined} />
             <span className="text-[11px]" style={{ color: theme.mutedColor }}>建立你的個人名片</span>
           </Link>
         ) : card.show_footer_logo !== false ? (

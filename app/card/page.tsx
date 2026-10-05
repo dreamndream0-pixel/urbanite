@@ -11,7 +11,7 @@ import ContactLineButton from './ContactLineButton';
 
 export const dynamic = 'force-dynamic';
 export const metadata: Metadata = {
-  title: '個人名片|一個網址,放進你的全部',
+  title: { absolute: 'URBANLINKS|一個網址,放進你的全部' },
   description: 'IG、LINE、作品、商品連結整理在同一頁。用 Google 或 LINE 免費建立你的個人名片。',
 };
 
@@ -86,7 +86,7 @@ export default async function CardServicePage() {
       {/* 主視覺 */}
       <section className="mx-auto grid max-w-6xl items-center gap-10 px-4 pb-16 pt-12 sm:px-6 lg:grid-cols-[1fr_1.1fr] lg:pt-20">
         <div>
-          <p className="text-xs font-semibold tracking-[0.3em] text-[#8a7f72]">URBANITE 個人名片</p>
+          <p className="text-xs font-semibold tracking-[0.3em] text-[#8a7f72]">URBANLINKS 個人名片</p>
           <h1 className="font-serif-tc mt-4 text-[40px] font-bold leading-[1.2] tracking-[0.04em] sm:text-[52px]">
             一個網址,
             <br />
