@@ -207,10 +207,10 @@ function ProLock({ title, desc, image }: { title: string; desc: string; image?: 
   return (
     <div className="relative rounded-2xl border border-[#e5ded4] bg-white px-5 py-6 text-center">
       <PlusCorner size={30} />
-      <ProBadge />
-      <p className="mt-2 text-sm font-semibold text-[#1f1b19]">{title}</p>
+      {/* 有示意圖:圖在上、說明在下;沒有圖:膠囊+說明 */}
+      {image ? <img src={image} alt="" loading="lazy" className="mx-auto w-full max-w-md rounded-xl border border-[#efe8dd]" /> : <ProBadge />}
+      <p className={`${image ? 'mt-4' : 'mt-2'} text-sm font-semibold text-[#1f1b19]`}>{title}</p>
       <p className="mx-auto mt-1 max-w-sm text-xs leading-5 text-[#8a7f72]">{desc}</p>
-      {image ? <img src={image} alt="" loading="lazy" className="mx-auto mt-4 w-full max-w-md rounded-xl border border-[#efe8dd]" /> : null}
       <a href={upgradeHref} className="mt-4 inline-block rounded-full bg-[#1f1b19] px-5 py-2 text-xs font-semibold text-white">升級 U Plus</a>
     </div>
   );
