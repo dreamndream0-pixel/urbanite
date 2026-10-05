@@ -18,9 +18,9 @@ export const TIERS: {
   available: boolean; // 目前可購買(U Pro / U Max 開發中)
 }[] = [
   { key: 'free', name: 'U Free', tagline: '免費個人名片', prices: null, available: true },
-  { key: 'plus', name: 'U Plus', tagline: '完整個人名片', prices: { month: 99, year: 990 }, available: true },
+  { key: 'plus', name: 'U Plus', tagline: '完整個人名片', prices: { month: 39, year: 390 }, available: true },
   { key: 'pro', name: 'U Pro', tagline: '名片+基本官網', prices: { month: 399, year: 3990 }, available: false },
-  { key: 'max', name: 'U Max', tagline: '全功能品牌官網', prices: { month: 999, year: 9990 }, available: false },
+  { key: 'max', name: 'U Max', tagline: '全功能品牌官網', prices: { month: 699, year: 6990 }, available: false },
 ];
 
 export const tierInfo = (tier: CardTier) => TIERS.find((t) => t.key === tier) ?? TIERS[0];
