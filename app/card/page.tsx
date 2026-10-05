@@ -6,6 +6,11 @@ import { getSessionUser } from '@/lib/supabase/server';
 import { CARD_TEMPLATES, type ProfileCard, type ProfileCardBlock } from '@/lib/profile-card';
 import { CONTACT_LINE_URL, SERVICE_LOGO, TIERS, type CardTier } from '@/lib/card-plan';
 import DemoPhone from './DemoPhone';
+import ShowcaseCarousel, { type ShowcaseItem } from './ShowcaseCarousel';
+import { createAdminClient } from '@/lib/supabase/admin';
+import { getCheckoutLine, lineAddFriendUrl } from '@/lib/checkout-line';
+import type { CardProduct } from '@/app/components/ProfileCardView';
+import type { SiteSettings } from '@/lib/types';
 import TierTable from './TierTable';
 import RefCapture from './RefCapture';
 
@@ -39,21 +44,37 @@ function demoCard(template: string, name: string, bio: string, avatarUrl: string
   };
 }
 
-// 主視覺三支手機:深色攝影師、雜誌選物、藍天創意總監
-const DEMOS: { card: ProfileCard; blocks: ProfileCardBlock[] }[] = [
-  {
-    card: demoCard('side-noir', 'Kelly.', '攝影師|記錄生活的質感', avatar('#3a3a3a', '#d8d8d8', 'K'), '', ['攝影']),
-    blocks: [block('a1', '作品集'), block('a2', '收費資訊'), block('a3', '預約拍攝'), block('a4', '聯絡我')],
-  },
-  {
-    card: demoCard('mag-mono', 'URBAN SELECT', 'Selected things for a better life.', avatar('#e8e4dc', '#6b6156', 'U'), '', ['選物']),
-    blocks: [block('b1', '線上商店'), block('b2', '新品上架'), block('b3', '門市資訊'), block('b4', '聯絡我們')],
-  },
-  {
-    card: demoCard('hero-sun', 'Hank', 'Creative Director', avatar('#cfdcef', '#2f4f7a', 'H'), cover('#7fb2e6', '#2f5f9a'), ['設計']),
-    blocks: [block('c1', '履歷', { image: 'icon:user' }), block('c2', '合作邀約', { image: 'icon:mail' }), block('c3', '精選作品', { image: 'icon:palette' })],
-  },
-];
+// 作品案例:實際的 @urbanite 名片,套上不同樣板
+const SHOWCASE_TEMPLATES = ['label-sand', 'polaroid-green', 'hero-sun', 'side-noir', 'mag-mono', 'arch-aurora', 'news', 'float-dark', 'framed-wood'];
+
+async function loadShowcase() {
+  const supabase = createAdminClient();
+  const { data: card } = await supabase.from('profile_cards').select('*').eq('slug', 'urbanite').maybeSingle();
+  if (!card) return null;
+  const [{ data: blocks }, { data: settings }] = await Promise.all([
+    supabase.from('profile_card_blocks').select('*').eq('card_id', card.id).order('sort_order'),
+    supabase.from('site_settings').select('footer_sections').eq('id', 1).maybeSingle(),
+  ]);
+  const ids = [...new Set((blocks ?? []).filter((x) => x.type === 'product' && x.product_id).map((x) => x.product_id as string))];
+  const { data: rows } = ids.length ? await supabase.from('products').select('id,name,price,original_price,image,images,status').in('id', ids) : { data: [] };
+  const products: Record<string, CardProduct> = {};
+  for (const p of rows ?? []) {
+    if (p.status !== '已下架') products[p.id] = { id: p.id, name: p.name, price: p.price, original_price: p.original_price, image: p.image || p.images?.[0] || '' };
+  }
+  const base = card as ProfileCard;
+  const theme = (base.theme ?? {}) as Partial<ProfileCard['theme']>;
+  const items: ShowcaseItem[] = SHOWCASE_TEMPLATES.flatMap((key) => {
+    const t = CARD_TEMPLATES.find((x) => x.key === key);
+    if (!t) return [];
+    return [{ key, label: t.name, card: { ...base, theme: { ...t.theme, template: key, coverImage: theme.coverImage ?? '', showAvatar: theme.showAvatar ?? true } } }];
+  });
+  return {
+    items,
+    blocks: (blocks ?? []) as ProfileCardBlock[],
+    products,
+    lineUrl: lineAddFriendUrl(getCheckoutLine(settings as Pick<SiteSettings, 'footer_sections'> | null)),
+  };
+}
 
 const STEPS = [
   { n: '01', title: '登入', body: '使用 Google 或 LINE,不用再記一組新的帳號密碼。' },
@@ -103,6 +124,7 @@ export default async function CardServicePage() {
   const user = await getSessionUser();
   const start = user ? '/mycard' : '/card/login';
   const upgradeHref = user ? '/mycard/upgrade' : '/card/login?next=/mycard/upgrade';
+  const showcase = await loadShowcase();
   const qr = await QRCode.toString('https://www.urbanite.com.tw/@yourname', { type: 'svg', margin: 0, color: { dark: '#1f1b19', light: '#0000' } });
 
   return (
@@ -118,7 +140,7 @@ export default async function CardServicePage() {
           <nav className="hidden items-center gap-7 text-[13px] text-[#4a4540] md:flex">
             <a href="#features" className="hover:text-[#1f1b19]">功能介紹</a>
             <a href="#pricing" className="hover:text-[#1f1b19]">方案價格</a>
-            <a href="#showcase" className="hover:text-[#1f1b19]">精選案例</a>
+            <a href="#cases" className="hover:text-[#1f1b19]">作品案例</a>
             <a href="#faq" className="hover:text-[#1f1b19]">常見問題</a>
           </nav>
           <div className="ml-auto flex items-center gap-4 text-[13px]">
@@ -163,21 +185,9 @@ export default async function CardServicePage() {
             </div>
           </div>
 
-          <div className="relative mx-auto h-[400px] w-full max-w-[520px] sm:h-[480px]">
-            {DEMOS.map((d, i) => (
-              <div
-                key={d.card.id}
-                className="absolute top-1/2 w-[38%] overflow-hidden rounded-[26px] border-[6px] border-[#1f1b19] bg-white shadow-[0_24px_50px_rgba(31,27,25,0.22)]"
-                style={[
-                  { left: '2%', transform: 'translateY(-46%) rotate(-7deg)', zIndex: 1 },
-                  { left: '31%', transform: 'translateY(-56%) rotate(1deg)', zIndex: 3 },
-                  { left: '60%', transform: 'translateY(-44%) rotate(7deg)', zIndex: 2 },
-                ][i]}
-              >
-                <DemoPhone card={d.card} blocks={d.blocks} />
-              </div>
-            ))}
-            <p className="absolute -bottom-2 left-[8%] -rotate-6 text-xs tracking-[0.1em] text-[#8a847d]">三分鐘,完成專屬頁面!</p>
+          <div id="cases" className="min-w-0 scroll-mt-20">
+            {showcase ? <ShowcaseCarousel items={showcase.items} blocks={showcase.blocks} products={showcase.products} lineUrl={showcase.lineUrl} /> : null}
+            <p className="-mt-1 -rotate-2 text-xs tracking-[0.1em] text-[#8a847d]">同一張名片,換個樣板就是不同風格。三分鐘,完成專屬頁面!</p>
           </div>
         </div>
       </section>
@@ -492,7 +502,7 @@ export default async function CardServicePage() {
           <nav className="flex flex-wrap gap-x-6 gap-y-2 text-xs text-[#55504a] sm:mx-auto">
             <a href="#features">功能介紹</a>
             <a href="#pricing">方案價格</a>
-            <a href="#showcase">精選案例</a>
+            <a href="#cases">作品案例</a>
             <a href="#faq">常見問題</a>
             <a href={CONTACT_LINE_URL} target="_blank" rel="noreferrer">聯絡我們</a>
           </nav>
