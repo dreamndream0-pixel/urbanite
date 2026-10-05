@@ -38,6 +38,16 @@ async function suggestSlug(user: User) {
   return `card${Date.now().toString(36)}`;
 }
 
+// 檢查網址代稱能不能用;可以回傳空字串
+export async function slugProblem(slug: string, plan: CardPlanInfo, cardId?: string) {
+  if (!slug) return '請輸入網址';
+  if (!SLUG_PATTERN.test(slug)) return '只能用小寫英文、數字、點、底線、連字號,2–30 字,開頭結尾要是英數字';
+  if (RESERVED_SLUGS.includes(slug) || slug.startsWith('line-') || (slug === 'urbanite' && !plan.isAdmin)) return '這個網址不能使用,請換一個';
+  const { data } = await createAdminClient().from('profile_cards').select('id').eq('slug', slug).maybeSingle();
+  if (data && data.id !== cardId) return '這個網址已經有人使用了';
+  return '';
+}
+
 // 目前登入者的名片(沒有就建立一張)
 export async function getOwnedCard(user: User, create = true): Promise<ProfileCard | null> {
   const supabase = createAdminClient();
@@ -56,6 +66,7 @@ export async function getOwnedCard(user: User, create = true): Promise<ProfileCa
       bio: '',
       theme: { template: 'ivory' },
       published: true,
+      onboarded: false, // 先到 /mycard/setup 設定暱稱與網址
     })
     .select()
     .single();

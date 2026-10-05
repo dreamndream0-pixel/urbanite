@@ -220,6 +220,8 @@ export type ProfileCard = {
   seo_description: string;
   seo_image: string;
   show_footer_logo: boolean;
+  onboarded?: boolean; // 第一次設定暱稱與網址完成
+  referred_by?: string;
   created_at?: string;
   updated_at?: string;
 };

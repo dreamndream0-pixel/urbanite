@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getSessionUser } from '@/lib/supabase/server';
-import { getPlanInfo } from '@/lib/card-access';
+import { getOwnedCard, getPlanInfo } from '@/lib/card-access';
 import { tierInfo } from '@/lib/card-plan';
 import ProfileCardManager from '@/app/admin/ProfileCardManager';
 import CardServiceHeader from '@/app/card/CardServiceHeader';
@@ -19,6 +19,9 @@ function daysLeft(iso: string | null) {
 export default async function MyCardPage() {
   const user = await getSessionUser();
   if (!user) redirect('/login?next=/mycard');
+  // 第一次使用:先設定暱稱與網址
+  const card = await getOwnedCard(user);
+  if (card && card.onboarded === false) redirect('/mycard/setup');
   const [{ data: settings }, plan] = await Promise.all([
     createAdminClient().from('site_settings').select('logo_url').eq('id', 1).maybeSingle(),
     getPlanInfo(user),
