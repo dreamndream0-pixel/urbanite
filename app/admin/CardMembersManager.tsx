@@ -16,6 +16,7 @@ type Member = {
   last_sign_in: string | null;
   published: boolean;
   onboarded: boolean;
+  is_admin: boolean;
   tier: CardTier;
   expires_at: string | null;
   blocks: number;
@@ -73,7 +74,7 @@ export default function CardMembersManager() {
   const stats: [string, string][] = [
     ['名片會員', members.length.toLocaleString()],
     ['近 7 天新增', joinedWithin(members, 7).toLocaleString()],
-    ['付費中', members.filter((m) => m.tier !== 'free').length.toLocaleString()],
+    ['付費中', members.filter((m) => m.tier !== 'free' && !m.is_admin).length.toLocaleString()],
     ['累計收入', `NT$${members.reduce((n, m) => n + m.paid, 0).toLocaleString()}`],
   ];
 
@@ -129,7 +130,7 @@ export default function CardMembersManager() {
                 </span>
                 <span className="block truncate text-xs text-[#a99e8f]">@{m.slug} · {m.email || '—'}</span>
               </span>
-              <span className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-medium ${TIER_COLOR[m.tier] ?? TIER_COLOR.free}`}>{tierInfo(m.tier).name}</span>
+              <span className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-medium ${TIER_COLOR[m.tier] ?? TIER_COLOR.free}`}>{tierInfo(m.tier).name}{m.is_admin ? '・管理員' : ''}</span>
             </button>
             {openId === m.id ? <MemberDetail m={m} onChanged={load} /> : null}
           </div>
@@ -170,7 +171,7 @@ function MemberDetail({ m, onChanged }: { m: Member; onChanged: () => void }) {
     ['登入方式', PROVIDER[m.provider] ?? (m.provider || '—')],
     ['加入日期', date(m.created_at)],
     ['最近登入', date(m.last_sign_in)],
-    ['方案到期', m.tier === 'free' ? '—' : date(m.expires_at)],
+    ['方案到期', m.is_admin ? '管理員帳號,永久 U Max' : m.tier === 'free' ? '—' : date(m.expires_at)],
     ['連結與區塊', `${m.blocks} 個`],
     ['累計付款', `NT$${m.paid.toLocaleString()}`],
     ['推薦人', m.referrer ? `@${m.referrer}` : '—'],
@@ -187,7 +188,7 @@ function MemberDetail({ m, onChanged }: { m: Member; onChanged: () => void }) {
           </div>
         ))}
       </dl>
-      {m.user_id ? (
+      {m.user_id && !m.is_admin ? (
         <div className="rounded-xl border border-[#ebe4da] bg-white p-3">
           <p className="mb-2 text-xs text-[#8a7f72]">手動開通方案(專員開通 U Pro / U Max、補償、贈送)</p>
           <div className="flex flex-wrap items-center gap-2">

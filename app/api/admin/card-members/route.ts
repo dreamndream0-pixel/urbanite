@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getAdminUser } from '@/lib/supabase/server';
 import { TIERS } from '@/lib/card-plan';
+import { getAdminEmails } from '@/lib/integrations';
 
 // 後台:名片服務的會員列表、手動開通方案
 
@@ -28,6 +29,9 @@ export async function GET() {
     if (!data || data.users.length < 1000) break;
   }
 
+  // 管理員帳號 = U Max(與 getPlanInfo 一致)
+  const admins = await getAdminEmails();
+
   const blockCount = new Map<string, number>();
   for (const b of blocks ?? []) blockCount.set(b.card_id, (blockCount.get(b.card_id) ?? 0) + 1);
   const subOf = new Map((subs ?? []).map((s) => [s.user_id, s]));
@@ -41,6 +45,7 @@ export async function GET() {
     const sub = c.owner_user_id ? subOf.get(c.owner_user_id) : undefined;
     const active = Boolean(sub && new Date(sub.expires_at).getTime() > Date.now());
     const u = c.owner_user_id ? users.get(c.owner_user_id) : undefined;
+    const isAdmin = Boolean(u?.email && admins.includes(u.email.toLowerCase()));
     return {
       id: c.id,
       user_id: c.owner_user_id,
@@ -52,8 +57,9 @@ export async function GET() {
       last_sign_in: u?.last ?? null,
       published: c.published,
       onboarded: c.onboarded,
-      tier: active ? sub!.plan : 'free',
-      expires_at: sub?.expires_at ?? null,
+      is_admin: isAdmin,
+      tier: isAdmin ? 'max' : active ? sub!.plan : 'free',
+      expires_at: isAdmin ? null : sub?.expires_at ?? null,
       blocks: blockCount.get(c.id) ?? 0,
       paid: c.owner_user_id ? paidOf.get(c.owner_user_id) ?? 0 : 0,
       referrer: c.referred_by ? slugOf.get(c.referred_by) ?? '' : '',
