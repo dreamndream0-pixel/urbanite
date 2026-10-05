@@ -3,13 +3,11 @@ import Link from 'next/link';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getSessionUser } from '@/lib/supabase/server';
 import { CARD_TEMPLATES, type ProfileCard, type ProfileCardBlock } from '@/lib/profile-card';
-import { TIERS } from '@/lib/card-plan';
+import { CONTACT_LINE_URL, TIERS } from '@/lib/card-plan';
 import CardServiceHeader from './CardServiceHeader';
 import DemoPhone from './DemoPhone';
 import TierTable from './TierTable';
 import ContactLineButton from './ContactLineButton';
-import { getCheckoutLine, lineAddFriendUrl } from '@/lib/checkout-line';
-import type { SiteSettings } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
 export const metadata: Metadata = {
@@ -77,9 +75,8 @@ const FAQ = [
 
 export default async function CardServicePage() {
   const user = await getSessionUser();
-  const { data: settings } = await createAdminClient().from('site_settings').select('logo_url, footer_sections').eq('id', 1).maybeSingle();
+  const { data: settings } = await createAdminClient().from('site_settings').select('logo_url').eq('id', 1).maybeSingle();
   const logoUrl = settings?.logo_url ?? '';
-  const lineUrl = lineAddFriendUrl(getCheckoutLine(settings as Pick<SiteSettings, 'footer_sections'> | null));
   const start = user ? '/mycard' : '/login?next=/mycard';
 
   return (
@@ -163,7 +160,7 @@ export default async function CardServicePage() {
                         {t.key === 'free' ? '開始使用' : `升級 ${t.name}`}
                       </Link>
                     ) : (
-                      <ContactLineButton href={lineUrl} />
+                      <ContactLineButton href={CONTACT_LINE_URL} />
                     )}
                   </div>
                 </div>

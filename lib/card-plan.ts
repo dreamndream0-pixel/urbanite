@@ -23,6 +23,9 @@ export const TIERS: {
   { key: 'max', name: 'U Max', tagline: '全功能品牌官網', prices: { month: 699, year: 6990 }, available: false },
 ];
 
+// U Pro / U Max「聯繫專員」的 LINE(與結帳頁官方 LINE 分開)
+export const CONTACT_LINE_URL = 'https://lin.ee/TcCrcXY';
+
 export const tierInfo = (tier: CardTier) => TIERS.find((t) => t.key === tier) ?? TIERS[0];
 export const tierRank = (tier: CardTier) => TIERS.findIndex((t) => t.key === tier);
 
