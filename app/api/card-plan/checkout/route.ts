@@ -14,7 +14,7 @@ export async function POST(request: Request) {
   const { tier = 'plus', period } = (await request.json().catch(() => ({}))) as { tier?: PaidTier; period?: CardPeriod };
   const info = TIERS.find((t) => t.key === tier);
   if (!info?.prices || !period || !PERIODS[period]) return NextResponse.json({ error: '請選擇方案' }, { status: 400 });
-  if (!info.available) return NextResponse.json({ error: `${info.name} 即將開放,目前還不能購買` }, { status: 400 });
+  if (!info.available) return NextResponse.json({ error: `${info.name} 請聯繫專員開通` }, { status: 400 });
   const price = { amount: info.prices[period], label: `${info.name} ${PERIODS[period].label}` };
 
   const cfg = await getNewebpayConfig();

@@ -7,6 +7,9 @@ import { TIERS } from '@/lib/card-plan';
 import CardServiceHeader from './CardServiceHeader';
 import DemoPhone from './DemoPhone';
 import TierTable from './TierTable';
+import ContactLineButton from './ContactLineButton';
+import { getCheckoutLine, lineAddFriendUrl } from '@/lib/checkout-line';
+import type { SiteSettings } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
 export const metadata: Metadata = {
@@ -66,7 +69,7 @@ const FEATURES = [
 
 const FAQ = [
   { q: '真的免費嗎?', a: 'U Free 可以一直用,不會到期。需要更多樣板、自訂樣式或完整數據時,再升級 U Plus。' },
-  { q: 'U Pro 和 U Max 什麼時候開放?', a: '正在開發中。U Pro 會加上子網域官網、商品上架與結帳;U Max 開放全部功能,包含會員、物流、LINE 機器人與自訂網域。' },
+  { q: 'U Pro 和 U Max 怎麼申請?', a: '點方案卡上的「聯繫專員」加入官方 LINE,專員會依你的需求協助開通。U Pro 包含子網域官網、商品上架與結帳;U Max 開放全部功能,包含會員、物流、LINE 機器人與自訂網域。' },
   { q: '付費方案會自動續約扣款嗎?', a: '不會。付費方案都是預付制,月付或年付一次,到期前會在後台提醒,到期後自動回到 U Free,名片和資料都會保留。' },
   { q: '網址代稱可以改嗎?', a: '可以,在「個人簡介」隨時修改。改了之後舊網址就會失效,記得更新你貼出去的地方。' },
   { q: '可以用哪些方式付款?', a: '信用卡、ATM 轉帳、超商代碼等,依付款頁顯示的方式為準。' },
@@ -74,8 +77,9 @@ const FAQ = [
 
 export default async function CardServicePage() {
   const user = await getSessionUser();
-  const { data: settings } = await createAdminClient().from('site_settings').select('logo_url').eq('id', 1).maybeSingle();
+  const { data: settings } = await createAdminClient().from('site_settings').select('logo_url, footer_sections').eq('id', 1).maybeSingle();
   const logoUrl = settings?.logo_url ?? '';
+  const lineUrl = lineAddFriendUrl(getCheckoutLine(settings as Pick<SiteSettings, 'footer_sections'> | null));
   const start = user ? '/mycard' : '/login?next=/mycard';
 
   return (
@@ -159,7 +163,7 @@ export default async function CardServicePage() {
                         {t.key === 'free' ? '開始使用' : `升級 ${t.name}`}
                       </Link>
                     ) : (
-                      <span className="block rounded-full bg-[#f3eee7] py-2 text-center text-xs text-[#8a7f72]">即將開放</span>
+                      <ContactLineButton href={lineUrl} />
                     )}
                   </div>
                 </div>

@@ -2,13 +2,14 @@
 
 import { useState, type ReactNode } from 'react';
 import Link from 'next/link';
+import ContactLineButton from '@/app/card/ContactLineButton';
 import { PERIODS, tierInfo, tierRank, TIERS, type CardPeriod, type CardPlanInfo, type PaidTier } from '@/lib/card-plan';
 
 type Payment = { order_no: string; tier: string; period: string; amount: number; paid_at: string | null };
 
 const date = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString('zh-TW', { timeZone: 'Asia/Taipei' }) : '');
 
-export default function UpgradeClient({ plan, payments, result, table }: { plan: CardPlanInfo; payments: Payment[]; result: string; table: ReactNode }) {
+export default function UpgradeClient({ plan, payments, result, table, lineUrl }: { plan: CardPlanInfo; payments: Payment[]; result: string; table: ReactNode; lineUrl: string }) {
   const buyable = TIERS.filter((t) => t.key !== 'free');
   const [tier, setTier] = useState<PaidTier>(plan.tier === 'free' ? 'plus' : (plan.tier as PaidTier));
   const [period, setPeriod] = useState<CardPeriod>('year');
@@ -74,13 +75,12 @@ export default function UpgradeClient({ plan, payments, result, table }: { plan:
                 <button
                   key={t.key}
                   type="button"
-                  disabled={!t.available}
                   onClick={() => setTier(t.key as PaidTier)}
-                  className={`rounded-xl border p-4 text-left transition disabled:cursor-not-allowed ${on ? 'border-[#1f1b19] bg-[#faf7f2]' : 'border-[#e5ded4] hover:border-[#1f1b19]/30'} ${t.available ? '' : 'opacity-60'}`}
+                  className={`rounded-xl border p-4 text-left transition ${on ? 'border-[#1f1b19] bg-[#faf7f2]' : 'border-[#e5ded4] hover:border-[#1f1b19]/30'}`}
                 >
                   <span className="flex items-center justify-between gap-2">
                     <span className="text-sm font-semibold">{t.name}</span>
-                    {!t.available ? <span className="rounded-full bg-[#f3eee7] px-2 py-0.5 text-[10px] text-[#8a7f72]">即將開放</span> : plan.tier === t.key ? <span className="text-[10px] text-[#1f7a44]">目前方案</span> : null}
+                    {!t.available ? <span className="rounded-full bg-[#e9f7ee] px-2 py-0.5 text-[10px] text-[#1f7a44]">聯繫專員</span> : plan.tier === t.key ? <span className="text-[10px] text-[#1f7a44]">目前方案</span> : null}
                   </span>
                   <span className="mt-0.5 block text-xs text-[#8a7f72]">{t.tagline}</span>
                   <span className="mt-2 block text-lg font-bold">NT${t.prices?.month}<span className="text-xs font-normal text-[#8a7f72]"> / 月</span></span>
@@ -104,10 +104,19 @@ export default function UpgradeClient({ plan, payments, result, table }: { plan:
           </div>
 
           {error ? <p className="mt-3 text-sm text-[#c0392b]">{error}</p> : null}
-          <button type="button" onClick={pay} disabled={busy || !chosen.available} className="mt-5 w-full rounded-full bg-[#1f1b19] py-3 text-sm font-semibold text-white transition hover:bg-[#3a322e] disabled:opacity-50">
-            {busy ? '前往付款頁…' : `${action} ${chosen.name}・付款 NT$${price.toLocaleString()}`}
-          </button>
-          <p className="mt-2 text-center text-[11px] text-[#a99e8f]">付款由藍新金流處理,可用信用卡、ATM、超商代碼等方式</p>
+          {chosen.available ? (
+            <>
+              <button type="button" onClick={pay} disabled={busy} className="mt-5 w-full rounded-full bg-[#1f1b19] py-3 text-sm font-semibold text-white transition hover:bg-[#3a322e] disabled:opacity-50">
+                {busy ? '前往付款頁…' : `${action} ${chosen.name}・付款 NT$${price.toLocaleString()}`}
+              </button>
+              <p className="mt-2 text-center text-[11px] text-[#a99e8f]">付款由藍新金流處理,可用信用卡、ATM、超商代碼等方式</p>
+            </>
+          ) : (
+            <>
+              <ContactLineButton href={lineUrl} className="mt-5 py-3 text-sm" />
+              <p className="mt-2 text-center text-[11px] text-[#a99e8f]">{chosen.name} 由專員協助開通,加入官方 LINE 告訴我們你的需求</p>
+            </>
+          )}
         </section>
       ) : null}
 

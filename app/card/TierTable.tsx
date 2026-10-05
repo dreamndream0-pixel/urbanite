@@ -12,7 +12,7 @@ export default function TierTable({ current }: { current?: CardTier }) {
               <th key={t.key} className={`px-3 py-3 text-xs font-semibold ${t.key === current ? 'text-[#702838]' : 'text-[#1f1b19]'}`}>
                 {t.name}
                 {t.key === current ? <span className="ml-1 font-normal">(目前)</span> : null}
-                {!t.available ? <span className="ml-1 rounded-full bg-[#f3eee7] px-1.5 py-0.5 text-[10px] font-normal text-[#8a7f72]">即將開放</span> : null}
+                {!t.available ? <span className="ml-1 rounded-full bg-[#e9f7ee] px-1.5 py-0.5 text-[10px] font-normal text-[#1f7a44]">聯繫專員</span> : null}
               </th>
             ))}
           </tr>
