@@ -34,8 +34,14 @@ async function load(slug: string) {
     const { data: owner } = await supabase.auth.admin.getUserById(card.owner_user_id);
     isStore = (await getAdminEmails()).includes((owner.user?.email ?? '').toLowerCase());
   }
+  // 免費版會員的名片:最上方顯示「加入 URBANLINKS」橫幅
+  let free = false;
+  if (!isStore && card.owner_user_id) {
+    const { data: sub } = await supabase.from('card_subscriptions').select('expires_at').eq('user_id', card.owner_user_id).maybeSingle();
+    free = !(sub?.expires_at && new Date(sub.expires_at).getTime() > Date.now());
+  }
   const lineUrl = isStore ? lineAddFriendUrl(getCheckoutLine(settings as Pick<SiteSettings, 'footer_sections'> | null)) : '';
-  return { card: card as ProfileCard & { owner_user_id?: string | null }, blocks: (blocks ?? []) as ProfileCardBlock[], products: isStore ? products : {}, logoUrl: settings?.logo_url ?? '', lineUrl, isStore };
+  return { card: card as ProfileCard & { owner_user_id?: string | null }, blocks: (blocks ?? []) as ProfileCardBlock[], products: isStore ? products : {}, logoUrl: settings?.logo_url ?? '', lineUrl, isStore, free };
 }
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
@@ -71,6 +77,13 @@ export default async function CardPage({ params }: { params: Promise<{ slug: str
   }
   return (
     <main>
+      {data.free ? (
+        <a href={`/card?ref=${encodeURIComponent(data.card.slug)}`} className="flex h-10 items-center justify-center gap-2 bg-[#121b33] px-4 text-[13px] text-white">
+          <img src="/brand/uplus-badge.png" alt="" className="h-6 w-6 shrink-0 rounded-full" />
+          <span className="truncate">加入 URBANLINKS,免費建立你的名片</span>
+          <span className="shrink-0 rounded-full bg-[#dcbc84] px-2.5 py-0.5 text-[11px] font-semibold text-[#121b33]">立即建立</span>
+        </a>
+      ) : null}
       <ProfileCardView card={data.card} blocks={data.blocks} products={data.products} logoUrl={data.logoUrl} lineUrl={data.lineUrl} serviceFooter={!data.isStore} fullScreen />
     </main>
   );

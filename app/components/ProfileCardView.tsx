@@ -5,7 +5,7 @@ import Link from 'next/link';
 import SocialIcon from '@/app/components/SocialIcon';
 import ProfileImageBlock from '@/app/components/ProfileImageBlock';
 import LinkIcon, { isIconImage } from '@/app/components/LinkIcon';
-import {
+import { blockOptions, followPlatform,
   coverSpec,
   detectSource,
   FONT_OPTIONS,
@@ -769,6 +769,45 @@ export default function ProfileCardView({
                   </span>
                   <span className="shrink-0 text-xs" style={{ color: theme.mutedColor }}>查看 →</span>
                 </Link>
+              );
+            }
+            if (b.type === 'social') {
+              const o = blockOptions(b);
+              const p = followPlatform(o.platform);
+              const stats = [o.statA, o.statB].filter(Boolean);
+              return (
+                <a
+                  key={b.id}
+                  href={normalizeUrl(b.url)}
+                  target="_blank"
+                  rel="noreferrer"
+                  onClick={() => track(b.id)}
+                  className="relative flex flex-col items-center bg-white px-5 pb-5 pt-6 text-center text-[#1f1b19] transition hover:opacity-95"
+                  style={{ borderRadius: Math.min(radius + 6, 28), boxShadow: '0 6px 20px rgba(0,0,0,0.08)' }}
+                >
+                  <span className="absolute right-3.5 top-3.5 flex h-8 w-8 items-center justify-center rounded-full text-white" style={{ background: p.color }}>
+                    <SocialIcon type={p.key} size={16} />
+                  </span>
+                  {b.image ? (
+                    <img src={b.image} alt="" className="h-20 w-20 rounded-full object-cover" />
+                  ) : (
+                    <span className="flex h-20 w-20 items-center justify-center rounded-full text-white" style={{ background: p.color }}><SocialIcon type={p.key} size={34} /></span>
+                  )}
+                  <span className="mt-3 text-xl font-semibold leading-7">{b.title || p.label}</span>
+                  {stats.length ? (
+                    <span className="mt-1 flex flex-wrap items-center justify-center gap-x-2.5 text-sm text-[#5f5852]">
+                      {stats.map((s, i) => (
+                        <span key={i} className="flex items-center gap-2.5">
+                          {i > 0 ? <span className="h-3.5 w-px bg-[#d7cfc4]" /> : null}
+                          {s}
+                        </span>
+                      ))}
+                    </span>
+                  ) : null}
+                  <span className="mt-4 flex w-full items-center justify-center rounded-full py-3 text-sm font-semibold text-white" style={{ background: p.color }}>
+                    {o.button || p.action}
+                  </span>
+                </a>
               );
             }
             if (b.type === 'line') {

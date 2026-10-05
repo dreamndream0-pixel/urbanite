@@ -29,7 +29,7 @@ export default function LoginClient({
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
 
-  const registerHref = `/register?next=${encodeURIComponent(nextPath)}`;
+  const registerHref = `${brand === 'card' ? '/card/register' : '/register'}?next=${encodeURIComponent(nextPath)}`;
 
   async function signInWithPassword() {
     setError(null);

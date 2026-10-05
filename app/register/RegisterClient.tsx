@@ -11,11 +11,14 @@ export default function RegisterClient({
   configured,
   nextPath,
   logoUrl = '',
+  brand = 'store',
 }: {
   configured: boolean;
   nextPath: string;
   logoUrl?: string;
+  brand?: 'store' | 'card'; // card = URBANLINKS 名片服務
 }) {
+  const isCard = brand === 'card';
   const [tab, setTab] = useState<'email' | 'phone'>('email');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -28,7 +31,7 @@ export default function RegisterClient({
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const loginHref = `/login?next=${encodeURIComponent(nextPath)}`;
+  const loginHref = `${isCard ? '/card/login' : '/login'}?next=${encodeURIComponent(nextPath)}`;
 
   async function syncCustomerAndGo() {
     await fetch('/api/customers', { method: 'POST' }).catch(() => {});
@@ -119,9 +122,9 @@ export default function RegisterClient({
       <header className="sticky top-0 z-30 border-b border-[#e6e1d8] bg-[var(--c-surface)]">
         <nav className="mx-auto grid max-w-4xl grid-cols-[1fr_auto_1fr] items-center px-5 py-4">
           <div />
-          <Link href="/" aria-label="回首頁" className="justify-self-center px-2 text-center">
+          <Link href={isCard ? '/card' : '/'} aria-label="回首頁" className="justify-self-center px-2 text-center">
             {logoUrl ? (
-              <img src={logoUrl} alt={STORE_NAME} className="site-logo mx-auto h-8 w-auto object-contain sm:h-10" />
+              <img src={logoUrl} alt={isCard ? 'URBANLINKS' : STORE_NAME} className={`${isCard ? '' : 'site-logo '}mx-auto h-8 w-auto object-contain sm:h-10`} />
             ) : (
               <span className="inline-block h-8 w-28 sm:h-10 sm:w-36" aria-hidden />
             )}
@@ -131,7 +134,14 @@ export default function RegisterClient({
       </header>
 
       <div className="mx-auto max-w-md px-8 py-10">
-        <h1 className="text-center text-4xl font-bold tracking-wide">註冊會員</h1>
+        <h1 className="text-center text-4xl font-bold tracking-wide">{isCard ? '建立帳號' : '註冊會員'}</h1>
+        {isCard ? (
+          <p className="mt-3 text-center text-sm leading-6 text-[#8a8a8a]">
+            註冊後就能建立你的個人名片。
+            <br />
+            也可以直接<Link href={loginHref} className="text-[var(--c-gold)] underline underline-offset-2">用 LINE、Google 登入</Link>,會自動建立帳號。
+          </p>
+        ) : null}
 
         {!configured ? (
           <div className="mt-6 rounded-lg bg-[#fdf3e7] p-4 text-sm text-[#9a6a1f]">
@@ -241,7 +251,9 @@ export default function RegisterClient({
                 ? '處理中...'
                 : tab === 'phone' && otpSent
                   ? '驗證並完成註冊'
-                  : '註冊並開始購物'}
+                  : isCard
+                    ? '註冊並建立名片'
+                    : '註冊並開始購物'}
             </button>
 
             <p className="mt-8 text-center text-sm text-[#8a8a8a]">

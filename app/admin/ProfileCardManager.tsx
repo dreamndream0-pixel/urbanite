@@ -11,6 +11,8 @@ import {
   BLOCK_TYPES,
   blockItems,
   blockOptions,
+  FOLLOW_PLATFORMS,
+  followPlatform,
   IMAGE_LAYOUTS,
   IMAGE_LIMIT,
   LINK_STYLES,
@@ -91,6 +93,7 @@ const BLOCK_ICON: Record<BlockType, ReactNode> = {
   video: <><rect x="3" y="5.5" width="18" height="13" rx="3" /><path d="M10.5 9.5v5l4-2.5z" /></>,
   line: <path d="M12 4C7 4 3 7.2 3 11.2c0 3.6 3.2 6.6 7.6 7.1.4.1.8.3.8.8l-.1 1.4c0 .3.3.6.7.4 1.3-.8 5.6-3.4 7.4-5.6 1.1-1.3 1.6-2.6 1.6-4.1C21 7.2 17 4 12 4z" />,
   divider: <path d="M4 12h16" />,
+  social: <><circle cx="12" cy="9" r="3.2" /><path d="M6 19c.8-3 3.2-4.6 6-4.6s5.2 1.6 6 4.6" /><path d="M17.5 4.5l1 1 2-2" /></>,
 };
 
 function Icon({ children, size = 18 }: { children: ReactNode; size?: number }) {
@@ -181,6 +184,77 @@ function templateIn(filter: TemplateFilter, key: string) {
   if (filter === 'free') return FREE_TEMPLATE_KEYS.includes(key);
   if (filter === 'plus') return !FREE_TEMPLATE_KEYS.includes(key);
   return false;
+}
+
+// 社群追蹤卡片:平台、網址、頭像、名稱、兩個數字、按鈕文字
+function SocialFollowEditor({
+  block,
+  uploading,
+  onUpload,
+  onLocalChange,
+  onPatch,
+  field,
+}: {
+  block: ProfileCardBlock;
+  uploading: boolean;
+  onUpload: (file: File | undefined) => void;
+  onLocalChange: (patch: Partial<ProfileCardBlock>) => void;
+  onPatch: (patch: Partial<ProfileCardBlock>) => void;
+  field: (key: 'title' | 'url', label: string, placeholder: string) => ReactNode;
+}) {
+  const options = blockOptions(block);
+  const platform = followPlatform(options.platform);
+  const setOption = (patch: Partial<BlockOptions>, save: boolean) => {
+    const next = { ...options, ...patch };
+    if (save) onPatch({ options: next });
+    else onLocalChange({ options: next });
+  };
+  const optionField = (key: 'statA' | 'statB' | 'button', label: string, placeholder: string) => (
+    <label className="block">
+      <span className="mb-1 block text-xs text-[#8a7f72]">{label}</span>
+      <input value={options[key]} onChange={(e) => setOption({ [key]: e.target.value }, false)} onBlur={(e) => setOption({ [key]: e.target.value }, true)} placeholder={placeholder} className={inputClass} />
+    </label>
+  );
+
+  return (
+    <>
+      <div>
+        <span className="mb-1.5 block text-xs text-[#8a7f72]">平台</span>
+        <div className="flex flex-wrap gap-1.5">
+          {FOLLOW_PLATFORMS.map((p) => (
+            <button
+              key={p.key}
+              type="button"
+              onClick={() => setOption({ platform: p.key }, true)}
+              className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs transition ${options.platform === p.key ? 'bg-[#1f1b19] text-white' : 'border border-[#e5ded4] text-[#5f5852]'}`}
+            >
+              <SocialIcon type={p.key} size={14} />
+              {p.label}
+            </button>
+          ))}
+        </div>
+      </div>
+      {field('url', `${platform.label} 個人頁網址`, platform.key === 'youtube' ? 'https://www.youtube.com/@…' : `https://…`)}
+      <div className="flex items-center gap-3">
+        <span className="h-14 w-14 shrink-0 overflow-hidden rounded-full bg-[#f6f2ec]">
+          {block.image ? <img src={block.image} alt="" className="h-full w-full object-cover" /> : null}
+        </span>
+        <label className="cursor-pointer rounded-full border border-[#d7c9bd] px-4 py-1.5 text-xs font-medium hover:bg-[#f6f2ec]">
+          {uploading ? '上傳中…' : block.image ? '更換頭像' : '上傳頭像'}
+          <input type="file" accept="image/png,image/jpeg,image/webp" className="hidden" disabled={uploading} onChange={(e) => { onUpload(e.target.files?.[0]); e.target.value = ''; }} />
+        </label>
+        {block.image ? <button type="button" onClick={() => onPatch({ image: '' })} className="text-xs text-[#8a7f72]">移除</button> : null}
+        <span className="ml-auto text-[11px] text-[#a99e8f]">建議 400×400</span>
+      </div>
+      {field('title', '名稱', '例如:YYUI')}
+      <div className="grid grid-cols-2 gap-2">
+        {optionField('statA', '數字一(選填)', '7.6 萬 粉絲')}
+        {optionField('statB', '數字二(選填)', '120 萬 個讚')}
+      </div>
+      {optionField('button', '按鈕文字(選填)', platform.action)}
+      <p className="text-[11px] leading-5 text-[#a99e8f]">粉絲數需自行填寫,不會自動更新。</p>
+    </>
+  );
 }
 
 // U Plus 膠囊(行內文字標示)
@@ -611,6 +685,7 @@ function BlockRow({
     block.type === 'product' ? block.title || product?.name || ''
     : block.type === 'line' ? block.title || '加入官方 LINE'
     : block.type === 'divider' ? '分隔線'
+    : block.type === 'social' ? block.title || followPlatform(blockOptions(block).platform).label
     : block.title;
 
   async function upload(file: File | undefined) {
@@ -755,6 +830,9 @@ function BlockRow({
               </>
             )}
             {block.type === 'divider' && <p className="text-xs text-[#a99e8f]">分隔線沒有內容,可拖曳調整位置。</p>}
+            {block.type === 'social' && (
+              <SocialFollowEditor block={block} uploading={uploading} onUpload={(file) => void upload(file)} onLocalChange={onLocalChange} onPatch={onPatch} field={field} />
+            )}
             {block.type === 'product' && (
               <div className="space-y-2">
                 {product ? (

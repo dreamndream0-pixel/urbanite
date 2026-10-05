@@ -18,6 +18,7 @@ export default async function RegisterPage({
 }) {
   const params = await searchParams;
   const nextPath = normalizeNext(params.next);
+  if (nextPath.startsWith('/mycard')) redirect(`/card/register?next=${encodeURIComponent(nextPath)}`);
   const configured = Boolean(
     process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
   );

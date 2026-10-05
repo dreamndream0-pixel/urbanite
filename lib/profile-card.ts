@@ -227,7 +227,7 @@ export type ProfileCard = {
   updated_at?: string;
 };
 
-export type BlockType = 'link' | 'text' | 'image' | 'product' | 'video' | 'line' | 'divider';
+export type BlockType = 'link' | 'text' | 'image' | 'product' | 'video' | 'line' | 'divider' | 'social';
 
 export type ProfileCardBlock = {
   id: string;
@@ -251,7 +251,8 @@ export type BlockItem = { image: string; title: string; url: string };
 export type ImageLayout =
   | 'banner' | 'overlay' | 'top' | 'tall' | 'square' | 'card' | 'card-right'
   | 'grid2' | 'grid3' | 'circle3' | 'mosaic' | 'mosaic5' | 'scroll';
-export type BlockOptions = { layout?: ImageLayout; captionMode?: 'link' | 'custom'; autoplay?: boolean };
+// 社群追蹤卡片:platform 平台、statA / statB 兩個數字欄(自行填寫)、button 按鈕文字
+export type BlockOptions = { layout?: ImageLayout; captionMode?: 'link' | 'custom'; autoplay?: boolean; platform?: string; statA?: string; statB?: string; button?: string };
 
 export const IMAGE_LIMIT = 10;
 export const LINK_TITLE_LIMIT = 80;
@@ -287,6 +288,10 @@ export function blockOptions(block: Pick<ProfileCardBlock, 'options'>): Required
     layout: IMAGE_LAYOUTS.some((l) => l.key === o.layout) ? (o.layout as ImageLayout) : 'banner',
     captionMode: o.captionMode === 'custom' ? 'custom' : 'link',
     autoplay: Boolean(o.autoplay),
+    platform: FOLLOW_PLATFORMS.some((p) => p.key === o.platform) ? String(o.platform) : 'instagram',
+    statA: typeof o.statA === 'string' ? o.statA.slice(0, 40) : '',
+    statB: typeof o.statB === 'string' ? o.statB.slice(0, 40) : '',
+    button: typeof o.button === 'string' ? o.button.slice(0, 30) : '',
   };
 }
 
@@ -302,7 +307,25 @@ export const BLOCK_TYPES: { type: BlockType; label: string; hint: string }[] = [
   { type: 'video', label: '影片', hint: 'YouTube 影片網址' },
   { type: 'line', label: 'LINE 加好友', hint: '一鍵加入官方 LINE' },
   { type: 'divider', label: '分隔線', hint: '純排版用' },
+  { type: 'social', label: '社群追蹤卡片', hint: 'IG、YouTube、TikTok 等追蹤卡' },
 ];
+
+// 社群追蹤卡片可選的平台(color = 品牌色,用在角落圖示與按鈕)
+export const FOLLOW_PLATFORMS: { key: string; label: string; color: string; action: string }[] = [
+  { key: 'instagram', label: 'Instagram', color: '#E1306C', action: '在 Instagram 追蹤' },
+  { key: 'youtube', label: 'YouTube', color: '#FF0000', action: '訂閱 YouTube 頻道' },
+  { key: 'tiktok', label: 'TikTok', color: '#111111', action: '在 TikTok 追蹤' },
+  { key: 'facebook', label: 'Facebook', color: '#1877F2', action: '在 Facebook 追蹤' },
+  { key: 'threads', label: 'Threads', color: '#111111', action: '在 Threads 追蹤' },
+  { key: 'x', label: 'X', color: '#111111', action: '在 X 追蹤' },
+  { key: 'line', label: 'LINE', color: '#06C755', action: '加入 LINE 好友' },
+  { key: 'xiaohongshu', label: '小紅書', color: '#FF2442', action: '在小紅書關注' },
+  { key: 'pinterest', label: 'Pinterest', color: '#E60023', action: '在 Pinterest 追蹤' },
+];
+
+export function followPlatform(key: string | undefined) {
+  return FOLLOW_PLATFORMS.find((p) => p.key === key) ?? FOLLOW_PLATFORMS[0];
+}
 
 export const TAG_SUGGESTIONS = ['印花 T', '客製團服', '日常穿搭', '質感選品', '情侶裝', '親子裝', '機能服飾', '配件'];
 
@@ -354,6 +377,7 @@ export function isBlockComplete(block: Pick<ProfileCardBlock, 'type' | 'title' |
     case 'image': return Boolean(block.url.trim() && blockItems(block).length);
     case 'product': return Boolean(block.product_id.trim());
     case 'video': return Boolean(videoEmbedUrl(block.url));
+    case 'social': return Boolean(block.url.trim());
     case 'line':
     case 'divider': return true;
     default: return false;
