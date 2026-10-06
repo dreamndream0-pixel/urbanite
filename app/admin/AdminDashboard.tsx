@@ -1060,13 +1060,34 @@ export default function AdminDashboard({
     } else void uiAlert(data.error ?? '新增失敗(代碼可能重複)');
   }
 
-  async function patchCategory(id: string, patch: Partial<Pick<Category, 'name' | 'en' | 'sort_order'>>) {
+  async function patchCategory(id: string, patch: Partial<Pick<Category, 'name' | 'en' | 'sort_order' | 'image'>>) {
     setCategories((l) => l.map((c) => (c.id === id ? { ...c, ...patch } : c)));
     await fetch(`/api/categories/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(patch),
     });
+  }
+
+  // 分類圖片(首頁分類導覽顯示)
+  const [categoryUploading, setCategoryUploading] = useState('');
+  async function uploadCategoryImage(category: Category, file: File | undefined) {
+    if (!file) return;
+    setCategoryUploading(category.id);
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      fd.append('folder', 'categories');
+      fd.append('productId', category.slug);
+      const res = await fetch('/api/products/image', { method: 'POST', body: fd });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? '圖片上傳失敗');
+      await patchCategory(category.id, { image: data.image_url });
+    } catch (e) {
+      void uiAlert(e instanceof Error ? e.message : '圖片上傳失敗');
+    } finally {
+      setCategoryUploading('');
+    }
   }
 
   async function setCategoryVisible(category: Category, visible: boolean) {
@@ -2122,8 +2143,17 @@ export default function AdminDashboard({
                             <td className="px-4 py-4">
                               <div className="flex items-center gap-4" style={{ paddingLeft: depth * 24 }}>
                                 {depth > 0 && <span className="text-[#c9bdb0]">└</span>}
-                                <div className="flex h-14 w-14 items-center justify-center overflow-hidden rounded bg-[#f1f1f1]">
-                                  {image ? <img src={image} alt="" className="h-full w-full object-cover" /> : <span className="text-xs text-[#bbb]">無圖</span>}
+                                <div className="flex shrink-0 flex-col items-center gap-1">
+                                  <label title="上傳分類圖片(首頁分類導覽顯示)" className="relative flex h-14 w-14 cursor-pointer items-center justify-center overflow-hidden rounded-full bg-[#f1f1f1] ring-1 ring-[#e5ded4] hover:ring-[#1f1b19]/40">
+                                    {c.image ? (
+                                      <img src={c.image} alt="" className="h-full w-full object-cover" />
+                                    ) : image ? (
+                                      <img src={image} alt="" className="h-full w-full object-cover opacity-40" />
+                                    ) : null}
+                                    {!c.image ? <span className="absolute text-[10px] font-semibold text-[#6b6156]">{categoryUploading === c.id ? '上傳中' : '＋圖片'}</span> : null}
+                                    <input type="file" accept="image/png,image/jpeg,image/webp" className="hidden" disabled={categoryUploading === c.id} onChange={(e) => { void uploadCategoryImage(c, e.target.files?.[0]); e.target.value = ''; }} />
+                                  </label>
+                                  {c.image ? <button type="button" onClick={() => patchCategory(c.id, { image: '' })} className="text-[10px] text-[#8a7f72]">移除</button> : null}
                                 </div>
                                 <div className="min-w-0">
                                   <input

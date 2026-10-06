@@ -54,7 +54,7 @@ function plainText(value = '') {
 }
 
 // 前台分類 tab 用的型別(虛擬的「全部」也用同一形狀)
-type CategoryTab = { slug: string; name: string; en: string; children?: CategoryTab[] };
+type CategoryTab = { slug: string; name: string; en: string; image?: string; children?: CategoryTab[] };
 const ALL_TAB: CategoryTab = { slug: 'all', name: '全部', en: 'ALL' };
 
 function readCart(): CartItem[] {
@@ -255,6 +255,7 @@ export default function Storefront({ campaign = null, preview = false }: { campa
         slug: c.slug,
         name: c.name,
         en: c.en || c.slug.toUpperCase(),
+        image: c.image || '',
         children: childrenOf(c.id),
       })),
   ];

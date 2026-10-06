@@ -174,6 +174,7 @@ export type Category = {
   en: string;
   sort_order: number;
   parent_id?: string | null;
+  image?: string; // 首頁分類導覽的圓形圖片
   created_at?: string;
 };
 

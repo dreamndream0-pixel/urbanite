@@ -6,6 +6,7 @@ import { createPortal } from 'react-dom';
 type NavigationCategory = {
   slug: string;
   name: string;
+  image?: string;
   children?: NavigationCategory[];
 };
 
@@ -22,6 +23,8 @@ export default function CategoryNavigation({ categories, value, onSelect }: {
   const focusMenu = useRef(false);
   const menuId = useId();
   const expanded = categories.find(category => category.slug === open);
+  // 有任何分類上傳了圖片 → 改成圓形圖片 + 名稱的樣式
+  const withImages = categories.some(category => category.image);
 
   useEffect(() => {
     const active = row.current?.querySelector<HTMLElement>('[aria-current="page"]');
@@ -76,7 +79,7 @@ export default function CategoryNavigation({ categories, value, onSelect }: {
 
   return (
     <nav className="store-category-navigation" aria-label="商品分類">
-      <div ref={row} className="store-category-row">
+      <div ref={row} className={`store-category-row${withImages ? ' store-category-row--images' : ''}`}>
         {categories.map(category => {
           const active = value === category.slug || !!category.children?.some(child => child.slug === value);
           const hasChildren = !!category.children?.length;
@@ -112,8 +115,21 @@ export default function CategoryNavigation({ categories, value, onSelect }: {
                 }
               }}
             >
-              {category.slug === 'all' ? '全部商品' : category.name}
-              {hasChildren ? <span className="store-category-chevron" aria-hidden="true" /> : null}
+              {withImages ? (
+                <span className="store-category-image" aria-hidden="true">
+                  {category.image ? (
+                    <img src={category.image} alt="" loading="lazy" />
+                  ) : category.slug === 'all' ? (
+                    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="4" width="6.5" height="6.5" rx="1.5" /><rect x="13.5" y="4" width="6.5" height="6.5" rx="1.5" /><rect x="4" y="13.5" width="6.5" height="6.5" rx="1.5" /><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.5" /></svg>
+                  ) : (
+                    <span className="store-category-initial">{category.name.slice(0, 1)}</span>
+                  )}
+                </span>
+              ) : null}
+              <span className="store-category-label">
+                {category.slug === 'all' ? '全部商品' : category.name}
+                {hasChildren ? <span className="store-category-chevron" aria-hidden="true" /> : null}
+              </span>
             </button>
           );
         })}
