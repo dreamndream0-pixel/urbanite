@@ -116,6 +116,8 @@ const tpl = (key: string, name: string, category: TemplateCategory, theme: Parti
 
 // 預設樣板(新的排前面):版面配置 × 連結樣式 × 配色,套用後仍可再微調
 export const CARD_TEMPLATES: { key: string; name: string; category: TemplateCategory; theme: Partial<CardTheme> }[] = [
+  // 無模板:白底、沒有任何裝飾;套用時一併開啟「純圖片版面」,適合搭配熱區圖片
+  tpl('blank', '無模板', 'minimal', { bgColor: '#ffffff', textColor: '#1f1b19', mutedColor: '#6b6156', accentColor: '#1f1b19', buttonFill: 'outline', buttonColor: '#1f1b19', buttonTextColor: '#1f1b19' }),
   tpl('gray-note', '灰調筆記', 'minimal', { avatarShape: 'square', align: 'left', layout: 'framed', linkStyle: 'bar', tagStyle: 'solid', bgColor: '#e9e9e9', textColor: '#222222', mutedColor: '#666666', accentColor: '#222222', buttonColor: '#9a9a9a', buttonTextColor: '#444444', divider: 'none' }),
   tpl('polaroid-green', '綠格拍立得', 'lively', { avatarShape: 'square', align: 'center', layout: 'polaroid', linkStyle: 'button', bgColor: '#cfdcc5', textColor: '#2f5a2a', mutedColor: '#4c7044', accentColor: '#3f7a33', buttonShape: 'rounded', buttonFill: 'soft', buttonColor: '#e3f0dc', buttonTextColor: '#2f5a2a' }),
   tpl('watercolor', '水彩藍', 'lively', { avatarShape: 'square', align: 'center', layout: 'framed', linkStyle: 'bar', tagStyle: 'solid', bgType: 'gradient', bgColor: '#7fb1ec', bgColor2: '#c9d6f2', textColor: '#0d4a8f', mutedColor: '#1d5c9f', accentColor: '#0d4a8f', buttonColor: '#2f7ae0', buttonTextColor: '#0d4a8f', divider: 'wave', font: 'sans' }),
@@ -257,7 +259,7 @@ export type ImageLayout =
 export type BlockOptions = { layout?: ImageLayout; captionMode?: 'link' | 'custom'; autoplay?: boolean; platform?: string; statA?: string; statB?: string; button?: string; bio?: string; fetchedAt?: string; fetchedUrl?: string; spots?: HotSpot[] };
 
 // 熱區圖片:位置與大小都是佔圖片寬高的百分比(0–100),不同螢幕都對得準
-export type HotSpot = { id: string; x: number; y: number; w: number; h: number; label: string; url: string };
+export type HotSpot = { id: string; x: number; y: number; w: number; h: number; label: string; url: string; shape: 'rect' | 'circle' };
 export const HOTSPOT_LIMIT = 40;
 
 function cleanSpots(value: unknown): HotSpot[] {
@@ -278,6 +280,7 @@ function cleanSpots(value: unknown): HotSpot[] {
         h: num(o.h, 0.5, 100 - y),
         label: String(o.label ?? '').slice(0, 40),
         url: String(o.url ?? '').trim().slice(0, 500),
+        shape: o.shape === 'circle' ? 'circle' : 'rect',
       };
     });
 }

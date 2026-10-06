@@ -1332,7 +1332,7 @@ function HotspotEditor({
       setDrawing(false);
       if (!r || r.w < 3 || r.h < 1) return;
       if (spots.length >= HOTSPOT_LIMIT) return void uiAlert(`一張圖最多 ${HOTSPOT_LIMIT} 個熱區`);
-      const sp: HotSpot = { id: newSpotId(), x: round(r.x), y: round(r.y), w: round(r.w), h: round(r.h), label: '', url: '' };
+      const sp: HotSpot = { id: newSpotId(), x: round(r.x), y: round(r.y), w: round(r.w), h: round(r.h), label: '', url: '', shape: 'rect' };
       save([...spots, sp]);
       setSelected(sp.id);
       return;
@@ -1393,11 +1393,24 @@ function HotspotEditor({
               return (
                 <div
                   key={sp.id}
-                  onPointerDown={(e) => onSpotDown(e, sp, 'move')}
-                  className={`absolute flex cursor-move items-start justify-start rounded-md border-2 ${on ? 'border-[#d4f53c] bg-[#d4f53c]/25' : 'border-white/90 bg-[#1f1b19]/25'}`}
-                  style={{ left: `${sp.x}%`, top: `${sp.y}%`, width: `${sp.w}%`, height: `${sp.h}%`, touchAction: 'none', boxShadow: '0 0 0 1px rgba(0,0,0,0.35)' }}
+                  onPointerDown={(e) => {
+                    e.stopPropagation();
+                    setSelected(sp.id);
+                  }}
+                  className={`absolute flex items-start justify-start border-2 ${sp.shape === 'circle' ? 'rounded-full' : 'rounded-md'} ${on ? 'border-[#d4f53c] bg-[#d4f53c]/25' : 'border-white/90 bg-[#1f1b19]/25'}`}
+                  style={{ left: `${sp.x}%`, top: `${sp.y}%`, width: `${sp.w}%`, height: `${sp.h}%`, boxShadow: '0 0 0 1px rgba(0,0,0,0.35)' }}
                 >
-                  <span className="m-0.5 rounded bg-[#1f1b19] px-1.5 text-[10px] font-semibold leading-4 text-white">{n + 1}{sp.url ? '' : ' 未設定'}</span>
+                  <span className={`m-0.5 rounded bg-[#1f1b19] px-1.5 text-[10px] font-semibold leading-4 text-white ${sp.shape === 'circle' ? 'mx-auto' : ''}`}>{n + 1}{sp.url ? '' : ' 未設定'}</span>
+                  {on ? (
+                    <span
+                      onPointerDown={(e) => onSpotDown(e, sp, 'move')}
+                      title="拖移"
+                      className="absolute -left-2.5 -top-2.5 flex h-6 w-6 cursor-move items-center justify-center rounded-full border-2 border-[#1f1b19] bg-white text-[13px] leading-none text-[#1f1b19] shadow"
+                      style={{ touchAction: 'none' }}
+                    >
+                      ✥
+                    </span>
+                  ) : null}
                   {on ? (
                     <span
                       onPointerDown={(e) => onSpotDown(e, sp, 'resize')}
@@ -1412,16 +1425,43 @@ function HotspotEditor({
               <div className="pointer-events-none absolute rounded-md border-2 border-dashed border-[#d4f53c] bg-[#d4f53c]/20" style={{ left: `${rect.x}%`, top: `${rect.y}%`, width: `${rect.w}%`, height: `${rect.h}%` }} />
             ) : null}
           </div>
-          <p className="text-[11px] leading-5 text-[#a99e8f]">點選框框可以拖曳移動,拉右下角的圓點調整大小。名片上這些框框是透明的,只有點的時候才看得出來。</p>
+          <p className="text-[11px] leading-5 text-[#a99e8f]">點一下框框選取,按住左上角 ✥ 拖移,拉右下角的圓點調整大小。名片上這些框框是透明的,只有點的時候才看得出來。</p>
 
           {sel ? (
             <div className="space-y-2 rounded-xl border border-[#d4f53c] bg-[#fbfde9] p-3">
               <p className="text-xs font-semibold">熱區 {spots.findIndex((sp) => sp.id === sel.id) + 1}</p>
               <input value={sel.label} onChange={(e) => updateSpot(sel.id, { label: e.target.value }, false)} onBlur={(e) => updateSpot(sel.id, { label: e.target.value }, true)} placeholder="名稱(例如:菜單)" className={inputClass} />
               <input value={sel.url} onChange={(e) => updateSpot(sel.id, { url: e.target.value }, false)} onBlur={(e) => updateSpot(sel.id, { url: e.target.value }, true)} placeholder="連結網址" className={inputClass} />
-              <div className="flex justify-between">
-                <button type="button" onClick={() => setSelected('')} className="text-xs text-[#6b6156]">完成</button>
-                <button type="button" onClick={() => { save(spots.filter((sp) => sp.id !== sel.id)); setSelected(''); }} className="text-xs text-[#c0392b]">刪除這個熱區</button>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-[#8a7f72]">形狀</span>
+                {([['rect', '方形'], ['circle', '圓形']] as const).map(([key, label]) => (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => updateSpot(sel.id, { shape: key }, true)}
+                    className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs ${sel.shape === key ? 'bg-[#1f1b19] text-white' : 'border border-[#e5ded4] bg-white text-[#5f5852]'}`}
+                  >
+                    <span className={`inline-block h-3 w-3 border-[1.5px] border-current ${key === 'circle' ? 'rounded-full' : 'rounded-[3px]'}`} />
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <div className="flex flex-wrap items-center gap-2 pt-1">
+                <button type="button" onClick={() => setSelected('')} className="rounded-full bg-[#1f1b19] px-4 py-1.5 text-xs font-semibold text-white">完成</button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (spots.length >= HOTSPOT_LIMIT) return void uiAlert(`一張圖最多 ${HOTSPOT_LIMIT} 個熱區`);
+                    // 複製:同大小、同形狀與連結,往右下移一點
+                    const copy: HotSpot = { ...sel, id: newSpotId(), x: round(clamp(sel.x + 3, 0, 100 - sel.w)), y: round(clamp(sel.y + 2, 0, 100 - sel.h)) };
+                    save([...spots, copy]);
+                    setSelected(copy.id);
+                  }}
+                  className="rounded-full border border-[#d7c9bd] bg-white px-4 py-1.5 text-xs font-medium"
+                >
+                  複製熱區
+                </button>
+                <button type="button" onClick={() => { save(spots.filter((sp) => sp.id !== sel.id)); setSelected(''); }} className="ml-auto text-xs text-[#c0392b]">刪除</button>
               </div>
             </div>
           ) : null}
@@ -1936,7 +1976,7 @@ function StyleEditor({
                 <button
                   key={tpl.key}
                   type="button"
-                  onClick={() => (locked ? void askUpgrade(`「${tpl.name}」是 U Plus 樣板。`, upgradeHref) : setTheme({ ...tpl.theme, template: tpl.key }))}
+                  onClick={() => (locked ? void askUpgrade(`「${tpl.name}」是 U Plus 樣板。`, upgradeHref) : setTheme({ ...tpl.theme, template: tpl.key, ...(tpl.key === 'blank' ? { imageOnly: true } : theme.template === 'blank' ? { imageOnly: false } : {}) }))}
                   className={`relative rounded-2xl border text-left transition ${selected ? 'border-[#1f1b19] ring-2 ring-[#1f1b19]/15' : 'border-[#e5ded4] hover:border-[#1f1b19]/30'}`}
                 >
                   {locked ? <PlusCorner size={30} /> : null}

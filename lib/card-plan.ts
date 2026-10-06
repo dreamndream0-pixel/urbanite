@@ -62,7 +62,7 @@ export const TIER_FEATURES: { group: string; rows: { label: string; values: [str
     rows: [
       { label: '專屬網址 /@代稱', values: ['✓', '✓', '✓', '✓'] },
       { label: '連結與區塊', values: ['8 個', '不限', '不限', '不限'] },
-      { label: '樣板', values: ['8 款', '24 款', '24 款', '24 款'] },
+      { label: '樣板', values: ['8 款', '25 款', '25 款', '25 款'] },
       { label: '自訂背景、文字、按鈕樣式', values: ['—', '✓', '✓', '✓'] },
       { label: '限時顯示、自訂分享預覽', values: ['—', '✓', '✓', '✓'] },
       { label: '隱藏頁尾 URBANLINKS 標誌', values: ['—', '✓', '✓', '✓'] },

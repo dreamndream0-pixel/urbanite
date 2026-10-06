@@ -742,7 +742,7 @@ export default function ProfileCardView({
                       rel="noreferrer"
                       onClick={() => track(b.id, s.id)}
                       aria-label={s.label || s.url}
-                      className="absolute rounded-lg transition hover:bg-white/10 active:bg-black/10"
+                      className={`absolute transition hover:bg-white/10 active:bg-black/10 ${s.shape === 'circle' ? 'rounded-full' : 'rounded-lg'}`}
                       style={{ left: `${s.x}%`, top: `${s.y}%`, width: `${s.w}%`, height: `${s.h}%` }}
                     >
                       <span className="sr-only">{s.label}</span>
