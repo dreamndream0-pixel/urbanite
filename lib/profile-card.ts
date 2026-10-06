@@ -252,7 +252,7 @@ export type ImageLayout =
   | 'banner' | 'overlay' | 'top' | 'tall' | 'square' | 'card' | 'card-right'
   | 'grid2' | 'grid3' | 'circle3' | 'mosaic' | 'mosaic5' | 'scroll';
 // 社群追蹤卡片:platform 平台、statA / statB 兩個數字欄(自行填寫)、button 按鈕文字
-export type BlockOptions = { layout?: ImageLayout; captionMode?: 'link' | 'custom'; autoplay?: boolean; platform?: string; statA?: string; statB?: string; button?: string };
+export type BlockOptions = { layout?: ImageLayout; captionMode?: 'link' | 'custom'; autoplay?: boolean; platform?: string; statA?: string; statB?: string; button?: string; bio?: string };
 
 export const IMAGE_LIMIT = 10;
 export const LINK_TITLE_LIMIT = 80;
@@ -292,6 +292,7 @@ export function blockOptions(block: Pick<ProfileCardBlock, 'options'>): Required
     statA: typeof o.statA === 'string' ? o.statA.slice(0, 40) : '',
     statB: typeof o.statB === 'string' ? o.statB.slice(0, 40) : '',
     button: typeof o.button === 'string' ? o.button.slice(0, 30) : '',
+    bio: typeof o.bio === 'string' ? o.bio.slice(0, 120) : '',
   };
 }
 

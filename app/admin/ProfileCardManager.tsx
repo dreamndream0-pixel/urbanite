@@ -209,6 +209,38 @@ function SocialFollowEditor({
     if (save) onPatch({ options: next });
     else onLocalChange({ options: next });
   };
+  const [fetching, setFetching] = useState(false);
+  const [fetchNote, setFetchNote] = useState('');
+
+  // 從個人頁網址抓名稱、頭像、追蹤數、簡介(抓不到的欄位保留原本內容)
+  async function autoFetch() {
+    const url = block.url.trim();
+    if (!url) return void uiAlert('請先貼上個人頁網址');
+    setFetching(true);
+    setFetchNote('');
+    try {
+      const res = await fetch('/api/profile-card/social-fetch', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url }) });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? '抓取失敗');
+      onPatch({
+        title: data.name || block.title,
+        image: data.avatar || block.image,
+        options: {
+          ...options,
+          platform: data.platform && FOLLOW_PLATFORMS.some((p) => p.key === data.platform) ? data.platform : options.platform,
+          statA: data.statA || options.statA,
+          statB: data.statB || options.statB,
+          bio: data.bio || options.bio,
+        },
+      });
+      setFetchNote(data.statA ? '已更新。追蹤數不會自動跟著變,之後可以再按一次更新。' : '已更新名稱與頭像。這個平台沒有公開追蹤數,需要的話可以自己填。');
+    } catch (e) {
+      void uiAlert(e instanceof Error ? e.message : '抓取失敗');
+    } finally {
+      setFetching(false);
+    }
+  }
+
   const optionField = (key: 'statA' | 'statB' | 'button', label: string, placeholder: string) => (
     <label className="block">
       <span className="mb-1 block text-xs text-[#8a7f72]">{label}</span>
@@ -235,6 +267,12 @@ function SocialFollowEditor({
         </div>
       </div>
       {field('url', `${platform.label} 個人頁網址`, platform.key === 'youtube' ? 'https://www.youtube.com/@…' : `https://…`)}
+      <div className="rounded-xl bg-[#faf7f2] p-3">
+        <button type="button" onClick={() => void autoFetch()} disabled={fetching} className="w-full rounded-full bg-[#1f1b19] py-2.5 text-xs font-semibold text-white disabled:opacity-50">
+          {fetching ? '抓取中…' : '自動抓取頭像、名稱、追蹤數'}
+        </button>
+        <p className="mt-2 text-[11px] leading-5 text-[#a99e8f]">{fetchNote || '支援 YouTube、Instagram、TikTok、Threads、Facebook、X,需為公開帳號。'}</p>
+      </div>
       <div className="flex items-center gap-3">
         <span className="h-14 w-14 shrink-0 overflow-hidden rounded-full bg-[#f6f2ec]">
           {block.image ? <img src={block.image} alt="" className="h-full w-full object-cover" /> : null}
@@ -251,8 +289,11 @@ function SocialFollowEditor({
         {optionField('statA', '數字一(選填)', '7.6 萬 粉絲')}
         {optionField('statB', '數字二(選填)', '120 萬 個讚')}
       </div>
+      <label className="block">
+        <span className="mb-1 block text-xs text-[#8a7f72]">簡介(選填)</span>
+        <textarea value={options.bio} rows={2} maxLength={120} onChange={(e) => setOption({ bio: e.target.value }, false)} onBlur={(e) => setOption({ bio: e.target.value }, true)} placeholder="一句話介紹這個帳號" className={`${inputClass} resize-none`} />
+      </label>
       {optionField('button', '按鈕文字(選填)', platform.action)}
-      <p className="text-[11px] leading-5 text-[#a99e8f]">粉絲數需自行填寫,不會自動更新。</p>
     </>
   );
 }

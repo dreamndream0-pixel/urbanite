@@ -800,6 +800,7 @@ export default function ProfileCardView({
                     <span className="flex h-20 w-20 items-center justify-center rounded-full text-white" style={{ background: p.color }}><SocialIcon type={p.key} size={34} /></span>
                   )}
                   <span className="mt-3 text-xl font-semibold leading-7">{b.title || p.label}</span>
+                  {o.bio ? <span className="mt-1 line-clamp-2 text-xs leading-5 text-[#77716b]">{o.bio}</span> : null}
                   {stats.length ? (
                     <span className="mt-1 flex flex-wrap items-center justify-center gap-x-2.5 text-sm text-[#5f5852]">
                       {stats.map((s, i) => (
