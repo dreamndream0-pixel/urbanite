@@ -1359,10 +1359,11 @@ function LinkThumbPicker({
   );
 }
 
-function Section({ title, children, defaultOpen = true }: { title: string; children: ReactNode; defaultOpen?: boolean }) {
+function Section({ title, children, defaultOpen = true, plus = false }: { title: string; children: ReactNode; defaultOpen?: boolean; plus?: boolean }) {
   const [open, setOpen] = useState(defaultOpen);
   return (
-    <section className="rounded-2xl border border-[#ebe4da] bg-white">
+    <section className="relative rounded-2xl border border-[#ebe4da] bg-white">
+      {plus ? <PlusCorner size={24} /> : null}
       <button type="button" onClick={() => setOpen(!open)} className="flex w-full items-center justify-between px-5 py-4 text-left">
         <span className="text-base font-semibold">{title}</span>
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className={`text-[#8a7f72] transition-transform ${open ? 'rotate-180' : ''}`}>
@@ -1656,9 +1657,21 @@ function StyleEditor({
   const [uploading, setUploading] = useState(false);
   const theme = resolveTheme(draft.theme);
   const setTheme = (patch: Partial<CardTheme>) => setDraft({ ...draft, theme: { ...theme, ...patch } });
+  // 背景 / 簡介樣式 / 連結樣式:免費版看得到,動到任何設定就提示升級(拖曳色盤只跳一次)
+  const locked = !plan.limits.customStyle;
+  const asking = useRef(false);
+  const askPlus = () => {
+    if (asking.current) return;
+    asking.current = true;
+    void askUpgrade('自訂樣式是 U Plus 功能。', upgradeHref).finally(() => {
+      asking.current = false;
+    });
+  };
+  const editTheme = (patch: Partial<CardTheme>) => (locked ? askPlus() : setTheme(patch));
 
   async function uploadBg(file: File | undefined) {
     if (!file) return;
+    if (locked) return askPlus();
     setUploading(true);
     try {
       setTheme({ bgType: 'image', bgImage: await uploadImage(file, false, 1920) });
@@ -1728,12 +1741,16 @@ function StyleEditor({
         </section>
       ) : null}
 
-      {tab !== 'template' && !plan.limits.customStyle ? (
-        <ProLock title="自訂樣式是 U Plus 功能" desc="升級後可以自由調整背景、文字顏色、版面配置、頭像形狀與按鈕樣式。免費版可直接套用 8 款樣板。" />
+      {tab !== 'template' && locked ? (
+        <div className="flex items-center gap-3 rounded-2xl border border-[#e5ded4] bg-white px-4 py-3">
+          <img src="/brand/uplus-badge.png" alt="" className="h-8 w-8 shrink-0 rounded-full" />
+          <p className="min-w-0 flex-1 text-xs leading-5 text-[#6b6156]">以下是 U Plus 功能,可以先看看有哪些設定;要修改時會提示升級。</p>
+          <a href={upgradeHref} className="shrink-0 rounded-full bg-[#1f1b19] px-3.5 py-1.5 text-xs font-semibold text-white">升級</a>
+        </div>
       ) : null}
 
-      {tab === 'background' && plan.limits.customStyle ? (
-        <Section title="背景">
+      {tab === 'background' ? (
+        <Section title="背景" plus={locked}>
           <Pills
             value={theme.bgType}
             options={[
@@ -1744,10 +1761,10 @@ function StyleEditor({
               { key: 'stripes', label: '條紋' },
               { key: 'image', label: '圖片' },
             ]}
-            onChange={(v) => setTheme({ bgType: v })}
+            onChange={(v) => editTheme({ bgType: v })}
           />
-          <ColorField label={theme.bgType === 'gradient' ? '漸層上方' : '背景色'} value={theme.bgColor} onChange={(v) => setTheme({ bgColor: v })} />
-          {theme.bgType === 'gradient' ? <ColorField label="漸層下方" value={theme.bgColor2} onChange={(v) => setTheme({ bgColor2: v })} /> : null}
+          <ColorField label={theme.bgType === 'gradient' ? '漸層上方' : '背景色'} value={theme.bgColor} onChange={(v) => editTheme({ bgColor: v })} />
+          {theme.bgType === 'gradient' ? <ColorField label="漸層下方" value={theme.bgColor2} onChange={(v) => editTheme({ bgColor2: v })} /> : null}
           {/* 背景圖片:整個手機畫面的底圖,上傳後自動切換成「圖片」 */}
           <div className="flex gap-4 rounded-xl border border-[#efe8dd] bg-[#fcfaf7] p-3">
             <span className="flex aspect-[9/16] w-16 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-[#e5ded4] bg-white text-[10px] text-[#b3a897]">
@@ -1766,65 +1783,65 @@ function StyleEditor({
                   <input type="file" accept="image/png,image/jpeg,image/webp" className="hidden" disabled={uploading} onChange={(e) => { void uploadBg(e.target.files?.[0]); e.target.value = ''; }} />
                 </label>
                 {theme.bgType === 'image' && theme.bgImage ? (
-                  <button type="button" onClick={() => setTheme({ bgType: 'color', bgImage: '' })} className="text-xs text-[#8a7f72]">移除</button>
+                  <button type="button" onClick={() => editTheme({ bgType: 'color', bgImage: '' })} className="text-xs text-[#8a7f72]">移除</button>
                 ) : null}
               </div>
               {theme.bgType === 'image' && theme.bgImage ? <p className="mt-2 text-[11px] leading-5 text-[#a99e8f]">圖片偏深時,把下面的「文字顏色」改成淺色比較好閱讀。</p> : null}
             </div>
           </div>
-          <ColorField label="文字顏色" value={theme.textColor} onChange={(v) => setTheme({ textColor: v })} />
-          <ColorField label="次要文字" value={theme.mutedColor} onChange={(v) => setTheme({ mutedColor: v })} />
-          <ColorField label="重點色(價格等)" value={theme.accentColor} onChange={(v) => setTheme({ accentColor: v })} />
+          <ColorField label="文字顏色" value={theme.textColor} onChange={(v) => editTheme({ textColor: v })} />
+          <ColorField label="次要文字" value={theme.mutedColor} onChange={(v) => editTheme({ mutedColor: v })} />
+          <ColorField label="重點色(價格等)" value={theme.accentColor} onChange={(v) => editTheme({ accentColor: v })} />
           <div className="flex items-center gap-3 pt-1">
             <span className="text-sm">頂部色塊</span>
-            <Toggle on={theme.headerBand} onChange={(v) => setTheme({ headerBand: v })} label="頂部色塊" />
+            <Toggle on={theme.headerBand} onChange={(v) => editTheme({ headerBand: v })} label="頂部色塊" />
             <span className="ml-auto text-[11px] text-[#a99e8f]">有封面照片時以照片為主</span>
           </div>
-          {theme.headerBand ? <ColorField label="色塊顏色" value={theme.bandColor} onChange={(v) => setTheme({ bandColor: v })} /> : null}
+          {theme.headerBand ? <ColorField label="色塊顏色" value={theme.bandColor} onChange={(v) => editTheme({ bandColor: v })} /> : null}
         </Section>
       ) : null}
 
-      {tab === 'profile' && plan.limits.customStyle ? (
-        <Section title="簡介樣式">
+      {tab === 'profile' ? (
+        <Section title="簡介樣式" plus={locked}>
           <div>
             <p className="mb-2 text-xs text-[#8a7f72]">版面配置</p>
-            <Pills value={theme.layout} options={PROFILE_LAYOUTS} onChange={(v) => setTheme({ layout: v })} />
+            <Pills value={theme.layout} options={PROFILE_LAYOUTS} onChange={(v) => editTheme({ layout: v })} />
             {theme.layout === 'hero' ? <p className="mt-2 text-[11px] text-[#a99e8f]">封面照片會延伸到名稱與簡述後方;沒有封面時改用大頭照。</p> : null}
           </div>
           <div>
             <p className="mb-2 text-xs text-[#8a7f72]">頭像形狀(主照片)</p>
-            <Pills value={theme.avatarShape} options={[{ key: 'circle', label: '圓形' }, { key: 'square', label: '方形' }, { key: 'portrait', label: '直式 4:5' }]} onChange={(v) => setTheme({ avatarShape: v })} />
+            <Pills value={theme.avatarShape} options={[{ key: 'circle', label: '圓形' }, { key: 'square', label: '方形' }, { key: 'portrait', label: '直式 4:5' }]} onChange={(v) => editTheme({ avatarShape: v })} />
           </div>
           <div>
             <p className="mb-2 text-xs text-[#8a7f72]">文字排列</p>
-            <Pills value={theme.align} options={[{ key: 'center', label: '置中' }, { key: 'left', label: '靠左' }]} onChange={(v) => setTheme({ align: v })} />
+            <Pills value={theme.align} options={[{ key: 'center', label: '置中' }, { key: 'left', label: '靠左' }]} onChange={(v) => editTheme({ align: v })} />
           </div>
           <div>
             <p className="mb-2 text-xs text-[#8a7f72]">字體</p>
-            <Pills value={theme.font} options={FONT_OPTIONS.map((f) => ({ key: f.key, label: f.label }))} onChange={(v) => setTheme({ font: v })} />
+            <Pills value={theme.font} options={FONT_OPTIONS.map((f) => ({ key: f.key, label: f.label }))} onChange={(v) => editTheme({ font: v })} />
           </div>
         </Section>
       ) : null}
 
-      {tab === 'button' && plan.limits.customStyle ? (
-        <Section title="連結樣式">
+      {tab === 'button' ? (
+        <Section title="連結樣式" plus={locked}>
           <div>
             <p className="mb-2 text-xs text-[#8a7f72]">排列方式</p>
-            <Pills value={theme.linkStyle} options={LINK_STYLES} onChange={(v) => setTheme({ linkStyle: v })} />
+            <Pills value={theme.linkStyle} options={LINK_STYLES} onChange={(v) => editTheme({ linkStyle: v })} />
           </div>
           <div>
             <p className="mb-2 text-xs text-[#8a7f72]">形狀</p>
-            <Pills value={theme.buttonShape} options={[{ key: 'pill', label: '膠囊' }, { key: 'rounded', label: '圓角' }, { key: 'square', label: '直角' }]} onChange={(v) => setTheme({ buttonShape: v })} />
+            <Pills value={theme.buttonShape} options={[{ key: 'pill', label: '膠囊' }, { key: 'rounded', label: '圓角' }, { key: 'square', label: '直角' }]} onChange={(v) => editTheme({ buttonShape: v })} />
           </div>
           <div>
             <p className="mb-2 text-xs text-[#8a7f72]">樣式</p>
-            <Pills value={theme.buttonFill} options={[{ key: 'solid', label: '實心' }, { key: 'soft', label: '淡色' }, { key: 'outline', label: '外框' }]} onChange={(v) => setTheme({ buttonFill: v })} />
+            <Pills value={theme.buttonFill} options={[{ key: 'solid', label: '實心' }, { key: 'soft', label: '淡色' }, { key: 'outline', label: '外框' }]} onChange={(v) => editTheme({ buttonFill: v })} />
           </div>
-          <ColorField label={theme.buttonFill === 'outline' ? '外框顏色' : '按鈕顏色'} value={theme.buttonColor} onChange={(v) => setTheme({ buttonColor: v })} />
-          <ColorField label="按鈕文字" value={theme.buttonTextColor} onChange={(v) => setTheme({ buttonTextColor: v })} />
+          <ColorField label={theme.buttonFill === 'outline' ? '外框顏色' : '按鈕顏色'} value={theme.buttonColor} onChange={(v) => editTheme({ buttonColor: v })} />
+          <ColorField label="按鈕文字" value={theme.buttonTextColor} onChange={(v) => editTheme({ buttonTextColor: v })} />
           <div className="flex items-center gap-3">
             <span className="text-sm">陰影</span>
-            <Toggle on={theme.buttonShadow} onChange={(v) => setTheme({ buttonShadow: v })} label="按鈕陰影" />
+            <Toggle on={theme.buttonShadow} onChange={(v) => editTheme({ buttonShadow: v })} label="按鈕陰影" />
           </div>
         </Section>
       ) : null}
