@@ -11,6 +11,8 @@ import {
   BLOCK_TYPES,
   blockItems,
   blockOptions,
+  HOTSPOT_LIMIT,
+  type HotSpot,
   normalizeUrl,
   FOLLOW_PLATFORMS,
   followPlatform,
@@ -47,7 +49,7 @@ import { detectPlatform } from '@/lib/social-fetch';
 const formatter = new Intl.NumberFormat('zh-TW', { style: 'currency', currency: 'TWD', maximumFractionDigits: 0 });
 
 // 上傳前縮圖:頭像裁成正方形,其他圖片限制最長邊;PNG 保留透明
-function resizeImage(file: File, max: number, square: boolean): Promise<Blob> {
+function resizeImage(file: File, max: number, square: boolean, jpeg = false): Promise<Blob> {
   return new Promise((resolve, reject) => {
     const url = URL.createObjectURL(file);
     const img = new Image();
@@ -67,7 +69,7 @@ function resizeImage(file: File, max: number, square: boolean): Promise<Blob> {
       ctx.imageSmoothingQuality = 'high';
       if (square) ctx.drawImage(img, (sw - side) / 2, (sh - side) / 2, side, side, 0, 0, w, h);
       else ctx.drawImage(img, 0, 0, w, h);
-      const png = file.type === 'image/png';
+      const png = file.type === 'image/png' && !jpeg;
       canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('圖片處理失敗'))), png ? 'image/png' : 'image/jpeg', 0.88);
     };
     img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('圖片讀取失敗')); };
@@ -75,8 +77,8 @@ function resizeImage(file: File, max: number, square: boolean): Promise<Blob> {
   });
 }
 
-async function uploadImage(file: File, square = false, max = 1600) {
-  const blob = await resizeImage(file, square ? 600 : max, square);
+async function uploadImage(file: File, square = false, max = 1600, jpeg = false) {
+  const blob = await resizeImage(file, square ? 600 : max, square, jpeg);
   const form = new FormData();
   form.append('file', new File([blob], blob.type === 'image/png' ? 'image.png' : 'image.jpg', { type: blob.type }));
   form.append('productId', 'card');
@@ -95,6 +97,7 @@ const BLOCK_ICON: Record<BlockType, ReactNode> = {
   video: <><rect x="3" y="5.5" width="18" height="13" rx="3" /><path d="M10.5 9.5v5l4-2.5z" /></>,
   line: <path d="M12 4C7 4 3 7.2 3 11.2c0 3.6 3.2 6.6 7.6 7.1.4.1.8.3.8.8l-.1 1.4c0 .3.3.6.7.4 1.3-.8 5.6-3.4 7.4-5.6 1.1-1.3 1.6-2.6 1.6-4.1C21 7.2 17 4 12 4z" />,
   divider: <path d="M4 12h16" />,
+  hotspot: <><rect x="3.5" y="3.5" width="17" height="17" rx="2" /><rect x="7" y="12" width="10" height="4" rx="1" strokeDasharray="2 1.6" /><path d="M7 7.5h6" /></>,
   social: <><circle cx="12" cy="9" r="3.2" /><path d="M6 19c.8-3 3.2-4.6 6-4.6s5.2 1.6 6 4.6" /><path d="M17.5 4.5l1 1 2-2" /></>,
 };
 
@@ -546,7 +549,8 @@ export default function ProfileCardManager({ products, lineUrl = '', upgradeHref
                     </div>
                     <div className="grid grid-cols-2 gap-2">
                       {BLOCK_TYPES.filter((t) => plan.isAdmin || t.type !== 'product').map((t) => (
-                        <button key={t.type} type="button" onClick={() => addBlock(t.type)} className="flex items-start gap-2.5 rounded-xl border border-[#efe8dd] p-3 text-left transition hover:border-[#1f1b19]/30 hover:bg-[#faf7f2]">
+                        <button key={t.type} type="button" onClick={() => addBlock(t.type)} className="relative flex items-start gap-2.5 rounded-xl border border-[#efe8dd] p-3 text-left transition hover:border-[#1f1b19]/30 hover:bg-[#faf7f2]">
+                          {t.type === 'hotspot' && !plan.limits.customStyle ? <PlusCorner size={22} /> : null}
                           <span className="mt-0.5 text-[#6b6156]"><Icon>{BLOCK_ICON[t.type]}</Icon></span>
                           <span>
                             <span className="block text-sm font-medium">{t.label}</span>
@@ -723,6 +727,7 @@ function BlockThumb({ block, productImage }: { block: ProfileCardBlock; productI
     return img(block.image, /\.png(\?|$)/i.test(block.image));
   }
   if (block.type === 'image' && blockItems(block)[0]) return img(blockItems(block)[0].image);
+  if (block.type === 'hotspot' && block.image) return img(block.image);
   if (block.type === 'product' && productImage) return img(productImage);
   if (block.type === 'social') {
     if (block.image) return img(block.image);
@@ -773,6 +778,7 @@ function BlockRow({
     : block.type === 'line' ? block.title || '加入官方 LINE'
     : block.type === 'divider' ? '分隔線'
     : block.type === 'social' ? block.title || followPlatform(blockOptions(block).platform).label
+    : block.type === 'hotspot' ? block.title || `熱區圖片(${blockOptions(block).spots.length} 個連結)`
     : block.title;
 
   async function upload(file: File | undefined) {
@@ -913,6 +919,7 @@ function BlockRow({
               </>
             )}
             {block.type === 'divider' && <p className="text-xs text-[#a99e8f]">分隔線沒有內容,可拖曳調整位置。</p>}
+            {block.type === 'hotspot' && <HotspotEditor block={block} onLocalChange={onLocalChange} onPatch={onPatch} field={field} />}
             {block.type === 'social' && (
               <SocialFollowEditor block={block} uploading={uploading} onUpload={(file) => void upload(file)} onLocalChange={onLocalChange} onPatch={onPatch} field={field} />
             )}
@@ -1232,6 +1239,212 @@ function ImageBlockEditor({
 
 // 連結按鈕縮圖:上傳圖片(PNG 透明背景會保留)或選內建圖示(預設顯示 2 排,其餘收合)
 const ICON_ROWS_SHOWN = 16;
+const newSpotId = () => Math.random().toString(36).slice(2, 10);
+
+// 熱區圖片:上傳整張設計圖,在圖上框出可以點的區域
+function HotspotEditor({
+  block,
+  onLocalChange,
+  onPatch,
+  field,
+}: {
+  block: ProfileCardBlock;
+  onLocalChange: (patch: Partial<ProfileCardBlock>) => void;
+  onPatch: (patch: Partial<ProfileCardBlock>) => void;
+  field: (key: 'title' | 'url', label: string, placeholder: string) => ReactNode;
+}) {
+  const options = blockOptions(block);
+  const spots = options.spots;
+  const [uploading, setUploading] = useState(false);
+  const [drawing, setDrawing] = useState(false);
+  const [selected, setSelected] = useState('');
+  const [live, setLive] = useState<HotSpot[] | null>(null); // 拖曳中的暫時位置
+  const [rect, setRect] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
+  const box = useRef<HTMLDivElement>(null);
+  const drag = useRef<{ mode: 'draw' | 'move' | 'resize'; id?: string; sx: number; sy: number; orig?: HotSpot } | null>(null);
+  const shown = live ?? spots;
+  const clamp = (v: number, min = 0, max = 100) => Math.min(max, Math.max(min, v));
+  const round = (v: number) => Math.round(v * 100) / 100;
+
+  const save = (next: HotSpot[]) => onPatch({ options: { ...options, spots: next } });
+  const local = (next: HotSpot[]) => onLocalChange({ options: { ...options, spots: next } });
+  const updateSpot = (id: string, patch: Partial<HotSpot>, persist: boolean) => {
+    const next = spots.map((sp) => (sp.id === id ? { ...sp, ...patch } : sp));
+    if (persist) save(next);
+    else local(next);
+  };
+
+  // 拖曳時游標移出圖片也能繼續追蹤
+  function capture(e: React.PointerEvent) {
+    try {
+      box.current?.setPointerCapture(e.pointerId);
+    } catch {
+      /* 部分瀏覽器不支援,略過 */
+    }
+  }
+
+  function point(e: React.PointerEvent) {
+    const r = box.current!.getBoundingClientRect();
+    return { x: clamp(((e.clientX - r.left) / r.width) * 100), y: clamp(((e.clientY - r.top) / r.height) * 100) };
+  }
+
+  function onBoxDown(e: React.PointerEvent) {
+    if (!drawing) return;
+    const p = point(e);
+    capture(e);
+    drag.current = { mode: 'draw', sx: p.x, sy: p.y };
+    setRect({ x: p.x, y: p.y, w: 0, h: 0 });
+  }
+
+  function onSpotDown(e: React.PointerEvent, sp: HotSpot, mode: 'move' | 'resize') {
+    e.stopPropagation();
+    const p = point(e);
+    setSelected(sp.id);
+    capture(e);
+    drag.current = { mode, id: sp.id, sx: p.x, sy: p.y, orig: sp };
+  }
+
+  function onMove(e: React.PointerEvent) {
+    const d = drag.current;
+    if (!d) return;
+    const p = point(e);
+    if (d.mode === 'draw') {
+      setRect({ x: Math.min(d.sx, p.x), y: Math.min(d.sy, p.y), w: Math.abs(p.x - d.sx), h: Math.abs(p.y - d.sy) });
+      return;
+    }
+    const o = d.orig!;
+    const dx = p.x - d.sx;
+    const dy = p.y - d.sy;
+    const next =
+      d.mode === 'move'
+        ? { ...o, x: round(clamp(o.x + dx, 0, 100 - o.w)), y: round(clamp(o.y + dy, 0, 100 - o.h)) }
+        : { ...o, w: round(clamp(o.w + dx, 3, 100 - o.x)), h: round(clamp(o.h + dy, 1, 100 - o.y)) };
+    setLive(spots.map((sp) => (sp.id === o.id ? next : sp)));
+  }
+
+  function onUp() {
+    const d = drag.current;
+    drag.current = null;
+    if (!d) return;
+    if (d.mode === 'draw') {
+      const r = rect;
+      setRect(null);
+      setDrawing(false);
+      if (!r || r.w < 3 || r.h < 1) return;
+      if (spots.length >= HOTSPOT_LIMIT) return void uiAlert(`一張圖最多 ${HOTSPOT_LIMIT} 個熱區`);
+      const sp: HotSpot = { id: newSpotId(), x: round(r.x), y: round(r.y), w: round(r.w), h: round(r.h), label: '', url: '' };
+      save([...spots, sp]);
+      setSelected(sp.id);
+      return;
+    }
+    if (live) save(live);
+    setLive(null);
+  }
+
+  async function upload(file: File | undefined) {
+    if (!file) return;
+    setUploading(true);
+    try {
+      onPatch({ image: await uploadImage(file, false, 3200, true) });
+    } catch (e) {
+      void uiAlert(e instanceof Error ? e.message : '上傳失敗');
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  const sel = spots.find((sp) => sp.id === selected);
+
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <label className="cursor-pointer rounded-full border border-[#d7c9bd] bg-white px-4 py-1.5 text-xs font-medium hover:bg-[#f6f2ec]">
+          {uploading ? '上傳中…' : block.image ? '更換圖片' : '上傳設計圖'}
+          <input type="file" accept="image/png,image/jpeg,image/webp" className="hidden" disabled={uploading} onChange={(e) => { void upload(e.target.files?.[0]); e.target.value = ''; }} />
+        </label>
+        <span className="text-[11px] text-[#a99e8f]">建議寬 1080px,長圖可切成幾段分開上傳</span>
+      </div>
+
+      {block.image ? (
+        <>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setDrawing(!drawing)}
+              className={`rounded-full px-4 py-2 text-xs font-semibold transition ${drawing ? 'bg-[#d4f53c] text-[#1f1b19]' : 'bg-[#1f1b19] text-white'}`}
+            >
+              {drawing ? '在圖上拖拉框出位置…(點這裡取消)' : '＋ 新增熱區'}
+            </button>
+            <span className="text-[11px] text-[#a99e8f]">{spots.length} / {HOTSPOT_LIMIT}</span>
+          </div>
+
+          <div
+            ref={box}
+            onPointerDown={onBoxDown}
+            onPointerMove={onMove}
+            onPointerUp={onUp}
+            onPointerCancel={onUp}
+            className={`relative select-none overflow-hidden rounded-xl border border-[#e5ded4] ${drawing ? 'cursor-crosshair' : ''}`}
+            style={{ touchAction: drawing ? 'none' : 'auto' }}
+          >
+            <img src={block.image} alt="" draggable={false} className="pointer-events-none block h-auto w-full" />
+            {shown.map((sp, n) => {
+              const on = sp.id === selected;
+              return (
+                <div
+                  key={sp.id}
+                  onPointerDown={(e) => onSpotDown(e, sp, 'move')}
+                  className={`absolute flex cursor-move items-start justify-start rounded-md border-2 ${on ? 'border-[#d4f53c] bg-[#d4f53c]/25' : 'border-white/90 bg-[#1f1b19]/25'}`}
+                  style={{ left: `${sp.x}%`, top: `${sp.y}%`, width: `${sp.w}%`, height: `${sp.h}%`, touchAction: 'none', boxShadow: '0 0 0 1px rgba(0,0,0,0.35)' }}
+                >
+                  <span className="m-0.5 rounded bg-[#1f1b19] px-1.5 text-[10px] font-semibold leading-4 text-white">{n + 1}{sp.url ? '' : ' 未設定'}</span>
+                  {on ? (
+                    <span
+                      onPointerDown={(e) => onSpotDown(e, sp, 'resize')}
+                      className="absolute -bottom-2 -right-2 h-5 w-5 cursor-nwse-resize rounded-full border-2 border-[#1f1b19] bg-[#d4f53c]"
+                      style={{ touchAction: 'none' }}
+                    />
+                  ) : null}
+                </div>
+              );
+            })}
+            {rect ? (
+              <div className="pointer-events-none absolute rounded-md border-2 border-dashed border-[#d4f53c] bg-[#d4f53c]/20" style={{ left: `${rect.x}%`, top: `${rect.y}%`, width: `${rect.w}%`, height: `${rect.h}%` }} />
+            ) : null}
+          </div>
+          <p className="text-[11px] leading-5 text-[#a99e8f]">點選框框可以拖曳移動,拉右下角的圓點調整大小。名片上這些框框是透明的,只有點的時候才看得出來。</p>
+
+          {sel ? (
+            <div className="space-y-2 rounded-xl border border-[#d4f53c] bg-[#fbfde9] p-3">
+              <p className="text-xs font-semibold">熱區 {spots.findIndex((sp) => sp.id === sel.id) + 1}</p>
+              <input value={sel.label} onChange={(e) => updateSpot(sel.id, { label: e.target.value }, false)} onBlur={(e) => updateSpot(sel.id, { label: e.target.value }, true)} placeholder="名稱(例如:菜單)" className={inputClass} />
+              <input value={sel.url} onChange={(e) => updateSpot(sel.id, { url: e.target.value }, false)} onBlur={(e) => updateSpot(sel.id, { url: e.target.value }, true)} placeholder="連結網址" className={inputClass} />
+              <div className="flex justify-between">
+                <button type="button" onClick={() => setSelected('')} className="text-xs text-[#6b6156]">完成</button>
+                <button type="button" onClick={() => { save(spots.filter((sp) => sp.id !== sel.id)); setSelected(''); }} className="text-xs text-[#c0392b]">刪除這個熱區</button>
+              </div>
+            </div>
+          ) : null}
+
+          {spots.length ? (
+            <div className="divide-y divide-[#f3eee7] rounded-xl border border-[#efe8dd] bg-white">
+              {spots.map((sp, n) => (
+                <button key={sp.id} type="button" onClick={() => setSelected(sp.id)} className={`flex w-full items-center gap-2 px-3 py-2 text-left text-xs ${sp.id === selected ? 'bg-[#fbfde9]' : ''}`}>
+                  <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-[#1f1b19] text-[10px] font-semibold text-white">{n + 1}</span>
+                  <span className="min-w-0 flex-1 truncate">{sp.label || '未命名'}</span>
+                  <span className={`max-w-[45%] truncate ${sp.url ? 'text-[#a99e8f]' : 'text-[#c0392b]'}`}>{sp.url || '還沒設定連結'}</span>
+                </button>
+              ))}
+            </div>
+          ) : null}
+        </>
+      ) : null}
+
+      {field('title', '名稱(選填,顯示在數據分析)', '例如:首頁主視覺')}
+    </div>
+  );
+}
+
 // 社群圖示(PNG,public/icons/social):四種樣式
 const SOCIAL_BRANDS: [string, string][] = [
   ['instagram', 'Instagram'], ['facebook', 'Facebook'], ['threads', 'Threads'], ['tiktok', 'TikTok'], ['youtube', 'YouTube'], ['shopee', '蝦皮購物'], ['x', 'X'], ['linkedin', 'LinkedIn'],
@@ -1803,6 +2016,13 @@ function StyleEditor({
 
       {tab === 'profile' ? (
         <Section title="簡介樣式" plus={locked}>
+          <div className="flex items-start gap-3 rounded-xl bg-[#faf7f2] p-3">
+            <div className="min-w-0 flex-1">
+              <p className="text-sm">純圖片版面</p>
+              <p className="mt-0.5 text-[11px] leading-5 text-[#a99e8f]">隱藏頭像、名稱、簡介與社群圖示,整頁只顯示你的區塊。搭配「熱區圖片」就能用整張設計圖當名片。</p>
+            </div>
+            <Toggle on={theme.imageOnly} onChange={(v) => editTheme({ imageOnly: v })} label="純圖片版面" />
+          </div>
           <div>
             <p className="mb-2 text-xs text-[#8a7f72]">版面配置</p>
             <Pills value={theme.layout} options={PROFILE_LAYOUTS} onChange={(v) => editTheme({ layout: v })} />
@@ -1873,7 +2093,7 @@ function MiniPreview({ card, blocks, productMap, lineUrl }: { card: ProfileCard;
 }
 
 // ---------- 數據分析 ----------
-type Stats = { days: number; views: number; clicks: number; daily: { day: string; views: number; clicks: number }[]; blocks: Record<string, number>; sources: Record<string, number> };
+type Stats = { days: number; views: number; clicks: number; daily: { day: string; views: number; clicks: number }[]; blocks: Record<string, number>; spots?: Record<string, Record<string, number>>; sources: Record<string, number> };
 
 function StatsPanel({ cardId, url, blocks, productMap }: { cardId: string; url: string; blocks: ProfileCardBlock[]; productMap: Record<string, CardProduct> }) {
   const [days, setDays] = useState<7 | 30>(7);
@@ -1959,6 +2179,16 @@ function StatsPanel({ cardId, url, blocks, productMap }: { cardId: string; url: 
                 <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-[#f3eee7]">
                   <div className="h-full rounded-full bg-[#1f1b19]/70" style={{ width: `${stats.clicks ? (count / Math.max(...ranked.map((r) => r.count), 1)) * 100 : 0}%` }} />
                 </div>
+                {block.type === 'hotspot' ? (
+                  <div className="mt-2 space-y-1 border-l-2 border-[#efe8dd] pl-3">
+                    {blockOptions(block).spots.map((sp, n) => (
+                      <div key={sp.id} className="flex items-center justify-between gap-3 text-xs text-[#6b6156]">
+                        <span className="truncate">{n + 1}. {sp.label || sp.url || '未命名熱區'}</span>
+                        <span className="shrink-0">{stats.spots?.[block.id]?.[sp.id] ?? 0}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
               </div>
             ))}
           </div>

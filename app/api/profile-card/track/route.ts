@@ -14,11 +14,12 @@ export async function POST(request: Request) {
   const blockId = body?.block_id ? String(body.block_id) : null;
   const type = body?.type === 'click' ? 'click' : body?.type === 'view' ? 'view' : '';
   const source = typeof body?.source === 'string' && body.source in SOURCE_LABELS ? body.source : 'direct';
+  const spot = typeof body?.spot === 'string' ? body.spot.replace(/[^\w-]/g, '').slice(0, 24) || null : null;
   if (!UUID.test(cardId) || !type || (blockId && !UUID.test(blockId))) {
     return NextResponse.json({ ok: false }, { status: 400 });
   }
   const supabase = createAdminClient();
-  await supabase.from('profile_card_events').insert({ card_id: cardId, block_id: type === 'click' ? blockId : null, type, source });
+  await supabase.from('profile_card_events').insert({ card_id: cardId, block_id: type === 'click' ? blockId : null, spot: type === 'click' ? spot : null, type, source });
   if (type === 'click' && blockId) {
     const { data } = await supabase.from('profile_card_blocks').select('clicks').eq('id', blockId).eq('card_id', cardId).maybeSingle();
     if (data) await supabase.from('profile_card_blocks').update({ clicks: (data.clicks ?? 0) + 1 }).eq('id', blockId);

@@ -15,6 +15,9 @@ export async function POST(request: Request) {
   if (!BLOCK_TYPES.some((t) => t.type === type) || (type === 'product' && !owner.plan.isAdmin)) {
     return NextResponse.json({ error: '資料格式錯誤' }, { status: 400 });
   }
+  if (type === 'hotspot' && !owner.plan.limits.customStyle) {
+    return NextResponse.json({ error: '熱區圖片是 U Plus 功能。', upgrade: true }, { status: 403 });
+  }
   const supabase = createAdminClient();
   const { count } = await supabase.from('profile_card_blocks').select('id', { count: 'exact', head: true }).eq('card_id', cardId);
   if ((count ?? 0) >= owner.plan.limits.maxBlocks) {

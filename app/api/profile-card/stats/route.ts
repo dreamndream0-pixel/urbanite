@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
   const since = new Date(Date.now() - days * 24 * 3600 * 1000).toISOString();
   const { data, error } = await createAdminClient()
     .from('profile_card_events')
-    .select('type, block_id, source, created_at')
+    .select('type, block_id, spot, source, created_at')
     .eq('card_id', cardId)
     .gte('created_at', since)
     .limit(50000);
@@ -29,6 +29,7 @@ export async function GET(request: NextRequest) {
   const dayKeys = Array.from({ length: days }, (_, i) => twDay(Date.now() - (days - 1 - i) * 24 * 3600 * 1000));
   const daily = new Map(dayKeys.map((d) => [d, { day: d, views: 0, clicks: 0 }]));
   const blocks: Record<string, number> = {};
+  const spots: Record<string, Record<string, number>> = {}; // 熱區圖片:每個熱區的點擊
   const sources: Record<string, number> = {};
   let views = 0;
   let clicks = 0;
@@ -42,10 +43,14 @@ export async function GET(request: NextRequest) {
       clicks += 1;
       if (bucket) bucket.clicks += 1;
       if (ev.block_id) blocks[ev.block_id] = (blocks[ev.block_id] ?? 0) + 1;
+      if (ev.block_id && ev.spot) {
+        const m = (spots[ev.block_id] ??= {});
+        m[ev.spot] = (m[ev.spot] ?? 0) + 1;
+      }
     }
   }
   return NextResponse.json(
-    { days, views, clicks, daily: [...daily.values()], blocks, sources: owner.plan.limits.sources ? sources : {}, sourcesLocked: !owner.plan.limits.sources },
+    { days, views, clicks, daily: [...daily.values()], blocks, spots, sources: owner.plan.limits.sources ? sources : {}, sourcesLocked: !owner.plan.limits.sources },
     { headers: { 'Cache-Control': 'no-store' } },
   );
 }

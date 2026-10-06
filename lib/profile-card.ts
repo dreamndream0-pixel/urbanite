@@ -64,6 +64,7 @@ export type CardTheme = {
   // 以下為內容設定,套用樣板時不會被覆蓋
   coverImage: string;
   showAvatar: boolean;
+  imageOnly: boolean; // 純圖片版面:隱藏頭像、名稱、簡介與社群圖示
 };
 
 export const DEFAULT_THEME: CardTheme = {
@@ -91,10 +92,11 @@ export const DEFAULT_THEME: CardTheme = {
   bandColor: '#e5dccf',
   coverImage: '',
   showAvatar: true,
+  imageOnly: false,
 };
 
 // 套用樣板時保留的欄位(使用者自己上傳的內容)
-export const THEME_CONTENT_KEYS = ['coverImage', 'showAvatar', 'bgImage'] as const;
+export const THEME_CONTENT_KEYS = ['coverImage', 'showAvatar', 'bgImage', 'imageOnly'] as const;
 
 export type TemplateCategory = 'lively' | 'minimal' | 'dark';
 export const TEMPLATE_CATEGORIES: { key: 'all' | TemplateCategory; label: string }[] = [
@@ -227,7 +229,7 @@ export type ProfileCard = {
   updated_at?: string;
 };
 
-export type BlockType = 'link' | 'text' | 'image' | 'product' | 'video' | 'line' | 'divider' | 'social';
+export type BlockType = 'link' | 'text' | 'image' | 'product' | 'video' | 'line' | 'divider' | 'social' | 'hotspot';
 
 export type ProfileCardBlock = {
   id: string;
@@ -252,7 +254,33 @@ export type ImageLayout =
   | 'banner' | 'overlay' | 'top' | 'tall' | 'square' | 'card' | 'card-right'
   | 'grid2' | 'grid3' | 'circle3' | 'mosaic' | 'mosaic5' | 'scroll';
 // 社群追蹤卡片:platform 平台、statA / statB 兩個數字欄(自行填寫)、button 按鈕文字
-export type BlockOptions = { layout?: ImageLayout; captionMode?: 'link' | 'custom'; autoplay?: boolean; platform?: string; statA?: string; statB?: string; button?: string; bio?: string; fetchedAt?: string; fetchedUrl?: string };
+export type BlockOptions = { layout?: ImageLayout; captionMode?: 'link' | 'custom'; autoplay?: boolean; platform?: string; statA?: string; statB?: string; button?: string; bio?: string; fetchedAt?: string; fetchedUrl?: string; spots?: HotSpot[] };
+
+// 熱區圖片:位置與大小都是佔圖片寬高的百分比(0–100),不同螢幕都對得準
+export type HotSpot = { id: string; x: number; y: number; w: number; h: number; label: string; url: string };
+export const HOTSPOT_LIMIT = 40;
+
+function cleanSpots(value: unknown): HotSpot[] {
+  if (!Array.isArray(value)) return [];
+  const num = (v: unknown, min: number, max: number) => Math.min(max, Math.max(min, Math.round((Number(v) || 0) * 100) / 100));
+  return value
+    .filter((s) => s && typeof s === 'object')
+    .slice(0, HOTSPOT_LIMIT)
+    .map((s) => {
+      const o = s as Record<string, unknown>;
+      const x = num(o.x, 0, 99);
+      const y = num(o.y, 0, 99);
+      return {
+        id: String(o.id ?? '').replace(/[^\w-]/g, '').slice(0, 24) || Math.random().toString(36).slice(2, 10),
+        x,
+        y,
+        w: num(o.w, 1, 100 - x),
+        h: num(o.h, 0.5, 100 - y),
+        label: String(o.label ?? '').slice(0, 40),
+        url: String(o.url ?? '').trim().slice(0, 500),
+      };
+    });
+}
 
 export const IMAGE_LIMIT = 10;
 export const LINK_TITLE_LIMIT = 80;
@@ -295,6 +323,7 @@ export function blockOptions(block: Pick<ProfileCardBlock, 'options'>): Required
     bio: typeof o.bio === 'string' ? o.bio.slice(0, 120) : '',
     fetchedAt: typeof o.fetchedAt === 'string' ? o.fetchedAt : '',
     fetchedUrl: typeof o.fetchedUrl === 'string' ? o.fetchedUrl : '',
+    spots: cleanSpots(o.spots),
   };
 }
 
@@ -311,6 +340,7 @@ export const BLOCK_TYPES: { type: BlockType; label: string; hint: string }[] = [
   { type: 'line', label: 'LINE 加好友', hint: '一鍵加入官方 LINE' },
   { type: 'divider', label: '分隔線', hint: '純排版用' },
   { type: 'social', label: '社群追蹤卡片', hint: 'IG、YouTube、TikTok 等追蹤卡' },
+  { type: 'hotspot', label: '熱區圖片', hint: '整張設計圖,在圖上框出連結' },
 ];
 
 // 社群追蹤卡片可選的平台(color = 品牌色,用在角落圖示與按鈕)
@@ -381,6 +411,7 @@ export function isBlockComplete(block: Pick<ProfileCardBlock, 'type' | 'title' |
     case 'product': return Boolean(block.product_id.trim());
     case 'video': return Boolean(videoEmbedUrl(block.url));
     case 'social': return Boolean(block.url.trim());
+    case 'hotspot': return Boolean(block.image);
     case 'line':
     case 'divider': return true;
     default: return false;

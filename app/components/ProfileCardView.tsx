@@ -96,9 +96,9 @@ export default function ProfileCardView({
     void fetch('/api/profile-card/track', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body, keepalive: true });
   }
 
-  function track(blockId: string) {
+  function track(blockId: string, spot?: string) {
     if (preview) return;
-    try { send({ card_id: card.id, block_id: blockId, type: 'click', source: source.current }); } catch { /* 略過 */ }
+    try { send({ card_id: card.id, block_id: blockId, spot, type: 'click', source: source.current }); } catch { /* 略過 */ }
   }
 
   // ---------- 樣式 ----------
@@ -717,16 +717,40 @@ export default function ProfileCardView({
     <div className={fullScreen ? 'relative min-h-screen' : 'min-h-full'} style={pageStyle}>
       {fixedBg ? <div aria-hidden="true" className="pointer-events-none fixed inset-0" style={{ backgroundImage: `url(${bgPhoto})`, backgroundSize: 'cover', backgroundPosition: 'center' }} /> : null}
       <div className={`relative mx-auto flex max-w-[440px] flex-col px-5 pb-10 ${left ? 'items-start' : 'items-center'}`}>
-        {header}
-        {theme.divider === 'wave' ? (
+        {theme.imageOnly ? null : header}
+        {!theme.imageOnly && theme.divider === 'wave' ? (
           <svg viewBox="0 0 200 10" preserveAspectRatio="none" className="mt-6 h-2.5 w-full" aria-hidden="true">
             <path d="M0 5 Q 5 0 10 5 T 20 5 T 30 5 T 40 5 T 50 5 T 60 5 T 70 5 T 80 5 T 90 5 T 100 5 T 110 5 T 120 5 T 130 5 T 140 5 T 150 5 T 160 5 T 170 5 T 180 5 T 190 5 T 200 5" fill="none" stroke={tint(theme.textColor, 55)} strokeWidth="1.4" />
           </svg>
         ) : null}
 
         {/* 區塊 */}
-        <div className="mt-8 w-full space-y-3">
-          {visible.map((b) => {
+        <div className={`${theme.imageOnly ? '' : 'mt-8 '}w-full space-y-3`}>
+          {visible.map((b, i) => {
+            if (b.type === 'hotspot') {
+              // 熱區圖片:滿版顯示;連續的熱區圖片之間沒有間距,看起來像同一張圖
+              const spots = blockOptions(b).spots.filter((s) => s.url);
+              const joined = visible[i + 1]?.type === 'hotspot';
+              return (
+                <div key={b.id} className={`relative -mx-5 ${joined ? '!mb-0' : ''}`}>
+                  <img src={b.image} alt={b.title || spots.map((s) => s.label).filter(Boolean).join('、')} className="block h-auto w-full" />
+                  {spots.map((s) => (
+                    <a
+                      key={s.id}
+                      href={normalizeUrl(s.url)}
+                      target="_blank"
+                      rel="noreferrer"
+                      onClick={() => track(b.id, s.id)}
+                      aria-label={s.label || s.url}
+                      className="absolute rounded-lg transition hover:bg-white/10 active:bg-black/10"
+                      style={{ left: `${s.x}%`, top: `${s.y}%`, width: `${s.w}%`, height: `${s.h}%` }}
+                    >
+                      <span className="sr-only">{s.label}</span>
+                    </a>
+                  ))}
+                </div>
+              );
+            }
             if (b.type === 'divider') {
               return <div key={b.id} className="py-2"><div className="h-px w-full" style={{ background: tint(theme.textColor, 14) }} /></div>;
             }
