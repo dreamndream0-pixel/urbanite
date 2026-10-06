@@ -11,6 +11,7 @@ import {
   BLOCK_TYPES,
   blockItems,
   blockOptions,
+  normalizeUrl,
   FOLLOW_PLATFORMS,
   followPlatform,
   IMAGE_LAYOUTS,
@@ -41,6 +42,7 @@ import {
 import type { Product } from '@/lib/types';
 import { FREE_TEMPLATE_KEYS, PRO_LIMITS, type CardPlanInfo } from '@/lib/card-plan';
 import { uiAlert, uiConfirm } from '@/lib/ui-dialog';
+import { detectPlatform } from '@/lib/social-fetch';
 
 const formatter = new Intl.NumberFormat('zh-TW', { style: 'currency', currency: 'TWD', maximumFractionDigits: 0 });
 
@@ -204,52 +206,83 @@ function SocialFollowEditor({
 }) {
   const options = blockOptions(block);
   const platform = followPlatform(options.platform);
+  const [fetching, setFetching] = useState(false);
+  const [fetchError, setFetchError] = useState('');
+  const latest = useRef({ block, options });
+  useEffect(() => {
+    latest.current = { block, options };
+  });
   const setOption = (patch: Partial<BlockOptions>, save: boolean) => {
     const next = { ...options, ...patch };
     if (save) onPatch({ options: next });
     else onLocalChange({ options: next });
   };
-  const [fetching, setFetching] = useState(false);
-  const [fetchNote, setFetchNote] = useState('');
 
-  // 從個人頁網址抓名稱、頭像、追蹤數、簡介(抓不到的欄位保留原本內容)
-  async function autoFetch() {
-    const url = block.url.trim();
-    if (!url) return void uiAlert('請先貼上個人頁網址');
-    setFetching(true);
-    setFetchNote('');
-    try {
-      const res = await fetch('/api/profile-card/social-fetch', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url }) });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? '抓取失敗');
-      onPatch({
-        title: data.name || block.title,
-        image: data.avatar || block.image,
-        options: {
-          ...options,
-          platform: data.platform && FOLLOW_PLATFORMS.some((p) => p.key === data.platform) ? data.platform : options.platform,
-          statA: data.statA || options.statA,
-          statB: data.statB || options.statB,
-          bio: data.bio || options.bio,
-        },
-      });
-      setFetchNote(data.statA ? '已更新。追蹤數不會自動跟著變,之後可以再按一次更新。' : '已更新名稱與頭像。這個平台沒有公開追蹤數,需要的話可以自己填。');
-    } catch (e) {
-      void uiAlert(e instanceof Error ? e.message : '抓取失敗');
-    } finally {
-      setFetching(false);
-    }
-  }
+  // 貼上 / 修改網址後自動抓取(抓不到的欄位保留原本內容)
+  const url = block.url.trim();
+  const target = normalizeUrl(url);
+  const shouldFetch = Boolean(url && detectPlatform(target) && target !== options.fetchedUrl);
+  useEffect(() => {
+    if (!shouldFetch) return;
+    const timer = setTimeout(async () => {
+      setFetching(true);
+      setFetchError('');
+      try {
+        const res = await fetch('/api/profile-card/social-fetch', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: target }) });
+        const data = await res.json();
+        const { block: b, options: o } = latest.current;
+        if (!res.ok) {
+          setFetchError(data.error ?? '抓不到資料');
+          onPatch({ url: b.url, options: { ...o, fetchedUrl: target } });
+          return;
+        }
+        onPatch({
+          url: b.url,
+          title: data.name || b.title,
+          image: data.avatar || b.image,
+          options: {
+            ...o,
+            platform: FOLLOW_PLATFORMS.some((p) => p.key === data.platform) ? data.platform : o.platform,
+            statA: data.statA,
+            statB: data.statB,
+            bio: o.bio || data.bio,
+            fetchedAt: data.fetchedAt,
+            fetchedUrl: target,
+          },
+        });
+      } catch {
+        setFetchError('網路不穩,稍後再試');
+      } finally {
+        setFetching(false);
+      }
+    }, 900);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [target, shouldFetch]);
 
-  const optionField = (key: 'statA' | 'statB' | 'button', label: string, placeholder: string) => (
-    <label className="block">
-      <span className="mb-1 block text-xs text-[#8a7f72]">{label}</span>
-      <input value={options[key]} onChange={(e) => setOption({ [key]: e.target.value }, false)} onBlur={(e) => setOption({ [key]: e.target.value }, true)} placeholder={placeholder} className={inputClass} />
-    </label>
-  );
+  const stats = [options.statA, options.statB].filter(Boolean).join(' · ');
+  const updated = options.fetchedAt ? new Date(options.fetchedAt).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
 
   return (
     <>
+      {field('url', '社群個人頁網址', 'https://www.youtube.com/@… 或 instagram.com/…')}
+      <div className="rounded-xl bg-[#faf7f2] px-3 py-2.5 text-xs leading-5">
+        {fetching ? (
+          <p className="text-[#6b6156]">正在讀取頭像、名稱與追蹤數…</p>
+        ) : fetchError ? (
+          <p className="text-[#c0392b]">{fetchError}</p>
+        ) : options.fetchedAt ? (
+          <>
+            <p className="text-[#1f1b19]">
+              <span className="text-[#8a7f72]">追蹤數:</span>
+              {stats || '這個平台沒有公開追蹤數'}
+            </p>
+            <p className="mt-0.5 text-[11px] text-[#a99e8f]">每天自動更新・上次 {updated}</p>
+          </>
+        ) : (
+          <p className="text-[#a99e8f]">貼上網址就會自動抓取頭像、名稱與追蹤數。支援 YouTube、Instagram、TikTok、Threads、Facebook、X,需為公開帳號。</p>
+        )}
+      </div>
       <div>
         <span className="mb-1.5 block text-xs text-[#8a7f72]">平台</span>
         <div className="flex flex-wrap gap-1.5">
@@ -266,13 +299,6 @@ function SocialFollowEditor({
           ))}
         </div>
       </div>
-      {field('url', `${platform.label} 個人頁網址`, platform.key === 'youtube' ? 'https://www.youtube.com/@…' : `https://…`)}
-      <div className="rounded-xl bg-[#faf7f2] p-3">
-        <button type="button" onClick={() => void autoFetch()} disabled={fetching} className="w-full rounded-full bg-[#1f1b19] py-2.5 text-xs font-semibold text-white disabled:opacity-50">
-          {fetching ? '抓取中…' : '自動抓取頭像、名稱、追蹤數'}
-        </button>
-        <p className="mt-2 text-[11px] leading-5 text-[#a99e8f]">{fetchNote || '支援 YouTube、Instagram、TikTok、Threads、Facebook、X,需為公開帳號。'}</p>
-      </div>
       <div className="flex items-center gap-3">
         <span className="h-14 w-14 shrink-0 overflow-hidden rounded-full bg-[#f6f2ec]">
           {block.image ? <img src={block.image} alt="" className="h-full w-full object-cover" /> : null}
@@ -282,18 +308,16 @@ function SocialFollowEditor({
           <input type="file" accept="image/png,image/jpeg,image/webp" className="hidden" disabled={uploading} onChange={(e) => { onUpload(e.target.files?.[0]); e.target.value = ''; }} />
         </label>
         {block.image ? <button type="button" onClick={() => onPatch({ image: '' })} className="text-xs text-[#8a7f72]">移除</button> : null}
-        <span className="ml-auto text-[11px] text-[#a99e8f]">建議 400×400</span>
       </div>
-      {field('title', '名稱', '例如:YYUI')}
-      <div className="grid grid-cols-2 gap-2">
-        {optionField('statA', '數字一(選填)', '7.6 萬 粉絲')}
-        {optionField('statB', '數字二(選填)', '120 萬 個讚')}
-      </div>
+      {field('title', '名稱', '自動帶入,可修改')}
       <label className="block">
         <span className="mb-1 block text-xs text-[#8a7f72]">簡介(選填)</span>
         <textarea value={options.bio} rows={2} maxLength={120} onChange={(e) => setOption({ bio: e.target.value }, false)} onBlur={(e) => setOption({ bio: e.target.value }, true)} placeholder="一句話介紹這個帳號" className={`${inputClass} resize-none`} />
       </label>
-      {optionField('button', '按鈕文字(選填)', platform.action)}
+      <label className="block">
+        <span className="mb-1 block text-xs text-[#8a7f72]">按鈕文字(選填)</span>
+        <input value={options.button} onChange={(e) => setOption({ button: e.target.value }, false)} onBlur={(e) => setOption({ button: e.target.value }, true)} placeholder={platform.action} className={inputClass} />
+      </label>
     </>
   );
 }

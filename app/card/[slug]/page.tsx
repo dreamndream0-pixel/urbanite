@@ -1,4 +1,6 @@
 import type { Metadata } from 'next';
+import { after } from 'next/server';
+import { refreshStaleSocialBlocks } from '@/lib/social-refresh';
 import { notFound } from 'next/navigation';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getAdminUser, getSessionUser } from '@/lib/supabase/server';
@@ -75,6 +77,8 @@ export default async function CardPage({ params }: { params: Promise<{ slug: str
       </main>
     );
   }
+  // 社群追蹤卡片:追蹤數超過一天就在背景更新(不影響這次的載入速度)
+  after(() => refreshStaleSocialBlocks(data.blocks));
   return (
     <main>
       {data.free ? (

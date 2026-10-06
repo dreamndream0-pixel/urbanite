@@ -39,5 +39,5 @@ export async function POST(request: Request) {
       avatar = '';
     }
   }
-  return NextResponse.json({ platform: profile.platform, name: profile.name, avatar, statA: profile.statA, statB: profile.statB, bio: profile.bio });
+  return NextResponse.json({ platform: profile.platform, name: profile.name, avatar, statA: profile.statA, statB: profile.statB, bio: profile.bio, fetchedAt: new Date().toISOString(), url });
 }

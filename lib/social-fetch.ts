@@ -121,3 +121,11 @@ export async function fetchSocialProfile(url: string): Promise<(Omit<SocialProfi
   const html = (await res.text()).slice(0, 4_000_000);
   return parse(platform, html);
 }
+
+// 名片頁被瀏覽時,超過一天沒更新的社群卡片在背景更新追蹤數(只更新數字,不動名稱頭像)
+export const SOCIAL_REFRESH_MS = 24 * 3600 * 1000;
+
+export function isStaleSocial(options: { fetchedAt?: string } | null | undefined, now = Date.now()) {
+  const t = options?.fetchedAt ? new Date(options.fetchedAt).getTime() : 0;
+  return !t || now - t > SOCIAL_REFRESH_MS;
+}
