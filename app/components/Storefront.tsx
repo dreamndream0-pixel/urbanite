@@ -468,7 +468,7 @@ export default function Storefront({ campaign = null, preview = false }: { campa
       />
 
       <HeroCarousel banners={heroBanners} />
-      <CategoryNavigation categories={categoryTabs} value={category} onSelect={setCategory} />
+      <CategoryNavigation categories={categoryTabs} value={category} onSelect={setCategory} imageStyle={settings?.category_image_style ?? 'circle'} />
 
       <div className="mx-auto max-w-6xl px-4 pb-8 sm:px-6">
         {/* 商品格狀排列 */}

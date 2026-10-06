@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { createBrowserSupabase } from '@/lib/supabase/client';
 import type {
   Banner,
+  CategoryImageStyle,
   Category,
   CouponUsage,
   Customer,
@@ -1071,6 +1072,12 @@ export default function AdminDashboard({
 
   // 分類圖片(首頁分類導覽顯示)
   const [categoryUploading, setCategoryUploading] = useState('');
+  const [categoryImageStyle, setCategoryImageStyle] = useState<CategoryImageStyle>(initialSettings?.category_image_style ?? 'circle');
+  async function saveCategoryImageStyle(style: CategoryImageStyle) {
+    setCategoryImageStyle(style);
+    const res = await fetch('/api/settings', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ category_image_style: style }) });
+    if (!res.ok) void uiAlert('樣式儲存失敗,請再試一次');
+  }
   async function uploadCategoryImage(category: Category, file: File | undefined) {
     if (!file) return;
     setCategoryUploading(category.id);
@@ -2089,6 +2096,10 @@ export default function AdminDashboard({
                 <div className="mb-4 rounded-lg border border-[#ffcf54] bg-[#fff8e8] px-4 py-3 text-sm text-[#8a7f72]">
                   新增分類前請先在下方填好分類代碼與名稱；詳情可加入或移出商品。
                 </div>
+                <p className="mb-4 text-xs text-[#8a7f72]">
+                  點分類左邊的圖片框可以上傳分類圖片;顯示成圓形、方形或去背 PNG,到「系統設定 → 一般設定 → 首頁商品分類版型」切換。
+                  {categoryImageStyle === 'cutout' ? ' 目前是去背 PNG,請上傳透明背景的 PNG。' : ' 建議上傳正方形照片(600×600 以上)。'}
+                </p>
                 <div className="mb-4 grid gap-2 md:grid-cols-2 lg:grid-cols-4">
                   <input
                     value={newCat.slug}
@@ -2144,9 +2155,9 @@ export default function AdminDashboard({
                               <div className="flex items-center gap-4" style={{ paddingLeft: depth * 24 }}>
                                 {depth > 0 && <span className="text-[#c9bdb0]">└</span>}
                                 <div className="flex shrink-0 flex-col items-center gap-1">
-                                  <label title="上傳分類圖片(首頁分類導覽顯示)" className="relative flex h-14 w-14 cursor-pointer items-center justify-center overflow-hidden rounded-full bg-[#f1f1f1] ring-1 ring-[#e5ded4] hover:ring-[#1f1b19]/40">
+                                  <label title="上傳分類圖片(首頁分類導覽顯示)" className={`relative flex h-14 w-14 cursor-pointer items-center justify-center overflow-hidden ring-1 ring-[#e5ded4] hover:ring-[#1f1b19]/40 ${categoryImageStyle === 'circle' ? 'rounded-full bg-[#f1f1f1]' : categoryImageStyle === 'square' ? 'rounded-xl bg-[#f1f1f1]' : 'rounded-xl bg-[repeating-conic-gradient(#f1f1f1_0%_25%,#ffffff_0%_50%)] bg-[length:12px_12px]'}`}>
                                     {c.image ? (
-                                      <img src={c.image} alt="" className="h-full w-full object-cover" />
+                                      <img src={c.image} alt="" className={`h-full w-full ${categoryImageStyle === 'cutout' ? 'object-contain p-1' : 'object-cover'}`} />
                                     ) : image ? (
                                       <img src={image} alt="" className="h-full w-full object-cover opacity-40" />
                                     ) : null}
@@ -2966,6 +2977,48 @@ export default function AdminDashboard({
               )}
 
               {settingsTab === 'general' && <SiteThemeEditor initial={initialSettings?.site_theme} />}
+
+              {settingsTab === 'general' && (
+              <Card title="首頁商品分類版型">
+                <p className="mb-4 text-sm text-[#8a7f72]">分類有上傳圖片時,首頁分類列會顯示圖片和名稱。圖片在「商品及分類 → 分類管理」上傳。</p>
+                <div className="grid gap-3 sm:grid-cols-3">
+                  {([
+                    ['circle', '圓形', '照片裁成圓形,適合一般商品照'],
+                    ['square', '方形', '圓角方形,保留更多畫面'],
+                    ['cutout', '去背 PNG', '沒有底色和框,圖案直接浮在頁面上'],
+                  ] as const).map(([key, label, note]) => {
+                    const on = categoryImageStyle === key;
+                    return (
+                      <button
+                        key={key}
+                        type="button"
+                        onClick={() => void saveCategoryImageStyle(key)}
+                        className={`rounded-xl border p-4 text-left transition ${on ? 'border-[#1f1b19] ring-2 ring-[#1f1b19]/10' : 'border-[#e5ded4] hover:border-[#1f1b19]/30'}`}
+                      >
+                        <span className="flex justify-center gap-3 py-2">
+                          {[0, 1, 2].map((i) => (
+                            <span key={i} className="flex flex-col items-center gap-1.5">
+                              <span
+                                className={`flex h-11 w-11 items-center justify-center ${key === 'circle' ? 'rounded-full bg-[#efe8dd]' : key === 'square' ? 'rounded-xl bg-[#efe8dd]' : ''}`}
+                              >
+                                <span className={`block ${key === 'cutout' ? 'h-9 w-9 rounded-[40%_60%_55%_45%] bg-[#d9b28a] shadow-[0_4px_8px_rgba(0,0,0,0.12)]' : 'h-6 w-6 rounded-md bg-[#c9a27a]'}`} />
+                              </span>
+                              <span className="h-1.5 w-8 rounded bg-[#e5ded4]" />
+                            </span>
+                          ))}
+                        </span>
+                        <span className="mt-2 flex items-center justify-between">
+                          <span className="text-sm font-semibold">{label}</span>
+                          {on ? <span className="text-xs text-[#1f7a44]">使用中</span> : null}
+                        </span>
+                        <span className="mt-1 block text-xs leading-5 text-[#8a7f72]">{note}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="mt-3 text-xs text-[#a99e8f]">{categoryImageStyle === 'cutout' ? '去背 PNG:上傳透明背景的 PNG,主體置中、四周留一點空白。' : '圓形 / 方形:建議上傳正方形照片(600×600 以上),主體放中間。'}</p>
+              </Card>
+              )}
 
               {settingsTab === 'general' && (
               <Card title="網站 Logo">

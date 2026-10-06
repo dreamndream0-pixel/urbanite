@@ -10,10 +10,11 @@ type NavigationCategory = {
   children?: NavigationCategory[];
 };
 
-export default function CategoryNavigation({ categories, value, onSelect }: {
+export default function CategoryNavigation({ categories, value, onSelect, imageStyle = 'circle' }: {
   categories: NavigationCategory[];
   value: string;
   onSelect: (slug: string) => void;
+  imageStyle?: 'circle' | 'square' | 'cutout'; // 圓形 / 方形 / 去背 PNG
 }) {
   const [open, setOpen] = useState<string | null>(null);
   const [position, setPosition] = useState({ left: 0, top: 0, maxHeight: 320 });
@@ -79,7 +80,7 @@ export default function CategoryNavigation({ categories, value, onSelect }: {
 
   return (
     <nav className="store-category-navigation" aria-label="商品分類">
-      <div ref={row} className={`store-category-row${withImages ? ' store-category-row--images' : ''}`}>
+      <div ref={row} className={`store-category-row${withImages ? ` store-category-row--images store-category-row--${imageStyle}` : ''}`}>
         {categories.map(category => {
           const active = value === category.slug || !!category.children?.some(child => child.slug === value);
           const hasChildren = !!category.children?.length;

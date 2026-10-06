@@ -52,9 +52,12 @@ export type Product = {
   created_at?: string;
 };
 
+export type CategoryImageStyle = 'circle' | 'square' | 'cutout';
+
 export type SiteSettings = {
   id: number;
   logo_url: string;
+  category_image_style?: CategoryImageStyle; // 首頁分類圖片:圓形 / 方形 / 去背 PNG
   footer_about_links?: string[];
   footer_service_links?: string[];
   footer_sections?: { title: string; items: { subtitle: string; content: string; url: string }[] }[];
