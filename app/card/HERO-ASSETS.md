@@ -60,3 +60,43 @@ assets are reused in the phone galleries.
 - Scroll reveal, phone screen movement, navigation menu, and creation link checked.
 - Reduced motion removes the sticky scroll sequence and shows a static scene.
 - Physical iOS/Android devices and Safari have not been tested.
+
+## Product Showcase And Template Collection
+
+The lower LINK / SHOP / BRAND scenes use independent phone and photograph
+layers. Their vertical offset, tilt, and screen position follow page scrolling.
+The section order is LINK, the full-width template carousel, SHOP, then BRAND.
+Reduced motion keeps the phone layers still. The original hero behavior is
+unchanged; both sections share `DemoPhoneContent.tsx` for the profile and shop
+screen artwork.
+
+The nine supplied examples (photos 2 through 10) are copied unchanged to
+`public/card/templates/`, in this order:
+
+1. `casa-mellow.jpg`
+2. `petal-nail.jpg`
+3. `aurea-beauty.jpg`
+4. `lunea-clinic.jpg`
+5. `mellow-cast.jpg`
+6. `velocraft.jpg`
+7. `sora-bean.jpg`
+8. `mona-atelier.jpg`
+9. `ciel-table.jpg`
+
+Photo 11 is not included because the requested range was photos 2 through 10.
+These are illustrative designs, not links to live businesses.
+
+The single-row carousel uses Embla 8.6.0 and its Auto Scroll plugin. It pauses
+when off screen, when the tab is hidden, during dragging, while hovered or
+keyboard-focused, and while a native image-preview dialog is open. Explicit
+pause and arrow navigation disable automatic movement until Play is selected.
+Reduced motion disables automatic scrolling but retains manual navigation.
+
+Reference: [Embla v8 Auto Scroll](https://www.embla-carousel.com/docs/v8/plugins/auto-scroll).
+
+Verified in the local browser at 320, 390, 430, 768, and 1440 pixel widths:
+all nine images load, the single row advances and loops, Pause holds its
+position, drag moves the row without opening a preview, arrow navigation works,
+Escape closes the preview and returns focus, and reduced motion stops automatic
+movement while retaining keyboard navigation. Lint and production build pass.
+These browser checks do not replace physical iOS or Android device testing.
