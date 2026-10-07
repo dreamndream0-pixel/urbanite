@@ -1,7 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { Caveat, LXGW_WenKai_TC } from "next/font/google";
-import { ArrowRight, Ellipsis, Link2, ShoppingBag } from "lucide-react";
+import { ArrowRight, ChevronDown, Ellipsis, Link2, ShoppingBag } from "lucide-react";
 import SocialIcon from "@/app/components/SocialIcon";
 import { SERVICE_LOGO } from "@/lib/card-plan";
 import ScrollHero from "./ScrollHero";
@@ -126,6 +126,9 @@ export default function HeroScene({
             </div>
           </div>
           <HeroImportBubble loggedIn={loggedIn} />
+          <span className={styles.scrollHint} aria-hidden="true">
+            <ChevronDown />
+          </span>
           <span className={styles.flourish} aria-hidden="true" />
         </div>
       </ScrollHero>

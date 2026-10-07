@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useState } from 'react';
 import { createBrowserSupabase } from '@/lib/supabase/client';
 import { getBrowserAuthOrigin } from '@/lib/site-url';
+import SocialAuthButtons, { rememberLogin } from '@/app/login/SocialAuth';
 
 const STORE_NAME = process.env.NEXT_PUBLIC_STORE_NAME || 'URBANITE';
 
@@ -57,6 +58,7 @@ export default function RegisterClient({
         },
       });
       if (error) throw error;
+      rememberLogin('email');
       if (data.session) {
         await syncCustomerAndGo();
       } else {
@@ -142,7 +144,8 @@ export default function RegisterClient({
           </div>
         ) : (
           <>
-            {/* Email / 手機 左右切換 */}
+            {/* Email / 手機 左右切換(名片服務只開放 Email,另有 LINE / Facebook / Google) */}
+            {isCard ? null : (
             <div className="mt-8 grid grid-cols-2 rounded-full border border-[#e0d9d2] p-1">
               <button
                 onClick={() => {
@@ -170,6 +173,7 @@ export default function RegisterClient({
                 手機註冊
               </button>
             </div>
+            )}
 
             <div className="mt-8 space-y-8">
               <input
@@ -248,6 +252,19 @@ export default function RegisterClient({
                     ? '註冊並建立名片'
                     : '註冊並開始購物'}
             </button>
+
+            {isCard ? (
+              <>
+                <div className="mt-10 flex items-center gap-3 text-sm text-[#7d7d7d]">
+                  <span className="h-px flex-1 bg-[#9b9b9b]" />
+                  <span>或使用其他方式註冊</span>
+                  <span className="h-px flex-1 bg-[#9b9b9b]" />
+                </div>
+                <div className="mt-7">
+                  <SocialAuthButtons nextPath={nextPath} mode="register" disabled={busy} onError={setError} />
+                </div>
+              </>
+            ) : null}
 
             <p className="mt-8 text-center text-sm text-[#8a8a8a]">
               已經是會員？{' '}

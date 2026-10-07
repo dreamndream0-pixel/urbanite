@@ -3,8 +3,7 @@
 import Link from 'next/link';
 import { useState } from 'react';
 import { createBrowserSupabase } from '@/lib/supabase/client';
-import { getBrowserAuthOrigin } from '@/lib/site-url';
-import type { Provider } from '@supabase/supabase-js';
+import SocialAuthButtons, { LastLoginBadge, rememberLogin, useLastLogin } from './SocialAuth';
 
 const STORE_NAME = process.env.NEXT_PUBLIC_STORE_NAME || 'URBANITE';
 
@@ -28,6 +27,7 @@ export default function LoginClient({
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const last = useLastLogin();
 
   const registerHref = `${brand === 'card' ? '/card/register' : '/register'}?next=${encodeURIComponent(nextPath)}`;
 
@@ -40,34 +40,10 @@ export default function LoginClient({
       if (error) throw error;
       // 確保顧客資料有建檔(email 登入不會經過 /auth/callback)
       await fetch('/api/customers', { method: 'POST' }).catch(() => {});
+      rememberLogin('email');
       window.location.href = nextPath;
     } catch (err) {
       setError(err instanceof Error ? err.message : '登入失敗');
-      setBusy(null);
-    }
-  }
-
-  async function signIn(provider: 'line' | 'facebook' | 'google') {
-    setError(null);
-    setBusy(provider);
-    if (provider === 'line') {
-      window.location.href = `/auth/line/start?next=${encodeURIComponent(nextPath)}`;
-      return;
-    }
-    try {
-      const supabase = createBrowserSupabase();
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: provider as Provider,
-        options: {
-          redirectTo: `${getBrowserAuthOrigin()}/auth/callback?next=${encodeURIComponent(nextPath)}`,
-        },
-      });
-      if (error) {
-        setError(error.message);
-        setBusy(null);
-      }
-    } catch {
-      setError('登入服務尚未設定完成');
       setBusy(null);
     }
   }
@@ -155,8 +131,9 @@ export default function LoginClient({
             <button
               onClick={signInWithPassword}
               disabled={busy !== null || !email || !password}
-              className="mt-8 w-full rounded bg-[var(--c-gold)] px-5 py-4 text-lg font-bold text-white transition hover:bg-[var(--c-gold)] disabled:opacity-50"
+              className="relative mt-8 w-full rounded bg-[var(--c-gold)] px-5 py-4 text-lg font-bold text-white transition hover:bg-[var(--c-gold)] disabled:opacity-50"
             >
+              {last === 'email' ? <LastLoginBadge className="-right-2" /> : null}
               {busy === 'password' ? '登入中...' : isCard ? '開始建立名片' : '開始購物吧！'}
             </button>
 
@@ -166,31 +143,8 @@ export default function LoginClient({
               <span className="h-px flex-1 bg-[#9b9b9b]" />
             </div>
 
-            <div className="mt-7 flex items-center justify-center gap-5">
-              <ProviderButton
-                label="LINE"
-                busy={busy === 'line'}
-                disabled={busy !== null}
-                onClick={() => signIn('line')}
-              >
-                <IconLine />
-              </ProviderButton>
-              <ProviderButton
-                label="Facebook"
-                busy={busy === 'facebook'}
-                disabled={busy !== null}
-                onClick={() => signIn('facebook')}
-              >
-                <IconFacebook />
-              </ProviderButton>
-              <ProviderButton
-                label="Google"
-                busy={busy === 'google'}
-                disabled={busy !== null}
-                onClick={() => signIn('google')}
-              >
-                <IconGoogle />
-              </ProviderButton>
+            <div className="mt-7">
+              <SocialAuthButtons nextPath={nextPath} disabled={busy !== null} onBusy={setBusy} onError={setError} />
             </div>
 
             <section className="mt-20">
@@ -211,7 +165,7 @@ export default function LoginClient({
                     <li>一個網址放進 IG、LINE、作品與商品</li>
                     <li>推薦 5 位朋友,送 1 個月 U Plus</li>
                   </ul>
-                  <p className="mt-4 text-sm leading-6">用 LINE、Google 登入會自動建立帳號;已經是 URBANITE 會員,用同一個帳號登入就可以。</p>
+                  <p className="mt-4 text-sm leading-6">用 LINE、Facebook、Google 登入會自動建立帳號;已經是 URBANITE 會員,用同一個帳號登入就可以。</p>
                 </div>
               ) : (
                 <div className="mt-9 text-lg leading-8 text-[#8a8a8a]">
@@ -233,31 +187,6 @@ export default function LoginClient({
 
       </div>
     </main>
-  );
-}
-
-function ProviderButton({
-  label,
-  busy,
-  disabled,
-  onClick,
-  children,
-}: {
-  label: string;
-  busy: boolean;
-  disabled: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      disabled={disabled}
-      aria-label={busy ? `前往 ${label}` : `使用 ${label} 登入`}
-      className="flex h-14 w-14 items-center justify-center rounded-full bg-[var(--c-surface)] shadow-sm ring-1 ring-[#e8e3dc] transition hover:bg-[var(--c-bg)] disabled:opacity-50"
-    >
-      {children}
-    </button>
   );
 }
 
@@ -306,32 +235,3 @@ function IconEye({ closed }: { closed: boolean }) {
   );
 }
 
-function IconLine() {
-  return (
-    <svg width="30" height="30" viewBox="0 0 32 32" aria-hidden>
-      <rect width="32" height="32" rx="16" fill="#06C755" />
-      <path fill="#fff" d="M25.5 14.4c0-4.3-4.3-7.8-9.5-7.8s-9.5 3.5-9.5 7.8c0 3.8 3.4 7 8 7.7.3.1.7.2.8.5.1.3.1.6 0 .9l-.1.8c0 .3-.2 1 .8.5 1-.4 5.2-3.1 7.1-5.3 1.3-1.4 1.9-3.1 1.9-5.1Z" />
-      <path fill="#06C755" d="M11.2 12.2h1.1v4.1h-1.1v-4.1Zm2 0h1.1l1.7 2.4v-2.4h1.1v4.1H16l-1.7-2.4v2.4h-1.1v-4.1Zm4.8 0h3v1h-1.9v.6h1.7v1h-1.7v.6H21v1h-3v-4.2Z" />
-    </svg>
-  );
-}
-
-function IconFacebook() {
-  return (
-    <svg width="30" height="30" viewBox="0 0 32 32" aria-hidden>
-      <rect width="32" height="32" rx="16" fill="#1877F2" />
-      <path fill="#fff" d="M18.1 17.1h2.1l.4-2.8h-2.5v-1.5c0-.8.2-1.3 1.3-1.3h1.3V9c-.6-.1-1.3-.2-2-.2-2.1 0-3.6 1.3-3.6 3.7v1.8h-2.4v2.8h2.4V24h3v-6.9Z" />
-    </svg>
-  );
-}
-
-function IconGoogle() {
-  return (
-    <svg width="30" height="30" viewBox="0 0 32 32" aria-hidden>
-      <path fill="#4285F4" d="M29 16.3c0-.9-.1-1.6-.2-2.4H16v4.5h7.3c-.1 1.1-.9 2.8-2.5 3.9v2.9h4c2.4-2.2 4.2-5.4 4.2-8.9Z" />
-      <path fill="#34A853" d="M16 29c3.5 0 6.4-1.1 8.5-3.1l-4-2.9c-1.1.7-2.5 1.2-4.5 1.2-3.4 0-6.3-2.3-7.3-5.4H4.6v3C6.7 26 11 29 16 29Z" />
-      <path fill="#FBBC05" d="M8.7 18.8c-.3-.8-.4-1.7-.4-2.8s.1-2 .4-2.8v-3H4.6A13 13 0 0 0 3 16c0 2.1.5 4.1 1.6 5.8l4.1-3Z" />
-      <path fill="#EA4335" d="M16 7.8c2 0 3.4.9 4.2 1.6l3.1-3C21.4 4.6 18.5 3 16 3 11 3 6.7 6 4.6 10.2l4.1 3C9.7 10.1 12.6 7.8 16 7.8Z" />
-    </svg>
-  );
-}
