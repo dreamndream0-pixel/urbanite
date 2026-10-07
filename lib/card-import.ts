@@ -1,10 +1,19 @@
 // 一鍵搬家:讀取會員自己在其他名片服務(Linktree、Portaly…)的頁面,轉成我們的區塊
 // 只接受下列名片服務的網址(避免被拿來讀任意網站)
 
+export type ImportedImage = { image: string; title: string; url: string };
 export type ImportedItem =
-  | { kind: 'link'; title: string; url: string; image: string }
+  | { kind: 'link'; title: string; url: string; image: string } // image:縮圖網址或 icon:圖示
   | { kind: 'text'; title: string }
-  | { kind: 'video'; title: string; url: string };
+  | { kind: 'video'; title: string; url: string }
+  | { kind: 'image'; title: string; layout: 'banner' | 'scroll' | 'grid2' | 'grid3' | 'circle3' | 'square'; items: ImportedImage[] } // 圖文連結
+  | { kind: 'divider' }
+  | { kind: 'social'; title: string; url: string; platform: string };
+
+// 我們內建的線條圖示(其他平台的圖示名稱對得上就沿用)
+const ICON_KEYS = new Set('instagram line facebook threads youtube tiktok shopping-bag gift tag ticket truck heart star message calendar map-pin x pinterest xiaohongshu shopping-cart store percent credit-card wallet package shirt scissors ruler palette gem crown sparkles flame zap award trophy thumbs-up smile phone smartphone mail send bell megaphone link globe share qr-code user users handshake hand clock timer map house plane car bike camera image video play music headphones book file newspaper clipboard bookmark download search info help hash chart coffee utensils cake leaf flower sprout sun moon umbrella dumbbell baby dog paw recycle briefcase laptop graduation lightbulb rocket target lock shield settings wrench'.split(' '));
+const iconOf = (name: string) => (ICON_KEYS.has(name) ? `icon:${name}` : '');
+const isVideo = (url: string) => /(?:youtube\.com\/(?:watch\?v=|shorts\/|live\/)|youtu\.be\/|vimeo\.com\/\d)/i.test(url);
 
 export type ImportedProfile = {
   source: string;
@@ -105,16 +114,68 @@ function parseLinktree(html: string): ImportedProfile | null {
   const p = (nextData(html) as { props?: { pageProps?: Record<string, unknown> } } | null)?.props?.pageProps;
   if (!p) return null;
   const account = (p.account ?? {}) as Record<string, unknown>;
-  const items: ImportedItem[] = [];
-  for (const l of (p.links as Record<string, unknown>[] | undefined) ?? []) {
+  const all = ((p.links as Record<string, unknown>[] | undefined) ?? []).filter((l) => l && typeof l === 'object');
+  const parentOf = (l: Record<string, unknown>) => {
+    const raw = l.parent;
+    if (!raw) return '';
+    try {
+      const o = typeof raw === 'string' ? JSON.parse(raw) : raw;
+      return String((o as { id?: unknown }).id ?? '');
+    } catch {
+      return '';
+    }
+  };
+  const groupLayout = (g: Record<string, unknown>) => {
+    try {
+      const c = typeof g.context === 'string' ? JSON.parse(g.context) : g.context;
+      return str((c as { layoutOption?: unknown })?.layoutOption) || str(g.layoutOption);
+    } catch {
+      return str(g.layoutOption);
+    }
+  };
+  const one = (l: Record<string, unknown>): ImportedItem | null => {
     const type = str(l.type);
     const title = str(l.title);
     const url = str(l.url);
-    if (type === 'HEADER' && title) items.push({ kind: 'text', title });
-    else if (/YOUTUBE|VIDEO/i.test(type) && isHttp(url)) items.push({ kind: 'video', title, url });
-    else if (isHttp(url) && title) {
-      const mod = (l.modifiers ?? {}) as Record<string, unknown>;
-      items.push({ kind: 'link', title, url, image: str(l.thumbnail) || str(mod.thumbnailUrl) });
+    const thumb = str(l.thumbnail) || str((l.modifiers as Record<string, unknown> | undefined)?.thumbnailUrl);
+    if (type === 'HEADER') return title ? { kind: 'text', title } : null;
+    if (/VIDEO/i.test(type) || isVideo(url)) return isHttp(url) ? { kind: 'video', title, url } : null;
+    if (!isHttp(url)) return null;
+    // 精選版型(大圖)→ 圖文連結
+    if (str(l.layoutOption) === 'featured' && thumb) return { kind: 'image', title, layout: 'banner', items: [{ image: thumb, title, url }] };
+    return { kind: 'link', title: title || url, url, image: thumb };
+  };
+  const items: ImportedItem[] = [];
+  for (const l of all.filter((x) => !parentOf(x))) {
+    if (str(l.type) !== 'GROUP') {
+      const it = one(l);
+      if (it) items.push(it);
+      continue;
+    }
+    // 群組:標題 + 底下的連結;輪播 / 方格版型而且有圖 → 圖文連結
+    const title = str(l.title);
+    if (title) items.push({ kind: 'text', title });
+    const children = all.filter((c) => parentOf(c) === String(l.id)).sort((a, b) => Number(a.position ?? 0) - Number(b.position ?? 0));
+    const layout = groupLayout(l);
+    const withImages = children.filter((c) => str(c.thumbnail) && isHttp(str(c.url)) && !/VIDEO/i.test(str(c.type)));
+    if ((layout === 'carousel' || layout === 'grid') && withImages.length >= 2) {
+      for (let i = 0; i < withImages.length; i += 10) {
+        items.push({
+          kind: 'image',
+          title: '',
+          layout: layout === 'carousel' ? 'scroll' : 'grid2',
+          items: withImages.slice(i, i + 10).map((c) => ({ image: str(c.thumbnail), title: str(c.title), url: str(c.url) })),
+        });
+      }
+      for (const c of children.filter((c) => !withImages.includes(c))) {
+        const it = one(c);
+        if (it) items.push(it);
+      }
+    } else {
+      for (const c of children) {
+        const it = one(c);
+        if (it) items.push(it);
+      }
     }
   }
   const socials = ((p.socialLinks as Record<string, unknown>[] | undefined) ?? [])
@@ -139,24 +200,47 @@ function parsePortaly(html: string): ImportedProfile | null {
   const order = (Array.isArray(d.blockOrders) ? d.blockOrders : []) as string[];
   const sorted = order.length ? [...blocks].sort((a, b) => order.indexOf(String(a.id)) - order.indexOf(String(b.id))) : blocks;
   const items: ImportedItem[] = [];
+  const linkUrl = (it: Record<string, unknown>) => str(links[str(it.linkId)]?.url);
   for (const b of sorted) {
     if (String(b.hidden) === 'true') continue;
     const type = str(b.type);
-    const list = (Array.isArray(b.items) ? b.items : []) as Record<string, unknown>[];
+    const list = ((Array.isArray(b.items) ? b.items : []) as Record<string, unknown>[]).filter((it) => String(it.hidden) !== 'true');
     if (type === 'title') {
-      const title = str(b.title) || str(list[0]?.text);
+      const title = str(b.text) || str(b.title) || str(list[0]?.text);
       if (title) items.push({ kind: 'text', title });
-      continue;
-    }
-    for (const it of list) {
-      const yt = str(it.urlyoutube);
-      if (yt) {
-        items.push({ kind: 'video', title: str(it.text), url: yt });
-        continue;
+    } else if (type === 'divider') {
+      items.push({ kind: 'divider' });
+    } else if (type === 'grid' || type === 'banner') {
+      // 方格 / 橫幅 → 圖文連結(一個區塊最多 10 張)
+      const imgs = list.filter((it) => str(it.image)).map((it) => ({ image: str(it.image), title: str(it.label) || str(it.text) || str(it.alt), url: linkUrl(it) }));
+      const variant = str(b.variant);
+      const layout: 'banner' | 'scroll' | 'grid2' | 'grid3' | 'circle3' =
+        type === 'banner' ? (imgs.length > 1 ? 'scroll' : 'banner') : variant === 'round' ? 'circle3' : imgs.length >= 3 && imgs.length % 3 === 0 ? 'grid3' : 'grid2';
+      const size = layout === 'circle3' || layout === 'grid3' ? 9 : 10;
+      for (let i = 0; i < imgs.length; i += size) items.push({ kind: 'image', title: '', layout, items: imgs.slice(i, i + size) });
+    } else if (type === 'player') {
+      for (const it of list) {
+        const yt = str(it.urlyoutube) || str(it.url);
+        if (yt) items.push({ kind: 'video', title: str(it.text), url: yt });
       }
-      const url = str(links[str(it.linkId)]?.url);
-      const title = str(it.text) || str(links[str(it.linkId)]?.title);
-      if (isHttp(url) && title) items.push({ kind: 'link', title, url, image: str(it.image) });
+    } else if (type === 'integrations') {
+      // 社群嵌入(IG、Threads…)→ 社群追蹤卡片
+      const platform = str(b.platform);
+      const url = str(b[`url-${platform}`]);
+      if (isHttp(url)) items.push({ kind: 'social', title: '', url, platform });
+    } else {
+      for (const it of list) {
+        const yt = str(it.urlyoutube);
+        if (yt) {
+          items.push({ kind: 'video', title: str(it.text), url: yt });
+          continue;
+        }
+        const url = linkUrl(it);
+        const title = str(it.text) || str(links[str(it.linkId)]?.title);
+        if (!isHttp(url) || !title) continue;
+        if (isVideo(url)) items.push({ kind: 'video', title, url });
+        else items.push({ kind: 'link', title, url, image: str(it.image) || iconOf(str(it.icon)) });
+      }
     }
   }
   const social = ((d.social as { links?: Record<string, string> } | undefined)?.links ?? {}) as Record<string, string>;
@@ -191,17 +275,30 @@ function parseGeneric(html: string, pageUrl: string, source: string): ImportedPr
       continue;
     }
     if (host === pageHost || host.endsWith(`.${pageHost}`) || seen.has(url)) continue;
-    const text = decode(m[2].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' '));
+    const inner = m[2];
+    const text = decode(inner.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' '));
+    const img = decode((inner.match(/<img[^>]+src=["'](https?:\/\/[^"']+)["']/i) || [])[1] ?? '');
     const s = socialType(url);
     if (s && (!text || text.length < 3)) {
       if (!socials.some((x) => x.type === s)) socials.push({ type: s, value: url });
       seen.add(url);
       continue;
     }
-    if (!text || SKIP_TEXT.test(text) || text.length > 80) continue;
+    if (SKIP_TEXT.test(text) || text.length > 80) continue;
+    if (!text && img) {
+      // 只有圖片的連結:接在前一個圖文連結後面,或開一個新的
+      seen.add(url);
+      const last = items[items.length - 1];
+      if (last?.kind === 'image' && last.items.length < 10) last.items.push({ image: img, title: '', url });
+      else items.push({ kind: 'image', title: '', layout: 'banner', items: [{ image: img, title: '', url }] });
+      continue;
+    }
+    if (!text) continue;
     seen.add(url);
-    items.push({ kind: 'link', title: text, url, image: '' });
+    if (isVideo(url)) items.push({ kind: 'video', title: text, url });
+    else items.push({ kind: 'link', title: text, url, image: img });
   }
+  for (const it of items) if (it.kind === 'image' && it.items.length > 1) it.layout = 'scroll';
   return {
     source,
     name: meta(html, 'og:title').replace(/\s*[|｜–-]\s*[^|｜–-]+$/, '').slice(0, 40),
@@ -229,13 +326,17 @@ export async function readImportPage(url: string): Promise<ImportedProfile> {
   const seen = new Set<string>();
   parsed.items = parsed.items
     .filter((it) => {
-      const key = it.kind === 'text' ? `t:${it.title}` : `${it.kind}:${it.url}`;
+      const key =
+        it.kind === 'text' ? `t:${it.title}`
+        : it.kind === 'divider' ? `d:${Math.random()}`
+        : it.kind === 'image' ? `i:${it.items.map((x) => x.image).join('|')}`
+        : `${it.kind}:${it.url}`;
       if (seen.has(key)) return false;
       seen.add(key);
       return true;
     })
     .slice(0, 60)
-    .map((it) => ({ ...it, title: it.title.slice(0, 80) }));
+    .map((it) => ('title' in it ? { ...it, title: it.title.slice(0, 80) } : it));
   // 只保留名片支援的社群(其他平台的連結已經在項目清單裡)
   const supported = new Set(['instagram', 'line', 'facebook', 'threads', 'tiktok', 'youtube', 'xiaohongshu', 'pinterest', 'x']);
   parsed.socials = parsed.socials.filter((s, i, arr) => supported.has(s.type) && arr.findIndex((x) => x.type === s.type) === i);

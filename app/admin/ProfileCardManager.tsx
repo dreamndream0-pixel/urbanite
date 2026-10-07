@@ -1266,7 +1266,14 @@ type ImportPreview = {
   bio: string;
   avatar: string;
   socials: { type: string; value: string }[];
-  items: ({ kind: 'link'; title: string; url: string; image: string } | { kind: 'text'; title: string } | { kind: 'video'; title: string; url: string })[];
+  items: (
+    | { kind: 'link'; title: string; url: string; image: string }
+    | { kind: 'text'; title: string }
+    | { kind: 'video'; title: string; url: string }
+    | { kind: 'image'; title: string; layout: string; items: { image: string; title: string; url: string }[] }
+    | { kind: 'divider' }
+    | { kind: 'social'; title: string; url: string; platform: string }
+  )[];
   maxBlocks: number;
 };
 
@@ -1318,7 +1325,25 @@ function ImportPanel({ onClose, onDone }: { onClose: () => void; onDone: () => v
   }
 
   const toggle = (i: number) => setPicked((p) => (p.includes(i) ? p.filter((x) => x !== i) : [...p, i]));
-  const kindLabel = { link: '連結', text: '標題', video: '影片' } as const;
+  const kindLabel = { link: '連結', text: '標題', video: '影片', image: '圖文', divider: '分隔', social: '社群' } as const;
+  const layoutLabel: Record<string, string> = { banner: '大圖', scroll: '橫向滑動', grid2: '兩欄', grid3: '三欄方格', circle3: '三個圓形', square: '方形' };
+  // 預覽清單每一列的縮圖與文字
+  const describe = (it: ImportPreview['items'][number]) => {
+    switch (it.kind) {
+      case 'image':
+        return { thumb: it.items[0]?.image ?? '', title: it.title || `圖文連結 · ${it.items.length} 張`, sub: `${layoutLabel[it.layout] ?? it.layout} · ${it.items.map((x) => x.title).filter(Boolean).slice(0, 3).join('、') || '圖片連結'}` };
+      case 'divider':
+        return { thumb: '', title: '分隔線', sub: '' };
+      case 'text':
+        return { thumb: '', title: it.title, sub: '文字標題' };
+      case 'social':
+        return { thumb: '', title: it.title || `${it.platform} 追蹤卡片`, sub: it.url };
+      case 'video':
+        return { thumb: '', title: it.title || '影片', sub: it.url };
+      default:
+        return { thumb: it.image.startsWith('icon:') ? '' : it.image, title: it.title || '(無標題)', sub: it.url };
+    }
+  };
 
   return (
     <div className="space-y-3 rounded-2xl border border-[#e5ded4] bg-white p-4">
@@ -1361,16 +1386,22 @@ function ImportPanel({ onClose, onDone }: { onClose: () => void; onDone: () => v
             </button>
           </div>
           <div className="max-h-72 divide-y divide-[#f3eee7] overflow-y-auto rounded-xl border border-[#efe8dd]">
-            {data.items.map((it, i) => (
-              <label key={i} className="flex cursor-pointer items-center gap-2.5 px-3 py-2 text-xs">
-                <input type="checkbox" checked={picked.includes(i)} onChange={() => toggle(i)} />
-                {it.kind === 'link' && it.image ? <img src={it.image} alt="" className="h-7 w-7 shrink-0 rounded object-cover" /> : <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded bg-[#f6f2ec] text-[10px] text-[#8a7f72]">{kindLabel[it.kind]}</span>}
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-[#1f1b19]">{it.title || '(無標題)'}</span>
-                  {'url' in it ? <span className="block truncate text-[#a99e8f]">{it.url}</span> : null}
-                </span>
-              </label>
-            ))}
+            {data.items.map((it, i) => {
+              const d = describe(it);
+              return (
+                <label key={i} className="flex cursor-pointer items-center gap-2.5 px-3 py-2 text-xs">
+                  <input type="checkbox" checked={picked.includes(i)} onChange={() => toggle(i)} />
+                  {d.thumb ? <img src={d.thumb} alt="" className="h-8 w-8 shrink-0 rounded object-cover" /> : <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded bg-[#f6f2ec] text-[10px] text-[#8a7f72]">{kindLabel[it.kind]}</span>}
+                  <span className="min-w-0 flex-1">
+                    <span className="flex items-center gap-1.5">
+                      <span className="shrink-0 rounded bg-[#f3eee7] px-1 text-[10px] text-[#8a7f72]">{kindLabel[it.kind]}</span>
+                      <span className="truncate text-[#1f1b19]">{d.title}</span>
+                    </span>
+                    {d.sub ? <span className="block truncate text-[#a99e8f]">{d.sub}</span> : null}
+                  </span>
+                </label>
+              );
+            })}
           </div>
           {!plan.pro && picked.length > data.maxBlocks ? (
             <p className="text-[11px] leading-5 text-[#8a5a1c]">

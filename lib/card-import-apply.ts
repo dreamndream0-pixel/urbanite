@@ -10,7 +10,9 @@ export type ImportChoice = { name?: boolean; bio?: boolean; avatar?: boolean; so
 async function storeImage(userId: string, url: string, size: number, square: boolean) {
   if (!/^https?:\/\//i.test(url)) return '';
   try {
-    const res = await fetch(url, { signal: AbortSignal.timeout(10000) });
+    // 圖片伺服器偶爾很慢:等 15 秒,失敗再試一次
+    const get = () => fetch(url, { signal: AbortSignal.timeout(15000), headers: { 'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0 Safari/537.36', accept: 'image/*,*/*;q=0.8' } });
+    const res = await get().catch(() => get());
     if (!res.ok || !(res.headers.get('content-type') ?? '').startsWith('image/')) return '';
     const raw = Buffer.from(await res.arrayBuffer());
     if (raw.length > 8 * 1024 * 1024) return '';
@@ -37,14 +39,44 @@ export async function applyImport(user: { id: string }, card: ProfileCard, plan:
   const toAdd = picked.slice(0, room);
   const skipped = picked.length - toAdd.length;
 
-  // 連結縮圖一起搬過來
-  const thumbs = await Promise.all(toAdd.map((it) => (it.kind === 'link' && it.image ? storeImage(user.id, it.image, 400, false) : Promise.resolve(''))));
+  // 所有圖片(連結縮圖、圖文連結的每一張)都下載存到自己的空間;同時最多 6 張
+  const jobs: { key: string; url: string; size: number }[] = [];
+  toAdd.forEach((it, i) => {
+    if (it.kind === 'link' && /^https?:/i.test(it.image)) jobs.push({ key: `${i}`, url: it.image, size: 400 });
+    if (it.kind === 'image') it.items.forEach((img, j) => jobs.push({ key: `${i}:${j}`, url: img.image, size: it.layout === 'banner' || it.layout === 'scroll' ? 1200 : 800 }));
+  });
+  const stored = new Map<string, string>();
+  for (let k = 0; k < jobs.length; k += 6) {
+    const batch = jobs.slice(k, k + 6);
+    const urls = await Promise.all(batch.map((j) => storeImage(user.id, j.url, j.size, false)));
+    batch.forEach((j, n) => stored.set(j.key, urls[n]));
+  }
+
+  const FOLLOW = ['instagram', 'youtube', 'tiktok', 'facebook', 'threads', 'x', 'line', 'xiaohongshu', 'pinterest'];
   let order = Math.max(0, ...(existing ?? []).map((b) => Number(b.sort_order) || 0)) + 1;
-  const rows = toAdd.map((it, i) => {
-    const base = { card_id: card.id, sort_order: order++, enabled: true, title: '', url: '', image: '', product_id: '' };
-    if (it.kind === 'text') return { ...base, type: 'text', title: it.title };
-    if (it.kind === 'video' && videoEmbedUrl(it.url)) return { ...base, type: 'video', title: it.title, url: it.url };
-    return { ...base, type: 'link', title: it.title || it.url, url: it.url, image: thumbs[i] };
+  const rows = toAdd.flatMap((it, i) => {
+    // 一次新增多筆時欄位要一致(沒填的欄位不能是 null)
+    const base = { card_id: card.id, sort_order: order++, enabled: true, title: '', url: '', image: '', product_id: '', items: [] as unknown[], options: {} as Record<string, unknown> };
+    switch (it.kind) {
+      case 'text':
+        return [{ ...base, type: 'text', title: it.title }];
+      case 'divider':
+        return [{ ...base, type: 'divider' }];
+      case 'video':
+        return [videoEmbedUrl(it.url) ? { ...base, type: 'video', title: it.title, url: it.url } : { ...base, type: 'link', title: it.title || it.url, url: it.url }];
+      case 'social': {
+        const platform = FOLLOW.includes(it.platform) ? it.platform : '';
+        return [platform ? { ...base, type: 'social', url: it.url, options: { platform } } : { ...base, type: 'link', title: it.title || it.url, url: it.url }];
+      }
+      case 'image': {
+        // 圖文連結:每張圖各自的標題與連結
+        const items = it.items.map((img, j) => ({ image: stored.get(`${i}:${j}`) ?? '', title: img.title.slice(0, 80), url: img.url })).filter((x) => x.image);
+        if (!items.length) return [];
+        return [{ ...base, type: 'image', title: it.title, url: items.find((x) => x.url)?.url ?? '', image: items[0].image, items, options: { layout: it.layout === 'square' ? 'square' : it.layout, captionMode: 'custom' } }];
+      }
+      default:
+        return [{ ...base, type: 'link', title: it.title || it.url, url: it.url, image: it.image.startsWith('icon:') ? it.image : stored.get(`${i}`) ?? '' }];
+    }
   });
   if (rows.length) {
     const { error } = await supabase.from('profile_card_blocks').insert(rows);
