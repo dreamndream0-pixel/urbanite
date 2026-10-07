@@ -25,6 +25,9 @@ export const TIERS: {
 
 // 名片服務品牌(與商店 URBANITE 分開)
 export const SERVICE_NAME = 'URBANLINKS';
+// 官網一鍵搬家:註冊 / 登入後,「我的名片」讀這個值(localStorage)自動完成搬家
+export const PENDING_IMPORT_KEY = 'ul_pending_import';
+
 export const SERVICE_LOGO = '/brand/urbanlinks-logo.png';
 
 // U Pro / U Max「聯繫專員」的 LINE(與結帳頁官方 LINE 分開)

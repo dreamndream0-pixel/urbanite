@@ -5,6 +5,7 @@ import { ArrowRight, Ellipsis, Link2, Menu, ShoppingBag } from "lucide-react";
 import SocialIcon from "@/app/components/SocialIcon";
 import { SERVICE_LOGO } from "@/lib/card-plan";
 import ScrollHero from "./ScrollHero";
+import HeroImportBubble from "./HeroImportBubble";
 import DemoPhoneContent from "./DemoPhoneContent";
 import styles from "./hero.module.css";
 
@@ -145,12 +146,7 @@ export default function HeroScene({
               <span className={styles.notch} />
             </div>
           </div>
-          <div className={styles.urlBubble}>
-            <span>urbanlinks.tw/yourname</span>
-            <Link href={startHref} aria-label="建立你的 URBANLINKS 頁面">
-              <ArrowRight />
-            </Link>
-          </div>
+          <HeroImportBubble loggedIn={loggedIn} />
           <span className={styles.flourish} aria-hidden="true" />
         </div>
       </ScrollHero>

@@ -42,7 +42,7 @@ import {
   type ProfileCardBlock,
 } from '@/lib/profile-card';
 import type { Product } from '@/lib/types';
-import { FREE_TEMPLATE_KEYS, PRO_LIMITS, type CardPlanInfo } from '@/lib/card-plan';
+import { FREE_TEMPLATE_KEYS, PENDING_IMPORT_KEY, PRO_LIMITS, type CardPlanInfo } from '@/lib/card-plan';
 import { uiAlert, uiConfirm } from '@/lib/ui-dialog';
 import { detectPlatform } from '@/lib/social-fetch';
 
@@ -380,6 +380,8 @@ export default function ProfileCardManager({ products, lineUrl = '', upgradeHref
   const [origin, setOrigin] = useState('');
 
   const [importOpen, setImportOpen] = useState(false);
+  const [pending, setPending] = useState<'' | 'running' | string>(''); // 官網一鍵搬家:註冊後自動搬
+
   function reloadCard() {
     return fetch('/api/profile-card', { cache: 'no-store' })
       .then((res) => res.json())
@@ -389,6 +391,32 @@ export default function ProfileCardManager({ products, lineUrl = '', upgradeHref
         setDraft(data.card);
         setBlocks(data.blocks);
       });
+  }
+
+  // 在官網預覽過、按了「確定搬家」:登入後自動搬進名片(一天內有效,只執行一次)
+  async function runPendingImport() {
+    let job: { url?: string; at?: number } | null = null;
+    try {
+      job = JSON.parse(localStorage.getItem(PENDING_IMPORT_KEY) ?? 'null');
+      localStorage.removeItem(PENDING_IMPORT_KEY);
+    } catch {
+      return;
+    }
+    if (!job?.url || Date.now() - Number(job.at ?? 0) > 86400000) return;
+    setPending('running');
+    try {
+      const res = await fetch('/api/profile-card/import', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: job.url, apply: { name: true, bio: true, avatar: true, socials: true, tags: true, items: Array.from({ length: 100 }, (_, i) => i) } }),
+      });
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.error ?? '搬家失敗');
+      await reloadCard();
+      setPending(d.skipped ? `搬家完成!已搬入 ${d.added} 個區塊,免費版最多 ${d.maxBlocks} 個,還有 ${d.skipped} 個沒有搬,升級 U Plus 後可以再用一鍵搬家補上。` : `搬家完成!已搬入 ${d.added} 個區塊,頭貼與資料也更新好了。`);
+    } catch (e) {
+      setPending(`搬家沒有完成:${e instanceof Error ? e.message : '請稍後再試'}。可以用下方的「一鍵搬家」再試一次。`);
+    }
   }
 
   useEffect(() => {
@@ -401,6 +429,7 @@ export default function ProfileCardManager({ products, lineUrl = '', upgradeHref
         setDraft(data.card);
         setBlocks(data.blocks);
         if (data.plan) setPlan(data.plan);
+        void runPendingImport();
       })
       .catch((e) => setLoadError(e instanceof Error ? e.message : '讀取失敗'));
   }, []);
@@ -520,6 +549,22 @@ export default function ProfileCardManager({ products, lineUrl = '', upgradeHref
             <Icon size={16}><rect x="4" y="4" width="6" height="6" rx="1" /><rect x="14" y="4" width="6" height="6" rx="1" /><rect x="4" y="14" width="6" height="6" rx="1" /><path d="M14 14h2v2h-2zM18 14h2M14 18h2M18 18h2v2" /></Icon>
           </button>
         </div>
+
+        {pending ? (
+          <div className={`flex items-center gap-3 rounded-2xl border-2 border-[#dcbc84] px-4 py-3 text-sm ${pending === 'running' ? 'bg-[#121b33] text-white' : 'bg-[#fbf6ec] text-[#6b4a1f]'}`}>
+            {pending === 'running' ? (
+              <>
+                <span className="h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                正在把你的連結和圖片搬過來,約 10–60 秒,請不要關閉頁面…
+              </>
+            ) : (
+              <>
+                <span className="flex-1">{pending}</span>
+                <button type="button" onClick={() => setPending('')} className="shrink-0 text-xs underline underline-offset-2">知道了</button>
+              </>
+            )}
+          </div>
+        ) : null}
 
         {/* 主分頁 */}
         <div className="grid grid-cols-4 gap-1 rounded-2xl border border-[#e5ded4] bg-white p-1">

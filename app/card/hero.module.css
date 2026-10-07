@@ -402,11 +402,13 @@
     0 16px 27px #6f604114;
   transform: rotate(3deg);
 }
-.urlBubble > span {
+.urlBubble > span,
+.importField input {
   font-size: 21px;
   white-space: nowrap;
 }
-.urlBubble a {
+.urlBubble a,
+.urlBubble button {
   display: grid;
   place-items: center;
   width: 56px;
@@ -418,12 +420,59 @@
   box-shadow: inset 0 2px 5px #ffffff26;
   transition: transform 180ms ease;
 }
-.urlBubble a:hover {
+.urlBubble a:hover,
+.urlBubble button:hover {
   transform: translateX(3px);
 }
 .urlBubble svg {
   width: 23px;
   height: 23px;
+}
+/* 一鍵搬家輸入框:透明、沿用氣泡字體 */
+.urlBubble button {
+  border: 0;
+  cursor: pointer;
+}
+.urlBubble button:disabled {
+  cursor: wait;
+}
+.importField {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+}
+.importField small {
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  color: #6f6041d9;
+}
+.importField input {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: inherit;
+  font-family: inherit;
+  font-size: 21px;
+}
+.importField input::placeholder {
+  color: #1f1b1966;
+}
+.importField em {
+  font-size: 12px;
+  font-style: normal;
+  color: #a33a2b;
+}
+.spin {
+  animation: spin 0.9s linear infinite;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 .flourish {
   position: absolute;
@@ -530,7 +579,8 @@
     width: 40px;
     height: 40px;
   }
-  .urlBubble > span {
+  .urlBubble > span,
+.importField input {
     font-size: 17px;
   }
   .urlBubble {
@@ -650,10 +700,12 @@
     min-height: 66px;
     padding: 10px 12px 10px 24px;
   }
-  .urlBubble > span {
+  .urlBubble > span,
+.importField input {
     font-size: 15px;
   }
-  .urlBubble a {
+  .urlBubble a,
+.urlBubble button {
     width: 42px;
     height: 42px;
   }
@@ -692,7 +744,8 @@
   .note {
     font-size: 17px;
   }
-  .urlBubble > span {
+  .urlBubble > span,
+.importField input {
     font-size: 13px;
   }
   .brand {
@@ -736,7 +789,8 @@
   .hero {
     position: relative;
   }
-  .urlBubble a {
+  .urlBubble a,
+.urlBubble button {
     transition: none;
   }
 }

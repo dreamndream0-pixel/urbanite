@@ -1,6 +1,6 @@
 import sharp from 'sharp';
 import { createAdminClient } from '@/lib/supabase/admin';
-import type { ImportedProfile } from '@/lib/card-import';
+import type { ImportedItem, ImportedProfile } from '@/lib/card-import';
 import type { CardPlanInfo } from '@/lib/card-plan';
 import { BIO_LIMIT, videoEmbedUrl, type ProfileCard, type SocialLink, MAX_TAGS } from '@/lib/profile-card';
 
@@ -24,6 +24,37 @@ async function storeImage(userId: string, url: string, size: number, square: boo
   } catch {
     return '';
   }
+}
+
+// 讀到的項目 → 名片區塊(實際搬家與官網預覽共用);image(key, 原網址) 回傳要用的圖片網址
+const FOLLOW = ['instagram', 'youtube', 'tiktok', 'facebook', 'threads', 'x', 'line', 'xiaohongshu', 'pinterest'];
+export function importRows(items: ImportedItem[], cardId: string, startOrder: number, image: (key: string, original: string) => string) {
+  const card = { id: cardId };
+  let order = startOrder;
+  return items.flatMap((it, i) => {
+    // 一次新增多筆時欄位要一致(沒填的欄位不能是 null)
+    const base = { card_id: card.id, sort_order: order++, enabled: true, title: '', url: '', image: '', product_id: '', items: [] as unknown[], options: {} as Record<string, unknown> };
+    switch (it.kind) {
+      case 'text':
+        return [{ ...base, type: 'text', title: it.title }];
+      case 'divider':
+        return [{ ...base, type: 'divider' }];
+      case 'video':
+        return [videoEmbedUrl(it.url) ? { ...base, type: 'video', title: it.title, url: it.url } : { ...base, type: 'link', title: it.title || it.url, url: it.url }];
+      case 'social': {
+        const platform = FOLLOW.includes(it.platform) ? it.platform : '';
+        return [platform ? { ...base, type: 'social', url: it.url, options: { platform } } : { ...base, type: 'link', title: it.title || it.url, url: it.url }];
+      }
+      case 'image': {
+        // 圖文連結:每張圖各自的標題與連結
+        const items = it.items.map((img, j) => ({ image: image(`${i}:${j}`, img.image), title: img.title.slice(0, 80), url: img.url })).filter((x) => x.image);
+        if (!items.length) return [];
+        return [{ ...base, type: 'image', title: it.title, url: it.url || (items.find((x) => x.url)?.url ?? ''), image: items[0].image, items, options: { layout: it.layout === 'square' ? 'square' : it.layout, captionMode: it.shared ? 'link' : 'custom' } }];
+      }
+      default:
+        return [{ ...base, type: 'link', title: it.title || it.url, url: it.url, image: it.image.startsWith('icon:') ? it.image : image(`${i}`, it.image) }];
+    }
+  });
 }
 
 // 把讀到的內容寫進名片:勾選的項目新增成區塊(依方案上限),頭像/名稱/簡介/社群依選擇更新
@@ -52,32 +83,8 @@ export async function applyImport(user: { id: string }, card: ProfileCard, plan:
     batch.forEach((j, n) => stored.set(j.key, urls[n]));
   }
 
-  const FOLLOW = ['instagram', 'youtube', 'tiktok', 'facebook', 'threads', 'x', 'line', 'xiaohongshu', 'pinterest'];
-  let order = Math.max(0, ...(existing ?? []).map((b) => Number(b.sort_order) || 0)) + 1;
-  const rows = toAdd.flatMap((it, i) => {
-    // 一次新增多筆時欄位要一致(沒填的欄位不能是 null)
-    const base = { card_id: card.id, sort_order: order++, enabled: true, title: '', url: '', image: '', product_id: '', items: [] as unknown[], options: {} as Record<string, unknown> };
-    switch (it.kind) {
-      case 'text':
-        return [{ ...base, type: 'text', title: it.title }];
-      case 'divider':
-        return [{ ...base, type: 'divider' }];
-      case 'video':
-        return [videoEmbedUrl(it.url) ? { ...base, type: 'video', title: it.title, url: it.url } : { ...base, type: 'link', title: it.title || it.url, url: it.url }];
-      case 'social': {
-        const platform = FOLLOW.includes(it.platform) ? it.platform : '';
-        return [platform ? { ...base, type: 'social', url: it.url, options: { platform } } : { ...base, type: 'link', title: it.title || it.url, url: it.url }];
-      }
-      case 'image': {
-        // 圖文連結:每張圖各自的標題與連結
-        const items = it.items.map((img, j) => ({ image: stored.get(`${i}:${j}`) ?? '', title: img.title.slice(0, 80), url: img.url })).filter((x) => x.image);
-        if (!items.length) return [];
-        return [{ ...base, type: 'image', title: it.title, url: it.url || (items.find((x) => x.url)?.url ?? ''), image: items[0].image, items, options: { layout: it.layout === 'square' ? 'square' : it.layout, captionMode: it.shared ? 'link' : 'custom' } }];
-      }
-      default:
-        return [{ ...base, type: 'link', title: it.title || it.url, url: it.url, image: it.image.startsWith('icon:') ? it.image : stored.get(`${i}`) ?? '' }];
-    }
-  });
+  const order = Math.max(0, ...(existing ?? []).map((b) => Number(b.sort_order) || 0)) + 1;
+  const rows = importRows(toAdd, card.id, order, (key) => stored.get(key) ?? '');
   if (rows.length) {
     const { error } = await supabase.from('profile_card_blocks').insert(rows);
     if (error) throw new Error(error.message);
