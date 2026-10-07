@@ -37,11 +37,9 @@ export default function ProfileCardView({
   card,
   blocks,
   products,
-  logoUrl = '',
   lineUrl = '',
   preview = false,
   fullScreen = false,
-  serviceFooter = false,
 }: {
   card: ProfileCard;
   blocks: ProfileCardBlock[];
@@ -868,16 +866,12 @@ export default function ProfileCardView({
           })}
         </div>
 
-        {card.show_footer_logo !== false && serviceFooter ? (
-          <Link href="/card" className="mt-12 flex w-full flex-col items-center gap-1.5 opacity-80 transition hover:opacity-100">
-            {/* 與 URBANLINKS 介紹頁表頭相同:U 標誌在上、URBANLINKS 字樣在下 */}
-            <img src="/brand/u-logo.png" alt="" className="h-8 w-auto object-contain" />
-            <img src="/brand/urbanlinks-logo.png" alt="URBANLINKS" className="h-3.5 w-auto object-contain" style={dark ? { filter: 'brightness(0) invert(1)' } : undefined} />
-            <span className="text-[11px]" style={{ color: theme.mutedColor }}>建立你的個人名片</span>
-          </Link>
-        ) : card.show_footer_logo !== false ? (
-          <Link href="/" className="mt-12 flex w-full justify-center opacity-70 transition hover:opacity-100">
-            {logoUrl ? <img src={logoUrl} alt="URBANITE" className="h-5 w-auto object-contain" /> : <span className="text-xs tracking-[0.3em]">URBANITE</span>}
+        {card.show_footer_logo !== false ? (
+          // 頁尾:URBANLINKS 文字 Logo + 免費建立名片(會員、店家名片都一樣)
+          <Link href={card.slug && card.slug !== 'preview' ? `/card?ref=${encodeURIComponent(card.slug)}` : '/card'} className="mt-12 flex w-full flex-col items-center gap-1.5 opacity-85 transition hover:opacity-100">
+            <img src="/brand/urbanlinks-logo.png" alt="URBANLINKS" className="h-4 w-auto object-contain" style={dark ? { filter: 'brightness(0) invert(1)' } : undefined} />
+            <span className="mt-1 text-xs font-medium" style={{ color: theme.textColor }}>立即免費建立個人名片</span>
+            <span className="rounded-full border px-3 py-0.5 text-[10px] tracking-[0.18em]" style={{ color: theme.mutedColor, borderColor: tint(theme.mutedColor, 40) }}>TRY FOR FREE</span>
           </Link>
         ) : null}
       </div>

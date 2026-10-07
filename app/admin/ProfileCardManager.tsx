@@ -459,6 +459,7 @@ export default function ProfileCardManager({ products, lineUrl = '', upgradeHref
         void runPendingImport();
       })
       .catch((e) => setLoadError(e instanceof Error ? e.message : '讀取失敗'));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const productMap = useMemo(() => {
@@ -621,6 +622,16 @@ export default function ProfileCardManager({ products, lineUrl = '', upgradeHref
                   {label}
                 </button>
               ))}
+              {/* 新增區塊:放在分頁列右側 */}
+              <button
+                type="button"
+                onClick={() => { setContentTab('links'); setPicker((v) => !v); }}
+                className={`ml-auto flex items-center gap-1 rounded-full px-4 py-2 text-sm font-semibold shadow-sm transition ${picker ? 'bg-[#efe8dd] text-[#1f1b19]' : 'bg-[#1f1b19] text-white hover:bg-[#3a332f]'}`}
+              >
+                <span className="text-base leading-none">{picker ? '×' : '＋'}</span>
+                新增區塊
+                {plan.pro ? null : <span className="text-[11px] font-normal opacity-70">{blocks.length}/{plan.limits.maxBlocks}</span>}
+              </button>
             </div>
             {contentTab === 'links' ? (
               <div className="space-y-3">
@@ -643,11 +654,7 @@ export default function ProfileCardManager({ products, lineUrl = '', upgradeHref
                       ))}
                     </div>
                   </div>
-                ) : (
-                  <button type="button" onClick={() => setPicker(true)} className="w-full rounded-2xl border border-dashed border-[#c9bcad] bg-white/60 py-3 text-sm font-medium text-[#1f1b19] transition hover:bg-white">
-                    ＋ 新增區塊{plan.pro ? '' : `(${blocks.length}/${plan.limits.maxBlocks})`}
-                  </button>
-                )}
+                ) : null}
                 {importOpen ? (
                   <ImportPanel onClose={() => setImportOpen(false)} onDone={() => void reloadCard()} />
                 ) : (
@@ -885,6 +892,8 @@ function BlockTypeSwitcher({ block, dirty, onChange }: { block: ProfileCardBlock
   );
 }
 
+const SWIPE_W = 144; // 左滑操作區寬度
+
 function BlockRow({
   block,
   handle,
@@ -959,6 +968,37 @@ function BlockRow({
   else status = <Toggle on={block.enabled} onChange={(v) => onPatch({ enabled: v })} label="顯示" />;
 
   const { plan, upgradeHref } = usePlan();
+
+  // 左滑露出「隱藏 / 刪除」(手機);展開編輯時不能滑
+  const [swipe, setSwipe] = useState(0);
+  const [dragging, setDragging] = useState(false);
+  const swipeRef = useRef<{ x: number; y: number; base: number; active: boolean; moved: boolean } | null>(null);
+  function swipeStart(e: React.PointerEvent) {
+    if (open || e.pointerType === 'mouse') return;
+    swipeRef.current = { x: e.clientX, y: e.clientY, base: swipe, active: false, moved: false };
+  }
+  function swipeMove(e: React.PointerEvent) {
+    const d = swipeRef.current;
+    if (!d) return;
+    const dx = e.clientX - d.x;
+    const dy = e.clientY - d.y;
+    if (!d.active) {
+      if (Math.abs(dy) > 10 && Math.abs(dy) > Math.abs(dx)) return void (swipeRef.current = null); // 上下捲動
+      if (Math.abs(dx) < 10) return;
+      d.active = true;
+      d.moved = true;
+      setDragging(true);
+    }
+    setSwipe(Math.max(-SWIPE_W, Math.min(0, d.base + dx)));
+  }
+  function swipeEnd() {
+    const d = swipeRef.current;
+    if (d?.active) setSwipe((v) => (v < -SWIPE_W / 2 ? -SWIPE_W : 0));
+    setDragging(false);
+    // click 事件在 pointerup 之後才觸發:稍後再清掉
+    setTimeout(() => { swipeRef.current = null; }, 0);
+  }
+
   const timedPanelPro = (
     <>
             {/* 限時顯示 */}
@@ -1003,10 +1043,44 @@ function BlockRow({
   );
 
   return (
-    <div className="flex overflow-hidden rounded-2xl border border-[#ebe4da] bg-white">
+    <div className="relative overflow-hidden rounded-2xl">
+      {/* 左滑後露出的操作:隱藏 / 刪除 */}
+      {swipe < 0 ? (
+        <div className="absolute inset-y-0 right-0 flex" style={{ width: SWIPE_W }}>
+          <button
+            type="button"
+            disabled={!complete}
+            onClick={() => { onPatch({ enabled: !block.enabled }); setSwipe(0); }}
+            className="flex flex-1 flex-col items-center justify-center gap-0.5 bg-[#8a7f72] text-xs font-medium text-white disabled:opacity-50"
+          >
+            <Icon size={18}>{block.enabled ? <><path d="M3 3l18 18" /><path d="M10.6 6.1A9.8 9.8 0 0 1 12 6c6.4 0 10 6 10 6a17 17 0 0 1-3.2 3.9M6.6 6.6C3.9 8.4 2 12 2 12s3.6 6 10 6a9.6 9.6 0 0 0 5.4-1.6" /></> : <><path d="M2 12s3.6-6 10-6 10 6 10 6-3.6 6-10 6S2 12 2 12z" /><circle cx="12" cy="12" r="3" /></>}</Icon>
+            {block.enabled ? '隱藏' : '顯示'}
+          </button>
+          <button type="button" onClick={() => { setSwipe(0); onDelete(); }} className="flex flex-1 flex-col items-center justify-center gap-0.5 bg-[#c84767] text-xs font-medium text-white">
+            <Icon size={18}><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3" /></Icon>
+            刪除
+          </button>
+        </div>
+      ) : null}
+    <div
+      className={`relative flex overflow-hidden rounded-2xl border border-[#ebe4da] bg-white ${dragging ? '' : 'transition-transform duration-200'}`}
+      style={{ transform: swipe ? `translateX(${swipe}px)` : undefined }}
+    >
       <div className="flex items-stretch border-r border-[#f3eee7] bg-[#fcfaf7] px-1.5">{handle}</div>
       <div className="min-w-0 flex-1">
-        <div className="flex cursor-pointer items-center gap-3 p-3.5" onClick={onToggleOpen}>
+        <div
+          className="flex cursor-pointer select-none items-center gap-3 p-3.5"
+          style={{ touchAction: 'pan-y' }}
+          onPointerDown={swipeStart}
+          onPointerMove={swipeMove}
+          onPointerUp={swipeEnd}
+          onPointerCancel={swipeEnd}
+          onClick={() => {
+            if (swipeRef.current?.moved) return; // 剛滑動過,不當成點擊
+            if (swipe) return setSwipe(0);
+            onToggleOpen();
+          }}
+        >
           <span className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-[#f6f2ec] text-[#6b6156]">
             <BlockThumb block={block} productImage={product?.image} />
           </span>
@@ -1130,6 +1204,7 @@ function BlockRow({
           </div>
         ) : null}
       </div>
+    </div>
     </div>
   );
 }
