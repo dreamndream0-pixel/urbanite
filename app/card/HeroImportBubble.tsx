@@ -74,55 +74,45 @@ export default function HeroImportBubble({ loggedIn }: { loggedIn: boolean }) {
 
   const linkCount = data?.blocks.length ?? 0;
   const modal = data ? (
-    <div className="fixed inset-0 z-[100] flex items-end justify-center bg-[#1f1b19]/45 backdrop-blur-sm sm:items-center sm:p-6" onClick={() => setData(null)}>
-      <div
-        className="flex max-h-[94dvh] w-full max-w-[880px] flex-col overflow-y-auto rounded-t-[28px] sm:overflow-hidden bg-[#faf7f2] shadow-[0_24px_60px_rgba(0,0,0,0.25)] sm:flex-row sm:rounded-[32px]"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* 搬家後的樣子 */}
-        <div className="flex shrink-0 justify-center bg-[#efe8dd] px-4 pt-4 sm:min-h-0 sm:flex-1 sm:items-center sm:py-6">
-          <div className="h-[48dvh] w-full max-w-[320px] overflow-y-auto rounded-t-[28px] border-x-[8px] border-t-[8px] border-[#1f1b19] bg-white sm:h-[min(640px,80dvh)] sm:rounded-[36px] sm:border-[9px]">
-            <ProfileCardView card={data.card} blocks={data.blocks} products={{}} preview />
-          </div>
+    // 滿版預覽:跟搬家後的名片頁一樣,下方固定一條確認列
+    <div className="fixed inset-0 z-[100] flex flex-col bg-white">
+      <div className="flex shrink-0 items-center gap-3 border-b border-[#e5ded4] bg-[#faf7f2] px-4 py-2.5">
+        <div className="min-w-0 flex-1">
+          <p className="text-[11px] tracking-[0.18em] text-[#a99e8f]">一鍵搬家預覽 · {data.source}</p>
+          <p className="truncate text-sm font-semibold text-[#1f1b19]">這是搬到 URBANLINKS 後的樣子</p>
         </div>
-        {/* 說明與確定 */}
-        <div className="flex shrink-0 flex-col gap-4 p-5 sm:w-[320px] sm:p-7">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <p className="text-xs tracking-[0.18em] text-[#a99e8f]">一鍵搬家預覽</p>
-              <h3 className="mt-1 text-lg font-semibold text-[#1f1b19]">這是搬到 URBANLINKS 後的樣子</h3>
-            </div>
-            <button type="button" onClick={() => setData(null)} aria-label="關閉" className="-mr-1 rounded-full p-1.5 text-[#8a7f72] hover:bg-[#efe8dd]">
-              <X size={18} />
-            </button>
-          </div>
-          <ul className="space-y-1.5 text-sm text-[#5f5852]">
-            <li>來源:{data.source}</li>
-            <li>名稱、頭貼、簡介{data.card.tags.length ? '、標籤' : ''}{data.card.socials.length ? `、${data.card.socials.length} 個社群帳號` : ''}</li>
-            <li>{linkCount} 個區塊,圖片會一起搬過來</li>
-          </ul>
-          {linkCount > data.freeBlocks ? (
-            <p className="rounded-xl bg-[#fbf6ec] px-3 py-2 text-xs leading-5 text-[#6b4a1f]">
-              免費版會先搬前 {data.freeBlocks} 個區塊,升級 U Plus 就能全部搬過來。
+        <button type="button" onClick={() => setData(null)} className="shrink-0 rounded-full border border-[#d7c9bd] px-3 py-1.5 text-xs text-[#5f5852]">
+          換一個網址
+        </button>
+        <button type="button" onClick={() => setData(null)} aria-label="關閉" className="shrink-0 rounded-full p-1.5 text-[#8a7f72] hover:bg-[#efe8dd]">
+          <X size={18} />
+        </button>
+      </div>
+      <div className="min-h-0 flex-1 overflow-y-auto">
+        <ProfileCardView card={data.card} blocks={data.blocks} products={{}} preview fullScreen />
+      </div>
+      <div className="shrink-0 border-t border-[#e5ded4] bg-[#faf7f2] px-4 pb-[max(12px,env(safe-area-inset-bottom))] pt-3 shadow-[0_-8px_24px_rgba(0,0,0,0.06)]">
+        <div className="mx-auto flex max-w-2xl flex-col gap-2.5 sm:flex-row sm:items-center sm:gap-4">
+          <div className="min-w-0 flex-1 space-y-1.5">
+            <p className="text-xs text-[#5f5852]">
+              {linkCount} 個區塊、名稱、頭貼{data.card.tags.length ? '、標籤' : ''}{data.card.socials.length ? `、${data.card.socials.length} 個社群帳號` : ''},圖片會一起搬過來
+              {linkCount > data.freeBlocks ? <span className="text-[#6b4a1f]">(免費版先搬前 {data.freeBlocks} 個,升級 U Plus 全部搬)</span> : null}
             </p>
-          ) : null}
-          <label className="flex items-start gap-2 text-xs leading-5 text-[#5f5852]">
-            <input type="checkbox" checked={mine} onChange={(e) => setMine(e.target.checked)} className="mt-0.5" />
-            這是我自己的頁面,我有權使用上面的內容
-          </label>
-          <div className="mt-auto space-y-2">
+            <label className="flex items-start gap-2 text-xs leading-5 text-[#5f5852]">
+              <input type="checkbox" checked={mine} onChange={(e) => setMine(e.target.checked)} className="mt-0.5" />
+              這是我自己的頁面,我有權使用上面的內容
+            </label>
+          </div>
+          <div className="shrink-0 sm:w-56">
             <button
               type="button"
               onClick={confirm}
               disabled={!mine}
-              className="w-full rounded-full bg-[#1f1b19] py-3 text-sm font-semibold text-white transition hover:bg-[#3a332f] disabled:opacity-40"
+              className="w-full rounded-full bg-[#121b33] py-3 text-sm font-semibold text-[#dcbc84] transition hover:bg-[#1d2a4d] disabled:opacity-40"
             >
               確定搬家
             </button>
-            <p className="text-center text-[11px] leading-4 text-[#a99e8f]">{loggedIn ? '會直接搬進你的名片' : '下一步建立帳號,完成後自動搬進你的名片'}</p>
-            <button type="button" onClick={() => setData(null)} className="w-full py-1.5 text-xs text-[#8a7f72] underline underline-offset-2">
-              換一個網址
-            </button>
+            <p className="mt-1 text-center text-[11px] text-[#a99e8f]">{loggedIn ? '會直接搬進你的名片' : '下一步建立帳號,完成後自動搬進名片'}</p>
           </div>
         </div>
       </div>
