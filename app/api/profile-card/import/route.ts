@@ -2,7 +2,8 @@ import { NextResponse } from 'next/server';
 import { requireCardOwner } from '@/lib/card-access';
 import { readImportPage } from '@/lib/card-import';
 import { normalizeUrl } from '@/lib/profile-card';
-import { applyImport, type ImportChoice } from '@/lib/card-import-apply';
+import { applyImport, templateAllowed, type ImportChoice } from '@/lib/card-import-apply';
+import { matchTemplate } from '@/lib/card-template-match';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 120; // 圖片多的頁面(例如 LINKGOODS 七十幾張大圖)需要較久
@@ -24,7 +25,7 @@ export async function POST(request: Request) {
   }
   if (!body.apply) {
     if (!profile.items.length && !profile.avatar && !profile.name) return NextResponse.json({ error: '這個頁面讀不到內容,請確認是公開的個人頁網址' }, { status: 404 });
-    return NextResponse.json({ ...profile, maxBlocks: owner.plan.limits.maxBlocks });
+    return NextResponse.json({ ...profile, maxBlocks: owner.plan.limits.maxBlocks, template: matchTemplate(profile.style, templateAllowed(owner.plan)) });
   }
 
   try {

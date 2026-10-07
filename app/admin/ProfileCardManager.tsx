@@ -422,7 +422,7 @@ export default function ProfileCardManager({ products, lineUrl = '', upgradeHref
 
   // 在官網預覽過、按了「確定搬家」:登入後自動搬進名片(一天內有效,只執行一次)
   async function runPendingImport() {
-    let job: { url?: string; at?: number } | null = null;
+    let job: { url?: string; at?: number; template?: string } | null = null;
     try {
       job = JSON.parse(localStorage.getItem(PENDING_IMPORT_KEY) ?? 'null');
       localStorage.removeItem(PENDING_IMPORT_KEY);
@@ -435,7 +435,7 @@ export default function ProfileCardManager({ products, lineUrl = '', upgradeHref
       const res = await fetch('/api/profile-card/import', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: job.url, apply: { name: true, bio: true, avatar: true, socials: true, tags: true, items: Array.from({ length: 100 }, (_, i) => i) } }),
+        body: JSON.stringify({ url: job.url, apply: { name: true, bio: true, avatar: true, socials: true, tags: true, template: job.template || 'auto', items: Array.from({ length: 100 }, (_, i) => i) } }),
       });
       const d = await res.json();
       if (!res.ok) throw new Error(d.error ?? '搬家失敗');
@@ -1482,6 +1482,7 @@ type ImportPreview = {
   avatar: string;
   socials: { type: string; value: string }[];
   tags?: string[];
+  template?: string; // 最接近原本頁面的模板
   items: (
     | { kind: 'link'; title: string; url: string; image: string }
     | { kind: 'text'; title: string }
@@ -1500,7 +1501,7 @@ function ImportPanel({ onClose, onDone }: { onClose: () => void; onDone: () => v
   const [error, setError] = useState('');
   const [data, setData] = useState<ImportPreview | null>(null);
   const [picked, setPicked] = useState<number[]>([]);
-  const [opts, setOpts] = useState({ name: true, bio: true, avatar: true, socials: true, tags: true });
+  const [opts, setOpts] = useState({ name: true, bio: true, avatar: true, socials: true, tags: true, template: true });
   const [mine, setMine] = useState(false);
   const [result, setResult] = useState('');
 
@@ -1527,7 +1528,7 @@ function ImportPanel({ onClose, onDone }: { onClose: () => void; onDone: () => v
     setBusy(true);
     setError('');
     try {
-      const res = await fetch('/api/profile-card/import', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url, apply: { ...opts, items: picked } }) });
+      const res = await fetch('/api/profile-card/import', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url, apply: { ...opts, template: opts.template && data.template ? data.template : '', items: picked } }) });
       const d = await res.json();
       if (!res.ok) throw new Error(d.error ?? '匯入失敗');
       setResult(d.skipped ? `已匯入 ${d.added} 個區塊。免費版最多 ${d.maxBlocks} 個區塊,還有 ${d.skipped} 個沒有匯入。` : `已匯入 ${d.added} 個區塊,頭像與資料也更新好了。`);
@@ -1593,7 +1594,7 @@ function ImportPanel({ onClose, onDone }: { onClose: () => void; onDone: () => v
             <span className="shrink-0 rounded-full bg-white px-2 py-0.5 text-[10px] text-[#8a7f72]">{data.source}</span>
           </div>
           <div className="flex flex-wrap gap-x-4 gap-y-1.5 text-xs">
-            {([['avatar', '換成這個頭像'], ['name', '換成這個名稱'], ['bio', '換成這段簡介'], ['socials', `加入社群帳號(${data.socials.length})`], ...(data.tags?.length ? ([['tags', `加入擅長領域標籤(${data.tags.length})`]] as const) : [])] as const).map(([k, label]) => (
+            {([['avatar', '換成這個頭像'], ['name', '換成這個名稱'], ['bio', '換成這段簡介'], ['socials', `加入社群帳號(${data.socials.length})`], ...(data.tags?.length ? ([['tags', `加入擅長領域標籤(${data.tags.length})`]] as const) : []), ...(data.template ? ([['template', `套用最接近的模板「${CARD_TEMPLATES.find((t) => t.key === data.template)?.name ?? data.template}」`]] as const) : [])] as const).map(([k, label]) => (
               <label key={k} className="flex items-center gap-1.5">
                 <input type="checkbox" checked={opts[k]} onChange={(e) => setOpts({ ...opts, [k]: e.target.checked })} />
                 {label}

@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server';
 import { readImportPage } from '@/lib/card-import';
 import { fillSocialRows, importRows } from '@/lib/card-import-apply';
+import { matchTemplate, templateTheme } from '@/lib/card-template-match';
+import { FREE_LIMITS, FREE_TEMPLATE_KEYS, tierRank } from '@/lib/card-plan';
+import { getCardPromo, promoActive } from '@/lib/card-promo';
 import { normalizeUrl, type ProfileCard, type ProfileCardBlock } from '@/lib/profile-card';
-import { FREE_LIMITS } from '@/lib/card-plan';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 30;
@@ -22,6 +24,10 @@ export async function POST(request: Request) {
   if (!profile.items.length && !profile.avatar && !profile.name) {
     return NextResponse.json({ error: '這個頁面讀不到內容,請確認是公開的個人頁網址' }, { status: 404 });
   }
+  // 還沒註冊 = 免費版,只能用免費模板;限時免費期間(U Plus 以上)全部模板都能用
+  const promo = await getCardPromo();
+  const allTemplates = promoActive(promo) && tierRank(promo.tier) >= tierRank('plus');
+  const template = matchTemplate(profile.style, (k) => allTemplates || FREE_TEMPLATE_KEYS.includes(k));
   const card: ProfileCard = {
     id: 'preview',
     slug: 'preview',
@@ -35,7 +41,7 @@ export async function POST(request: Request) {
     show_socials: true,
     tags: (profile.tags ?? []).slice(0, 3),
     show_tags: Boolean(profile.tags?.length),
-    theme: {},
+    theme: (template && templateTheme(template)) || {},
     published: true,
     seo_title: '',
     seo_description: '',
@@ -46,5 +52,5 @@ export async function POST(request: Request) {
   const blocks = rows.map(
     (row, i) => ({ ...row, id: `p${i}`, clicks: 0, start_at: null, end_at: null }) as unknown as ProfileCardBlock,
   );
-  return NextResponse.json({ source: profile.source, url, card, blocks, freeBlocks: FREE_LIMITS.maxBlocks });
+  return NextResponse.json({ source: profile.source, url, card, blocks, freeBlocks: allTemplates ? 999 : FREE_LIMITS.maxBlocks, template, allTemplates });
 }

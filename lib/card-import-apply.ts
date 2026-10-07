@@ -1,11 +1,17 @@
 import sharp from 'sharp';
 import { createAdminClient } from '@/lib/supabase/admin';
 import type { ImportedItem, ImportedProfile } from '@/lib/card-import';
-import type { CardPlanInfo } from '@/lib/card-plan';
+import { FREE_TEMPLATE_KEYS, type CardPlanInfo } from '@/lib/card-plan';
+import { matchTemplate, templateTheme } from '@/lib/card-template-match';
 import { detectPlatform, fetchSocialProfile } from '@/lib/social-fetch';
 import { BIO_LIMIT, videoEmbedUrl, type ProfileCard, type SocialLink, MAX_TAGS } from '@/lib/profile-card';
 
-export type ImportChoice = { name?: boolean; bio?: boolean; avatar?: boolean; socials?: boolean; tags?: boolean; items?: number[] };
+export type ImportChoice = { name?: boolean; bio?: boolean; avatar?: boolean; socials?: boolean; tags?: boolean; template?: string; items?: number[] }; // template:'auto' = 自動挑最接近的,或指定模板 key
+
+// 這個方案能用的模板
+export function templateAllowed(plan: Pick<CardPlanInfo, 'limits'>) {
+  return (key: string) => plan.limits.allTemplates || FREE_TEMPLATE_KEYS.includes(key);
+}
 
 // 下載圖片存到自己的空間(其他平台的圖片網址可能會失效)
 async function storeImage(userId: string, url: string, size: number, square: boolean) {
@@ -133,6 +139,14 @@ export async function applyImport(user: { id: string }, card: ProfileCard, plan:
     const current = Array.isArray(card.tags) ? card.tags : [];
     update.tags = [...new Set([...current, ...profile.tags])].slice(0, MAX_TAGS);
     update.show_tags = true;
+  }
+  if (apply.template) {
+    // 套用模板:指定的模板方案不能用時,改挑方案內最接近的
+    const allowed = templateAllowed(plan);
+    let key = apply.template === 'auto' ? matchTemplate(profile.style, allowed) : apply.template;
+    if (key && !allowed(key)) key = matchTemplate(profile.style, allowed);
+    const theme = key ? templateTheme(key, (card.theme ?? {}) as Record<string, unknown>) : null;
+    if (theme) update.theme = theme;
   }
   if (Object.keys(update).length) {
     update.updated_at = new Date().toISOString();

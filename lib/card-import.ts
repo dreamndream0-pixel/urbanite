@@ -22,8 +22,22 @@ export type ImportedProfile = {
   avatar: string;
   socials: { type: string; value: string }[];
   tags?: string[]; // 擅長領域 / 標籤
+  style?: ImportedStyle; // 原本頁面的配色與按鈕樣式(用來挑最接近的模板)
   items: ImportedItem[];
 };
+
+// 原本頁面的外觀:背景、文字、按鈕顏色與形狀
+export type ImportedStyle = {
+  bg?: string;
+  bg2?: string; // 漸層第二色
+  text?: string;
+  button?: string;
+  buttonText?: string;
+  shape?: 'pill' | 'rounded' | 'square';
+  fill?: 'solid' | 'outline' | 'soft';
+  dark?: boolean;
+};
+const cornerShape = (px: number): ImportedStyle['shape'] => (px >= 18 ? 'pill' : px >= 6 ? 'rounded' : 'square');
 
 const SOURCES: [RegExp, string][] = [
   [/(^|\.)linktr\.ee$/, 'Linktree'],
@@ -182,12 +196,27 @@ function parseLinktree(html: string): ImportedProfile | null {
   const socials = ((p.socialLinks as Record<string, unknown>[] | undefined) ?? [])
     .map((s) => ({ type: socialType(str(s.url)) || str(s.type).toLowerCase(), value: str(s.url) }))
     .filter((s) => s.value);
+  // 外觀:theme.background / buttonStyle / typeface
+  const theme = ((p.theme ?? account.theme ?? {}) as Record<string, Record<string, unknown>>);
+  const btn = (theme.buttonStyle ?? {}) as Record<string, Record<string, unknown> | string>;
+  const corner = str((btn.cornerStyle as Record<string, unknown> | undefined)?.type);
+  const btnType = str(btn.type);
+  const style: ImportedStyle = {
+    bg: str(theme.background?.color),
+    text: str(theme.typeface?.color),
+    button: str((btn.backgroundStyle as Record<string, unknown> | undefined)?.color),
+    buttonText: str((btn.textStyle as Record<string, unknown> | undefined)?.color),
+    shape: /FULL|PILL/.test(corner) ? 'pill' : /SQUARE|NONE/.test(corner) ? 'square' : corner ? 'rounded' : undefined,
+    fill: /OUTLINE/.test(btnType) ? 'outline' : /SOFT|GLASS|SHADOW/.test(btnType) ? 'soft' : btnType ? 'solid' : undefined,
+    dark: str((theme as Record<string, unknown>).luminance) === 'DARK' || undefined,
+  };
   return {
     source: 'Linktree',
     name: str(p.pageTitle) || str(account.pageTitle) || str(p.username),
     bio: str(p.description) || str(account.description),
     avatar: str(account.profilePictureUrl) || str(p.customAvatar),
     socials,
+    style,
     items,
   };
 }
@@ -257,7 +286,21 @@ function parsePortaly(html: string): ImportedProfile | null {
       return { type: socialType(value) || k.toLowerCase(), value };
     })
     .filter((s) => isHttp(s.value));
-  return { source: 'Portaly', name: str(d.name), bio: str(d.description), avatar: str(d.avatar), socials, items };
+  // 外觀:背景(純色 / 漸層)、主題色、圓角、深淺色
+  const bgd = (d.background ?? {}) as Record<string, unknown>;
+  const grad = ((bgd.gradient as Record<string, unknown> | undefined)?.colors as string[] | undefined)?.filter(Boolean) ?? [];
+  const THEME_COLOR: Record<string, string> = { blue: '#3b82f6', purple: '#8b5cf6', green: '#22c55e', red: '#ef4444', orange: '#f97316', pink: '#ec4899', yellow: '#eab308', black: '#111111', gray: '#6b7280', brown: '#92400e', teal: '#14b8a6' };
+  const dark = str(d.colorMode) === 'dark';
+  const style: ImportedStyle = {
+    bg: str(bgd.color) || (str(bgd.colorMode) === 'gradient' ? grad[0] : '') || (dark ? '#111111' : '#ffffff'),
+    bg2: str(bgd.colorMode) === 'gradient' ? grad[1] : undefined,
+    text: dark ? '#ffffff' : '#1f1b19',
+    button: THEME_COLOR[str(d.theme)] ?? '',
+    shape: str(d.borderRadiusStyles) === 'square' ? 'square' : str(d.borderRadiusStyles) ? 'pill' : undefined,
+    fill: str(d.buttonMode) === 'transparent' ? 'outline' : str(d.buttonMode) ? 'solid' : undefined,
+    dark,
+  };
+  return { source: 'Portaly', name: str(d.name), bio: str(d.description), avatar: str(d.avatar), socials, style, items };
 }
 
 // ---------- LINKGOODS(Nuxt + Apollo 快取)----------
@@ -390,7 +433,18 @@ function parseLinkgoods(html: string): ImportedProfile | null {
   // 擅長領域 → 標籤
   const tags = ((Array.isArray(user.kolFields) ? user.kolFields : []) as unknown[]).map((f) => str(deref(f).name)).filter(Boolean);
   const bio = user.isDescriptionShow === false ? '' : str(user.description);
-  return { source: 'LINKGOODS', name: str(user.nickname) || str(user.username), bio, avatar: str(user.photo), socials, tags, items };
+  // 外觀:template.theme 的背景、主色、按鈕底色與文字色
+  const t = (json(user.template).theme ?? {}) as Obj;
+  const linkBg = str(t.linkBgColor1);
+  const style: ImportedStyle = {
+    bg: str(t.bgColor) || str((json(user.template).lib as Obj | undefined)?.customBgColor),
+    text: str(t.primaryColor),
+    button: linkBg,
+    buttonText: str(t.linkTextColor),
+    // 白底按鈕配彩色外框 → 外框按鈕
+    fill: linkBg && /^#?f{6}$/i.test(linkBg.replace('#', '')) && str(t.linkBorderColor) ? 'outline' : linkBg ? 'solid' : undefined,
+  };
+  return { source: 'LINKGOODS', name: str(user.nickname) || str(user.username), bio, avatar: str(user.photo), socials, tags, style, items };
 }
 
 // ---------- Linkfly(內容在另一個 JSON 檔,頁面載入後才抓)----------
@@ -470,8 +524,31 @@ async function parseLinkfly(html: string): Promise<ImportedProfile | null> {
       }
     }
   }
+  // 外觀:window.__theme 的背景、區塊顏色與圓角
+  let style: ImportedStyle | undefined;
+  const tm = html.match(/window\.__theme=(\{[\s\S]*?\});<\/script>/);
+  if (tm) {
+    try {
+      const th = JSON.parse(tm[1]) as Record<string, Record<string, Record<string, unknown>>>;
+      const bgk = th.background ?? {};
+      const colors = th.layout?.colors ?? {};
+      const outline = String(colors.opacity ?? '') === '0';
+      style = {
+        bg: str(bgk.color1) || str(bgk.color) || undefined,
+        bg2: str(bgk.color2) || undefined,
+        text: str(th.theme?.textColor) || str(colors.text) || undefined,
+        button: outline ? str(colors.border) : str(colors.background),
+        buttonText: str(colors.text) || undefined,
+        shape: cornerShape(Number(th.layout?.block?.corner ?? 0)),
+        fill: outline ? 'outline' : 'solid',
+      };
+    } catch {
+      style = undefined;
+    }
+  }
   return {
     source: 'Linkfly',
+    style,
     name: str(basic.title),
     bio: str(basic.desc).replace(/\s*\n\s*/g, ' '),
     avatar: img(str(basic.cover)),
