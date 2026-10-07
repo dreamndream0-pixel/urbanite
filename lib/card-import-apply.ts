@@ -2,6 +2,7 @@ import sharp from 'sharp';
 import { createAdminClient } from '@/lib/supabase/admin';
 import type { ImportedItem, ImportedProfile } from '@/lib/card-import';
 import type { CardPlanInfo } from '@/lib/card-plan';
+import { detectPlatform, fetchSocialProfile } from '@/lib/social-fetch';
 import { BIO_LIMIT, videoEmbedUrl, type ProfileCard, type SocialLink, MAX_TAGS } from '@/lib/profile-card';
 
 export type ImportChoice = { name?: boolean; bio?: boolean; avatar?: boolean; socials?: boolean; tags?: boolean; items?: number[] };
@@ -28,6 +29,26 @@ async function storeImage(userId: string, url: string, size: number, square: boo
 
 // 讀到的項目 → 名片區塊(實際搬家與官網預覽共用);image(key, 原網址) 回傳要用的圖片網址
 const FOLLOW = ['instagram', 'youtube', 'tiktok', 'facebook', 'threads', 'x', 'line', 'xiaohongshu', 'pinterest'];
+// 社群追蹤卡片:搬家時直接讀取頭像、名稱、追蹤數與簡介(抓不到就維持空白,之後打開編輯會再抓)
+// avatar(原網址) 回傳要存的頭像網址:實際搬家會下載到自己的空間,預覽直接用原網址
+export async function fillSocialRows<T extends { type: string; url: string; title: string; image: string; options: Record<string, unknown> }>(rows: T[], avatar: (url: string) => Promise<string>) {
+  const social = rows.filter((r) => r.type === 'social' && detectPlatform(r.url)).slice(0, 8);
+  await Promise.all(
+    social.map(async (r) => {
+      try {
+        const p = await fetchSocialProfile(r.url);
+        if (!p) return;
+        r.title = p.name || r.title;
+        r.image = p.image ? (await avatar(p.image)) || r.image : r.image;
+        r.options = { ...r.options, platform: p.platform || r.options.platform, statA: p.statA, statB: p.statB, bio: p.bio, fetchedAt: new Date().toISOString(), fetchedUrl: r.url };
+      } catch {
+        /* 抓不到就跳過 */
+      }
+    }),
+  );
+  return rows;
+}
+
 export function importRows(items: ImportedItem[], cardId: string, startOrder: number, image: (key: string, original: string) => string) {
   const card = { id: cardId };
   let order = startOrder;
@@ -85,6 +106,7 @@ export async function applyImport(user: { id: string }, card: ProfileCard, plan:
 
   const order = Math.max(0, ...(existing ?? []).map((b) => Number(b.sort_order) || 0)) + 1;
   const rows = importRows(toAdd, card.id, order, (key) => stored.get(key) ?? '');
+  await fillSocialRows(rows, (src) => storeImage(user.id, src, 400, true));
   if (rows.length) {
     const { error } = await supabase.from('profile_card_blocks').insert(rows);
     if (error) throw new Error(error.message);

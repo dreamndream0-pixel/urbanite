@@ -5,7 +5,7 @@ import Link from 'next/link';
 import SocialIcon from '@/app/components/SocialIcon';
 import ProfileImageBlock from '@/app/components/ProfileImageBlock';
 import LinkIcon, { isIconImage } from '@/app/components/LinkIcon';
-import { blockOptions, followPlatform,
+import { blockOptions, followLogo, followPlatform,
   coverSpec,
   detectSource,
   FONT_OPTIONS,
@@ -805,6 +805,7 @@ export default function ProfileCardView({
               const o = blockOptions(b);
               const p = followPlatform(o.platform);
               const stats = [o.statA, o.statB].filter(Boolean);
+              const logo = o.logoStyle === 'color' ? followLogo(p.key) : ''; // 彩色版 Logo
               return (
                 <a
                   key={b.id}
@@ -815,11 +816,17 @@ export default function ProfileCardView({
                   className="relative flex flex-col items-center bg-white px-5 pb-5 pt-6 text-center text-[#1f1b19] transition hover:opacity-95"
                   style={{ borderRadius: Math.min(radius + 6, 28), boxShadow: '0 6px 20px rgba(0,0,0,0.08)' }}
                 >
-                  <span className="absolute right-3.5 top-3.5 flex h-8 w-8 items-center justify-center rounded-full text-white" style={{ background: p.color }}>
-                    <SocialIcon type={p.key} size={16} />
-                  </span>
+                  {logo ? (
+                    <img src={logo} alt={p.label} className="absolute right-3.5 top-3.5 h-8 w-8 object-contain" />
+                  ) : (
+                    <span className="absolute right-3.5 top-3.5 flex h-8 w-8 items-center justify-center rounded-full text-white" style={{ background: p.color }}>
+                      <SocialIcon type={p.key} size={16} />
+                    </span>
+                  )}
                   {b.image ? (
                     <img src={b.image} alt="" className="h-20 w-20 rounded-full object-cover" />
+                  ) : logo ? (
+                    <img src={logo} alt="" className="h-20 w-20 object-contain" />
                   ) : (
                     <span className="flex h-20 w-20 items-center justify-center rounded-full text-white" style={{ background: p.color }}><SocialIcon type={p.key} size={34} /></span>
                   )}

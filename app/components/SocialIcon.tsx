@@ -17,7 +17,13 @@ export default function SocialIcon({ type, size = 20 }: { type: string; size?: n
     case 'facebook':
       return (<svg {...p}><path d="M14.5 8H17V4.5h-2.5A4 4 0 0 0 10.5 8.5V11H8v3.5h2.5V20H14v-5.5h2.6l.4-3.5h-3V8.9c0-.5.4-.9.9-.9z" /></svg>);
     case 'line':
-      return (<svg {...p}><path d="M12 4C7 4 3 7.2 3 11.2c0 3.6 3.2 6.6 7.6 7.1.3.1.7.2.8.5.1.3 0 .6 0 .9l-.1.8c0 .3-.2 1 .9.5s5.8-3.4 7.9-5.9c1.4-1.6 2-3.2 2-4.9C21 7.2 17 4 12 4z" /><path d="M7.5 9.5v3.5h2M11.5 9.5V13M13.5 13V9.5l2.5 3.5V9.5" /></svg>);
+      // 官方 LINE 對話框(含 LINE 字樣),用遮罩上色,跟著文字顏色走
+      return (
+        <span
+          aria-hidden="true"
+          style={{ display: 'inline-block', width: size, height: size, flexShrink: 0, background: 'currentColor', WebkitMask: 'url(/icons/social/line-mask.png) center / contain no-repeat', mask: 'url(/icons/social/line-mask.png) center / contain no-repeat' }}
+        />
+      );
     case 'threads':
       return (<svg {...p}><path d="M16.5 11.2c-.3-2.4-1.8-3.7-4.3-3.7-2.2 0-3.6 1.2-4 3" /><path d="M16.6 11.5c-1.2-.6-2.6-.8-4-.7-2.1.2-3.4 1.2-3.3 2.6.1 1.3 1.4 2 2.9 1.9 2.3-.1 3.5-1.8 3.6-5" /><path d="M18.5 8.2C17.3 5.4 15 4 12 4 7.4 4 4.5 7.3 4.5 12s2.9 8 7.5 8c3.5 0 5.9-1.8 6.6-4.2.6-2.1-.3-3.6-2-4.3" /></svg>);
     case 'youtube':

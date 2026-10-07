@@ -256,7 +256,7 @@ export type ImageLayout =
   | 'banner' | 'overlay' | 'top' | 'tall' | 'square' | 'card' | 'card-right'
   | 'grid2' | 'grid3' | 'circle3' | 'mosaic' | 'mosaic5' | 'scroll';
 // 社群追蹤卡片:platform 平台、statA / statB 兩個數字欄(自行填寫)、button 按鈕文字
-export type BlockOptions = { layout?: ImageLayout; captionMode?: 'link' | 'custom'; autoplay?: boolean; platform?: string; statA?: string; statB?: string; button?: string; bio?: string; fetchedAt?: string; fetchedUrl?: string; spots?: HotSpot[] };
+export type BlockOptions = { layout?: ImageLayout; captionMode?: 'link' | 'custom'; autoplay?: boolean; platform?: string; statA?: string; statB?: string; button?: string; bio?: string; fetchedAt?: string; fetchedUrl?: string; logoStyle?: 'mono' | 'color'; spots?: HotSpot[] };
 
 // 熱區圖片:位置與大小都是佔圖片寬高的百分比(0–100),不同螢幕都對得準
 export type HotSpot = { id: string; x: number; y: number; w: number; h: number; label: string; url: string; shape: 'rect' | 'circle' };
@@ -326,6 +326,7 @@ export function blockOptions(block: Pick<ProfileCardBlock, 'options'>): Required
     bio: typeof o.bio === 'string' ? o.bio.slice(0, 120) : '',
     fetchedAt: typeof o.fetchedAt === 'string' ? o.fetchedAt : '',
     fetchedUrl: typeof o.fetchedUrl === 'string' ? o.fetchedUrl : '',
+    logoStyle: o.logoStyle === 'color' ? 'color' : 'mono',
     spots: cleanSpots(o.spots),
   };
 }
@@ -358,6 +359,12 @@ export const FOLLOW_PLATFORMS: { key: string; label: string; color: string; acti
   { key: 'xiaohongshu', label: '小紅書', color: '#FF2442', action: '在小紅書關注' },
   { key: 'pinterest', label: 'Pinterest', color: '#E60023', action: '在 Pinterest 追蹤' },
 ];
+
+// 社群卡片彩色 Logo(public/icons/social/*-logo.png);沒有彩色檔的平台用單色
+export const FOLLOW_COLOR_LOGOS = new Set(['instagram', 'youtube', 'tiktok', 'facebook', 'threads', 'x', 'line', 'pinterest']);
+export function followLogo(key: string) {
+  return FOLLOW_COLOR_LOGOS.has(key) ? `/icons/social/${key}-logo.png` : '';
+}
 
 export function followPlatform(key: string | undefined) {
   return FOLLOW_PLATFORMS.find((p) => p.key === key) ?? FOLLOW_PLATFORMS[0];

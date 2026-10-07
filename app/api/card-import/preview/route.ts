@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { readImportPage } from '@/lib/card-import';
-import { importRows } from '@/lib/card-import-apply';
+import { fillSocialRows, importRows } from '@/lib/card-import-apply';
 import { normalizeUrl, type ProfileCard, type ProfileCardBlock } from '@/lib/profile-card';
 import { FREE_LIMITS } from '@/lib/card-plan';
 
@@ -42,7 +42,8 @@ export async function POST(request: Request) {
     seo_image: '',
     show_footer_logo: true,
   };
-  const blocks = importRows(profile.items, card.id, 0, (_key, original) => original).map(
+  const rows = await fillSocialRows(importRows(profile.items, card.id, 0, (_key, original) => original), async (src) => src);
+  const blocks = rows.map(
     (row, i) => ({ ...row, id: `p${i}`, clicks: 0, start_at: null, end_at: null }) as unknown as ProfileCardBlock,
   );
   return NextResponse.json({ source: profile.source, url, card, blocks, freeBlocks: FREE_LIMITS.maxBlocks });

@@ -15,6 +15,7 @@ import {
   type HotSpot,
   normalizeUrl,
   FOLLOW_PLATFORMS,
+  followLogo,
   followPlatform,
   IMAGE_LAYOUTS,
   IMAGE_LIMIT,
@@ -301,6 +302,32 @@ function SocialFollowEditor({
             </button>
           ))}
         </div>
+      </div>
+      <div>
+        <span className="mb-1.5 block text-xs text-[#8a7f72]">Logo 樣式</span>
+        <div className="flex gap-2">
+          {([['mono', '單色'], ['color', '彩色']] as const).map(([key, label]) => {
+            const logo = followLogo(platform.key);
+            const disabled = key === 'color' && !logo;
+            return (
+              <button
+                key={key}
+                type="button"
+                disabled={disabled}
+                onClick={() => setOption({ logoStyle: key }, true)}
+                className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-xs transition disabled:opacity-40 ${options.logoStyle === key ? 'border-[#1f1b19] bg-[#faf7f2] font-medium' : 'border-[#e5ded4] text-[#5f5852] hover:bg-[#faf7f2]'}`}
+              >
+                {key === 'color' && logo ? (
+                  <img src={logo} alt="" className="h-6 w-6 object-contain" />
+                ) : (
+                  <span className="flex h-6 w-6 items-center justify-center rounded-full text-white" style={{ background: platform.color }}><SocialIcon type={platform.key} size={13} /></span>
+                )}
+                {label}
+              </button>
+            );
+          })}
+        </div>
+        {!followLogo(platform.key) ? <p className="mt-1 text-[11px] text-[#a99e8f]">{platform.label} 目前只有單色版</p> : null}
       </div>
       <div className="flex items-center gap-3">
         <span className="h-14 w-14 shrink-0 overflow-hidden rounded-full bg-[#f6f2ec]">
@@ -1788,7 +1815,7 @@ function HotspotEditor({
 
 // 社群圖示(PNG,public/icons/social):四種樣式
 const SOCIAL_BRANDS: [string, string][] = [
-  ['instagram', 'Instagram'], ['facebook', 'Facebook'], ['threads', 'Threads'], ['tiktok', 'TikTok'], ['youtube', 'YouTube'], ['shopee', '蝦皮購物'], ['x', 'X'], ['linkedin', 'LinkedIn'],
+  ['instagram', 'Instagram'], ['line', 'LINE'], ['facebook', 'Facebook'], ['threads', 'Threads'], ['tiktok', 'TikTok'], ['youtube', 'YouTube'], ['shopee', '蝦皮購物'], ['x', 'X'], ['linkedin', 'LinkedIn'],
   ['pinterest', 'Pinterest'], ['whatsapp', 'WhatsApp'], ['telegram', 'Telegram'], ['messenger', 'Messenger'], ['discord', 'Discord'], ['twitch', 'Twitch'], ['snapchat', 'Snapchat'],
 ];
 const SOCIAL_UTILS: [string, string][] = [
