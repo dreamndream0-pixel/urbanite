@@ -579,9 +579,19 @@ export default function ProfileCardManager({ products, lineUrl = '', upgradeHref
                 {importOpen ? (
                   <ImportPanel onClose={() => setImportOpen(false)} onDone={() => void reloadCard()} />
                 ) : (
-                  <button type="button" onClick={() => setImportOpen(true)} className="flex w-full items-center justify-center gap-2 rounded-2xl bg-white/60 py-2.5 text-xs text-[#6b6156] transition hover:bg-white">
-                    <Icon size={15}><path d="M4 12h12M12 6l6 6-6 6" /><path d="M20 5v14" /></Icon>
-                    一鍵搬家:從 Linktree、Portaly 等其他名片匯入
+                  <button
+                    type="button"
+                    onClick={() => setImportOpen(true)}
+                    className="group flex w-full items-center gap-3 rounded-2xl border-2 border-[#dcbc84] bg-gradient-to-r from-[#121b33] to-[#24345c] px-4 py-3.5 text-left text-white shadow-[0_6px_18px_rgba(18,27,51,0.18)] transition hover:shadow-[0_8px_24px_rgba(18,27,51,0.28)]"
+                  >
+                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#dcbc84] text-[#121b33]">
+                      <Icon size={20}><path d="M3 10l9-6 9 6v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z" /><path d="M14 3.5h5v5" /></Icon>
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-sm font-semibold">一鍵搬家</span>
+                      <span className="block truncate text-[11px] text-white/70">貼上 Linktree、Portaly、LINKGOODS、Linkfly 網址,連結圖片一次搬過來</span>
+                    </span>
+                    <span className="shrink-0 rounded-full bg-[#dcbc84] px-3 py-1 text-[11px] font-semibold text-[#121b33] transition group-hover:bg-[#e8cd9c]">開始</span>
                   </button>
                 )}
                 {blocks.length === 0 ? (
@@ -1324,6 +1334,7 @@ type ImportPreview = {
   bio: string;
   avatar: string;
   socials: { type: string; value: string }[];
+  tags?: string[];
   items: (
     | { kind: 'link'; title: string; url: string; image: string }
     | { kind: 'text'; title: string }
@@ -1342,7 +1353,7 @@ function ImportPanel({ onClose, onDone }: { onClose: () => void; onDone: () => v
   const [error, setError] = useState('');
   const [data, setData] = useState<ImportPreview | null>(null);
   const [picked, setPicked] = useState<number[]>([]);
-  const [opts, setOpts] = useState({ name: true, bio: true, avatar: true, socials: true });
+  const [opts, setOpts] = useState({ name: true, bio: true, avatar: true, socials: true, tags: true });
   const [mine, setMine] = useState(false);
   const [result, setResult] = useState('');
 
@@ -1384,12 +1395,12 @@ function ImportPanel({ onClose, onDone }: { onClose: () => void; onDone: () => v
 
   const toggle = (i: number) => setPicked((p) => (p.includes(i) ? p.filter((x) => x !== i) : [...p, i]));
   const kindLabel = { link: '連結', text: '標題', video: '影片', image: '圖文', divider: '分隔', social: '社群' } as const;
-  const layoutLabel: Record<string, string> = { banner: '大圖', scroll: '橫向滑動', grid2: '兩欄', grid3: '三欄方格', circle3: '三個圓形', square: '方形' };
+  const layoutLabel: Record<string, string> = { banner: '大圖', scroll: '橫向滑動', grid2: '兩欄', grid3: '三欄方格', circle3: '三個圓形', square: '方形', mosaic: '一大兩小', mosaic5: '一大四小' };
   // 預覽清單每一列的縮圖與文字
   const describe = (it: ImportPreview['items'][number]) => {
     switch (it.kind) {
       case 'image':
-        return { thumb: it.items[0]?.image ?? '', title: it.title || `圖文連結 · ${it.items.length} 張`, sub: `${layoutLabel[it.layout] ?? it.layout} · ${it.items.map((x) => x.title).filter(Boolean).slice(0, 3).join('、') || '圖片連結'}` };
+        return { thumb: it.items[0]?.image ?? '', title: it.title || `圖文連結 · ${it.items.length} 張`, sub: `${layoutLabel[it.layout] ?? it.layout}${it.items.length > 1 && ['banner', 'square', 'top', 'overlay', 'tall'].includes(it.layout) ? '輪播' : ''} · ${it.items.map((x) => x.title).filter(Boolean).slice(0, 3).join('、') || '圖片連結'}` };
       case 'divider':
         return { thumb: '', title: '分隔線', sub: '' };
       case 'text':
@@ -1404,7 +1415,7 @@ function ImportPanel({ onClose, onDone }: { onClose: () => void; onDone: () => v
   };
 
   return (
-    <div className="space-y-3 rounded-2xl border border-[#e5ded4] bg-white p-4">
+    <div className="space-y-3 rounded-2xl border-2 border-[#dcbc84] bg-white p-4 shadow-[0_6px_18px_rgba(18,27,51,0.10)]">
       <div className="flex items-center justify-between">
         <p className="text-sm font-semibold">一鍵搬家</p>
         <button type="button" onClick={onClose} className="text-xs text-[#8a7f72]">關閉</button>
@@ -1422,15 +1433,20 @@ function ImportPanel({ onClose, onDone }: { onClose: () => void; onDone: () => v
       {data ? (
         <div className="space-y-3">
           <div className="flex items-center gap-3 rounded-xl bg-[#faf7f2] p-3">
-            {data.avatar ? <img src={data.avatar} alt="" className="h-12 w-12 shrink-0 rounded-full object-cover" /> : <span className="h-12 w-12 shrink-0 rounded-full bg-[#efe8dd]" />}
+            {data.avatar ? <img src={data.avatar} alt="" referrerPolicy="no-referrer" className="h-12 w-12 shrink-0 rounded-full object-cover" /> : <span className="h-12 w-12 shrink-0 rounded-full bg-[#efe8dd]" />}
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-semibold">{data.name || '(沒有名稱)'}</p>
               <p className="line-clamp-2 text-xs text-[#8a7f72]">{data.bio || '(沒有簡介)'}</p>
+              {data.tags?.length ? (
+                <div className="mt-1.5 flex flex-wrap gap-1">
+                  {data.tags.map((t) => <span key={t} className="rounded-full bg-[#1f1b19] px-2 py-0.5 text-[10px] text-white">{t}</span>)}
+                </div>
+              ) : null}
             </div>
             <span className="shrink-0 rounded-full bg-white px-2 py-0.5 text-[10px] text-[#8a7f72]">{data.source}</span>
           </div>
           <div className="flex flex-wrap gap-x-4 gap-y-1.5 text-xs">
-            {([['avatar', '換成這個頭像'], ['name', '換成這個名稱'], ['bio', '換成這段簡介'], ['socials', `加入社群帳號(${data.socials.length})`]] as const).map(([k, label]) => (
+            {([['avatar', '換成這個頭像'], ['name', '換成這個名稱'], ['bio', '換成這段簡介'], ['socials', `加入社群帳號(${data.socials.length})`], ...(data.tags?.length ? ([['tags', `加入擅長領域標籤(${data.tags.length})`]] as const) : [])] as const).map(([k, label]) => (
               <label key={k} className="flex items-center gap-1.5">
                 <input type="checkbox" checked={opts[k]} onChange={(e) => setOpts({ ...opts, [k]: e.target.checked })} />
                 {label}
@@ -1449,7 +1465,7 @@ function ImportPanel({ onClose, onDone }: { onClose: () => void; onDone: () => v
               return (
                 <label key={i} className="flex cursor-pointer items-center gap-2.5 px-3 py-2 text-xs">
                   <input type="checkbox" checked={picked.includes(i)} onChange={() => toggle(i)} />
-                  {d.thumb ? <img src={d.thumb} alt="" className="h-8 w-8 shrink-0 rounded object-cover" /> : <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded bg-[#f6f2ec] text-[10px] text-[#8a7f72]">{kindLabel[it.kind]}</span>}
+                  {d.thumb ? <img src={d.thumb} alt="" referrerPolicy="no-referrer" className="h-8 w-8 shrink-0 rounded object-cover" /> : <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded bg-[#f6f2ec] text-[10px] text-[#8a7f72]">{kindLabel[it.kind]}</span>}
                   <span className="min-w-0 flex-1">
                     <span className="flex items-center gap-1.5">
                       <span className="shrink-0 rounded bg-[#f3eee7] px-1 text-[10px] text-[#8a7f72]">{kindLabel[it.kind]}</span>

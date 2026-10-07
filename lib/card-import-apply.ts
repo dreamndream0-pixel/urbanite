@@ -2,9 +2,9 @@ import sharp from 'sharp';
 import { createAdminClient } from '@/lib/supabase/admin';
 import type { ImportedProfile } from '@/lib/card-import';
 import type { CardPlanInfo } from '@/lib/card-plan';
-import { BIO_LIMIT, videoEmbedUrl, type ProfileCard, type SocialLink } from '@/lib/profile-card';
+import { BIO_LIMIT, videoEmbedUrl, type ProfileCard, type SocialLink, MAX_TAGS } from '@/lib/profile-card';
 
-export type ImportChoice = { name?: boolean; bio?: boolean; avatar?: boolean; socials?: boolean; items?: number[] };
+export type ImportChoice = { name?: boolean; bio?: boolean; avatar?: boolean; socials?: boolean; tags?: boolean; items?: number[] };
 
 // 下載圖片存到自己的空間(其他平台的圖片網址可能會失效)
 async function storeImage(userId: string, url: string, size: number, square: boolean) {
@@ -98,6 +98,12 @@ export async function applyImport(user: { id: string }, card: ProfileCard, plan:
       if (!merged.some((m) => m.type === s.type && m.value.trim())) merged.push({ type: s.type, value: s.value });
     }
     update.socials = merged;
+  }
+  if (apply.tags && profile.tags?.length) {
+    // 擅長領域:補進標籤(名片最多 3 個)並顯示
+    const current = Array.isArray(card.tags) ? card.tags : [];
+    update.tags = [...new Set([...current, ...profile.tags])].slice(0, MAX_TAGS);
+    update.show_tags = true;
   }
   if (Object.keys(update).length) {
     update.updated_at = new Date().toISOString();

@@ -6,7 +6,7 @@ export type ImportedItem =
   | { kind: 'link'; title: string; url: string; image: string } // image:縮圖網址或 icon:圖示
   | { kind: 'text'; title: string }
   | { kind: 'video'; title: string; url: string }
-  | { kind: 'image'; title: string; layout: 'banner' | 'scroll' | 'grid2' | 'grid3' | 'circle3' | 'square'; items: ImportedImage[]; url?: string; shared?: boolean } // 圖文連結;shared = 共用標題與連結
+  | { kind: 'image'; title: string; layout: 'banner' | 'scroll' | 'grid2' | 'grid3' | 'circle3' | 'square' | 'mosaic' | 'mosaic5'; items: ImportedImage[]; url?: string; shared?: boolean } // 圖文連結;shared = 共用標題與連結
   | { kind: 'divider' }
   | { kind: 'social'; title: string; url: string; platform: string };
 
@@ -21,6 +21,7 @@ export type ImportedProfile = {
   bio: string;
   avatar: string;
   socials: { type: string; value: string }[];
+  tags?: string[]; // 擅長領域 / 標籤
   items: ImportedItem[];
 };
 
@@ -358,14 +359,21 @@ function parseLinkgoods(html: string): ImportedProfile | null {
       .filter((x) => isHttp(x.image));
     if (!photos.length && isHttp(str(p.thumbnail)) && mode === 'IMAGETEXT') photos.push({ image: str(p.thumbnail), title: '', url });
     if (photos.length) {
-      if (p.isPhotoCarousel || photos.length === 1 || title) {
-        // 商品輪播:一張一張滑、標題在下、共用一個連結 → 圖文連結「標題在下」
-        for (let i = 0; i < photos.length; i += 10) items.push({ kind: 'image', title, layout: 'banner', items: photos.slice(i, i + 10), url, shared: Boolean(title) });
-      } else {
-        // 沒有標題的多張圖 → 方格,每張各自的連結
-        const layout = photos.length % 3 === 0 ? 'grid3' : 'grid2';
-        for (let i = 0; i < photos.length; i += 9) items.push({ kind: 'image', title: '', layout, items: photos.slice(i, i + 9).map((x) => ({ ...x, url: x.url || url })) });
-      }
+      // LINKGOODS 圖文版型(template.layoutId):
+      //   1 = 左邊一張大圖 + 右邊四張小圖 → 一大四小(三、四張 → 一大兩小)
+      //   2 = 一排三張方圖,超過三張可左右滑 → 三欄方格 / 橫向滑動
+      //   5 與其他 = 整張寬的輪播圖(有圓點)→ 方形輪播
+      // 標題在圖片上方 → 先放一個文字標題
+      const list = photos.map((x) => ({ ...x, url: x.url || url }));
+      const layoutId = str(json(p.template).layoutId);
+      const push = (layout: Extract<ImportedItem, { kind: 'image' }>['layout'], size: number) => {
+        if (title) items.push({ kind: 'text', title });
+        for (let i = 0; i < list.length; i += size) items.push({ kind: 'image', title: '', layout, items: list.slice(i, i + size), url });
+      };
+      if (list.length === 1) items.push({ kind: 'image', title, layout: 'square', items: list, url, shared: Boolean(title) });
+      else if (layoutId === '1') push(list.length >= 5 ? 'mosaic5' : list.length >= 3 ? 'mosaic' : 'grid2', list.length >= 5 ? 5 : 3);
+      else if (layoutId === '2') push(list.length <= 3 ? 'grid3' : 'scroll', 10);
+      else push('square', 10);
       continue;
     }
     if (!isHttp(url)) continue;
@@ -379,7 +387,10 @@ function parseLinkgoods(html: string): ImportedProfile | null {
     .filter(isHttp)
     .map((value) => ({ type: socialType(value), value }))
     .filter((x) => x.type);
-  return { source: 'LINKGOODS', name: str(user.nickname) || str(user.username), bio: str(user.description), avatar: str(user.photo), socials, items };
+  // 擅長領域 → 標籤
+  const tags = ((Array.isArray(user.kolFields) ? user.kolFields : []) as unknown[]).map((f) => str(deref(f).name)).filter(Boolean);
+  const bio = user.isDescriptionShow === false ? '' : str(user.description);
+  return { source: 'LINKGOODS', name: str(user.nickname) || str(user.username), bio, avatar: str(user.photo), socials, tags, items };
 }
 
 // ---------- Linkfly(內容在另一個 JSON 檔,頁面載入後才抓)----------
@@ -554,5 +565,6 @@ export async function readImportPage(url: string): Promise<ImportedProfile> {
   parsed.socials = parsed.socials.filter((s, i, arr) => supported.has(s.type) && arr.findIndex((x) => x.type === s.type) === i);
   parsed.name = parsed.name.slice(0, 40);
   parsed.bio = parsed.bio.slice(0, 120);
+  parsed.tags = [...new Set((parsed.tags ?? []).map((t) => t.trim().slice(0, 12)).filter(Boolean))];
   return parsed;
 }
