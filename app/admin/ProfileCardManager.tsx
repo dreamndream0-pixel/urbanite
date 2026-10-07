@@ -379,6 +379,18 @@ export default function ProfileCardManager({ products, lineUrl = '', upgradeHref
   const [saving, setSaving] = useState(false);
   const [origin, setOrigin] = useState('');
 
+  const [importOpen, setImportOpen] = useState(false);
+  function reloadCard() {
+    return fetch('/api/profile-card', { cache: 'no-store' })
+      .then((res) => res.json())
+      .then((data) => {
+        if (!data.card) return;
+        setCard(data.card);
+        setDraft(data.card);
+        setBlocks(data.blocks);
+      });
+  }
+
   useEffect(() => {
     Promise.resolve().then(() => setOrigin(window.location.origin));
     fetch('/api/profile-card', { cache: 'no-store' })
@@ -563,6 +575,14 @@ export default function ProfileCardManager({ products, lineUrl = '', upgradeHref
                 ) : (
                   <button type="button" onClick={() => setPicker(true)} className="w-full rounded-2xl border border-dashed border-[#c9bcad] bg-white/60 py-3 text-sm font-medium text-[#1f1b19] transition hover:bg-white">
                     ＋ 新增區塊{plan.pro ? '' : `(${blocks.length}/${plan.limits.maxBlocks})`}
+                  </button>
+                )}
+                {importOpen ? (
+                  <ImportPanel onClose={() => setImportOpen(false)} onDone={() => void reloadCard()} />
+                ) : (
+                  <button type="button" onClick={() => setImportOpen(true)} className="flex w-full items-center justify-center gap-2 rounded-2xl bg-white/60 py-2.5 text-xs text-[#6b6156] transition hover:bg-white">
+                    <Icon size={15}><path d="M4 12h12M12 6l6 6-6 6" /><path d="M20 5v14" /></Icon>
+                    一鍵搬家:從 Linktree、Portaly 等其他名片匯入
                   </button>
                 )}
                 {blocks.length === 0 ? (
@@ -1239,6 +1259,137 @@ function ImageBlockEditor({
 
 // 連結按鈕縮圖:上傳圖片(PNG 透明背景會保留)或選內建圖示(預設顯示 2 排,其餘收合)
 const ICON_ROWS_SHOWN = 16;
+// 一鍵搬家:貼上自己在其他名片服務的網址,預覽後勾選要匯入的內容
+type ImportPreview = {
+  source: string;
+  name: string;
+  bio: string;
+  avatar: string;
+  socials: { type: string; value: string }[];
+  items: ({ kind: 'link'; title: string; url: string; image: string } | { kind: 'text'; title: string } | { kind: 'video'; title: string; url: string })[];
+  maxBlocks: number;
+};
+
+function ImportPanel({ onClose, onDone }: { onClose: () => void; onDone: () => void }) {
+  const { plan, upgradeHref } = usePlan();
+  const [url, setUrl] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [data, setData] = useState<ImportPreview | null>(null);
+  const [picked, setPicked] = useState<number[]>([]);
+  const [opts, setOpts] = useState({ name: true, bio: true, avatar: true, socials: true });
+  const [mine, setMine] = useState(false);
+  const [result, setResult] = useState('');
+
+  async function read() {
+    setBusy(true);
+    setError('');
+    setData(null);
+    setResult('');
+    try {
+      const res = await fetch('/api/profile-card/import', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url }) });
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.error ?? '讀取失敗');
+      setData(d);
+      setPicked(d.items.map((_: unknown, i: number) => i));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : '讀取失敗');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function apply() {
+    if (!data) return;
+    setBusy(true);
+    setError('');
+    try {
+      const res = await fetch('/api/profile-card/import', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url, apply: { ...opts, items: picked } }) });
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.error ?? '匯入失敗');
+      setResult(d.skipped ? `已匯入 ${d.added} 個區塊。免費版最多 ${d.maxBlocks} 個區塊,還有 ${d.skipped} 個沒有匯入。` : `已匯入 ${d.added} 個區塊,頭像與資料也更新好了。`);
+      setData(null);
+      onDone();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : '匯入失敗');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const toggle = (i: number) => setPicked((p) => (p.includes(i) ? p.filter((x) => x !== i) : [...p, i]));
+  const kindLabel = { link: '連結', text: '標題', video: '影片' } as const;
+
+  return (
+    <div className="space-y-3 rounded-2xl border border-[#e5ded4] bg-white p-4">
+      <div className="flex items-center justify-between">
+        <p className="text-sm font-semibold">一鍵搬家</p>
+        <button type="button" onClick={onClose} className="text-xs text-[#8a7f72]">關閉</button>
+      </div>
+      <p className="text-xs leading-5 text-[#8a7f72]">貼上你在 Linktree、Portaly、LINKGOODS、Linkfly、lit.link 等服務的個人頁網址,會讀取頭像、名稱、簡介和所有連結,勾選後匯入。</p>
+      <div className="flex gap-2">
+        <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://linktr.ee/你的帳號" className={`${inputClass} min-w-0 flex-1`} />
+        <button type="button" onClick={() => void read()} disabled={busy || !url.trim()} className="shrink-0 rounded-full bg-[#1f1b19] px-4 text-xs font-semibold text-white disabled:opacity-50">
+          {busy && !data ? '讀取中…' : '讀取'}
+        </button>
+      </div>
+      {error ? <p className="rounded-xl bg-[#fbf3f0] px-3 py-2 text-xs text-[#a33a2b]">{error}</p> : null}
+      {result ? <p className="rounded-xl bg-[#f3fbf5] px-3 py-2 text-xs text-[#1f5a33]">{result}</p> : null}
+
+      {data ? (
+        <div className="space-y-3">
+          <div className="flex items-center gap-3 rounded-xl bg-[#faf7f2] p-3">
+            {data.avatar ? <img src={data.avatar} alt="" className="h-12 w-12 shrink-0 rounded-full object-cover" /> : <span className="h-12 w-12 shrink-0 rounded-full bg-[#efe8dd]" />}
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-semibold">{data.name || '(沒有名稱)'}</p>
+              <p className="line-clamp-2 text-xs text-[#8a7f72]">{data.bio || '(沒有簡介)'}</p>
+            </div>
+            <span className="shrink-0 rounded-full bg-white px-2 py-0.5 text-[10px] text-[#8a7f72]">{data.source}</span>
+          </div>
+          <div className="flex flex-wrap gap-x-4 gap-y-1.5 text-xs">
+            {([['avatar', '換成這個頭像'], ['name', '換成這個名稱'], ['bio', '換成這段簡介'], ['socials', `加入社群帳號(${data.socials.length})`]] as const).map(([k, label]) => (
+              <label key={k} className="flex items-center gap-1.5">
+                <input type="checkbox" checked={opts[k]} onChange={(e) => setOpts({ ...opts, [k]: e.target.checked })} />
+                {label}
+              </label>
+            ))}
+          </div>
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-[#6b6156]">讀到 {data.items.length} 個項目,已勾選 {picked.length} 個</span>
+            <button type="button" onClick={() => setPicked(picked.length === data.items.length ? [] : data.items.map((_, i) => i))} className="text-[#6b6156] underline underline-offset-2">
+              {picked.length === data.items.length ? '全部取消' : '全部勾選'}
+            </button>
+          </div>
+          <div className="max-h-72 divide-y divide-[#f3eee7] overflow-y-auto rounded-xl border border-[#efe8dd]">
+            {data.items.map((it, i) => (
+              <label key={i} className="flex cursor-pointer items-center gap-2.5 px-3 py-2 text-xs">
+                <input type="checkbox" checked={picked.includes(i)} onChange={() => toggle(i)} />
+                {it.kind === 'link' && it.image ? <img src={it.image} alt="" className="h-7 w-7 shrink-0 rounded object-cover" /> : <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded bg-[#f6f2ec] text-[10px] text-[#8a7f72]">{kindLabel[it.kind]}</span>}
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-[#1f1b19]">{it.title || '(無標題)'}</span>
+                  {'url' in it ? <span className="block truncate text-[#a99e8f]">{it.url}</span> : null}
+                </span>
+              </label>
+            ))}
+          </div>
+          {!plan.pro && picked.length > data.maxBlocks ? (
+            <p className="text-[11px] leading-5 text-[#8a5a1c]">
+              免費版最多 {data.maxBlocks} 個區塊,超過的不會匯入。<a href={upgradeHref} className="underline">升級 U Plus</a> 不限數量。
+            </p>
+          ) : null}
+          <label className="flex items-start gap-2 text-[11px] leading-5 text-[#6b6156]">
+            <input type="checkbox" checked={mine} onChange={(e) => setMine(e.target.checked)} className="mt-1" />
+            我確認這是我自己的頁面,有權使用上面的內容與圖片。
+          </label>
+          <button type="button" onClick={() => void apply()} disabled={busy || !mine || (!picked.length && !opts.avatar && !opts.name && !opts.bio && !opts.socials)} className="w-full rounded-full bg-[#1f1b19] py-3 text-sm font-semibold text-white disabled:opacity-50">
+            {busy ? '匯入中…' : `匯入勾選的 ${picked.length} 個項目`}
+          </button>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 const newSpotId = () => Math.random().toString(36).slice(2, 10);
 
 // 熱區圖片:上傳整張設計圖,在圖上框出可以點的區域

@@ -53,7 +53,8 @@ export const PRO_LIMITS: PlanLimits = { maxBlocks: 100, allTemplates: true, cust
 export const FREE_TEMPLATE_KEYS = ['ivory', 'gray-note', 'hero-sun', 'polaroid-green', 'label-sand', 'float-latte', 'framed-wood', 'mag-mono', 'news'];
 
 // pro:名片付費功能是否開啟(U Plus 以上)
-export type CardPlanInfo = { tier: CardTier; pro: boolean; isAdmin: boolean; expiresAt: string | null; limits: PlanLimits };
+// promo:目前是因為「限時免費」活動才有這個等級;promoEnd:活動結束時間
+export type CardPlanInfo = { tier: CardTier; pro: boolean; isAdmin: boolean; expiresAt: string | null; limits: PlanLimits; promo?: boolean; promoEnd?: string };
 
 // 方案比較表:[U Free, U Plus, U Pro, U Max]
 export const TIER_FEATURES: { group: string; rows: { label: string; values: [string, string, string, string] }[] }[] = [

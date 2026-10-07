@@ -2,7 +2,8 @@ import type { User } from '@supabase/supabase-js';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getSessionUser } from '@/lib/supabase/server';
 import { getAdminEmails } from '@/lib/integrations';
-import { FREE_LIMITS, PRO_LIMITS, RESERVED_SLUGS, type CardPlanInfo, type CardTier } from '@/lib/card-plan';
+import { FREE_LIMITS, PRO_LIMITS, RESERVED_SLUGS, tierRank, type CardPlanInfo, type CardTier } from '@/lib/card-plan';
+import { getCardPromo, promoActive } from '@/lib/card-promo';
 import { SLUG_PATTERN, type ProfileCard } from '@/lib/profile-card';
 
 // 名片服務:誰可以編輯哪張名片、目前方案
@@ -14,9 +15,18 @@ export async function getPlanInfo(user: User): Promise<CardPlanInfo> {
   const expiresAt = data?.expires_at ?? null;
   const active = Boolean(expiresAt && new Date(expiresAt).getTime() > Date.now());
   // 管理員(店家)= U Max;付費且未到期 = 購買的等級;其餘 U Free
-  const tier: CardTier = isAdmin ? 'max' : active ? ((['plus', 'pro', 'max'].includes(data?.plan) ? data!.plan : 'plus') as CardTier) : 'free';
+  let tier: CardTier = isAdmin ? 'max' : active ? ((['plus', 'pro', 'max'].includes(data?.plan) ? data!.plan : 'plus') as CardTier) : 'free';
+  // 限時免費:活動期間等級比活動低的會員,升到活動等級
+  let promo: { promo?: boolean; promoEnd?: string } = {};
+  if (!isAdmin) {
+    const p = await getCardPromo();
+    if (promoActive(p) && tierRank(tier) < tierRank(p.tier)) {
+      tier = p.tier;
+      promo = { promo: true, promoEnd: p.end };
+    }
+  }
   const pro = tier !== 'free';
-  return { tier, pro, isAdmin, expiresAt: isAdmin ? null : expiresAt, limits: pro ? PRO_LIMITS : FREE_LIMITS };
+  return { tier, pro, isAdmin, expiresAt: isAdmin ? null : active ? expiresAt : null, limits: pro ? PRO_LIMITS : FREE_LIMITS, ...promo };
 }
 
 // 由 Email 產生預設代稱(英數字),重複時加數字

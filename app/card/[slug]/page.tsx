@@ -1,6 +1,8 @@
 import type { Metadata } from 'next';
 import { after } from 'next/server';
 import { refreshStaleSocialBlocks } from '@/lib/social-refresh';
+import { getPlanInfo } from '@/lib/card-access';
+import { applyFreeView } from '@/lib/card-free-view';
 import { notFound } from 'next/navigation';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getAdminUser, getSessionUser } from '@/lib/supabase/server';
@@ -32,18 +34,16 @@ async function load(slug: string) {
   }
   // 店家的名片(擁有者是管理員):LINE 區塊未填網址時沿用「結帳頁 LINE 設定」;會員的名片不帶店家 LINE
   let isStore = !card.owner_user_id;
+  let free = false;
   if (card.owner_user_id) {
     const { data: owner } = await supabase.auth.admin.getUserById(card.owner_user_id);
     isStore = (await getAdminEmails()).includes((owner.user?.email ?? '').toLowerCase());
-  }
-  // 免費版會員的名片:最上方顯示「加入 URBANLINKS」橫幅
-  let free = false;
-  if (!isStore && card.owner_user_id) {
-    const { data: sub } = await supabase.from('card_subscriptions').select('expires_at').eq('user_id', card.owner_user_id).maybeSingle();
-    free = !(sub?.expires_at && new Date(sub.expires_at).getTime() > Date.now());
+    // 會員目前的等級(含限時免費);免費版的名片顯示時套用免費版限制
+    if (!isStore && owner.user) free = (await getPlanInfo(owner.user)).tier === 'free';
   }
   const lineUrl = isStore ? lineAddFriendUrl(getCheckoutLine(settings as Pick<SiteSettings, 'footer_sections'> | null)) : '';
-  return { card: card as ProfileCard & { owner_user_id?: string | null }, blocks: (blocks ?? []) as ProfileCardBlock[], products: isStore ? products : {}, logoUrl: settings?.logo_url ?? '', lineUrl, isStore, free };
+  const view = free ? applyFreeView(card as ProfileCard, (blocks ?? []) as ProfileCardBlock[]) : { card: card as ProfileCard, blocks: (blocks ?? []) as ProfileCardBlock[] };
+  return { card: view.card as ProfileCard & { owner_user_id?: string | null }, blocks: view.blocks, products: isStore ? products : {}, logoUrl: settings?.logo_url ?? '', lineUrl, isStore, free };
 }
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {

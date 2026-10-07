@@ -1,7 +1,7 @@
 import { TIER_FEATURES, TIERS, type CardTier } from '@/lib/card-plan';
 
 // 四個等級的功能比較表(介紹頁、方案頁共用);手機上可左右滑動
-export default function TierTable({ current }: { current?: CardTier }) {
+export default function TierTable({ current, promoTier }: { current?: CardTier; promoTier?: CardTier }) {
   return (
     <div className="overflow-x-auto rounded-2xl border border-[#e5ded4] bg-white [scrollbar-width:thin]">
       <table className="w-full min-w-[640px] border-collapse text-sm">
@@ -13,6 +13,7 @@ export default function TierTable({ current }: { current?: CardTier }) {
                 {t.name}
                 {t.key === current ? <span className="ml-1 font-normal">(目前)</span> : null}
                 {!t.available ? <span className="ml-1 rounded-full bg-[#e9f7ee] px-1.5 py-0.5 text-[10px] font-normal text-[#1f7a44]">聯繫專員</span> : null}
+                {promoTier === t.key ? <span className="ml-1 rounded-full bg-[#121b33] px-1.5 py-0.5 text-[10px] font-semibold text-[#dcbc84]">限時免費</span> : null}
               </th>
             ))}
           </tr>

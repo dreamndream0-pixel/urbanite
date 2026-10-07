@@ -43,6 +43,97 @@ function joinedWithin(members: Member[], days: number) {
 }
 
 // 後台:名片服務的會員
+// 限時免費活動:設定時間,期間內所有會員可免費使用 U Plus
+type Promo = { enabled: boolean; tier: string; start: string; end: string; note: string };
+const toLocal = (iso: string) => {
+  if (!iso) return '';
+  const d = new Date(new Date(iso).getTime() + 8 * 3600 * 1000); // 台灣時間
+  return d.toISOString().slice(0, 16);
+};
+const fromLocal = (v: string) => (v ? new Date(`${v}:00+08:00`).toISOString() : '');
+
+function PromoSettings() {
+  const [promo, setPromo] = useState<Promo | null>(null);
+  const [status, setStatus] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState('');
+
+  useEffect(() => {
+    fetch('/api/admin/card-promo')
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.promo) {
+          setPromo(d.promo);
+          setStatus(d.status);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  async function save(next: Promo) {
+    setBusy(true);
+    setMsg('');
+    try {
+      const res = await fetch('/api/admin/card-promo', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(next) });
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.error ?? '儲存失敗');
+      setPromo(d.promo);
+      setStatus(d.status);
+      setMsg('已儲存');
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : '儲存失敗');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (!promo) return null;
+  const statusColor = status === '進行中' ? 'bg-[#e9f7ee] text-[#1f7a44]' : status === '尚未開始' ? 'bg-[#fff6e5] text-[#8a5a1c]' : 'bg-[#f3eee7] text-[#8a7f72]';
+  return (
+    <section className="rounded-2xl border border-[#ebe4da] bg-white p-4">
+      <div className="flex flex-wrap items-center gap-3">
+        <p className="text-sm font-semibold">限時免費活動</p>
+        <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-medium ${statusColor}`}>{status}</span>
+        <label className="ml-auto flex items-center gap-2 text-sm">
+          <span>開啟</span>
+          <input type="checkbox" checked={promo.enabled} onChange={(e) => setPromo({ ...promo, enabled: e.target.checked })} className="h-4 w-4" />
+        </label>
+      </div>
+      <p className="mt-1 text-xs leading-5 text-[#8a7f72]">活動期間,所有免費會員都能使用 U Plus 全部功能;介紹頁、我的名片、方案頁會同步顯示「限時免費」。時間到自動結束,會員回到 U Free(名片資料保留)。</p>
+      <div className="mt-3 grid gap-3 sm:grid-cols-2">
+        <label className="block text-xs text-[#8a7f72]">
+          開始時間(留空 = 立即開始)
+          <input type="datetime-local" value={toLocal(promo.start)} onChange={(e) => setPromo({ ...promo, start: fromLocal(e.target.value) })} className="mt-1 w-full rounded-xl border border-[#e5ded4] px-3 py-2 text-sm text-[#1f1b19]" />
+        </label>
+        <label className="block text-xs text-[#8a7f72]">
+          結束時間
+          <input type="datetime-local" value={toLocal(promo.end)} onChange={(e) => setPromo({ ...promo, end: fromLocal(e.target.value) })} className="mt-1 w-full rounded-xl border border-[#e5ded4] px-3 py-2 text-sm text-[#1f1b19]" />
+        </label>
+        <label className="block text-xs text-[#8a7f72] sm:col-span-2">
+          公告文字(選填,留空顯示「U Plus 全部功能免費開放」)
+          <input value={promo.note} maxLength={60} onChange={(e) => setPromo({ ...promo, note: e.target.value })} placeholder="例如:開站慶!U Plus 全部功能免費用" className="mt-1 w-full rounded-xl border border-[#e5ded4] px-3 py-2 text-sm text-[#1f1b19]" />
+        </label>
+      </div>
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        {[7, 14, 30].map((days) => (
+          <button
+            key={days}
+            type="button"
+            onClick={() => setPromo({ ...promo, start: '', end: new Date(Date.now() + days * 86400000).toISOString() })}
+            className="rounded-full border border-[#e5ded4] px-3 py-1.5 text-xs text-[#5f5852] hover:bg-[#faf7f2]"
+          >
+            從現在起 {days} 天
+          </button>
+        ))}
+        <button type="button" disabled={busy} onClick={() => void save(promo)} className="ml-auto rounded-full bg-[#1f1b19] px-5 py-2 text-sm font-semibold text-white disabled:opacity-50">
+          {busy ? '儲存中…' : '儲存'}
+        </button>
+      </div>
+      {msg ? <p className={`mt-2 text-xs ${msg === '已儲存' ? 'text-[#1f7a44]' : 'text-[#c0392b]'}`}>{msg}</p> : null}
+    </section>
+  );
+}
+
 export default function CardMembersManager() {
   const [members, setMembers] = useState<Member[] | null>(null);
   const [error, setError] = useState('');
@@ -80,6 +171,7 @@ export default function CardMembersManager() {
 
   return (
     <div className="space-y-4">
+      <PromoSettings />
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         {stats.map(([label, value]) => (
           <div key={label} className="rounded-2xl border border-[#ebe4da] bg-white px-4 py-3">

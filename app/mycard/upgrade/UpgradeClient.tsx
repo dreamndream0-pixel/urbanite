@@ -9,7 +9,8 @@ type Payment = { order_no: string; tier: string; period: string; amount: number;
 
 const date = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString('zh-TW', { timeZone: 'Asia/Taipei' }) : '');
 
-export default function UpgradeClient({ plan, payments, result, table, lineUrl }: { plan: CardPlanInfo; payments: Payment[]; result: string; table: ReactNode; lineUrl: string }) {
+export default function UpgradeClient({ plan, payments, result, table, lineUrl, promo = null }: { plan: CardPlanInfo; payments: Payment[]; result: string; table: ReactNode; lineUrl: string; promo?: { tier: string; end: string } | null }) {
+  const promoEnd = promo ? new Date(promo.end).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false }) : '';
   const buyable = TIERS.filter((t) => t.key !== 'free');
   const [tier, setTier] = useState<PaidTier>(plan.tier === 'free' ? 'plus' : (plan.tier as PaidTier));
   const [period, setPeriod] = useState<CardPeriod>('year');
@@ -60,7 +61,7 @@ export default function UpgradeClient({ plan, payments, result, table, lineUrl }
           <p className="mt-1 text-xl font-semibold">{tierInfo(plan.tier).name}</p>
         </div>
         <p className="text-sm text-[#6b6156]">
-          {plan.isAdmin ? '管理員帳號,所有功能都已開啟。' : plan.tier !== 'free' ? `${date(plan.expiresAt)} 到期,到期後自動回到 U Free。` : '免費個人名片。升級後解鎖更多功能。'}
+          {plan.isAdmin ? '管理員帳號,所有功能都已開啟。' : plan.promo ? `限時免費中,${promoEnd} 結束後回到 U Free。想繼續使用可以先購買,付費期間從今天開始算。` : plan.tier !== 'free' ? `${date(plan.expiresAt)} 到期,到期後自動回到 U Free。` : '免費個人名片。升級後解鎖更多功能。'}
         </p>
       </div>
 
@@ -80,10 +81,18 @@ export default function UpgradeClient({ plan, payments, result, table, lineUrl }
                 >
                   <span className="flex items-center justify-between gap-2">
                     <span className="text-sm font-semibold">{t.name}</span>
-                    {!t.available ? <span className="rounded-full bg-[#e9f7ee] px-2 py-0.5 text-[10px] text-[#1f7a44]">聯繫專員</span> : plan.tier === t.key ? <span className="text-[10px] text-[#1f7a44]">目前方案</span> : null}
+                    {!t.available ? <span className="rounded-full bg-[#e9f7ee] px-2 py-0.5 text-[10px] text-[#1f7a44]">聯繫專員</span> : promo?.tier === t.key ? <span className="rounded-full bg-[#121b33] px-2 py-0.5 text-[10px] font-semibold text-[#dcbc84]">限時免費</span> : plan.tier === t.key ? <span className="text-[10px] text-[#1f7a44]">目前方案</span> : null}
                   </span>
                   <span className="mt-0.5 block text-xs text-[#8a7f72]">{t.tagline}</span>
-                  <span className="mt-2 block text-lg font-bold">NT${t.prices?.month}<span className="text-xs font-normal text-[#8a7f72]"> / 月</span></span>
+                  {promo?.tier === t.key ? (
+                    <span className="mt-2 block">
+                      <span className="text-lg font-bold text-[#702838]">限時免費</span>
+                      <span className="ml-2 text-xs text-[#a99e8f] line-through">NT${t.prices?.month} / 月</span>
+                      <span className="block text-[11px] text-[#8a7f72]">至 {promoEnd}</span>
+                    </span>
+                  ) : (
+                    <span className="mt-2 block text-lg font-bold">NT${t.prices?.month}<span className="text-xs font-normal text-[#8a7f72]"> / 月</span></span>
+                  )}
                 </button>
               );
             })}
