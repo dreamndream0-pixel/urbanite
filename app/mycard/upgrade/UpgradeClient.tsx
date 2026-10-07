@@ -128,10 +128,11 @@ export default function UpgradeClient({ plan, payments, result, table, lineUrl, 
               </button>
               <p className="mt-2 text-center text-[11px] text-[#a99e8f]">付款由藍新金流處理,可用信用卡、ATM、超商代碼等方式</p>
             </>
-          ) : inPromo(tier) ? null : (
+          ) : (
             <>
-              <ContactLineButton href={lineUrl} className="mt-5 py-3 text-sm" />
-              <p className="mt-2 text-center text-[11px] text-[#a99e8f]">{chosen.name} 由專員協助開通,加入官方 LINE 告訴我們你的需求</p>
+              {/* U Pro / U Max:官網由專員協助建立(限時免費期間也要能聯絡) */}
+              <ContactLineButton href={lineUrl} label="聯絡專員建立官網" className="mt-5 py-3 text-sm" />
+              <p className="mt-2 text-center text-[11px] text-[#a99e8f]">{chosen.name} 的品牌官網由專員協助建立,加入官方 LINE 告訴我們你的需求</p>
             </>
           )}
         </section>
