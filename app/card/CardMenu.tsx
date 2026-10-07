@@ -6,18 +6,20 @@ import { createBrowserSupabase } from '@/lib/supabase/client';
 
 type Me = { email: string; name: string } | null;
 
-// 名片服務的漢堡選單:我的名片 / 方案 / 會員中心 / 登入登出都收在這裡
+// 名片服務的漢堡選單:我的名片 / 方案 / 登入登出都收在這裡;links = 額外的導覽連結(介紹頁用)
 // variant="header":放在頁首;variant="floating":公開名片右上角的半透明圓鈕
 export default function CardMenu({
   variant = 'header',
   loggedIn,
   current,
   top = 12,
+  links = [],
 }: {
   variant?: 'header' | 'floating';
   loggedIn?: boolean; // 伺服器已知登入狀態就直接帶入,沒帶就自己查
   current?: 'mycard' | 'upgrade' | 'login';
   top?: number;
+  links?: { href: string; label: string }[];
 }) {
   const [open, setOpen] = useState(false);
   const [me, setMe] = useState<Me | undefined>(loggedIn === false ? null : undefined);
@@ -80,6 +82,16 @@ export default function CardMenu({
       </button>
       {open ? (
         <div className="absolute right-0 top-12 w-60 rounded-2xl border border-[#e5ded4] bg-white p-2 shadow-[0_12px_32px_rgba(31,27,25,0.16)]">
+          {links.length ? (
+            <>
+              {links.map((l) => (
+                <Link key={l.href + l.label} href={l.href} onClick={() => setOpen(false)} className={item(false)}>
+                  {l.label}
+                </Link>
+              ))}
+              <div className="my-1.5 border-t border-[#f0ebe3]" />
+            </>
+          ) : null}
           {signedIn ? (
             <>
               {me ? (
@@ -93,10 +105,6 @@ export default function CardMenu({
                 <MenuIcon d="M12 3l2.6 5.6 6 .7-4.5 4.1 1.2 6L12 16.4 6.7 19.4l1.2-6L3.4 9.3l6-.7z" />
                 方案
               </Link>
-              <Link href="/account" onClick={() => setOpen(false)} className={item(false)}>
-                <MenuIcon d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21c1.5-3.5 4.4-5 8-5s6.5 1.5 8 5" />
-                會員中心
-              </Link>
               <Link href="/card" onClick={() => setOpen(false)} className={item(false)}>
                 <MenuIcon d="M3 11l9-7 9 7M5 10v10h14V10" />
                 URBANLINKS 首頁
@@ -109,14 +117,12 @@ export default function CardMenu({
             </>
           ) : (
             <>
-              <Link href="/card/login" onClick={() => setOpen(false)} className={item(current === 'login')}>
-                <MenuIcon d="M9 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h3M14 16l4-4-4-4M18 12H8" />
-                登入
-              </Link>
-              <Link href="/card/register" onClick={() => setOpen(false)} className={item(false)}>
-                <MenuIcon d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21c1.5-3.5 4.4-5 8-5 1 0 2 .1 2.9.4M19 15v6M16 18h6" />
-                免費註冊
-              </Link>
+              <div className="grid grid-cols-2 gap-2 p-1">
+                <Link href="/card/login" onClick={() => setOpen(false)} className="rounded-full border border-[#121b33] py-2 text-center text-sm font-semibold text-[#121b33]">登入</Link>
+                <Link href="/card/register" onClick={() => setOpen(false)} className="rounded-full bg-[#121b33] py-2 text-center text-sm font-semibold text-[#dcbc84]">註冊</Link>
+              </div>
+              {links.length ? null : (
+              <>
               <Link href="/card#pricing" onClick={() => setOpen(false)} className={item(false)}>
                 <MenuIcon d="M12 3l2.6 5.6 6 .7-4.5 4.1 1.2 6L12 16.4 6.7 19.4l1.2-6L3.4 9.3l6-.7z" />
                 方案介紹
@@ -125,6 +131,8 @@ export default function CardMenu({
                 <MenuIcon d="M3 11l9-7 9 7M5 10v10h14V10" />
                 URBANLINKS 首頁
               </Link>
+              </>
+              )}
             </>
           )}
         </div>

@@ -135,13 +135,6 @@ export default function RegisterClient({
 
       <div className="mx-auto max-w-md px-8 py-10">
         <h1 className="text-center text-4xl font-bold tracking-wide">{isCard ? '建立帳號' : '註冊會員'}</h1>
-        {isCard ? (
-          <p className="mt-3 text-center text-sm leading-6 text-[#8a8a8a]">
-            註冊後就能建立你的個人名片。
-            <br />
-            也可以直接<Link href={loginHref} className="text-[var(--c-gold)] underline underline-offset-2">用 LINE、Google 登入</Link>,會自動建立帳號。
-          </p>
-        ) : null}
 
         {!configured ? (
           <div className="mt-6 rounded-lg bg-[#fdf3e7] p-4 text-sm text-[#9a6a1f]">

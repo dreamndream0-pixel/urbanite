@@ -10,7 +10,7 @@
 .hero {
   position: sticky;
   top: 0;
-  height: calc(100svh - 28px);
+  height: calc(100svh - 96px); /* 扣掉表頭 */
   min-height: 570px;
   overflow: clip;
   isolation: isolate;
@@ -26,6 +26,44 @@
   max-width: 1440px;
   height: 100%;
   margin: auto;
+}
+/* 表頭:獨立一條 */
+.topbar {
+  position: relative;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  height: 68px;
+  padding: 0 5%;
+  background: #faf7f2;
+  border-bottom: 1px solid #e5ded4;
+}
+.topBrand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.topMark {
+  width: 34px;
+  height: 32px;
+  object-fit: contain;
+}
+.topName {
+  width: 150px;
+  height: auto;
+}
+.topActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.topActions .start {
+  min-height: 42px;
+  padding: 0 22px;
+  background: #121b33;
+  color: #dcbc84;
 }
 .header {
   position: absolute;
@@ -116,7 +154,7 @@
 .copy {
   position: absolute;
   left: 5.5%;
-  top: 31%;
+  top: 24%; /* 表頭移出主視覺後往上移 */
   width: 43%;
   z-index: 5;
 }
@@ -400,7 +438,6 @@
     inset 4px 5px 8px #fffffff0,
     inset -3px -5px 9px #aa9d8730,
     0 16px 27px #6f604114;
-  transform: rotate(3deg);
 }
 .urlBubble > span,
 .importField input {
@@ -593,7 +630,7 @@
 }
 @media (max-width: 760px) {
   .hero {
-    height: calc(100svh - 24px);
+    height: calc(100svh - 84px);
     min-height: 570px;
   }
   .background {
@@ -633,7 +670,7 @@
     width: 25px;
   }
   .copy {
-    top: 31%;
+    top: 18%;
     left: 5%;
     width: 43%;
   }
@@ -792,5 +829,29 @@
   .urlBubble a,
 .urlBubble button {
     transition: none;
+  }
+}
+
+/* 手機:表頭較矮;輸入框至少 16px,iOS 點下去才不會放大、畫面跳動 */
+@media (max-width: 760px) {
+  .topbar {
+    height: 60px;
+    padding: 0 16px;
+  }
+  .topMark {
+    width: 28px;
+    height: 27px;
+  }
+  .topName {
+    width: 118px;
+  }
+  .topActions .start {
+    min-height: 38px;
+    padding: 0 16px;
+    gap: 6px;
+    font-size: 13px;
+  }
+  .importField input {
+    font-size: 16px;
   }
 }

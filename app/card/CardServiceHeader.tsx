@@ -6,7 +6,7 @@ import CardMenu from './CardMenu';
 // 右上角的按鈕都收進漢堡選單(我的名片 / 方案 / 會員中心 / 登入登出)
 export default function CardServiceHeader({ loggedIn, current }: { logoUrl?: string; loggedIn: boolean; current?: 'mycard' | 'upgrade' | 'login' }) {
   return (
-    <header className="sticky top-0 z-30 border-b border-[#e5ded4] bg-[#faf7f2]">
+    <header className="sticky top-0 z-50 border-b border-[#e5ded4] bg-[#faf7f2]">
       <div className="mx-auto flex h-14 max-w-6xl items-center gap-3 px-4 sm:px-6">
         <Link href="/card" className="flex items-center gap-2">
           <img src={SERVICE_LOGO} alt={SERVICE_NAME} className="h-[18px] w-auto object-contain sm:h-5" />

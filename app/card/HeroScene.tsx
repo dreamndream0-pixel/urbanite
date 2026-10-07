@@ -1,11 +1,12 @@
 import Image from "next/image";
 import Link from "next/link";
 import { Caveat, LXGW_WenKai_TC } from "next/font/google";
-import { ArrowRight, Ellipsis, Link2, Menu, ShoppingBag } from "lucide-react";
+import { ArrowRight, Ellipsis, Link2, ShoppingBag } from "lucide-react";
 import SocialIcon from "@/app/components/SocialIcon";
 import { SERVICE_LOGO } from "@/lib/card-plan";
 import ScrollHero from "./ScrollHero";
 import HeroImportBubble from "./HeroImportBubble";
+import CardMenu from "./CardMenu";
 import DemoPhoneContent from "./DemoPhoneContent";
 import styles from "./hero.module.css";
 
@@ -32,6 +33,27 @@ export default function HeroScene({
 }) {
   return (
     <div className={`${handwriting.variable} ${script.variable}`}>
+      {/* 表頭:獨立一條,跟下面的主視覺分開 */}
+      <header className={styles.topbar}>
+        <Link className={styles.topBrand} href="/card" aria-label="URBANLINKS 首頁">
+          <Image src="/brand/u-logo.png" alt="" width={74} height={70} className={styles.topMark} priority />
+          <Image src={SERVICE_LOGO} alt="URBANLINKS" width={184} height={36} className={styles.topName} priority />
+        </Link>
+        <div className={styles.topActions}>
+          <Link href={startHref} className={styles.start}>
+            建立名片
+            <ArrowRight />
+          </Link>
+          <CardMenu
+            loggedIn={loggedIn}
+            links={[
+              { href: "#spaces", label: "產品服務" },
+              { href: "/card/business", label: "品牌官網" },
+              { href: loggedIn ? "/mycard/upgrade" : "/card#pricing", label: "方案價格" },
+            ]}
+          />
+        </div>
+      </header>
       <ScrollHero>
         <picture>
           <source
@@ -49,49 +71,6 @@ export default function HeroScene({
           />
         </picture>
         <div className={styles.scene}>
-          <header className={styles.header}>
-            <Link
-              className={styles.brand}
-              href="/card"
-              aria-label="URBANLINKS 首頁"
-            >
-              <Image
-                src="/brand/u-logo.png"
-                alt=""
-                width={74}
-                height={70}
-                className={styles.brandMark}
-                priority
-              />
-              <Image
-                src={SERVICE_LOGO}
-                alt="URBANLINKS"
-                width={184}
-                height={36}
-                className={styles.brandName}
-                priority
-              />
-            </Link>
-            <div className={styles.headerActions}>
-              <Link href={startHref} className={styles.start}>
-                {loggedIn ? "我的頁面" : "立即開始"}
-                <ArrowRight />
-              </Link>
-              <details className={styles.menu}>
-                <summary aria-label="開啟選單">
-                  <Menu />
-                </summary>
-                <nav aria-label="網站導覽">
-                  <a href="#spaces">產品服務</a>
-                  <Link href="/card/business">品牌官網</Link>
-                  <Link href={loggedIn ? "/mycard/upgrade" : "/card/register"}>
-                    方案價格
-                  </Link>
-                  <Link href={startHref}>開始建立</Link>
-                </nav>
-              </details>
-            </div>
-          </header>
           <div className={styles.copy}>
             <h1>
               <span>一個網址，</span>

@@ -601,7 +601,7 @@ export default function ProfileCardManager({ products, lineUrl = '', upgradeHref
               key={t.key}
               type="button"
               onClick={() => setMainTab(t.key)}
-              className={`flex flex-col items-center gap-0.5 rounded-xl py-2 text-[11px] transition sm:flex-row sm:justify-center sm:gap-1.5 sm:text-sm ${mainTab === t.key ? 'bg-[#1f1b19] text-white' : 'text-[#6b6156] hover:bg-[#f6f2ec]'}`}
+              className={`flex flex-col items-center gap-0.5 rounded-xl py-2 text-[11px] transition sm:flex-row sm:justify-center sm:gap-1.5 sm:text-sm ${mainTab === t.key ? 'bg-[#121b33] text-[#dcbc84]' : 'text-[#6b6156] hover:bg-[#f6f2ec]'}`}
             >
               <Icon size={16}>{t.icon}</Icon>
               {t.label}
@@ -622,14 +622,14 @@ export default function ProfileCardManager({ products, lineUrl = '', upgradeHref
                   {label}
                 </button>
               ))}
-              {/* 新增區塊:放在分頁列右側 */}
+              {/* 新增連結(區塊):放在分頁列右側 */}
               <button
                 type="button"
                 onClick={() => { setContentTab('links'); setPicker((v) => !v); }}
-                className={`ml-auto flex items-center gap-1 rounded-full px-4 py-2 text-sm font-semibold shadow-sm transition ${picker ? 'bg-[#efe8dd] text-[#1f1b19]' : 'bg-[#1f1b19] text-white hover:bg-[#3a332f]'}`}
+                className={`ml-auto flex items-center gap-1 rounded-full px-4 py-2 text-sm font-semibold shadow-sm transition ${picker ? 'bg-[#efe8dd] text-[#121b33]' : 'bg-[#121b33] text-[#dcbc84] hover:bg-[#1d2a4d]'}`}
               >
                 <span className="text-base leading-none">{picker ? '×' : '＋'}</span>
-                新增區塊
+                新增連結
                 {plan.pro ? null : <span className="text-[11px] font-normal opacity-70">{blocks.length}/{plan.limits.maxBlocks}</span>}
               </button>
             </div>
