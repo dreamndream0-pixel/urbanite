@@ -87,6 +87,17 @@ The nine supplied examples (photos 2 through 10) are copied unchanged to
 Photo 11 is not included because the requested range was photos 2 through 10.
 These are illustrative designs, not links to live businesses.
 
+The following LINK examples were subsequently replaced with supplied images,
+keeping their original positions and leaving SHOP unchanged:
+
+- PETAL NAIL -> PETAL NAILS (`petal-nails.jpg`)
+- AUREA BEAUTY -> LUMEA SKIN (`lumea-skin.jpg`)
+- VELOCRAFT -> VELOMOSS (`velomoss.jpg`)
+- SORA BEAN -> MORNING BEAN (`morning-bean.jpg`)
+
+The medical clinic example remains separate from the skincare brand example.
+New filenames avoid reusing cached versions of the previous images.
+
 The eight unique supplied SHOP examples are copied unchanged to
 `public/card/templates/shop/`, in this order:
 
