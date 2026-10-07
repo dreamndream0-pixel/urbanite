@@ -5,7 +5,7 @@ import type { CardTier } from '@/lib/card-plan';
 // 名片方案限時免費:活動期間所有會員都能使用指定等級(目前開放 U Plus)
 export type CardPromo = { enabled: boolean; tier: CardTier; start: string; end: string; note: string };
 
-export const EMPTY_PROMO: CardPromo = { enabled: false, tier: 'plus', start: '', end: '', note: '' };
+export const EMPTY_PROMO: CardPromo = { enabled: false, tier: 'max', start: '', end: '', note: '' };
 
 const isoOrEmpty = (v: unknown) => {
   const t = typeof v === 'string' && v ? new Date(v).getTime() : NaN;
@@ -16,7 +16,7 @@ export function cleanPromo(raw: unknown): CardPromo {
   const o = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
   return {
     enabled: o.enabled === true,
-    tier: 'plus', // U Pro / U Max 還沒開放購買,先只開放 U Plus
+    tier: o.tier === 'plus' || o.tier === 'pro' ? o.tier : 'max', // 免費開放到哪個等級(含以下所有付費方案)
     start: isoOrEmpty(o.start),
     end: isoOrEmpty(o.end),
     note: typeof o.note === 'string' ? o.note.trim().slice(0, 60) : '',

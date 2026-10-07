@@ -99,7 +99,7 @@ function PromoSettings() {
           <input type="checkbox" checked={promo.enabled} onChange={(e) => setPromo({ ...promo, enabled: e.target.checked })} className="h-4 w-4" />
         </label>
       </div>
-      <p className="mt-1 text-xs leading-5 text-[#8a7f72]">活動期間,所有免費會員都能使用 U Plus 全部功能;介紹頁、我的名片、方案頁會同步顯示「限時免費」。時間到自動結束,會員回到 U Free(名片資料保留)。</p>
+      <p className="mt-1 text-xs leading-5 text-[#8a7f72]">活動期間,所有會員都能免費使用下面選的方案;介紹頁、我的名片、方案頁會同步顯示「限時免費」。時間到自動結束,會員回到 U Free(名片資料保留)。</p>
       <div className="mt-3 grid gap-3 sm:grid-cols-2">
         <label className="block text-xs text-[#8a7f72]">
           開始時間(留空 = 立即開始)
@@ -109,8 +109,23 @@ function PromoSettings() {
           結束時間
           <input type="datetime-local" value={toLocal(promo.end)} onChange={(e) => setPromo({ ...promo, end: fromLocal(e.target.value) })} className="mt-1 w-full rounded-xl border border-[#e5ded4] px-3 py-2 text-sm text-[#1f1b19]" />
         </label>
+        <div className="sm:col-span-2">
+          <p className="text-xs text-[#8a7f72]">免費開放的方案</p>
+          <div className="mt-1 flex flex-wrap gap-2">
+            {([['plus', 'U Plus'], ['pro', 'U Plus + U Pro'], ['max', '全部方案(U Plus、U Pro、U Max)']] as const).map(([key, label]) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => setPromo({ ...promo, tier: key })}
+                className={`rounded-full px-3.5 py-1.5 text-xs transition ${promo.tier === key ? 'bg-[#1f1b19] text-white' : 'border border-[#e5ded4] text-[#5f5852] hover:bg-[#faf7f2]'}`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
         <label className="block text-xs text-[#8a7f72] sm:col-span-2">
-          公告文字(選填,留空顯示「U Plus 全部功能免費開放」)
+          公告文字(選填,留空顯示「U Plus、U Pro、U Max 全部功能免費開放」)
           <input value={promo.note} maxLength={60} onChange={(e) => setPromo({ ...promo, note: e.target.value })} placeholder="例如:開站慶!U Plus 全部功能免費用" className="mt-1 w-full rounded-xl border border-[#e5ded4] px-3 py-2 text-sm text-[#1f1b19]" />
         </label>
       </div>

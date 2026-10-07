@@ -3,14 +3,16 @@
 import { useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import ContactLineButton from '@/app/card/ContactLineButton';
-import { PERIODS, tierInfo, tierRank, TIERS, type CardPeriod, type CardPlanInfo, type PaidTier } from '@/lib/card-plan';
+import { PERIODS, tierInfo, tierRank, TIERS, type CardPeriod, type CardPlanInfo, type CardTier, type PaidTier } from '@/lib/card-plan';
 
 type Payment = { order_no: string; tier: string; period: string; amount: number; paid_at: string | null };
 
 const date = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString('zh-TW', { timeZone: 'Asia/Taipei' }) : '');
 
 export default function UpgradeClient({ plan, payments, result, table, lineUrl, promo = null }: { plan: CardPlanInfo; payments: Payment[]; result: string; table: ReactNode; lineUrl: string; promo?: { tier: string; end: string } | null }) {
-  const promoEnd = promo ? new Date(promo.end).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false }) : '';
+  const inPromo = (key: string) => Boolean(promo && tierRank(key as CardTier) <= tierRank(promo.tier as CardTier));
+  // 自己組字串(台灣時間),避免伺服器和瀏覽器的日期格式不同造成畫面不一致
+  const promoEnd = promo ? (() => { const d = new Date(new Date(promo.end).getTime() + 8 * 3600000); const p = (n: number) => String(n).padStart(2, '0'); return `${d.getUTCMonth() + 1}/${d.getUTCDate()} ${p(d.getUTCHours())}:${p(d.getUTCMinutes())}`; })() : '';
   const buyable = TIERS.filter((t) => t.key !== 'free');
   const [tier, setTier] = useState<PaidTier>(plan.tier === 'free' ? 'plus' : (plan.tier as PaidTier));
   const [period, setPeriod] = useState<CardPeriod>('year');
@@ -81,10 +83,11 @@ export default function UpgradeClient({ plan, payments, result, table, lineUrl, 
                 >
                   <span className="flex items-center justify-between gap-2">
                     <span className="text-sm font-semibold">{t.name}</span>
-                    {!t.available ? <span className="rounded-full bg-[#e9f7ee] px-2 py-0.5 text-[10px] text-[#1f7a44]">聯繫專員</span> : promo?.tier === t.key ? <span className="rounded-full bg-[#121b33] px-2 py-0.5 text-[10px] font-semibold text-[#dcbc84]">限時免費</span> : plan.tier === t.key ? <span className="text-[10px] text-[#1f7a44]">目前方案</span> : null}
+                    {!t.available && !inPromo(t.key) ? <span className="rounded-full bg-[#e9f7ee] px-2 py-0.5 text-[10px] text-[#1f7a44]">聯繫專員</span> : null}
+                    {inPromo(t.key) ? <span className="rounded-full bg-[#121b33] px-2 py-0.5 text-[10px] font-semibold text-[#dcbc84]">限時免費</span> : !t.available ? null : plan.tier === t.key ? <span className="text-[10px] text-[#1f7a44]">目前方案</span> : null}
                   </span>
                   <span className="mt-0.5 block text-xs text-[#8a7f72]">{t.tagline}</span>
-                  {promo?.tier === t.key ? (
+                  {inPromo(t.key) ? (
                     <span className="mt-2 block">
                       <span className="text-lg font-bold text-[#702838]">限時免費</span>
                       <span className="ml-2 text-xs text-[#a99e8f] line-through">NT${t.prices?.month} / 月</span>
@@ -113,6 +116,11 @@ export default function UpgradeClient({ plan, payments, result, table, lineUrl, 
           </div>
 
           {error ? <p className="mt-3 text-sm text-[#c0392b]">{error}</p> : null}
+          {inPromo(tier) ? (
+            <p className="mt-5 rounded-xl bg-[#fbf6ec] px-4 py-3 text-center text-sm text-[#6b4a1f]">
+              {chosen.name} 限時免費中,現在就能使用,不用付款。{chosen.available ? '想在活動結束後繼續使用,可以先購買。' : ''}
+            </p>
+          ) : null}
           {chosen.available ? (
             <>
               <button type="button" onClick={pay} disabled={busy} className="mt-5 w-full rounded-full bg-[#1f1b19] py-3 text-sm font-semibold text-white transition hover:bg-[#3a322e] disabled:opacity-50">
@@ -120,7 +128,7 @@ export default function UpgradeClient({ plan, payments, result, table, lineUrl, 
               </button>
               <p className="mt-2 text-center text-[11px] text-[#a99e8f]">付款由藍新金流處理,可用信用卡、ATM、超商代碼等方式</p>
             </>
-          ) : (
+          ) : inPromo(tier) ? null : (
             <>
               <ContactLineButton href={lineUrl} className="mt-5 py-3 text-sm" />
               <p className="mt-2 text-center text-[11px] text-[#a99e8f]">{chosen.name} 由專員協助開通,加入官方 LINE 告訴我們你的需求</p>
