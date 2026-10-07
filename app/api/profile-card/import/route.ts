@@ -5,7 +5,7 @@ import { normalizeUrl } from '@/lib/profile-card';
 import { applyImport, type ImportChoice } from '@/lib/card-import-apply';
 
 export const dynamic = 'force-dynamic';
-export const maxDuration = 60;
+export const maxDuration = 120; // 圖片多的頁面(例如 LINKGOODS 七十幾張大圖)需要較久
 
 // POST /api/profile-card/import
 // { url } → 預覽讀到的內容

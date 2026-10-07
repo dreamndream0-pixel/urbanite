@@ -549,7 +549,6 @@ export default function ProfileCardManager({ products, lineUrl = '', upgradeHref
                   {label}
                 </button>
               ))}
-              <button type="button" onClick={() => setPreviewOpen(true)} className="ml-auto rounded-full border border-[#d7c9bd] bg-white px-4 py-2 text-sm text-[#6b6156] lg:hidden">預覽</button>
             </div>
             {contentTab === 'links' ? (
               <div className="space-y-3">
@@ -614,7 +613,7 @@ export default function ProfileCardManager({ products, lineUrl = '', upgradeHref
           </>
         ) : null}
 
-        {mainTab === 'style' ? <StyleEditor draft={draft} setDraft={setDraft} onPreview={() => setPreviewOpen(true)} blocks={blocks} productMap={productMap} lineUrl={lineUrl} /> : null}
+        {mainTab === 'style' ? <StyleEditor draft={draft} setDraft={setDraft} blocks={blocks} productMap={productMap} lineUrl={lineUrl} /> : null}
         {mainTab === 'stats' ? <StatsPanel cardId={card.id} url={url} blocks={blocks} productMap={productMap} /> : null}
         {mainTab === 'settings' ? <SettingsEditor draft={draft} setDraft={setDraft} /> : null}
 
@@ -638,14 +637,28 @@ export default function ProfileCardManager({ products, lineUrl = '', upgradeHref
         <div className="mx-auto h-[680px] w-[340px] overflow-y-auto rounded-[36px] border-[10px] border-[#1f1b19] bg-white">{preview}</div>
       </aside>
 
-      {/* 手機預覽 */}
+      {/* 懸浮預覽按鈕:畫面下方中間,任何分頁都能隨時預覽 */}
+      {!previewOpen ? (
+        <button
+          type="button"
+          onClick={() => setPreviewOpen(true)}
+          className="fixed left-1/2 z-[65] flex -translate-x-1/2 items-center gap-2 rounded-full bg-[#1f1b19]/60 px-5 py-2.5 text-sm font-medium text-white shadow-[0_6px_20px_rgba(0,0,0,0.18)] backdrop-blur-md transition hover:bg-[#1f1b19]/80"
+          style={{ bottom: needsSave ? 'calc(env(safe-area-inset-bottom) + 76px)' : 'calc(env(safe-area-inset-bottom) + 20px)' }}
+        >
+          <Icon size={17}><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z" /><circle cx="12" cy="12" r="3" /></Icon>
+          預覽
+        </button>
+      ) : null}
+
+      {/* 預覽:手機全螢幕,桌機置中手機框 */}
       {previewOpen ? (
-        <div className="fixed inset-0 z-[70] flex flex-col bg-white">
-          <div className="flex items-center justify-between border-b border-[#e5ded4] bg-white px-4 py-3">
+        <div className="fixed inset-0 z-[70] flex flex-col bg-white lg:items-center lg:justify-center lg:bg-black/50 lg:backdrop-blur-sm" onClick={() => setPreviewOpen(false)}>
+          <div className="flex items-center justify-between border-b border-[#e5ded4] bg-white px-4 py-3 lg:hidden">
             <span className="text-sm font-medium">預覽</span>
             <button type="button" onClick={() => setPreviewOpen(false)} className="rounded-full border border-[#d7c9bd] px-3 py-1 text-xs">關閉</button>
           </div>
-          <div className="flex-1 overflow-y-auto">{preview}</div>
+          <div className="flex-1 overflow-y-auto lg:h-[min(760px,calc(100dvh-90px))] lg:w-[380px] lg:flex-none lg:rounded-[40px] lg:border-[10px] lg:border-[#1f1b19] lg:bg-white" onClick={(e) => e.stopPropagation()}>{preview}</div>
+          <button type="button" onClick={() => setPreviewOpen(false)} className="mt-4 hidden rounded-full bg-white/90 px-5 py-2 text-sm font-medium text-[#1f1b19] lg:block">關閉預覽</button>
         </div>
       ) : null}
 
@@ -760,6 +773,34 @@ function BlockThumb({ block, productImage }: { block: ProfileCardBlock; productI
   }
   if (block.type === 'line') return <span className="flex h-full w-full items-center justify-center bg-[#06C755] text-white"><SocialIcon type="line" size={18} /></span>;
   return <Icon size={17}>{BLOCK_ICON[block.type]}</Icon>;
+}
+
+// 區塊類型:展開編輯時隨時可以換,原本填的內容會保留
+function BlockTypeSwitcher({ block, dirty, onChange }: { block: ProfileCardBlock; dirty: boolean; onChange: (type: BlockType) => void }) {
+  const { plan } = usePlan();
+  const types = BLOCK_TYPES.filter((t) => plan.isAdmin || t.type !== 'product' || block.type === 'product');
+  return (
+    <div className="border-t border-[#f3eee7] px-3.5 pt-3">
+      <span className="mb-1.5 block text-xs text-[#8a7f72]">區塊類型{dirty ? '(會先儲存目前的內容)' : ''}</span>
+      <div className="-mx-3.5 flex gap-1.5 overflow-x-auto px-3.5 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        {types.map((t) => {
+          const on = t.type === block.type;
+          return (
+            <button
+              key={t.type}
+              type="button"
+              onClick={() => (on ? undefined : onChange(t.type))}
+              className={`relative flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs transition ${on ? 'border-[#1f1b19] bg-[#1f1b19] text-white' : 'border-[#e5ded4] bg-white text-[#5f5852] hover:bg-[#faf7f2]'}`}
+            >
+              <Icon size={14}>{BLOCK_ICON[t.type]}</Icon>
+              {t.label}
+              {t.type === 'hotspot' && !plan.limits.customStyle ? <ProBadge /> : null}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
 }
 
 function BlockRow({
@@ -898,6 +939,23 @@ function BlockRow({
           {status}
         </div>
 
+        {open ? (
+          <BlockTypeSwitcher
+            block={block}
+            dirty={dirty}
+            onChange={(type) => {
+              if (type === 'hotspot' && !plan.limits.customStyle) return void askUpgrade('熱區圖片是 U Plus 功能。', upgradeHref);
+              // 已填的標題、網址、圖片都保留;換成圖文連結時,原本的圖片直接當第一張
+              const patch: Partial<ProfileCardBlock> = { type };
+              if (type === 'image' && !blockItems(block).length && block.image && !block.image.startsWith('icon:')) {
+                patch.items = [{ image: block.image, title: '', url: block.url }];
+              }
+              if (block.type === 'image' && dirty) Object.assign(patch, { title: block.title, url: block.url, items: blockItems(block), options: blockOptions(block) });
+              setDirty(false);
+              onPatch(patch);
+            }}
+          />
+        ) : null}
         {open && block.type === 'image' ? (
           <ImageBlockEditor
             block={block}
@@ -914,7 +972,7 @@ function BlockRow({
             onDelete={onDelete}
           />
         ) : open ? (
-          <div className="space-y-3 border-t border-[#f3eee7] px-3.5 pb-3.5 pt-3">
+          <div className="space-y-3 px-3.5 pb-3.5 pt-3">
             {block.type === 'link' && (
               <>
                 {field('title', '標題', '例如:官方網站|全館商品')}
@@ -1091,7 +1149,7 @@ function ImageBlockEditor({
   );
 
   return (
-    <div className="space-y-5 border-t border-[#f3eee7] px-3.5 pb-3.5 pt-3">
+    <div className="space-y-5 px-3.5 pb-3.5 pt-3">
       <div className="-mb-2 flex items-center justify-end gap-1">
         <button
           type="button"
@@ -2069,14 +2127,12 @@ function ProfileEditor({ draft, setDraft }: { draft: ProfileCard; setDraft: (c: 
 function StyleEditor({
   draft,
   setDraft,
-  onPreview,
   blocks,
   productMap,
   lineUrl,
 }: {
   draft: ProfileCard;
   setDraft: (c: ProfileCard) => void;
-  onPreview: () => void;
   blocks: ProfileCardBlock[];
   productMap: Record<string, CardProduct>;
   lineUrl: string;
@@ -2126,7 +2182,6 @@ function StyleEditor({
             {key !== 'template' && !plan.limits.customStyle ? <PlusCorner /> : null}
           </button>
         ))}
-        <button type="button" onClick={onPreview} className="ml-auto shrink-0 rounded-full border border-[#d7c9bd] bg-white px-4 py-2 text-sm text-[#6b6156] lg:hidden">預覽</button>
       </div>
 
       {tab === 'template' ? (

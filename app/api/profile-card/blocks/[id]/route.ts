@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { requireCardOwner } from '@/lib/card-access';
-import { blockOptions, IMAGE_LIMIT, LINK_TITLE_LIMIT, type ProfileCardBlock } from '@/lib/profile-card';
+import { BLOCK_TYPES, blockOptions, IMAGE_LIMIT, LINK_TITLE_LIMIT, type ProfileCardBlock } from '@/lib/profile-card';
 
 export const dynamic = 'force-dynamic';
 
@@ -25,6 +25,17 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   }
   if (typeof update.title === 'string') update.title = (update.title as string).slice(0, LINK_TITLE_LIMIT);
   if (typeof body.enabled === 'boolean') update.enabled = body.enabled;
+  // 更換區塊類型:原本的標題、網址、圖片都保留,換回來還在
+  if (typeof body.type === 'string') {
+    const type = body.type;
+    if (!BLOCK_TYPES.some((t) => t.type === type) || (type === 'product' && !owner.plan.isAdmin)) {
+      return NextResponse.json({ error: '資料格式錯誤' }, { status: 400 });
+    }
+    if (type === 'hotspot' && !owner.plan.limits.customStyle) {
+      return NextResponse.json({ error: '熱區圖片是 U Plus 功能。', upgrade: true }, { status: 403 });
+    }
+    update.type = type;
+  }
   // 圖文連結:多張圖片與版型
   if (Array.isArray(body.items)) {
     update.items = body.items

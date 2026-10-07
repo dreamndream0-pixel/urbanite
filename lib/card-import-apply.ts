@@ -15,7 +15,7 @@ async function storeImage(userId: string, url: string, size: number, square: boo
     const res = await get().catch(() => get());
     if (!res.ok || !(res.headers.get('content-type') ?? '').startsWith('image/')) return '';
     const raw = Buffer.from(await res.arrayBuffer());
-    if (raw.length > 8 * 1024 * 1024) return '';
+    if (raw.length > 25 * 1024 * 1024) return ''; // 原圖可能很大(LINKGOODS 常見 9MB),壓縮後只剩幾百 KB
     const buf = await sharp(raw).resize(size, size, { fit: square ? 'cover' : 'inside', withoutEnlargement: true }).webp({ quality: 85 }).toBuffer();
     const supabase = createAdminClient();
     const path = `profile-card/${userId}/import-${Date.now()}-${Math.random().toString(36).slice(2, 7)}.webp`;
@@ -39,15 +39,15 @@ export async function applyImport(user: { id: string }, card: ProfileCard, plan:
   const toAdd = picked.slice(0, room);
   const skipped = picked.length - toAdd.length;
 
-  // 所有圖片(連結縮圖、圖文連結的每一張)都下載存到自己的空間;同時最多 6 張
+  // 所有圖片(連結縮圖、圖文連結的每一張)都下載存到自己的空間;同時最多 8 張
   const jobs: { key: string; url: string; size: number }[] = [];
   toAdd.forEach((it, i) => {
     if (it.kind === 'link' && /^https?:/i.test(it.image)) jobs.push({ key: `${i}`, url: it.image, size: 400 });
     if (it.kind === 'image') it.items.forEach((img, j) => jobs.push({ key: `${i}:${j}`, url: img.image, size: it.layout === 'banner' || it.layout === 'scroll' ? 1200 : 800 }));
   });
   const stored = new Map<string, string>();
-  for (let k = 0; k < jobs.length; k += 6) {
-    const batch = jobs.slice(k, k + 6);
+  for (let k = 0; k < jobs.length; k += 8) {
+    const batch = jobs.slice(k, k + 8);
     const urls = await Promise.all(batch.map((j) => storeImage(user.id, j.url, j.size, false)));
     batch.forEach((j, n) => stored.set(j.key, urls[n]));
   }
@@ -72,7 +72,7 @@ export async function applyImport(user: { id: string }, card: ProfileCard, plan:
         // 圖文連結:每張圖各自的標題與連結
         const items = it.items.map((img, j) => ({ image: stored.get(`${i}:${j}`) ?? '', title: img.title.slice(0, 80), url: img.url })).filter((x) => x.image);
         if (!items.length) return [];
-        return [{ ...base, type: 'image', title: it.title, url: items.find((x) => x.url)?.url ?? '', image: items[0].image, items, options: { layout: it.layout === 'square' ? 'square' : it.layout, captionMode: 'custom' } }];
+        return [{ ...base, type: 'image', title: it.title, url: it.url || (items.find((x) => x.url)?.url ?? ''), image: items[0].image, items, options: { layout: it.layout === 'square' ? 'square' : it.layout, captionMode: it.shared ? 'link' : 'custom' } }];
       }
       default:
         return [{ ...base, type: 'link', title: it.title || it.url, url: it.url, image: it.image.startsWith('icon:') ? it.image : stored.get(`${i}`) ?? '' }];

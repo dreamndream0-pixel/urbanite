@@ -6,7 +6,7 @@ export type ImportedItem =
   | { kind: 'link'; title: string; url: string; image: string } // image:縮圖網址或 icon:圖示
   | { kind: 'text'; title: string }
   | { kind: 'video'; title: string; url: string }
-  | { kind: 'image'; title: string; layout: 'banner' | 'scroll' | 'grid2' | 'grid3' | 'circle3' | 'square'; items: ImportedImage[] } // 圖文連結
+  | { kind: 'image'; title: string; layout: 'banner' | 'scroll' | 'grid2' | 'grid3' | 'circle3' | 'square'; items: ImportedImage[]; url?: string; shared?: boolean } // 圖文連結;shared = 共用標題與連結
   | { kind: 'divider' }
   | { kind: 'social'; title: string; url: string; platform: string };
 
@@ -259,6 +259,129 @@ function parsePortaly(html: string): ImportedProfile | null {
   return { source: 'Portaly', name: str(d.name), bio: str(d.description), avatar: str(d.avatar), socials, items };
 }
 
+// ---------- LINKGOODS(Nuxt + Apollo 快取)----------
+// Nuxt 3 的 __NUXT_DATA__ 是 devalue 格式:一個大陣列,裡面的數字都是索引
+function nuxtData(html: string): unknown {
+  const m = html.match(/<script[^>]+id="__NUXT_DATA__"[^>]*>([\s\S]*?)<\/script>/);
+  if (!m) return null;
+  let a: unknown[];
+  try {
+    a = JSON.parse(m[1]);
+  } catch {
+    return null;
+  }
+  const memo = new Map<number, unknown>();
+  const WRAP = new Set(['ShallowReactive', 'Reactive', 'Ref', 'ShallowRef', 'EmptyRef', 'EmptyShallowRef', 'Set', 'Map', 'Object']);
+  const r = (i: unknown): unknown => {
+    if (typeof i !== 'number' || i < 0 || i >= a.length) return undefined;
+    if (memo.has(i)) return memo.get(i);
+    const v = a[i];
+    if (Array.isArray(v)) {
+      if (v[0] === 'null') {
+        const o: Record<string, unknown> = {};
+        memo.set(i, o);
+        for (let k = 1; k < v.length; k += 2) o[String(v[k])] = r(v[k + 1]);
+        return o;
+      }
+      if (typeof v[0] === 'string' && WRAP.has(v[0])) {
+        const out = r(v[1]);
+        memo.set(i, out);
+        return out;
+      }
+      if (v[0] === 'Date') return v[1];
+      const out: unknown[] = [];
+      memo.set(i, out);
+      for (const x of v) out.push(r(x));
+      return out;
+    }
+    if (v && typeof v === 'object') {
+      const o: Record<string, unknown> = {};
+      memo.set(i, o);
+      for (const k of Object.keys(v)) o[k] = r((v as Record<string, unknown>)[k]);
+      return o;
+    }
+    return v;
+  };
+  return r(0);
+}
+
+// 連結按鈕的圖示:依網址猜我們內建的圖示
+function guessIcon(url: string) {
+  const social = socialType(url);
+  if (social && ICON_KEYS.has(social)) return `icon:${social}`;
+  if (/shopee|momo|pchome|rakuten|pinkoi|shopline|cyberbiz|91app|easystore/i.test(url)) return 'icon:shopping-bag';
+  return 'icon:globe';
+}
+
+function parseLinkgoods(html: string): ImportedProfile | null {
+  type Obj = Record<string, unknown>;
+  const root = nuxtData(html) as { data?: Obj } | null;
+  const cache = root?.data?.['_apollo:default'] as Record<string, Obj> | undefined;
+  if (!cache?.ROOT_QUERY) return null;
+  const deref = (x: unknown): Obj => ((x && typeof x === 'object' && '__ref' in x ? cache[String((x as Obj).__ref)] : (x as Obj | undefined)) ?? {});
+  const q = cache.ROOT_QUERY;
+  const user = deref(q[Object.keys(q).find((k) => k.startsWith('user(')) ?? '']);
+  const json = (v: unknown): Obj => {
+    try {
+      return (typeof v === 'string' ? JSON.parse(v) : v ?? {}) as Obj;
+    } catch {
+      return {};
+    }
+  };
+  const order = json(q[Object.keys(q).find((k) => k.startsWith('productSort(')) ?? '']) as unknown;
+  const items: ImportedItem[] = [];
+  for (const s of (Array.isArray(order) ? order : []) as Obj[]) {
+    if (s.isShow === false) continue;
+    const mode = str(s.mode);
+    if (mode === 'DIVIDER') {
+      // 有文字的分隔線 = 區段標題
+      const title = str(s.title);
+      items.push(title ? { kind: 'text', title } : { kind: 'divider' });
+      continue;
+    }
+    const p = cache[`Product:${str(s.id)}`];
+    if (!p || p.isShow === false) continue;
+    const title = str(p.title) || str(s.title);
+    const url = str(p.sourceUrl) || str(p.shortUrl);
+    if (mode === 'RICHTEXT') {
+      const text = decode(str(p.content).replace(/<br\s*\/?>|<\/p>/gi, '\n').replace(/<[^>]+>/g, '')).trim();
+      if (text || title) items.push({ kind: 'text', title: text || title });
+      continue;
+    }
+    if (/VIDEO/.test(mode) || isVideo(url)) {
+      if (isHttp(url)) items.push({ kind: 'video', title, url });
+      continue;
+    }
+    const photos = ((Array.isArray(p.productItems) ? p.productItems : []) as unknown[])
+      .map(deref)
+      .map((it) => ({ image: str(deref(it.photo).url), title: str(it.title), url: str(it.sourceUrl) || str(it.shortUrl) }))
+      .filter((x) => isHttp(x.image));
+    if (!photos.length && isHttp(str(p.thumbnail)) && mode === 'IMAGETEXT') photos.push({ image: str(p.thumbnail), title: '', url });
+    if (photos.length) {
+      if (p.isPhotoCarousel || photos.length === 1 || title) {
+        // 商品輪播:一張一張滑、標題在下、共用一個連結 → 圖文連結「標題在下」
+        for (let i = 0; i < photos.length; i += 10) items.push({ kind: 'image', title, layout: 'banner', items: photos.slice(i, i + 10), url, shared: Boolean(title) });
+      } else {
+        // 沒有標題的多張圖 → 方格,每張各自的連結
+        const layout = photos.length % 3 === 0 ? 'grid3' : 'grid2';
+        for (let i = 0; i < photos.length; i += 9) items.push({ kind: 'image', title: '', layout, items: photos.slice(i, i + 9).map((x) => ({ ...x, url: x.url || url })) });
+      }
+      continue;
+    }
+    if (!isHttp(url)) continue;
+    const hasIcon = /ICON/.test(str(json(p.template).thumbnailType));
+    items.push({ kind: 'link', title: title || url, url, image: hasIcon ? guessIcon(url) : '' });
+  }
+  const socialKeys = Array.isArray(user.socialAccountUrlOrder) ? (user.socialAccountUrlOrder as string[]) : [];
+  const allKeys = [...socialKeys, ...Object.keys(user).filter((k) => /Url$/.test(k) && !socialKeys.includes(k))];
+  const socials = allKeys
+    .map((k) => str(user[k]))
+    .filter(isHttp)
+    .map((value) => ({ type: socialType(value), value }))
+    .filter((x) => x.type);
+  return { source: 'LINKGOODS', name: str(user.nickname) || str(user.username), bio: str(user.description), avatar: str(user.photo), socials, items };
+}
+
 // ---------- 其他平台:通用解析 ----------
 const SKIP_TEXT = /privacy|terms|cookie|report|sign ?up|log ?in|create your|隱私|條款|檢舉|註冊|登入|免費建立|try for free/i;
 function parseGeneric(html: string, pageUrl: string, source: string): ImportedProfile {
@@ -321,7 +444,9 @@ export async function readImportPage(url: string): Promise<ImportedProfile> {
   if (res.status === 403 || res.status === 429) throw new Error(`${source} 不允許自動讀取,這個平台請改用手動新增`);
   if (!res.ok) throw new Error(`讀取失敗(${res.status}),請確認網址是公開的個人頁`);
   const html = (await res.text()).slice(0, 6_000_000);
-  const parsed = (source === 'Linktree' ? parseLinktree(html) : source === 'Portaly' ? parsePortaly(html) : null) ?? parseGeneric(html, url, source);
+  const parsed =
+    (source === 'Linktree' ? parseLinktree(html) : source === 'Portaly' ? parsePortaly(html) : source === 'LINKGOODS' ? parseLinkgoods(html) : null) ??
+    parseGeneric(html, url, source);
   // 去除重複、清理長度
   const seen = new Set<string>();
   parsed.items = parsed.items
@@ -329,7 +454,7 @@ export async function readImportPage(url: string): Promise<ImportedProfile> {
       const key =
         it.kind === 'text' ? `t:${it.title}`
         : it.kind === 'divider' ? `d:${Math.random()}`
-        : it.kind === 'image' ? `i:${it.items.map((x) => x.image).join('|')}`
+        : it.kind === 'image' ? `i:${it.title}:${it.items.map((x) => x.image).join('|')}`
         : `${it.kind}:${it.url}`;
       if (seen.has(key)) return false;
       seen.add(key);

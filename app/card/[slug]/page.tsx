@@ -8,6 +8,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { getAdminUser, getSessionUser } from '@/lib/supabase/server';
 import { getAdminEmails } from '@/lib/integrations';
 import ProfileCardView, { type CardProduct } from '@/app/components/ProfileCardView';
+import CardMenu from '@/app/card/CardMenu';
 import type { ProfileCard, ProfileCardBlock } from '@/lib/profile-card';
 import type { SiteSettings } from '@/lib/types';
 import { getCheckoutLine, lineAddFriendUrl } from '@/lib/checkout-line';
@@ -88,6 +89,8 @@ export default async function CardPage({ params }: { params: Promise<{ slug: str
           <span className="shrink-0 rounded-full bg-[#dcbc84] px-2.5 py-0.5 text-[11px] font-semibold text-[#121b33]">立即建立</span>
         </a>
       ) : null}
+      {/* 右上角漢堡選單:登入登出、我的名片 */}
+      <CardMenu variant="floating" top={data.free ? 52 : 12} />
       <ProfileCardView card={data.card} blocks={data.blocks} products={data.products} logoUrl={data.logoUrl} lineUrl={data.lineUrl} serviceFooter={!data.isStore} fullScreen />
     </main>
   );
