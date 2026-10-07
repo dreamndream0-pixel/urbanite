@@ -65,7 +65,8 @@ assets are reused in the phone galleries.
 
 The lower LINK / SHOP / BRAND scenes use independent phone and photograph
 layers. Their vertical offset, tilt, and screen position follow page scrolling.
-The section order is LINK, the full-width template carousel, SHOP, then BRAND.
+The section order is LINK, the full-width LINK carousel, SHOP, the full-width
+SHOP carousel, then BRAND.
 Reduced motion keeps the phone layers still. The original hero behavior is
 unchanged; both sections share `DemoPhoneContent.tsx` for the profile and shop
 screen artwork.
@@ -86,6 +87,24 @@ The nine supplied examples (photos 2 through 10) are copied unchanged to
 Photo 11 is not included because the requested range was photos 2 through 10.
 These are illustrative designs, not links to live businesses.
 
+The eight unique supplied SHOP examples are copied unchanged to
+`public/card/templates/shop/`, in this order:
+
+1. `lunora-studio.jpg`
+2. `veloa-trail.jpg`
+3. `paw-co.jpg`
+4. `papermint.jpg`
+5. `bon-sucre.jpg`
+6. `nova-case.jpg`
+7. `ember-roast.jpg`
+8. `vera-glow.jpg`
+
+The supplemental batch contained two byte-identical repeats (VELOA TRAIL and
+LUNORA STUDIO), which are not duplicated in the carousel. Two additional unique
+designs are still needed to reach ten. Collection metadata is
+in `template-collections.ts`; both rows share `TemplateCarousel.tsx` with
+independent controls, dialog state, and accessible element IDs.
+
 The single-row carousel uses Embla 8.6.0 and its Auto Scroll plugin. It pauses
 when off screen, when the tab is hidden, during dragging, while hovered or
 keyboard-focused, and while a native image-preview dialog is open. Explicit
@@ -100,3 +119,9 @@ position, drag moves the row without opening a preview, arrow navigation works,
 Escape closes the preview and returns focus, and reduced motion stops automatic
 movement while retaining keyboard navigation. Lint and production build pass.
 These browser checks do not replace physical iOS or Android device testing.
+
+The added SHOP collection was checked at 320, 390, and 1440 pixel widths.
+All six images load, placement follows SHOP, navigation does not change LINK
+controls, and its preview opens the correct SHOP image. Escape restores focus.
+No duplicate IDs or horizontal page overflow were found. Reduced motion hides
+automatic playback controls for both collections. Lint and production build pass.

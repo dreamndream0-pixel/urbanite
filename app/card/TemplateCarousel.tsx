@@ -11,19 +11,8 @@ import {
 import { ArrowLeft, ArrowRight, Pause, Play, X } from "lucide-react";
 import useEmblaCarousel from "embla-carousel-react";
 import AutoScroll from "embla-carousel-auto-scroll";
+import type { TemplateCollection } from "./template-collections";
 import styles from "./templates.module.css";
-
-const templates = [
-  { key: "casa-mellow", name: "CASA MELLOW", label: "居家選物" },
-  { key: "petal-nail", name: "PETAL NAIL", label: "美甲工作室" },
-  { key: "aurea-beauty", name: "AUREA BEAUTY", label: "美妝品牌" },
-  { key: "lunea-clinic", name: "LUNÉA CLINIC", label: "醫美診所" },
-  { key: "mellow-cast", name: "MELLOW CAST", label: "自媒體創作者" },
-  { key: "velocraft", name: "VELOCRAFT", label: "單車生活" },
-  { key: "sora-bean", name: "SORA BEAN", label: "咖啡品牌" },
-  { key: "mona-atelier", name: "MONA ATELIER", label: "服飾品牌" },
-  { key: "ciel-table", name: "CIEL TABLE", label: "餐飲品牌" },
-];
 
 function subscribeMotion(callback: () => void) {
   const query = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -34,7 +23,15 @@ const readMotion = () =>
   window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 const serverMotion = () => false;
 
-export default function TemplateCarousel() {
+export default function TemplateCarousel({
+  collection,
+}: {
+  collection: TemplateCollection;
+}) {
+  const { id, eyebrow, title, label, basePath, templates } = collection;
+  const titleId = `${id}-collection-title`;
+  const viewportId = `${id}-collection-viewport`;
+  const previewTitleId = `${id}-template-title`;
   const reduced = useSyncExternalStore(
     subscribeMotion,
     readMotion,
@@ -150,17 +147,22 @@ export default function TemplateCarousel() {
   const current = templates[selected];
 
   return (
-    <section className={styles.collection} aria-labelledby="collection-title">
+    <section
+      id={`${id}-templates`}
+      className={styles.collection}
+      aria-labelledby={titleId}
+    >
       <header className={styles.header}>
         <div>
-          <p>LINK COLLECTION</p>
-          <h2 id="collection-title">一頁，無限種可能。</h2>
+          <p>{eyebrow}</p>
+          <h2 id={titleId}>{title}</h2>
         </div>
         <div className={styles.controls}>
           <button
             type="button"
             onClick={() => step(-1)}
             aria-label="上一個設計"
+            aria-controls={viewportId}
             title="上一個設計"
           >
             <ArrowLeft />
@@ -172,6 +174,7 @@ export default function TemplateCarousel() {
               aria-label={paused ? "開始自動輪播" : "暫停自動輪播"}
               title={paused ? "開始自動輪播" : "暫停自動輪播"}
               aria-pressed={paused}
+              aria-controls={viewportId}
             >
               {paused ? <Play /> : <Pause />}
             </button>
@@ -180,6 +183,7 @@ export default function TemplateCarousel() {
             type="button"
             onClick={() => step(1)}
             aria-label="下一個設計"
+            aria-controls={viewportId}
             title="下一個設計"
           >
             <ArrowRight />
@@ -188,11 +192,12 @@ export default function TemplateCarousel() {
       </header>
       <div
         ref={viewport}
+        id={viewportId}
         className={styles.viewport}
         data-ready={Boolean(api)}
         role="region"
         aria-roledescription="輪播"
-        aria-label="九種網站設計示意"
+        aria-label={`${label}，共 ${templates.length} 款`}
         tabIndex={0}
         onKeyDown={(event) => {
           if (event.key === "ArrowRight" || event.key === "ArrowLeft") {
@@ -217,7 +222,7 @@ export default function TemplateCarousel() {
                 aria-label={`放大查看 ${template.name} ${template.label}`}
               >
                 <Image
-                  src={`/card/templates/${template.key}.jpg`}
+                  src={`${basePath}/${template.key}.jpg`}
                   alt={`${template.name} ${template.label}完整網頁設計示意`}
                   width={575}
                   height={1280}
@@ -239,7 +244,7 @@ export default function TemplateCarousel() {
       <dialog
         ref={dialog}
         className={styles.dialog}
-        aria-labelledby="template-title"
+        aria-labelledby={previewTitleId}
         onClose={() => setModalOpen(false)}
         onClick={(event) => {
           if (event.target === event.currentTarget) dialog.current?.close();
@@ -248,7 +253,7 @@ export default function TemplateCarousel() {
         <div className={styles.dialogContent}>
           <header>
             <div>
-              <h2 id="template-title">{current.name}</h2>
+              <h2 id={previewTitleId}>{current.name}</h2>
               <p>{current.label}</p>
             </div>
             <button
@@ -263,7 +268,7 @@ export default function TemplateCarousel() {
           </header>
           <Image
             key={current.key}
-            src={`/card/templates/${current.key}.jpg`}
+            src={`${basePath}/${current.key}.jpg`}
             alt={`${current.name} 完整網頁示意`}
             width={575}
             height={1280}

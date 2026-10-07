@@ -5,6 +5,7 @@ import { ArrowRight } from "lucide-react";
 import DemoPhoneContent from "./DemoPhoneContent";
 import FloatingShowcase from "./FloatingShowcase";
 import TemplateCarousel from "./TemplateCarousel";
+import { linkCollection, shopCollection } from "./template-collections";
 import styles from "./showcase.module.css";
 
 const products = [
@@ -102,7 +103,12 @@ export default function ProductShowcase({ startHref }: { startHref: string }) {
               </div>
             </div>
           </article>
-          {product.key === "link" && <TemplateCarousel />}
+          {product.key === "link" && (
+            <TemplateCarousel collection={linkCollection} />
+          )}
+          {product.key === "shop" && (
+            <TemplateCarousel collection={shopCollection} />
+          )}
         </Fragment>
       ))}
     </FloatingShowcase>

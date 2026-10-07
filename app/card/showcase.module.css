@@ -13,7 +13,8 @@
   max-width: 1140px;
   margin: 0 auto 50px;
 }
-.panel.link {
+.panel.link,
+.panel.shop {
   margin-bottom: 12px;
 }
 .panel:last-child {
