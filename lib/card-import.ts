@@ -382,6 +382,93 @@ function parseLinkgoods(html: string): ImportedProfile | null {
   return { source: 'LINKGOODS', name: str(user.nickname) || str(user.username), bio: str(user.description), avatar: str(user.photo), socials, items };
 }
 
+// ---------- Linkfly(內容在另一個 JSON 檔,頁面載入後才抓)----------
+async function parseLinkfly(html: string): Promise<ImportedProfile | null> {
+  type Obj = Record<string, unknown>;
+  const m = html.match(/window\.__data=(\{[\s\S]*?\});<\/script>/);
+  if (!m) return null;
+  let data: Obj;
+  try {
+    data = JSON.parse(m[1]);
+  } catch {
+    return null;
+  }
+  const basic = (data.basic ?? {}) as Obj;
+  const bioId = str((data.bio as Obj | undefined)?.id);
+  const uid = str(basic.uid);
+  const img = (p: string) => (!p ? '' : isHttp(p) ? p : `https://fly.linkcdn.cc/${p.replace(/^\//, '')}`);
+  const items: ImportedItem[] = [];
+  const socials: { type: string; value: string }[] = [];
+  if (bioId) {
+    const get = async (url: string) => {
+      const res = await fetch(url, { signal: AbortSignal.timeout(10000), headers: { 'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0 Safari/537.36' }, cache: 'no-store' });
+      return res.ok ? ((await res.json()) as Obj) : null;
+    };
+    const file = await get(`https://fly.linkcdn.cc/upload/lnkcmpts/${bioId}.json?lnkcmpt=${String(data.vt ?? '')}`).catch(() => null);
+    const json = (v: unknown): unknown => {
+      try {
+        return typeof v === 'string' ? JSON.parse(v || 'null') : v;
+      } catch {
+        return null;
+      }
+    };
+    const contents = ((json(file?.contents) as Obj[] | null) ?? []).filter((c) => c && Number(c.state ?? 1) === 1);
+    const orders = (json(file?.orders) as string[] | null) ?? [];
+    contents.sort((a, b) => (orders.indexOf(str(a.id)) + 1 || 999) - (orders.indexOf(str(b.id)) + 1 || 999));
+    for (const c of contents) {
+      // 社群列
+      if (Array.isArray(c.socials)) {
+        for (const s of c.socials as Obj[]) if (isHttp(str(s.link))) socials.push({ type: socialType(str(s.link)), value: str(s.link) });
+        continue;
+      }
+      // TikTok 帳號嵌入 → 社群追蹤卡片(帳號網址要另外查)
+      if (str(c.subtype) === 'cmpt-tiktok-profile' && uid) {
+        const id = str(c.path) || str(((json(c.text) as Obj | null)?.provider as Obj | undefined)?.id);
+        const r = id ? await get(`https://api.linkfly.to/v/2.0/share/${uid}/link/${bioId}/itgr/tiktok/op/profile/?id=${encodeURIComponent(id)}`).catch(() => null) : null;
+        const link = str(((r?.data as Obj | undefined)?.user as Obj | undefined)?.profile_deep_link);
+        if (isHttp(link)) items.push({ kind: 'social', title: '', url: link, platform: 'tiktok' });
+        continue;
+      }
+      const buttons = Array.isArray(c.buttons) ? (c.buttons as Obj[]) : null;
+      if (!buttons) {
+        const link = str(c.link);
+        if (isHttp(link)) items.push(isVideo(link) ? { kind: 'video', title: str(c.title), url: link } : { kind: 'link', title: str(c.title) || link, url: link, image: img(str(c.image)) });
+        continue;
+      }
+      if (str(c.title)) items.push({ kind: 'text', title: str(c.title) });
+      for (const b of buttons) {
+        const type = Number(b.type);
+        const title = str(b.title);
+        if (type === 11) {
+          // 標題
+          if (title) items.push({ kind: 'text', title });
+          continue;
+        }
+        if (type === 13) {
+          // 圖片連結
+          const t = (json(b.text) as Obj | null) ?? {};
+          const image = img(str(t.url) || str(t.image) || str(b.icon));
+          const link = str(t.link) || str(b.link);
+          if (image) items.push({ kind: 'image', title: '', layout: 'banner', items: [{ image, title, url: link }] });
+          continue;
+        }
+        const link = str(b.link) || str(b.link1);
+        if (!isHttp(link)) continue;
+        if (isVideo(link)) items.push({ kind: 'video', title, url: link });
+        else items.push({ kind: 'link', title: title || link, url: link, image: img(str(b.icon)) });
+      }
+    }
+  }
+  return {
+    source: 'Linkfly',
+    name: str(basic.title),
+    bio: str(basic.desc).replace(/\s*\n\s*/g, ' '),
+    avatar: img(str(basic.cover)),
+    socials: socials.filter((s) => s.type),
+    items,
+  };
+}
+
 // ---------- 其他平台:通用解析 ----------
 const SKIP_TEXT = /privacy|terms|cookie|report|sign ?up|log ?in|create your|隱私|條款|檢舉|註冊|登入|免費建立|try for free/i;
 function parseGeneric(html: string, pageUrl: string, source: string): ImportedProfile {
@@ -445,7 +532,7 @@ export async function readImportPage(url: string): Promise<ImportedProfile> {
   if (!res.ok) throw new Error(`讀取失敗(${res.status}),請確認網址是公開的個人頁`);
   const html = (await res.text()).slice(0, 6_000_000);
   const parsed =
-    (source === 'Linktree' ? parseLinktree(html) : source === 'Portaly' ? parsePortaly(html) : source === 'LINKGOODS' ? parseLinkgoods(html) : null) ??
+    (source === 'Linktree' ? parseLinktree(html) : source === 'Portaly' ? parsePortaly(html) : source === 'LINKGOODS' ? parseLinkgoods(html) : source === 'Linkfly' ? await parseLinkfly(html) : null) ??
     parseGeneric(html, url, source);
   // 去除重複、清理長度
   const seen = new Set<string>();
