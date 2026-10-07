@@ -862,7 +862,9 @@ export default function ProfileCardView({
         </div>
 
         {card.show_footer_logo !== false && serviceFooter ? (
-          <Link href="/card" className="mt-12 flex w-full flex-col items-center gap-1 opacity-70 transition hover:opacity-100">
+          <Link href="/card" className="mt-12 flex w-full flex-col items-center gap-1.5 opacity-80 transition hover:opacity-100">
+            {/* 與 URBANLINKS 介紹頁表頭相同:U 標誌在上、URBANLINKS 字樣在下 */}
+            <img src="/brand/u-logo.png" alt="" className="h-8 w-auto object-contain" />
             <img src="/brand/urbanlinks-logo.png" alt="URBANLINKS" className="h-3.5 w-auto object-contain" style={dark ? { filter: 'brightness(0) invert(1)' } : undefined} />
             <span className="text-[11px]" style={{ color: theme.mutedColor }}>建立你的個人名片</span>
           </Link>
