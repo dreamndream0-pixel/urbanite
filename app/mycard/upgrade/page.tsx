@@ -8,16 +8,23 @@ import UpgradeClient from './UpgradeClient';
 import TierTable from '@/app/card/TierTable';
 import PromoBar from '@/app/card/PromoBar';
 import { getCardPromo, promoActive } from '@/lib/card-promo';
-import { CONTACT_LINE_URL } from '@/lib/card-plan';
+import { CONTACT_LINE_URL, type PaidTier } from '@/lib/card-plan';
 
 export const dynamic = 'force-dynamic';
 export const metadata: Metadata = { title: { absolute: '方案 | URBANLINKS' }, robots: { index: false } };
 
 // 名片服務方案:目前等級、付款紀錄、選擇等級與月付 / 年付
-export default async function UpgradePage({ searchParams }: { searchParams: Promise<{ result?: string }> }) {
+export default async function UpgradePage({ searchParams }: { searchParams: Promise<{ result?: string; tier?: string; period?: string }> }) {
+  const { result, tier, period } = await searchParams;
+  const selectedTier = ['plus', 'pro', 'max'].includes(tier ?? '') ? tier as PaidTier : undefined;
+  const selectedPeriod = period === 'month' || period === 'year' ? period : undefined;
   const user = await getSessionUser();
-  if (!user) redirect('/card/login?next=/mycard/upgrade');
-  const { result } = await searchParams;
+  if (!user) {
+    const query = new URLSearchParams();
+    if (selectedTier) query.set('tier', selectedTier);
+    if (selectedPeriod) query.set('period', selectedPeriod);
+    redirect(`/card/login?next=${encodeURIComponent(`/mycard/upgrade${query.size ? `?${query}` : ''}`)}`);
+  }
   const supabase = createAdminClient();
   const [{ data: settings }, plan, { data: payments }, promo] = await Promise.all([
     supabase.from('site_settings').select('logo_url').eq('id', 1).maybeSingle(),
@@ -30,7 +37,7 @@ export default async function UpgradePage({ searchParams }: { searchParams: Prom
     <main className="min-h-screen bg-[#f6f2ec] text-[#1f1b19]">
       <CardServiceHeader logoUrl={settings?.logo_url ?? ''} loggedIn current="upgrade" />
       <PromoBar />
-      <UpgradeClient plan={plan} payments={payments ?? []} result={result ?? ''} table={<TierTable current={plan.tier} promoTier={promoInfo?.tier} />} lineUrl={CONTACT_LINE_URL} promo={promoInfo} />
+      <UpgradeClient initialTier={selectedTier} initialPeriod={selectedPeriod} plan={plan} payments={payments ?? []} result={result ?? ''} table={<TierTable current={plan.tier} promoTier={promoInfo?.tier} />} lineUrl={CONTACT_LINE_URL} promo={promoInfo} />
     </main>
   );
 }

@@ -136,3 +136,13 @@ All six images load, placement follows SHOP, navigation does not change LINK
 controls, and its preview opens the correct SHOP image. Escape restores focus.
 No duplicate IDs or horizontal page overflow were found. Reduced motion hides
 automatic playback controls for both collections. Lint and production build pass.
+
+## Public pricing page (2026-10-08)
+
+`pricing-studio.webp` and `pricing-studio-wide.webp` are AI-generated studio
+photographs created for this page, with separate mobile and panoramic crops.
+Headlines, prices, feature lists, and actions are live HTML rather than image text.
+Prices and features use `lib/card-plan.ts`; campaigns read the existing backend
+settings through `getCardPromo`. No production campaign settings were changed.
+Run `node scripts/test-card-promo.cjs` for scheduled, active, disabled, and expired
+campaign boundary checks. These checks do not submit payments.

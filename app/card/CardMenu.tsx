@@ -101,10 +101,11 @@ export default function CardMenu({
                 <MenuIcon d="M4 6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2zM9 10a2 2 0 1 0 4 0 2 2 0 1 0-4 0M7.5 16.5c.8-1.5 2-2.3 3.5-2.3s2.7.8 3.5 2.3" />
                 我的名片
               </Link>
-              <Link href="/mycard/upgrade" onClick={() => setOpen(false)} className={item(current === 'upgrade')}>
+              <Link href="/card/pricing" onClick={() => setOpen(false)} className={item(false)}>
                 <MenuIcon d="M12 3l2.6 5.6 6 .7-4.5 4.1 1.2 6L12 16.4 6.7 19.4l1.2-6L3.4 9.3l6-.7z" />
-                方案
+                方案價格
               </Link>
+              <Link href="/mycard/upgrade" onClick={() => setOpen(false)} className={item(current === 'upgrade')}>我的方案與付款紀錄</Link>
               <Link href="/card" onClick={() => setOpen(false)} className={item(false)}>
                 <MenuIcon d="M3 11l9-7 9 7M5 10v10h14V10" />
                 URBANLINKS 首頁
@@ -123,7 +124,7 @@ export default function CardMenu({
               </div>
               {links.length ? null : (
               <>
-              <Link href="/card#pricing" onClick={() => setOpen(false)} className={item(false)}>
+              <Link href="/card/pricing" onClick={() => setOpen(false)} className={item(false)}>
                 <MenuIcon d="M12 3l2.6 5.6 6 .7-4.5 4.1 1.2 6L12 16.4 6.7 19.4l1.2-6L3.4 9.3l6-.7z" />
                 方案介紹
               </Link>

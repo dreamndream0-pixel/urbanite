@@ -9,13 +9,13 @@ type Payment = { order_no: string; tier: string; period: string; amount: number;
 
 const date = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString('zh-TW', { timeZone: 'Asia/Taipei' }) : '');
 
-export default function UpgradeClient({ plan, payments, result, table, lineUrl, promo = null }: { plan: CardPlanInfo; payments: Payment[]; result: string; table: ReactNode; lineUrl: string; promo?: { tier: string; end: string } | null }) {
+export default function UpgradeClient({ plan, payments, result, table, lineUrl, promo = null, initialTier, initialPeriod }: { plan: CardPlanInfo; payments: Payment[]; result: string; table: ReactNode; lineUrl: string; promo?: { tier: string; end: string } | null; initialTier?: PaidTier; initialPeriod?: CardPeriod }) {
   const inPromo = (key: string) => Boolean(promo && tierRank(key as CardTier) <= tierRank(promo.tier as CardTier));
   // 自己組字串(台灣時間),避免伺服器和瀏覽器的日期格式不同造成畫面不一致
   const promoEnd = promo ? (() => { const d = new Date(new Date(promo.end).getTime() + 8 * 3600000); const p = (n: number) => String(n).padStart(2, '0'); return `${d.getUTCMonth() + 1}/${d.getUTCDate()} ${p(d.getUTCHours())}:${p(d.getUTCMinutes())}`; })() : '';
   const buyable = TIERS.filter((t) => t.key !== 'free');
-  const [tier, setTier] = useState<PaidTier>(plan.tier === 'free' ? 'plus' : (plan.tier as PaidTier));
-  const [period, setPeriod] = useState<CardPeriod>('year');
+  const [tier, setTier] = useState<PaidTier>(initialTier ?? (plan.tier === 'free' ? 'plus' : (plan.tier as PaidTier)));
+  const [period, setPeriod] = useState<CardPeriod>(initialPeriod ?? 'year');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const chosen = tierInfo(tier);

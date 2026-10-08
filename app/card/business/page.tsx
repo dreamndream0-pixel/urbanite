@@ -205,7 +205,7 @@ export default function SystemIntroductionPage() {
         <p>預約系統展示，我們會依商品數量、付款物流方式與需要的客製功能提供導入建議。</p>
         <div className={styles.contactActions}>
           <a className={styles.contactPrimary} href={CONTACT_LINE_URL} target="_blank" rel="noreferrer">聯繫專員預約展示 <span aria-hidden>↗</span></a>
-          <Link className={styles.contactSecondary} href="/card#pricing">查看方案價格</Link>
+          <Link className={styles.contactSecondary} href="/card/pricing">查看方案價格</Link>
           <Link className={styles.contactSecondary} href="/">查看目前示範商店</Link>
         </div>
       </section>

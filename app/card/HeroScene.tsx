@@ -49,7 +49,7 @@ export default function HeroScene({
             links={[
               { href: "#spaces", label: "產品服務" },
               { href: "/card/business", label: "品牌官網" },
-              { href: loggedIn ? "/mycard/upgrade" : "/card#pricing", label: "方案價格" },
+              { href: "/card/pricing", label: "方案價格" },
             ]}
           />
         </div>
@@ -73,8 +73,8 @@ export default function HeroScene({
         <div className={styles.scene}>
           <div className={styles.copy}>
             <h1>
-              <span>一個網址，</span>
-              <span>放進你的全部。</span>
+              <span>一個連結，</span>
+              <span>把你的世界串起來</span>
             </h1>
             <div className={styles.underline} aria-hidden="true" />
             <ul className={styles.socials} aria-label="社群、商店與連結整合">

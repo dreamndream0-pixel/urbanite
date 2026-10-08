@@ -3,14 +3,14 @@
   --spread: 0%;
   --tilt: 13deg;
   --screen-scroll: 0%;
-  height: 210svh;
+  height: 170svh;
   color: #20201e;
   letter-spacing: 0;
 }
 .hero {
   position: sticky;
   top: 0;
-  height: calc(100svh - 28px);
+  height: calc(100svh - 140px);
   min-height: 570px;
   overflow: clip;
   isolation: isolate;
@@ -154,13 +154,13 @@
 .copy {
   position: absolute;
   left: 5.5%;
-  top: 24%; /* 表頭移出主視覺後往上移 */
+  top: 34%;
   width: 43%;
   z-index: 5;
 }
 .copy h1 {
   font:
-    400 56px/1.5 var(--hero-hand),
+    400 44px/1.5 var(--hero-hand),
     "DFKai-SB",
     cursive;
   margin: 0;
@@ -244,14 +244,14 @@
 }
 .frontPhone {
   left: 48%;
-  top: 19%;
+  top: 10%;
   z-index: 3;
   transform: translate(calc(-1 * var(--spread)), var(--rise))
     rotate(calc(-1 * var(--tilt)));
 }
 .backPhone {
   left: 68%;
-  top: 22%;
+  top: 12%;
   z-index: 2;
   transform: translate(var(--spread), calc(var(--rise) * 0.8))
     rotate(var(--tilt));
@@ -666,8 +666,8 @@
 }
 @media (max-width: 760px) {
   .hero {
-    height: calc(100svh - 24px);
-    min-height: 570px;
+    height: min(760px, calc(100svh - 110px));
+    min-height: 480px;
   }
   .background {
     object-position: 60% center;
@@ -706,12 +706,12 @@
     width: 25px;
   }
   .copy {
-    top: 18%;
+    top: 32%;
     left: 5%;
-    width: 43%;
+    width: 44%;
   }
   .copy h1 {
-    font-size: 32px;
+    font-size: 25px;
     line-height: 1.6;
   }
   .underline {
@@ -751,13 +751,13 @@
     border-radius: 17px;
   }
   .frontPhone {
-    left: 53%;
-    top: 26%;
+    left: 57%;
+    top: 10%;
     width: 32%;
   }
   .backPhone {
-    left: 68%;
-    top: 28%;
+    left: 72%;
+    top: 12%;
     width: 26%;
   }
   .notch {
@@ -767,11 +767,14 @@
   }
   .urlBubble {
     left: 50%;
-    bottom: calc(9% + var(--shift, 0px));
+    bottom: 9%;
     width: 82%;
     max-width: 360px;
     min-height: 66px;
     padding: 10px 12px 10px 24px;
+  }
+  .scrollHint {
+    bottom: 1.5%;
   }
   .urlBubble > span,
 .importField input {
@@ -800,12 +803,12 @@
 }
 @media (max-width: 590px) {
   .copy h1 {
-    font-size: 21px;
+    font-size: 18px;
   }
 }
 @media (max-width: 370px) {
   .copy h1 {
-    font-size: 18px;
+    font-size: 16px;
   }
   .socials {
     gap: 4px;
@@ -890,4 +893,12 @@
   .importField input {
     font-size: 16px;
   }
+}
+@media (max-width: 370px) {
+  .topbar { padding: 0 10px; gap: 8px; }
+  .topBrand { gap: 5px; }
+  .topMark { width: 24px; }
+  .topName { width: 100px; }
+  .topActions { gap: 2px; }
+  .topActions .start { padding: 0 10px; font-size: 11px; white-space: nowrap; }
 }

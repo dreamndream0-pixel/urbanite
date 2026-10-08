@@ -1,6 +1,7 @@
 import { cache } from 'react';
 import { createAdminClient } from '@/lib/supabase/admin';
 import type { CardTier } from '@/lib/card-plan';
+export { promoActive } from './card-promo-state';
 
 // 名片方案限時免費:活動期間所有會員都能使用指定等級(目前開放 U Plus)
 export type CardPromo = { enabled: boolean; tier: CardTier; start: string; end: string; note: string };
@@ -21,13 +22,6 @@ export function cleanPromo(raw: unknown): CardPromo {
     end: isoOrEmpty(o.end),
     note: typeof o.note === 'string' ? o.note.trim().slice(0, 60) : '',
   };
-}
-
-// 進行中:已開啟、已到開始時間、還沒到結束時間(一定要有結束時間)
-export function promoActive(p: CardPromo, now = Date.now()) {
-  if (!p.enabled || !p.end) return false;
-  if (p.start && new Date(p.start).getTime() > now) return false;
-  return now < new Date(p.end).getTime();
 }
 
 export function promoStatus(p: CardPromo, now = Date.now()) {
