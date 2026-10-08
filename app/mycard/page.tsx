@@ -7,6 +7,7 @@ import { tierInfo } from '@/lib/card-plan';
 import ProfileCardManager from '@/app/admin/ProfileCardManager';
 import CardServiceHeader from '@/app/card/CardServiceHeader';
 import PromoBar from '@/app/card/PromoBar';
+import DismissibleNotice from '@/app/card/DismissibleNotice';
 
 export const dynamic = 'force-dynamic';
 export const metadata: Metadata = { title: { absolute: '我的名片 | URBANLINKS' }, robots: { index: false } };
@@ -32,12 +33,14 @@ export default async function MyCardPage() {
   return (
     <main className="min-h-screen bg-[#f6f2ec] text-[#1f1b19]">
       <CardServiceHeader logoUrl={settings?.logo_url ?? ''} loggedIn current="mycard" />
-      <PromoBar href="/mycard/upgrade" cta="看方案" />
+      <PromoBar href="/mycard/upgrade" cta="看方案" dismissible />
       <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6">
         {plan.promo ? (
-          <p className="mb-4 rounded-xl border border-[#e8dcc4] bg-[#fbf6ec] px-4 py-3 text-sm text-[#6b4a1f]">
+          <DismissibleNotice label="關閉免費方案提示" className="mb-4 rounded-xl border border-[#e8dcc4] bg-[#fbf6ec] pl-4 pr-12 py-3 text-sm text-[#6b4a1f]">
+          <p>
             現在是限時免費期間,你可以使用 {tierInfo(plan.tier).name} 的全部功能。活動結束後會回到 U Free,想繼續使用可以<a href="/mycard/upgrade" className="ml-1 font-semibold underline underline-offset-2">升級方案</a>。
           </p>
+          </DismissibleNotice>
         ) : null}
         {!plan.isAdmin && plan.pro && !plan.promo && days !== null && days <= 7 ? (
           <p className="mb-4 rounded-xl border border-[#f0d9b5] bg-[#fff8ec] px-4 py-3 text-sm text-[#8a5a1c]">

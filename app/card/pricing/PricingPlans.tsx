@@ -3,11 +3,11 @@
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, ArrowRight, Check, ChevronDown, Minus } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Check, Minus } from 'lucide-react';
 import { CONTACT_LINE_URL, TIERS, TIER_FEATURES, tierRank, type CardPeriod } from '@/lib/card-plan';
 import type { CardPromo } from '@/lib/card-promo';
 import { promoActive } from '@/lib/card-promo-state';
-import TierTable from '../TierTable';
+import ComparisonDialog from './ComparisonDialog';
 import styles from './pricing.module.css';
 
 const audiences = ['適合想先體驗的人', '適合個人品牌與創作者', '適合品牌、店家與自媒體', '適合企業、工作室與多元經營者'];
@@ -77,10 +77,7 @@ export default function PricingPlans({ promo, initialNow, loggedIn }: {
           </article>;
         })}
       </div>
-      <details className={styles.comparison}>
-        <summary>完整功能比較 <ChevronDown size={20} /></summary>
-        <TierTable promoTier={active ? promo.tier : undefined} />
-      </details>
+      <ComparisonDialog promoTier={active ? promo.tier : undefined} />
       <footer className={styles.footer}>
         <Link href={startHref}>立即建立你的 URBANLINKS <ArrowRight size={22} /></Link>
         <p>MORE THAN A LINK</p>
