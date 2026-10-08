@@ -127,6 +127,7 @@ export default function HeroScene({
           </div>
           <HeroImportBubble loggedIn={loggedIn} />
           <span className={styles.scrollHint} aria-hidden="true">
+            <small>往下滑</small>
             <ChevronDown />
           </span>
           <span className={styles.flourish} aria-hidden="true" />

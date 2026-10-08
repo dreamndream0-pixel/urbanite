@@ -521,8 +521,7 @@
   translate: -50% 0;
   display: grid;
   place-items: center;
-  width: 40px;
-  height: 40px;
+  gap: 2px;
   color: rgb(40 40 40 / 30%);
   opacity: var(--hint, 1);
   transition: opacity 250ms ease;
@@ -530,8 +529,14 @@
   pointer-events: none;
 }
 .scrollHint svg {
-  width: 30px;
-  height: 30px;
+  width: 26px;
+  height: 26px;
+  margin-top: -4px;
+}
+.scrollHint small {
+  font-size: 12px;
+  letter-spacing: 0.2em;
+  white-space: nowrap;
 }
 @keyframes hintBounce {
   0%,
@@ -767,14 +772,14 @@
   }
   .urlBubble {
     left: 50%;
-    bottom: 9%;
+    bottom: calc(9% + var(--shift, 0px));
     width: 82%;
     max-width: 360px;
     min-height: 66px;
     padding: 10px 12px 10px 24px;
   }
   .scrollHint {
-    bottom: 1.5%;
+    bottom: calc(1% + var(--shift, 0px));
   }
   .urlBubble > span,
 .importField input {

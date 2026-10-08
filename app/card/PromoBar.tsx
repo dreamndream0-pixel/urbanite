@@ -4,7 +4,8 @@ import { TIERS, tierRank } from '@/lib/card-plan';
 import DismissibleNotice from './DismissibleNotice';
 
 // 限時免費公告條(介紹頁、我的名片、方案頁共用);活動沒有進行時不顯示
-export default async function PromoBar({ href, cta = '立即免費使用', dismissible = false }: { href?: string; cta?: string; dismissible?: boolean }) {
+// 每一頁都可以按 X 關掉;這次瀏覽期間不再出現,新開網頁才會再顯示
+export default async function PromoBar({ href, cta = '立即免費使用', dismissible = true }: { href?: string; cta?: string; dismissible?: boolean }) {
   const promo = await getCardPromo();
   if (!promoActive(promo)) return null;
   // 活動涵蓋的付費方案,例如「U Plus、U Pro、U Max」
@@ -22,5 +23,5 @@ export default async function PromoBar({ href, cta = '立即免費使用', dismi
       ) : null}
     </div>
   );
-  return dismissible ? <DismissibleNotice label="關閉限時免費公告" className="bg-[#121b33] text-white">{banner}</DismissibleNotice> : banner;
+  return dismissible ? <DismissibleNotice label="關閉限時免費公告" sessionKey="ul_promo_bar_hidden" className="bg-[#121b33] text-white">{banner}</DismissibleNotice> : banner;
 }
