@@ -1,9 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ArrowRight, Check, ChevronDown, Minus } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Check, ChevronDown, Minus } from 'lucide-react';
 import { CONTACT_LINE_URL, TIERS, TIER_FEATURES, tierRank, type CardPeriod } from '@/lib/card-plan';
 import type { CardPromo } from '@/lib/card-promo';
 import { promoActive } from '@/lib/card-promo-state';
@@ -23,6 +23,12 @@ export default function PricingPlans({ promo, initialNow, loggedIn }: {
   const [period, setPeriod] = useState<CardPeriod>('month');
   const [now, setNow] = useState(initialNow);
   const router = useRouter();
+  const track = useRef<HTMLDivElement>(null);
+  const slide = (direction: number) => {
+    const element = track.current;
+    if (!element) return;
+    element.scrollBy({ left: direction * ((element.firstElementChild?.getBoundingClientRect().width ?? 280) + 14), behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth' });
+  };
   useEffect(() => {
     const clock = window.setInterval(() => setNow(Date.now()), 1000);
     // Refresh server-owned campaign settings without losing the selected period.
@@ -34,11 +40,6 @@ export default function PricingPlans({ promo, initialNow, loggedIn }: {
   }, [router]);
   const active = promoActive(promo, now);
   const startHref = loggedIn ? '/mycard' : '/card/register';
-  const end = promo.end ? (() => {
-    const date = new Date(new Date(promo.end).getTime() + 8 * 3600000);
-    const pad = (n: number) => String(n).padStart(2, '0');
-    return `${date.getUTCMonth() + 1}/${date.getUTCDate()} ${pad(date.getUTCHours())}:${pad(date.getUTCMinutes())}`;
-  })() : '';
 
   return (
     <section id="plans" className={styles.plans}>
@@ -49,12 +50,11 @@ export default function PricingPlans({ promo, initialNow, loggedIn }: {
           <button type="button" aria-pressed={period === 'year'} onClick={() => setPeriod('year')}>年付</button>
         </div>
       </div>
-      {active && <aside className={styles.promo} aria-live="polite">
-        <strong>限時免費</strong>
-        <div><p>{promo.note || '把想法變成自己的頁面，現在就開始。'}</p><span>{TIERS.filter(t => t.key !== 'free' && tierRank(t.key) <= tierRank(promo.tier)).map(t => t.name).join('、')} 免費體驗至 {end}（台灣時間）</span></div>
-        <Link href={startHref}>立即免費使用 <ArrowRight size={17} /></Link>
-      </aside>}
-      <div className={styles.grid}>
+      <div className={styles.planNav}>
+        <Link href="#account">我的方案與付款紀錄</Link>
+        <div><button type="button" onClick={() => slide(-1)} aria-label="上一個方案" title="上一個方案"><ArrowLeft size={18} /></button><button type="button" onClick={() => slide(1)} aria-label="下一個方案" title="下一個方案"><ArrowRight size={18} /></button></div>
+      </div>
+      <div ref={track} className={styles.grid} role="region" aria-label="方案價格" tabIndex={0}>
         {TIERS.map((tier, index) => {
           const free = tier.key === 'free';
           const covered = !free && active && tierRank(tier.key) <= tierRank(promo.tier);

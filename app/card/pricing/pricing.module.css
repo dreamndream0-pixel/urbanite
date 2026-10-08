@@ -77,3 +77,43 @@
 }
 @media(max-width:359px) { .grid { grid-template-columns: 1fr; } .heroCopy h1 { font-size: 20px; max-width: 70%; } .heroCopy p { max-width: 60%; } }
 @media(prefers-reduced-motion:reduce) { .plan,.action { transition: none; } .plan:hover { transform: none; } }
+
+.hero { height: 430px; }
+.heroCopy { padding-top: 100px; }
+.heroCopy > p:first-child { margin-bottom: 14px; }
+.heroCopy h1 { margin-bottom: 14px; }
+.heroCopy a { margin-top: 12px; }
+.grid { display: grid; grid-auto-flow: column; grid-template-columns: none; grid-auto-columns: minmax(270px, calc((100% - 42px) / 4)); overflow-x: auto; scroll-snap-type: x mandatory; padding: 8px 0 16px; gap: 14px; scrollbar-width: thin; }
+.plan { scroll-snap-align: start; }
+.planNav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; gap: 12px; font-size: 13px; }
+.planNav a { text-decoration: underline; text-underline-offset: 4px; }
+.planNav > div { display: flex; gap: 8px; }
+.planNav button { display: grid; place-items: center; width: 40px; height: 40px; border: 1px solid #cfc6b9; border-radius: 50%; cursor: pointer; }
+@media(min-width:1200px) { .planNav > div { display: none; } }
+.account { max-width: 1232px; margin: 0 auto; padding: 32px 24px 56px; border-top: 1px solid #d5cec2; scroll-margin-top: 80px; }
+.account h2 { font-size: 22px; margin-bottom: 24px; }
+.account h3 { font-size: 16px; margin-block: 24px 12px; }
+.account a { text-decoration: underline; text-underline-offset: 4px; font-size: 14px; }
+.accountSummary { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 20px; }
+.accountSummary strong { font-size: 26px; }
+.account p { font-size: 14px; line-height: 1.8; }
+.payments { list-style: none; padding: 0; }
+.payments li { display: flex; justify-content: space-between; gap: 20px; padding: 16px 0; border-bottom: 1px solid #d5cec2; font-size: 14px; }
+.payments li > div { min-width: 0; overflow-wrap: anywhere; }
+.payments li > div:last-child { text-align: right; }
+.payments small { display: block; margin-top: 6px; }
+@media(max-width:600px) {
+  .hero { height: 350px; }
+  .heroCopy { padding-top: 85px; }
+  .heroCopy > p:first-child { margin-bottom: 12px; }
+  .heroCopy h1 { font-size: 20px; max-width: 62%; }
+  .heroCopy p { font-size: 12px; max-width: 53%; }
+  .heroCopy a { font-size: 12px; margin-top: 10px; }
+  .grid { grid-auto-columns: 84%; }
+  .plan:hover { transform: none; }
+}
+@media(max-width:359px) {
+  .heroCopy { padding-top: 68px; }
+  .heroCopy h1 { font-size: 17px; max-width: 64%; }
+  .heroCopy p { font-size: 11px; max-width: 55%; }
+}

@@ -5,6 +5,8 @@ import { getCardPromo } from '@/lib/card-promo';
 import CardServiceHeader from '../CardServiceHeader';
 import PricingPlans from './PricingPlans';
 import styles from './pricing.module.css';
+import PromoBar from '../PromoBar';
+import PricingAccount from './PricingAccount';
 
 export const dynamic = 'force-dynamic';
 export const metadata: Metadata = {
@@ -21,6 +23,7 @@ export default async function PricingPage() {
   const { promo, now } = await getPromoSnapshot();
   return (
     <main className={styles.page}>
+      <PromoBar href={user ? '/mycard' : '/card/register'} />
       <CardServiceHeader loggedIn={Boolean(user)} />
       <section className={styles.hero}>
         <picture>
@@ -35,6 +38,7 @@ export default async function PricingPage() {
         </div>
       </section>
       <PricingPlans promo={promo} initialNow={now} loggedIn={Boolean(user)} />
+      <PricingAccount />
     </main>
   );
 }
