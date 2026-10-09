@@ -183,6 +183,8 @@ export default function CheckoutPage() {
   const needsPickupStore = isStorePickupMethod(selectedShippingMethod);
   // 其他店家沒有串藍新物流:超商取貨不開地圖,改成買家自己填門市資料,店家自己寄
   const manualStore = settings?.platform === false;
+  // 店家也是先用藍新地圖選門市(只選門市,不走藍新物流/金流);地圖不能用時才改手動填
+  const [manualEntry, setManualEntry] = useState(false);
   function setManualStore(patch: Partial<PickupStore>) {
     setPickupStore((prev) => {
       const base: PickupStore = prev && prev.store_lgs_type === 'MANUAL' ? prev : { store_id: '', store_name: '', store_phone: '', store_address: '', store_ship_type: shipTypeFromCheckout(selectedShippingMethod), store_lgs_type: 'MANUAL' };
@@ -647,9 +649,12 @@ export default function CheckoutPage() {
                     ))}
                   </select>
                 </label>
-                {needsPickupStore && manualStore ? (
+                {needsPickupStore && manualStore && manualEntry ? (
                   <div className="space-y-2 rounded-xl border border-[var(--c-border)] bg-[var(--c-header)] p-4">
-                    <p className="text-sm font-semibold text-[var(--c-text)]">取貨門市</p>
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="text-sm font-semibold text-[var(--c-text)]">取貨門市</p>
+                      <button type="button" onClick={() => { setManualEntry(false); setPickupStore(null); }} className="text-xs font-semibold text-[var(--c-muted)] underline">改用地圖選擇</button>
+                    </div>
                     <p className="text-xs leading-5 text-[var(--c-muted)]">請填寫要取貨的{selectedShippingMethod.replace(/取貨.*$/, '')}門市,店家會寄到這間門市。</p>
                     <input
                       className="w-full rounded-lg border border-[var(--c-border)] bg-white px-3 py-2.5 text-sm"
@@ -695,6 +700,9 @@ export default function CheckoutPage() {
                         {pickupStore ? '重新選擇' : '選擇門市'}
                       </button>
                     </div>
+                    {manualStore ? (
+                      <button type="button" onClick={() => { setManualEntry(true); setPickupStore(null); }} className="mt-3 text-xs font-semibold text-[var(--c-muted)] underline">地圖打不開?改手動填寫門市</button>
+                    ) : null}
                   </div>
                 ) : null}
                 {codPickup ? (
@@ -768,7 +776,7 @@ export default function CheckoutPage() {
 
                 {needsPickupStore ? (
                   <p className="rounded-lg bg-[var(--c-header)] px-4 py-3 text-sm text-[var(--c-muted)]">
-                    {manualStore ? '超商取貨免填地址，取貨門市請填在上方。' : '超商取貨免填地址，取貨門市請於上方「選擇門市」設定。'}
+                    {manualStore && manualEntry ? '超商取貨免填地址，取貨門市請填在上方。' : '超商取貨免填地址，取貨門市請於上方「選擇門市」設定。'}
                   </p>
                 ) : (
                   <>

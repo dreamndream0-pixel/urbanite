@@ -1,13 +1,17 @@
 import { NextResponse } from 'next/server';
 import { buildNewebpayLogisticsForm, shipTypeName } from '@/lib/newebpay-logistics';
 import { getConfiguredSiteUrl } from '@/lib/site-url';
+import { getCurrentShop, isPlatformShop, shopUrl } from '@/lib/shop';
 
 export async function GET(request: Request) {
   try {
     const url = new URL(request.url);
     const shipType = url.searchParams.get('ship_type') || '1';
     const lgsType = url.searchParams.get('lgs_type') || 'C2C';
-    const returnUrl = `${getConfiguredSiteUrl()}/api/logistics/newebpay/store-map/return`;
+    // 選完門市要回到原本的網域(店家子網域),結帳頁才收得到門市資料
+    const shop = await getCurrentShop();
+    const returnPath = '/api/logistics/newebpay/store-map/return';
+    const returnUrl = shop && !isPlatformShop(shop) ? shopUrl(shop.slug, returnPath) : `${getConfiguredSiteUrl()}${returnPath}`;
     const merchantOrderNo = `MAP${Date.now()}`;
     const { actionUrl, fields } = await buildNewebpayLogisticsForm('storeMap', {
       MerchantOrderNo: merchantOrderNo,
