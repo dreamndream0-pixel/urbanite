@@ -30,6 +30,7 @@ import {
   RETURN_STATUS_LABEL,
   buildProgress,
 } from '@/lib/order-status';
+import { uiToast } from '@/lib/ui-toast';
 import { uiAlert, uiConfirm, uiPrompt } from '@/lib/ui-dialog';
 import { OrderCardBadges, orderNeedsAttention, AttentionDot, isPaymentReported } from '@/app/components/OrderStatusBadge';
 import { COUPON_PRESETS } from '@/lib/coupon-presets';
@@ -985,6 +986,7 @@ export default function AdminDashboard({
     });
     setMovementLines([{ id: `line-${Date.now()}`, product_id: '', variant_key: '', color: '', size: '', quantity: 1, unit_price: 0 }]);
     setMvForm({ ...mvForm, document_no: '', payment_status: '', payment_no: '', location: '', note: '' });
+    uiToast(`${mvForm.type === 'in' ? '已入庫' : '已出庫'} ${createdMovements.length} 筆`);
   }
 
   // 在庫存管理直接修改某規格的成本 / 安全庫存 / 儲位(不動庫存數量)
@@ -3262,8 +3264,13 @@ export default function AdminDashboard({
                   </button>
                 }
               >
+                {platform ? null : (
+                  <p className="mb-3 rounded-lg bg-[#faf7f2] px-3 py-2 text-xs leading-5 text-[#6b6156]">
+                    超商取貨不付款:買家結帳時自己填門市,由你自己寄出(例如 7-11 賣貨便、全家好賣+),出貨時在訂單填物流單號。取貨付款需要串接金流物流,目前不提供。
+                  </p>
+                )}
                 <ShippingMethodsEditor
-                  defaults={DEFAULT_SHIPPING_METHODS}
+                  defaults={platform ? DEFAULT_SHIPPING_METHODS : DEFAULT_SHIPPING_METHODS.filter((m) => !/取貨付款/.test(m))}
                   value={footerDraft.shippings}
                   onChange={(v) => setFooterDraft({ ...footerDraft, shippings: v })}
                   fees={shippingFees}
@@ -4487,7 +4494,9 @@ function AdminOrderModal({
     ?? undefined;
   const hasShipment = (detail?.shipments?.length ?? 0) > 0;
   // 宅配到府(非超商取貨):收款後才能出貨(貨到付款除外)
-  const isHomeDelivery = !order.store_id && /宅配|到府|home/i.test(order.shipping_method ?? '');
+  // 手動超商取貨(店家自己寄,例如賣貨便):和宅配一樣手動填物流單號出貨,不建藍新物流單
+  const isManualStore = order.store_lgs_type === 'MANUAL';
+  const isHomeDelivery = isManualStore || (!order.store_id && /宅配|到府|home/i.test(order.shipping_method ?? ''));
   const canShipHome = order.paid || isCollectOnDelivery(order.shipping_method ?? '', order.payment_method ?? '');
   // 訂單歷程:狀態紀錄 + 物流貨態事件,依時間合併
   const timeline = detail
@@ -4562,7 +4571,7 @@ function AdminOrderModal({
       setHomeShipOpen(false);
       onOrderChange?.({ ...order, status: '已出貨', fulfillment_status: 'SHIPPED', order_status: 'PROCESSING' });
       await loadDetail();
-      flash('已宅配出貨');
+      flash(isManualStore ? '已超商寄件' : '已宅配出貨');
     } finally { setBusy(false); }
   }
 
@@ -4662,7 +4671,7 @@ ${order.note ? `<div class="sec"><h2>備註</h2><p class="muted">${escapeHtml(or
                 }}
                 className={`inline-flex h-10 items-center rounded-full px-6 text-sm font-semibold text-white ${canShipHome ? 'bg-[#1f7a44] hover:bg-[#186437]' : 'bg-[#b8c9bd]'}`}
               >
-                宅配出貨
+                {isManualStore ? '超商寄件' : '宅配出貨'}
               </button>
             ) : null}
             <button onClick={printShippingDocument} className="inline-flex h-10 items-center rounded-full bg-[#1f1b19] px-6 text-sm font-semibold text-white hover:bg-black">列印出貨單</button>
@@ -4956,7 +4965,7 @@ ${order.note ? `<div class="sec"><h2>備註</h2><p class="muted">${escapeHtml(or
   );
 }
 
-const HOME_CARRIERS = ['黑貓宅急便', '新竹物流', '中華郵政', '宅配通', '嘉里大榮'];
+const HOME_CARRIERS = ['黑貓宅急便', '新竹物流', '中華郵政', '宅配通', '嘉里大榮', '7-11 賣貨便', '全家好賣+', '萊爾富', 'OK 超商'];
 
 // 宅配出貨:輸入物流公司與物流單號
 function HomeShipModal({ busy, onClose, onSubmit }: { busy: boolean; onClose: () => void; onSubmit: (carrier: string, tracking: string) => void }) {
@@ -6725,9 +6734,12 @@ function ProductModal({
             <Field label="售價">
               <input
                 type="number"
+                inputMode="numeric"
+                placeholder="0"
                 className="w-full rounded-lg border border-[#e5ded4] px-3 py-2"
-                value={draft.price}
-                onChange={(e) => set('price', Number(e.target.value))}
+                // 0 顯示成空白,打字時才不會變成「0300」
+                value={draft.price ? draft.price : ''}
+                onChange={(e) => set('price', Number(e.target.value.replace(/^0+(?=\d)/, '')) || 0)}
               />
             </Field>
             <Field label="原價(可空)">
@@ -6937,7 +6949,8 @@ function ProductModal({
                       key={`${url}-${index}`}
                       className="group relative aspect-[4/5] overflow-hidden rounded-lg border border-[#e5ded4] bg-[#f6f2ec]"
                     >
-                      <img src={url} alt="" className="h-full w-full object-contain drop-shadow-[0_10px_12px_rgba(31,27,25,0.2)]" />
+                      {/* iPhone Safari:大照片加 drop-shadow 濾鏡、或在固定比例框裡用百分比高度,常常整張畫不出來 → 絕對定位,陰影只給去背 PNG */}
+                      <img src={url} alt="" loading="eager" decoding="async" className={`absolute inset-0 h-full w-full object-contain ${/\.png($|\?)/i.test(url) ? 'drop-shadow-[0_10px_12px_rgba(31,27,25,0.2)]' : ''}`} />
                       {index === 0 ? (
                         <span className="absolute left-1 top-1 rounded bg-[#1f1b19] px-1.5 py-0.5 text-[10px] font-semibold text-white">
                           封面

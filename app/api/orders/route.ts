@@ -9,7 +9,7 @@ import { computeShipping, resolveMethodFee } from '@/lib/shipping';
 import { isCampaignLive } from '@/lib/campaign';
 import type { Campaign, Discount, Order, OrderItem, Product, Shipment } from '@/lib/types';
 import { getCurrentShop, isPlatformShop, shopAdminClient } from '@/lib/shop';
-import { isOnlinePayment } from '@/lib/payment';
+import { isCollectOnDelivery, isOnlinePayment } from '@/lib/payment';
 import { createAdminClient } from '@/lib/supabase/admin';
 
 // GET /api/orders — 取得所有訂單(限管理員)
@@ -71,14 +71,21 @@ export async function POST(request: Request) {
   if (!shippingMethod || !paymentMethod) {
     return NextResponse.json({ error: '請選擇付款與送貨方式' }, { status: 400 });
   }
-  // 其他店家(U Pro):只能用這家店開啟的付款 / 寄送方式,而且不能是線上金流或超商物流(那是 URBANITE 的帳號)
-  if (!isPlatformShop(await getCurrentShop())) {
+  // 其他店家(U Pro):只能用這家店開啟的付款 / 寄送方式;不能用線上金流與「取貨付款」(需要藍新代收,是 URBANITE 的帳號)
+  // 「超商取貨不付款」可以:買家自己填門市,店家自己寄(例如賣貨便),手動填物流單號
+  const platformShop = isPlatformShop(await getCurrentShop());
+  if (!platformShop) {
     const { data: shopSettings } = await (await shopAdminClient()).from('site_settings').select('enabled_payment_methods, enabled_shipping_methods').maybeSingle();
     const pays = ((shopSettings?.enabled_payment_methods as string[] | null) ?? ['轉帳匯款']).filter((m) => !isOnlinePayment(m));
-    const ships = ((shopSettings?.enabled_shipping_methods as string[] | null) ?? ['宅配到府']).filter((m) => !isStorePickup(m));
+    const ships = ((shopSettings?.enabled_shipping_methods as string[] | null) ?? ['宅配到府']).filter((m) => !(isStorePickup(m) && isCollectOnDelivery(m, '')));
     if (!pays.includes(paymentMethod) || !ships.includes(shippingMethod)) {
-      return NextResponse.json({ error: '這家店目前只提供轉帳匯款與宅配寄送' }, { status: 400 });
+      return NextResponse.json({ error: '這家店只提供轉帳匯款,配送可選宅配或超商取貨不付款' }, { status: 400 });
     }
+  }
+  if (!platformShop && isStorePickup(shippingMethod)) {
+    pickupStore.store_lgs_type = 'MANUAL'; // 店家自己寄,不建藍新物流單
+    if (!pickupStore.store_name) return NextResponse.json({ error: '請填寫取貨門市名稱' }, { status: 400 });
+    if (!pickupStore.store_id) pickupStore.store_id = 'MANUAL';
   }
   if (isStorePickup(shippingMethod) && !pickupStore.store_id) {
     return NextResponse.json({ error: '請先選擇超商取貨門市' }, { status: 400 });

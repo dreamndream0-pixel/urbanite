@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import './globals.css';
 import DialogHost from './components/DialogHost';
+import ToastHost from './components/ToastHost';
 import { unstable_cache } from 'next/cache';
 import { resolveSiteTheme, siteThemeCss } from '@/lib/site-theme';
 import { getCurrentShop, isPlatformShop, scopedClient, shopUrl, URBANITE_SHOP_ID } from '@/lib/shop';
@@ -108,6 +109,7 @@ export default async function RootLayout({
           </main>
         )}
         <DialogHost />
+        <ToastHost />
       </body>
     </html>
   );

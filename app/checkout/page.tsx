@@ -181,6 +181,14 @@ export default function CheckoutPage() {
   const shipping = computeShipping(subtotal, cart, products, selectedShippingMethod, resolveMethodFee(settings, selectedShippingMethod));
   const total = Math.max(0, subtotal + shipping - (applied?.amount ?? 0));
   const needsPickupStore = isStorePickupMethod(selectedShippingMethod);
+  // 其他店家沒有串藍新物流:超商取貨不開地圖,改成買家自己填門市資料,店家自己寄
+  const manualStore = settings?.platform === false;
+  function setManualStore(patch: Partial<PickupStore>) {
+    setPickupStore((prev) => {
+      const base: PickupStore = prev && prev.store_lgs_type === 'MANUAL' ? prev : { store_id: '', store_name: '', store_phone: '', store_address: '', store_ship_type: shipTypeFromCheckout(selectedShippingMethod), store_lgs_type: 'MANUAL' };
+      return { ...base, ...patch, store_ship_type: shipTypeFromCheckout(selectedShippingMethod), store_lgs_type: 'MANUAL' };
+    });
+  }
   // 常用收件人依模式篩選:超商模式只顯示「常用取貨門市」且同一超商;宅配模式只顯示「宅配收件人」
   const visibleRecipients = recipients
     .map((r, i) => ({ r, i }))
@@ -314,7 +322,11 @@ export default function CheckoutPage() {
   async function saveRecipient() {
     if (savingRecipient) return;
     if (!name.trim() || !phone.trim()) { setMessage({ type: 'err', text: '請先填寫收件人姓名與電話' }); return; }
-    if (needsPickupStore && !pickupStore?.store_id) { setMessage({ type: 'err', text: '請先選擇取貨門市再加入常用取貨人' }); return; }
+    if (needsPickupStore && manualStore && !pickupStore?.store_name?.trim()) {
+      setMessage({ type: 'err', text: '請填寫取貨門市名稱' });
+      return;
+    }
+    if (needsPickupStore && !manualStore && !pickupStore?.store_id) { setMessage({ type: 'err', text: '請先選擇取貨門市再加入常用取貨人' }); return; }
     setSavingRecipient(true);
     try {
       const next: Recipient = needsPickupStore
@@ -442,7 +454,7 @@ export default function CheckoutPage() {
           note,
           shipping_method: selectedShippingMethod,
           payment_method: selectedPaymentMethod,
-          store_id: needsPickupStore ? pickupStore?.store_id ?? '' : '',
+          store_id: needsPickupStore ? pickupStore?.store_id || (manualStore ? 'MANUAL' : '') : '',
           store_name: needsPickupStore ? pickupStore?.store_name ?? '' : '',
           store_phone: needsPickupStore ? pickupStore?.store_phone ?? '' : '',
           store_address: needsPickupStore ? pickupStore?.store_address ?? '' : '',
@@ -635,7 +647,32 @@ export default function CheckoutPage() {
                     ))}
                   </select>
                 </label>
-                {needsPickupStore ? (
+                {needsPickupStore && manualStore ? (
+                  <div className="space-y-2 rounded-xl border border-[var(--c-border)] bg-[var(--c-header)] p-4">
+                    <p className="text-sm font-semibold text-[var(--c-text)]">取貨門市</p>
+                    <p className="text-xs leading-5 text-[var(--c-muted)]">請填寫要取貨的{selectedShippingMethod.replace(/取貨.*$/, '')}門市,店家會寄到這間門市。</p>
+                    <input
+                      className="w-full rounded-lg border border-[var(--c-border)] bg-white px-3 py-2.5 text-sm"
+                      placeholder="門市名稱(必填),例如:7-11 信義門市"
+                      value={pickupStore?.store_lgs_type === 'MANUAL' ? pickupStore.store_name : ''}
+                      onChange={(e) => setManualStore({ store_name: e.target.value })}
+                    />
+                    <div className="grid grid-cols-2 gap-2">
+                      <input
+                        className="rounded-lg border border-[var(--c-border)] bg-white px-3 py-2.5 text-sm"
+                        placeholder="門市店號(選填)"
+                        value={pickupStore?.store_lgs_type === 'MANUAL' && pickupStore.store_id !== 'MANUAL' ? pickupStore.store_id : ''}
+                        onChange={(e) => setManualStore({ store_id: e.target.value.trim() })}
+                      />
+                      <input
+                        className="rounded-lg border border-[var(--c-border)] bg-white px-3 py-2.5 text-sm"
+                        placeholder="門市地址(選填)"
+                        value={pickupStore?.store_lgs_type === 'MANUAL' ? pickupStore.store_address : ''}
+                        onChange={(e) => setManualStore({ store_address: e.target.value })}
+                      />
+                    </div>
+                  </div>
+                ) : needsPickupStore ? (
                   <div className="rounded-xl border border-[var(--c-border)] bg-[var(--c-header)] p-4">
                     <div className="flex flex-wrap items-center justify-between gap-3">
                       <div>
@@ -731,7 +768,7 @@ export default function CheckoutPage() {
 
                 {needsPickupStore ? (
                   <p className="rounded-lg bg-[var(--c-header)] px-4 py-3 text-sm text-[var(--c-muted)]">
-                    超商取貨免填地址，取貨門市請於上方「選擇門市」設定。
+                    {manualStore ? '超商取貨免填地址，取貨門市請填在上方。' : '超商取貨免填地址，取貨門市請於上方「選擇門市」設定。'}
                   </p>
                 ) : (
                   <>
