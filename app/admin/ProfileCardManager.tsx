@@ -46,7 +46,7 @@ import type { Product } from '@/lib/types';
 import { FREE_TEMPLATE_KEYS, PENDING_IMPORT_KEY, PRO_LIMITS, type CardPlanInfo } from '@/lib/card-plan';
 import { uiAlert, uiConfirm } from '@/lib/ui-dialog';
 import { detectPlatform } from '@/lib/social-fetch';
-import { extractUrl } from '@/lib/extract-url';
+import { extractUrl, pastedUrl } from '@/lib/extract-url';
 
 const formatter = new Intl.NumberFormat('zh-TW', { style: 'currency', currency: 'TWD', maximumFractionDigits: 0 });
 
@@ -1575,10 +1575,10 @@ function ImportPanel({ onClose, onDone }: { onClose: () => void; onDone: () => v
           value={url}
           onChange={(e) => setUrl(/s/.test(e.target.value.trim()) ? extractUrl(e.target.value) : e.target.value)}
           onPaste={(e) => {
-            const text = e.clipboardData.getData('text');
-            if (!text) return;
+            const pasted = pastedUrl(e.clipboardData);
+            if (!pasted) return;
             e.preventDefault();
-            setUrl(extractUrl(text));
+            setUrl(pasted);
           }}
           placeholder="https://linktr.ee/你的帳號" className={`${inputClass} min-w-0 flex-1`} />
         <button type="button" onClick={() => void read()} disabled={busy || !url.trim()} className="shrink-0 rounded-full bg-[#1f1b19] px-4 text-xs font-semibold text-white disabled:opacity-50">

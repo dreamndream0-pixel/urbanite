@@ -7,7 +7,7 @@ import ProfileCardView from '@/app/components/ProfileCardView';
 import { CARD_TEMPLATES, resolveTheme, type ProfileCard, type ProfileCardBlock } from '@/lib/profile-card';
 import { FREE_TEMPLATE_KEYS, PENDING_IMPORT_KEY } from '@/lib/card-plan';
 import { templateTheme } from '@/lib/card-template-match';
-import { extractUrl } from '@/lib/extract-url';
+import { extractUrl, pastedUrl } from '@/lib/extract-url';
 import styles from './hero.module.css';
 
 
@@ -178,10 +178,10 @@ export default function HeroImportBubble({ loggedIn }: { loggedIn: boolean }) {
             value={url}
             onChange={(e) => setUrl(/s/.test(e.target.value.trim()) ? extractUrl(e.target.value) : e.target.value)}
             onPaste={(e) => {
-              const text = e.clipboardData.getData('text');
-              if (!text) return;
+              const pasted = pastedUrl(e.clipboardData);
+              if (!pasted) return;
               e.preventDefault();
-              setUrl(extractUrl(text));
+              setUrl(pasted);
             }}
             placeholder="linktr.ee/yourname"
             inputMode="url"
