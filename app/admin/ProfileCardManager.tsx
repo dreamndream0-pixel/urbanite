@@ -46,6 +46,7 @@ import type { Product } from '@/lib/types';
 import { FREE_TEMPLATE_KEYS, PENDING_IMPORT_KEY, PRO_LIMITS, type CardPlanInfo } from '@/lib/card-plan';
 import { uiAlert, uiConfirm } from '@/lib/ui-dialog';
 import { detectPlatform } from '@/lib/social-fetch';
+import { extractUrl } from '@/lib/extract-url';
 
 const formatter = new Intl.NumberFormat('zh-TW', { style: 'currency', currency: 'TWD', maximumFractionDigits: 0 });
 
@@ -1570,7 +1571,16 @@ function ImportPanel({ onClose, onDone }: { onClose: () => void; onDone: () => v
       </div>
       <p className="text-xs leading-5 text-[#8a7f72]">貼上你現在的個人頁網址(Linktree、Portaly、LINKGOODS、Linkfly、Campsite 或任何網站都可以,直接貼分享文字也行),會讀取頭像、名稱、簡介和所有連結,勾選後匯入。</p>
       <div className="flex gap-2">
-        <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://linktr.ee/你的帳號" className={`${inputClass} min-w-0 flex-1`} />
+        <input
+          value={url}
+          onChange={(e) => setUrl(/s/.test(e.target.value.trim()) ? extractUrl(e.target.value) : e.target.value)}
+          onPaste={(e) => {
+            const text = e.clipboardData.getData('text');
+            if (!text) return;
+            e.preventDefault();
+            setUrl(extractUrl(text));
+          }}
+          placeholder="https://linktr.ee/你的帳號" className={`${inputClass} min-w-0 flex-1`} />
         <button type="button" onClick={() => void read()} disabled={busy || !url.trim()} className="shrink-0 rounded-full bg-[#1f1b19] px-4 text-xs font-semibold text-white disabled:opacity-50">
           {busy && !data ? '讀取中…' : '讀取'}
         </button>

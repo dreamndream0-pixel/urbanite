@@ -1,3 +1,5 @@
+import { extractUrl } from '@/lib/extract-url';
+export { extractUrl };
 // 一鍵搬家:讀取會員自己在其他名片服務(Linktree、Portaly…)的頁面,轉成我們的區塊
 // 只接受下列名片服務的網址(避免被拿來讀任意網站)
 
@@ -69,17 +71,6 @@ export function importSource(url: string) {
   } catch {
     return '';
   }
-}
-
-// 從貼上的文字取出網址(例如「Check out this profile on Campsite.bio! https://campsite.bio/xxx」)
-export function extractUrl(text: string) {
-  const t = String(text ?? '').trim();
-  const full = t.match(/https?:\/\/[^\s"'<>，。、]+/i);
-  if (full) return full[0].replace(/[)\]}.,!?]+$/, '');
-  // 沒寫 https:// 的網址:分享文字裡常有「on Campsite.bio!」這種品牌字,優先選有路徑(/帳號)的那個
-  const bare = [...t.matchAll(/(?:[a-z0-9-]+\.)+[a-z]{2,}(?:\/[^\s"'<>，。、]*)?/gi)].map((m) => m[0].replace(/[)\]}.,!?]+$/, ''));
-  const best = bare.find((x) => /\/[^/]/.test(x)) ?? bare[bare.length - 1];
-  return best ? `https://${best}` : t;
 }
 
 // 只讀公開網站:擋掉 localhost、內網與保留位址(避免被拿來探測伺服器內部)

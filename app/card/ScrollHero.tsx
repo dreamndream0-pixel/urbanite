@@ -27,7 +27,8 @@ export default function ScrollHero({ children }: { children: ReactNode }) {
       element.style.setProperty("--spread", `${eased * 5}%`);
       element.style.setProperty("--tilt", `${(1 - eased) * 5 + 8}deg`);
       // 主視覺上方還露出公告條 / 表頭時,底部的輸入框與箭頭跟著往上抬
-      element.style.setProperty("--shift", `${Math.max(0, Math.round(rect.top))}px`);
+      const overflow = rect.top + stage.offsetHeight - window.innerHeight; // 主視覺超出畫面底部多少
+      element.style.setProperty("--shift", `${Math.max(0, Math.min(Math.round(rect.top), Math.round(overflow)))}px`);
       // 往下滑的提示箭頭:快滑到底時淡出
       element.style.setProperty("--hint", progress > 0.92 ? "0" : "1");
       element.style.setProperty(
