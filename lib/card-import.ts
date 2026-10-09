@@ -76,8 +76,10 @@ export function extractUrl(text: string) {
   const t = String(text ?? '').trim();
   const full = t.match(/https?:\/\/[^\s"'<>，。、]+/i);
   if (full) return full[0].replace(/[)\]}.,!?]+$/, '');
-  const bare = t.match(/(?:[a-z0-9-]+\.)+[a-z]{2,}(?:\/[^\s"'<>，。、]*)?/i); // 沒寫 https:// 的網址
-  return bare ? `https://${bare[0].replace(/[)\]}.,!?]+$/, '')}` : t;
+  // 沒寫 https:// 的網址:分享文字裡常有「on Campsite.bio!」這種品牌字,優先選有路徑(/帳號)的那個
+  const bare = [...t.matchAll(/(?:[a-z0-9-]+\.)+[a-z]{2,}(?:\/[^\s"'<>，。、]*)?/gi)].map((m) => m[0].replace(/[)\]}.,!?]+$/, ''));
+  const best = bare.find((x) => /\/[^/]/.test(x)) ?? bare[bare.length - 1];
+  return best ? `https://${best}` : t;
 }
 
 // 只讀公開網站:擋掉 localhost、內網與保留位址(避免被拿來探測伺服器內部)
@@ -692,6 +694,9 @@ function parseGeneric(html: string, pageUrl: string, source: string): ImportedPr
 export async function readImportPage(url: string): Promise<ImportedProfile> {
   url = extractUrl(url);
   if (!importSource(url)) throw new Error('請貼上個人頁的網址(http 或 https 開頭)');
+  // 名片平台的首頁(沒有帳號)不是個人頁
+  const known = SOURCES.find(([re]) => re.test(new URL(url).hostname.toLowerCase()))?.[1];
+  if (known && /^\/?$/.test(new URL(url).pathname)) throw new Error(`這是 ${known} 的首頁,請貼上你自己的個人頁網址(例如 ${new URL(url).hostname}/你的帳號)`);
   const fetched = await fetchPublic(url);
   const res = fetched.res;
   // 短網址轉到其他平台時,以最後的網址判斷是哪個平台
