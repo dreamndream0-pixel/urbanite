@@ -6,7 +6,8 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { createBrowserSupabase } from '@/lib/supabase/client';
 
-type Me = { email: string; name: string; isAdmin: boolean } | null;
+type MyShop = { slug: string; name: string; current: boolean; adminUrl: string };
+type Me = { email: string; name: string; isAdmin: boolean; adminRole?: string; shops?: MyShop[] } | null;
 
 // 全站共用的「我的帳號」人頭 + 下拉選單(內容與首頁一致)。
 // 選單用 portal 掛到 document.body:若直接巢狀在 sticky header(z-30)底下,
@@ -26,7 +27,7 @@ export default function AccountMenu({ nextPath = '/account' }: { nextPath?: stri
     fetch('/api/me')
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
-        if (data?.email) setMe({ email: data.email, name: data.name ?? '', isAdmin: Boolean(data.isAdmin) });
+        if (data?.email) setMe({ email: data.email, name: data.name ?? '', isAdmin: Boolean(data.isAdmin), adminRole: data.adminRole ?? '', shops: Array.isArray(data.shops) ? data.shops : [] });
         else setMe(null);
       })
       .catch(() => setMe(null));
@@ -75,7 +76,7 @@ export default function AccountMenu({ nextPath = '/account' }: { nextPath?: stri
           <p className="truncate text-xs text-[var(--c-muted)]">{me.email}</p>
           {me.isAdmin && (
             <span className="mt-1 inline-block rounded-full bg-[var(--c-button)] px-2 py-0.5 text-[10px] font-semibold tracking-wide text-[var(--c-button-text)]">
-              主管理員
+              {me.adminRole === 'platform' ? '主管理員' : me.adminRole === 'staff' ? '店家員工' : '店家管理員'}
             </span>
           )}
         </div>
@@ -84,6 +85,13 @@ export default function AccountMenu({ nextPath = '/account' }: { nextPath?: stri
             進入管理後台
           </Link>
         )}
+        {/* 自己開的官網(不在那家店的網址時,直接連到它的後台) */}
+        {(me.shops ?? []).filter((s) => !s.current).map((s) => (
+          <a key={s.slug} href={s.adminUrl} onClick={() => setOpen(false)} className="mb-1 block rounded bg-[var(--c-soft)] px-3 py-2 text-sm font-semibold hover:bg-[#ece2d5]">
+            我的官網後台
+            <span className="block truncate text-[11px] font-normal text-[var(--c-muted)]">{s.name || s.slug}</span>
+          </a>
+        ))}
         <Link href="/account?tab=profile" onClick={() => setOpen(false)} className="block rounded px-3 py-2 text-sm hover:bg-[var(--c-bg)]">
           我的帳戶
         </Link>

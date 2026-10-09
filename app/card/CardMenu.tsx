@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { createBrowserSupabase } from '@/lib/supabase/client';
 
-type Me = { email: string; name: string } | null;
+type Me = { email: string; name: string; isAdmin?: boolean; shops?: { slug: string; name: string; current: boolean; adminUrl: string }[] } | null;
 
 // 名片服務的漢堡選單:我的名片 / 方案 / 登入登出都收在這裡;links = 額外的導覽連結(介紹頁用)
 // variant="header":放在頁首;variant="floating":公開名片右上角的半透明圓鈕
@@ -29,7 +29,7 @@ export default function CardMenu({
     if (loggedIn === false) return;
     fetch('/api/me', { cache: 'no-store' })
       .then((res) => (res.ok ? res.json() : null))
-      .then((data) => setMe(data?.email ? { email: data.email, name: data.name ?? '' } : null))
+      .then((data) => setMe(data?.email ? { email: data.email, name: data.name ?? '', isAdmin: Boolean(data.isAdmin), shops: Array.isArray(data.shops) ? data.shops : [] } : null))
       .catch(() => setMe(null));
   }, [loggedIn]);
 
@@ -97,6 +97,22 @@ export default function CardMenu({
               {me ? (
                 <p className="truncate px-3 pb-2 pt-1.5 text-xs text-[#a99e8f]">{me.name || me.email}</p>
               ) : null}
+              {/* 管理員:進入管理後台;開了官網的會員:我的官網後台 */}
+              {me?.isAdmin ? (
+                <a href="/admin" onClick={() => setOpen(false)} className={`${item(false)} bg-[#f6f2ec] font-semibold`}>
+                  <MenuIcon d="M4 4h7v7H4zM13 4h7v4h-7zM13 10h7v10h-7zM4 13h7v7H4z" />
+                  管理後台
+                </a>
+              ) : null}
+              {(me?.shops ?? []).filter((sh) => !sh.current).map((sh) => (
+                <a key={sh.slug} href={sh.adminUrl} onClick={() => setOpen(false)} className={`${item(false)} bg-[#f6f2ec] font-semibold`}>
+                  <MenuIcon d="M3 9l1.5-5h15L21 9M3 9h18M3 9v11h18V9M9 20v-6h6v6" />
+                  <span className="min-w-0">
+                    我的官網後台
+                    <span className="block truncate text-[11px] font-normal text-[#8a7f72]">{sh.name || sh.slug}</span>
+                  </span>
+                </a>
+              ))}
               <Link href="/mycard" onClick={() => setOpen(false)} className={item(current === 'mycard')}>
                 <MenuIcon d="M4 6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2zM9 10a2 2 0 1 0 4 0 2 2 0 1 0-4 0M7.5 16.5c.8-1.5 2-2.3 3.5-2.3s2.7.8 3.5 2.3" />
                 我的名片
