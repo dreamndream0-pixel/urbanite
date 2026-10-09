@@ -38,11 +38,14 @@ export default function ScrollHero({ children }: { children: ReactNode }) {
       }
       element.style.setProperty("--spread", `${eased * 5}%`);
       element.style.setProperty("--tilt", `${(1 - eased) * 5 + 8}deg`);
-      // 主視覺上方還露出公告條 / 表頭時,底部的輸入框與箭頭跟著往上抬
-      // 主視覺超出「看得到的畫面」底部多少;iPhone Chrome 的 innerHeight 含底部工具列後方,改用 svh 實際高度
+      // 主視覺上方有公告條 / 表頭時,第一屏會被往下推、底部超出畫面:
+      // 把整個主視覺往上收(上緣藏到表頭後面),手、手機示意圖、輸入框都完整出現在畫面裡
+      // 用 svh 實際高度,iPhone Chrome 的 innerHeight 含底部工具列後方
       const visible = Math.min(window.innerHeight, probe.offsetHeight || window.innerHeight);
-      const overflow = rect.top + stage.offsetHeight - visible;
-      element.style.setProperty("--shift", `${Math.max(0, Math.min(Math.round(rect.top), Math.round(overflow)))}px`);
+      const prev = element.previousElementSibling;
+      const above = prev ? prev.getBoundingClientRect().bottom + window.scrollY : 0;
+      const crop = Math.max(0, Math.min(above, Math.round(above + stage.offsetHeight - visible)));
+      element.style.marginTop = crop ? `-${crop}px` : "";
       // 往下滑的提示箭頭:快滑到底時淡出
       element.style.setProperty("--hint", progress > 0.92 ? "0" : "1");
       element.style.setProperty(

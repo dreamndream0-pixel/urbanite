@@ -11,7 +11,7 @@
   position: sticky;
   top: 0;
   /* 釘住時剛好填滿「一定看得到的畫面高度」(svh,扣掉瀏覽器工具列),下方不會露出空白;
-     第一屏被公告條、表頭往下推而超出的部分,由 --shift 把輸入框抬上來 */
+     第一屏被公告條、表頭往下推時,整個主視覺往上收到表頭後面(見 ScrollHero) */
   height: 100vh;
   height: 100svh;
   min-height: 570px;
@@ -424,7 +424,7 @@
   position: absolute;
   z-index: 6;
   left: 50%;
-  bottom: calc(8% + var(--shift, 0px)); /* 上方還有公告條、表頭時往上抬,確保看得到 */
+  bottom: 8%;
   translate: -50% 0; /* 左右置中 */
   display: flex;
   align-items: center;
@@ -520,7 +520,7 @@
   position: absolute;
   z-index: 6;
   left: 50%;
-  bottom: calc(1.5% + var(--shift, 0px));
+  bottom: 1.5%;
   translate: -50% 0;
   display: grid;
   place-items: center;
@@ -715,7 +715,7 @@
     width: 25px;
   }
   .copy {
-    top: 32%;
+    top: 38%; /* 往下一點,靠近輸入框 */
     left: 5%;
     width: 44%;
   }
@@ -776,14 +776,14 @@
   }
   .urlBubble {
     left: 50%;
-    bottom: calc(9% + var(--shift, 0px));
+    bottom: 9%;
     width: 82%;
     max-width: 360px;
     min-height: 66px;
     padding: 10px 12px 10px 24px;
   }
   .scrollHint {
-    bottom: calc(1% + var(--shift, 0px));
+    bottom: 1%;
   }
   .urlBubble > span,
 .importField input {
