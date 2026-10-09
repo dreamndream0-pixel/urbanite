@@ -21,6 +21,7 @@ function CompleteInner() {
   const hintStatus = sp.get('status') || ''; // paid / fail(來自藍新導回)
   const [order, setOrder] = useState<OrderStatus | null>(null);
   const [loading, setLoading] = useState(() => Boolean(orderNo));
+  const [lookupFailed, setLookupFailed] = useState(false);
 
   useEffect(() => {
     if (!orderNo) {
@@ -31,8 +32,16 @@ function CompleteInner() {
     async function poll() {
       try {
         const res = await fetch(`/api/orders/status?order_no=${encodeURIComponent(orderNo)}`);
+        if (stop) return;
+        if (res.status === 401 || res.status === 403 || res.status === 404) {
+          setOrder(null);
+          setLookupFailed(true);
+          setLoading(false);
+          return;
+        }
         if (res.ok) {
           const data = (await res.json()) as OrderStatus;
+          if (stop) return;
           setOrder(data);
           // 已付款就停止;否則在導回顯示 paid 時,輪詢幾次等 ReturnURL 入帳
           if (data.paid || hintStatus !== 'paid' || tries >= 5) {
@@ -45,7 +54,7 @@ function CompleteInner() {
       }
       tries += 1;
       if (!stop && tries <= 5) setTimeout(poll, 1500);
-      else setLoading(false);
+      else if (!stop) { setLookupFailed(true); setLoading(false); }
     }
     poll();
     return () => {
@@ -67,6 +76,12 @@ function CompleteInner() {
             <>
               <div className="mx-auto mb-4 h-9 w-9 animate-spin rounded-full border-[3px] border-[var(--c-border)] border-t-[var(--c-sale)]" />
               <p className="text-[var(--c-text2)]">確認付款結果中…</p>
+            </>
+          ) : lookupFailed || !orderNo ? (
+            <>
+              <p className="text-lg font-semibold">暫時無法確認訂單</p>
+              <p className="mt-2 text-sm text-[var(--c-muted)]">請登入下單帳號，或使用原本下單的瀏覽器。訪客憑證失效時，請聯絡客服協助確認；若已扣款，請勿重複下單。</p>
+              <Link href={`/login?next=${encodeURIComponent(`/checkout/complete?order_no=${encodeURIComponent(orderNo)}`)}`} className="mt-4 inline-block underline">登入查詢</Link>
             </>
           ) : paid ? (
             <>

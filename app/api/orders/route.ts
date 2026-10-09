@@ -5,6 +5,7 @@ import { evaluateCoupon } from '@/lib/discount';
 import { isStorePickup, shipTypeFromMethod } from '@/lib/newebpay-logistics';
 import { deriveStatuses } from '@/lib/order-status';
 import { initialOrderStatus } from '@/lib/payment';
+import { createOrderAccessToken, orderAccessCookieName, ORDER_ACCESS_MAX_AGE } from '@/lib/order-access-token';
 import { computeShipping, resolveMethodFee } from '@/lib/shipping';
 import { isCampaignLive } from '@/lib/campaign';
 import type { Campaign, Discount, Order, OrderItem, Product, Shipment } from '@/lib/types';
@@ -236,6 +237,7 @@ export async function POST(request: Request) {
     .select('order_no', { count: 'exact', head: true })
     .like('order_no', `${prefix}%`);
   const orderNo = `${prefix}${String((todayCount ?? 0) + 1).padStart(4, '0')}`;
+  const guestAccess = user ? null : createOrderAccessToken(orderNo);
 
   // 寫入訂單
   const { data: order, error: orderErr } = await supabase
@@ -380,5 +382,10 @@ export async function POST(request: Request) {
     /* 記錄失敗不影響下單 */
   }
 
-  return NextResponse.json(order as Order, { status: 201 });
+  const response = NextResponse.json(order as Order, { status: 201, headers: { 'Cache-Control': 'private, no-store' } });
+  if (guestAccess) response.cookies.set(orderAccessCookieName(orderNo), guestAccess, {
+    httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax',
+    path: '/', maxAge: ORDER_ACCESS_MAX_AGE,
+  });
+  return response;
 }

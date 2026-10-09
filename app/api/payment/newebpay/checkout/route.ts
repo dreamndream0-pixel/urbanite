@@ -1,6 +1,7 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import { buildMPGParams } from '@/lib/newebpay';
 import type { Order } from '@/lib/types';
+import { canAccessOrder } from '@/lib/order-access';
 
 // GET /api/payment/newebpay/checkout?order=<order_no>
 // 依訂單組出藍新 MPG 參數,回傳自動送出的表單(瀏覽器跳轉到藍新付款頁)。
@@ -16,7 +17,7 @@ export async function GET(request: Request) {
     .eq('order_no', orderNo)
     .maybeSingle();
 
-  if (!order) return htmlError('找不到訂單');
+  if (!order || !(await canAccessOrder(order))) return htmlError('無法存取訂單,請登入原帳號或使用下單的瀏覽器', 404);
   const o = order as Order;
   if (o.paid) return redirect(`/checkout/complete?order_no=${encodeURIComponent(orderNo)}`);
 
@@ -52,7 +53,7 @@ export async function GET(request: Request) {
 </body>
 </html>`;
 
-  return new Response(html, { headers: { 'Content-Type': 'text/html; charset=utf-8' } });
+  return new Response(html, { headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'private, no-store', 'Referrer-Policy': 'no-referrer' } });
 }
 
 function esc(s: string): string {
@@ -65,12 +66,12 @@ function esc(s: string): string {
 
 function redirect(path: string): Response {
   const site = (process.env.NEXT_PUBLIC_SITE_URL || '').replace(/\/$/, '');
-  return new Response(null, { status: 303, headers: { Location: site + path } });
+  return new Response(null, { status: 303, headers: { Location: site + path, 'Cache-Control': 'private, no-store' } });
 }
 
-function htmlError(msg: string): Response {
+function htmlError(msg: string, status = 400): Response {
   return new Response(
     `<!doctype html><meta charset="utf-8"><body style="font-family:sans-serif;padding:40px;text-align:center"><p>${esc(msg)}</p><a href="/checkout">返回結帳</a></body>`,
-    { status: 400, headers: { 'Content-Type': 'text/html; charset=utf-8' } },
+    { status, headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'private, no-store' } },
   );
 }
