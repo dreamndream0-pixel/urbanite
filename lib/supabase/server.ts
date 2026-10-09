@@ -31,23 +31,20 @@ export async function getSessionUser() {
   const supabase = await createServerSupabase();
   const {
     data: { user },
+    error,
   } = await supabase.auth.getUser();
-  return user ?? null;
+  return error ? null : user ?? null;
 }
 
 // 判斷目前登入者是否為管理員(email 在白名單內)。
 export async function getAdminUser() {
-  const supabase = await createServerSupabase();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user?.email) return null;
-
-  // 主機環境變數 ∪ 後台「串接設定」的管理員 Email
-  const allow = await getAdminEmails();
-
-  if (allow.length > 0 && !allow.includes(user.email.toLowerCase())) {
+  try {
+    const user = await getSessionUser();
+    if (!user?.email) return null;
+    const allow = await getAdminEmails();
+    // An empty or unavailable allowlist must never grant administrator access.
+    return allow.includes(user.email.trim().toLowerCase()) ? user : null;
+  } catch {
     return null;
   }
-  return user;
 }

@@ -69,7 +69,11 @@ export async function getIntegrations<K extends string>(keys: readonly K[]): Pro
 
 // 管理員名單:主機環境變數 ∪ 後台設定
 export async function getAdminEmails(): Promise<string[]> {
-  const stored = (await loadStored()).get('ADMIN_EMAILS') ?? '';
+  // Authorization must not reuse stale settings or silently ignore read failures.
+  const { data, error } = await createAdminClient().from('integration_settings').select('value').eq('key', 'ADMIN_EMAILS').maybeSingle();
+  if (error) throw new Error('Unable to load administrator allowlist');
+  const stored = data ? decrypt(String(data.value ?? '')) : '';
+  if (data && !String(data.value ?? '').startsWith('v1:')) throw new Error('Invalid administrator allowlist');
   const list = `${process.env.ADMIN_EMAILS ?? ''},${stored}`
     .split(',')
     .map((email) => email.trim().toLowerCase())

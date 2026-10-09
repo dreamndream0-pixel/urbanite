@@ -55,7 +55,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     const date = body[key] ? new Date(String(body[key])) : null;
     update[key] = date && !Number.isNaN(date.getTime()) ? date.toISOString() : null;
   }
-  const { data, error } = await createAdminClient().from('profile_card_blocks').update(update).eq('id', id).select().single();
+  const { data, error } = await createAdminClient().from('profile_card_blocks').update(update).eq('id', id).eq('card_id', owner.card.id).select().single();
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
   return NextResponse.json(data as ProfileCardBlock);
 }
@@ -63,8 +63,9 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 // DELETE /api/profile-card/blocks/[id]
 export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  if (!(await ownBlock(id))) return NextResponse.json({ error: '未授權' }, { status: 401 });
-  const { error } = await createAdminClient().from('profile_card_blocks').delete().eq('id', id);
+  const owner = await ownBlock(id);
+  if (!owner) return NextResponse.json({ error: '未授權' }, { status: 401 });
+  const { error } = await createAdminClient().from('profile_card_blocks').delete().eq('id', id).eq('card_id', owner.card.id);
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
   return NextResponse.json({ ok: true });
 }
