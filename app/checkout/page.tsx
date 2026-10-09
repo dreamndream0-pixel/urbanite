@@ -272,7 +272,11 @@ export default function CheckoutPage() {
 
   // 用彈出視窗開藍新電子地圖:選完由回傳頁 postMessage 帶回門市,結帳頁不換頁
   function openStoreMap(shipType: string) {
-    const url = `/api/logistics/newebpay/store-map?ship_type=${encodeURIComponent(shipType)}&lgs_type=C2C`;
+    // 店家自寄:7-11 直接開 7-11 官方地圖(不經過藍新);URBANITE 走藍新物流地圖
+    const mobile = window.matchMedia('(max-width: 768px)').matches;
+    const url = manualStore
+      ? `/api/logistics/cvs-map?ship_type=${encodeURIComponent(shipType)}${mobile ? '&m=1' : ''}`
+      : `/api/logistics/newebpay/store-map?ship_type=${encodeURIComponent(shipType)}&lgs_type=C2C`;
     // 超商電子地圖頁面較寬,彈窗需夠大並可捲動,否則按不到確認鈕
     const width = Math.min(1040, window.screen.availWidth || 1040);
     const height = Math.min(820, window.screen.availHeight || 820);

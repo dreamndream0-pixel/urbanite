@@ -3,6 +3,7 @@ const CALLBACKS = new Set([
   '/api/payment/newebpay/notify', '/api/payment/newebpay/return',
   '/api/card-plan/return', '/api/line/webhook',
   '/api/logistics/newebpay/notify', '/api/logistics/newebpay/store-map/return',
+  '/api/logistics/cvs-map/return',
 ]);
 
 export function requestSecurityError(request: Request): number | null {
