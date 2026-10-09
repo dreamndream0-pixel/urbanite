@@ -53,7 +53,7 @@ export const PRO_LIMITS: PlanLimits = { maxBlocks: 100, allTemplates: true, cust
 
 // 免費版可用的樣板
 // ivory 是新名片的預設值(不在樣板列表);實際可選 8 款
-export const FREE_TEMPLATE_KEYS = ['ivory', 'gray-note', 'hero-sun', 'polaroid-green', 'label-sand', 'float-latte', 'framed-wood', 'mag-mono', 'news'];
+export const FREE_TEMPLATE_KEYS = ['ivory', 'cream-plain', 'gray-note', 'hero-sun', 'polaroid-green', 'label-sand', 'float-latte', 'framed-wood', 'mag-mono', 'news'];
 
 // pro:名片付費功能是否開啟(U Plus 以上)
 // promo:目前是因為「限時免費」活動才有這個等級;promoEnd:活動結束時間
