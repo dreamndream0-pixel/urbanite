@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { requireCardOwner } from '@/lib/card-access';
-import { readImportPage } from '@/lib/card-import';
+import { extractUrl, readImportPage } from '@/lib/card-import';
 import { normalizeUrl } from '@/lib/profile-card';
 import { applyImport, templateAllowed, type ImportChoice } from '@/lib/card-import-apply';
 import { matchTemplate } from '@/lib/card-template-match';
@@ -15,7 +15,7 @@ export async function POST(request: Request) {
   const owner = await requireCardOwner();
   if (!owner) return NextResponse.json({ error: '請先登入' }, { status: 401 });
   const body = await request.json().catch(() => ({}));
-  const url = normalizeUrl(String(body.url ?? ''));
+  const url = normalizeUrl(extractUrl(String(body.url ?? '')));
 
   let profile;
   try {

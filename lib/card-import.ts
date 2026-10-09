@@ -65,10 +65,57 @@ export function importSource(url: string) {
     const u = new URL(url);
     if (!/^https?:$/.test(u.protocol)) return '';
     const host = u.hostname.toLowerCase();
-    return SOURCES.find(([re]) => re.test(host))?.[1] ?? '';
+    return SOURCES.find(([re]) => re.test(host))?.[1] ?? host.replace(/^www\./, '');
   } catch {
     return '';
   }
+}
+
+// 從貼上的文字取出網址(例如「Check out this profile on Campsite.bio! https://campsite.bio/xxx」)
+export function extractUrl(text: string) {
+  const t = String(text ?? '').trim();
+  const full = t.match(/https?:\/\/[^\s"'<>，。、]+/i);
+  if (full) return full[0].replace(/[)\]}.,!?]+$/, '');
+  const bare = t.match(/(?:[a-z0-9-]+\.)+[a-z]{2,}(?:\/[^\s"'<>，。、]*)?/i); // 沒寫 https:// 的網址
+  return bare ? `https://${bare[0].replace(/[)\]}.,!?]+$/, '')}` : t;
+}
+
+// 只讀公開網站:擋掉 localhost、內網與保留位址(避免被拿來探測伺服器內部)
+function privateIp(ip: string) {
+  if (/^::1$|^::$|^fe80:|^fc|^fd/i.test(ip)) return true;
+  const v4 = ip.replace(/^::ffff:/i, '');
+  const m = v4.match(/^(\d+)\.(\d+)\.(\d+)\.(\d+)$/);
+  if (!m) return false;
+  const [a, b] = [Number(m[1]), Number(m[2])];
+  return a === 0 || a === 10 || a === 127 || a >= 224 || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) || (a === 100 && b >= 64 && b <= 127);
+}
+async function assertPublicUrl(raw: string) {
+  const u = new URL(raw);
+  if (!/^https?:$/.test(u.protocol)) throw new Error('請貼上 http 或 https 開頭的網址');
+  const host = u.hostname.toLowerCase().replace(/^\[|\]$/g, '');
+  if (host === 'localhost' || host.endsWith('.localhost') || host.endsWith('.local') || host.endsWith('.internal') || !host.includes('.')) throw new Error('這個網址無法讀取');
+  const { lookup } = await import('node:dns/promises');
+  const addrs = await lookup(host, { all: true }).catch(() => []);
+  if (!addrs.length) throw new Error('找不到這個網站,請確認網址是否正確');
+  if (addrs.some((a) => privateIp(a.address))) throw new Error('這個網址無法讀取');
+}
+
+// 一步一步跟著轉址,每一步都檢查是公開網站
+async function fetchPublic(url: string) {
+  let current = url;
+  for (let i = 0; i < 5; i++) {
+    await assertPublicUrl(current);
+    const res = await fetch(current, {
+      headers: { 'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0 Safari/537.36', 'accept-language': 'zh-TW,zh;q=0.9,en;q=0.8' },
+      redirect: 'manual',
+      signal: AbortSignal.timeout(15000),
+      cache: 'no-store',
+    });
+    const next = res.status >= 300 && res.status < 400 ? res.headers.get('location') : null;
+    if (!next) return { res, url: current };
+    current = new URL(next, current).toString();
+  }
+  throw new Error('轉址太多次,請改貼最終的個人頁網址');
 }
 
 export const SUPPORTED_SOURCES = SOURCES.map(([, name]) => name);
@@ -559,6 +606,41 @@ async function parseLinkfly(html: string): Promise<ImportedProfile | null> {
 
 // ---------- 其他平台:通用解析 ----------
 const SKIP_TEXT = /privacy|terms|cookie|report|sign ?up|log ?in|create your|隱私|條款|檢舉|註冊|登入|免費建立|try for free/i;
+// 名稱:分享標題 → 頁面大標 → 網頁標題(去掉「's Campsite.bio」「| 網站名」這類尾巴)
+function genericName(html: string) {
+  const clean = (s: string) => decode(s.replace(/<[^>]+>/g, ' ')).replace(/\s+/g, ' ').trim();
+  const strip = (s: string) => s.replace(/['’]s\s+[\w.]+$/i, '').replace(/\s*[|｜–-]\s*[^|｜–-]+$/, '').trim();
+  const og = strip(meta(html, 'og:title'));
+  const h1 = clean((html.match(/<h1\b[^>]*>([\s\S]*?)<\/h1>/i) || [])[1] ?? '');
+  const title = strip(clean((html.match(/<title[^>]*>([\s\S]*?)<\/title>/i) || [])[1] ?? ''));
+  return (og || h1 || title).slice(0, 40);
+}
+
+// 簡介:分享說明,但排除平台自己的宣傳文字(例如「Create your own bio link for free」)
+const BOILERPLATE = /create your (own )?(free )?|for free today|sign up|link in bio tool|bio link|免費建立|立即註冊/i;
+function genericBio(html: string) {
+  const raw = meta(html, 'og:description') || (html.match(/<meta[^>]+name=["']description["'][^>]+content=["']([^"']+)["']/i) || [])[1] || '';
+  const text = decode(raw).replace(/\s+/g, ' ').trim();
+  return BOILERPLATE.test(text) ? '' : text.slice(0, 120);
+}
+
+// 頭像:頁面上標成頭像的圖片優先(很多平台的 og:image 是平台自己的宣傳圖)
+function genericAvatar(html: string, pageUrl: string) {
+  for (const m of html.matchAll(/<img\b[^>]*>/gi)) {
+    const tag = m[0];
+    if (!/(avatar|profile|頭像|大頭)/i.test(tag)) continue;
+    const src = (tag.match(/\ssrc=["']([^"']+)["']/i) || [])[1];
+    if (src && !src.startsWith('data:')) {
+      try {
+        return new URL(decode(src), pageUrl).toString();
+      } catch {
+        /* 下一張 */
+      }
+    }
+  }
+  return meta(html, 'og:image');
+}
+
 function parseGeneric(html: string, pageUrl: string, source: string): ImportedProfile {
   const pageHost = new URL(pageUrl).hostname.replace(/^www\./, '');
   const seen = new Set<string>();
@@ -599,23 +681,23 @@ function parseGeneric(html: string, pageUrl: string, source: string): ImportedPr
   for (const it of items) if (it.kind === 'image' && it.items.length > 1) it.layout = 'scroll';
   return {
     source,
-    name: meta(html, 'og:title').replace(/\s*[|｜–-]\s*[^|｜–-]+$/, '').slice(0, 40),
-    bio: meta(html, 'og:description').slice(0, 120),
-    avatar: meta(html, 'og:image'),
+    name: genericName(html),
+    bio: genericBio(html),
+    avatar: genericAvatar(html, pageUrl),
     socials,
     items,
   };
 }
 
 export async function readImportPage(url: string): Promise<ImportedProfile> {
+  url = extractUrl(url);
+  if (!importSource(url)) throw new Error('請貼上個人頁的網址(http 或 https 開頭)');
+  const fetched = await fetchPublic(url);
+  const res = fetched.res;
+  // 短網址轉到其他平台時,以最後的網址判斷是哪個平台
+  url = fetched.url;
   const source = importSource(url);
-  if (!source) throw new Error(`目前支援:${SUPPORTED_SOURCES.slice(0, 8).join('、')} 等名片服務的網址`);
-  const res = await fetch(url, {
-    headers: { 'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0 Safari/537.36', 'accept-language': 'zh-TW,zh;q=0.9,en;q=0.8' },
-    redirect: 'follow',
-    signal: AbortSignal.timeout(15000),
-    cache: 'no-store',
-  });
+  if (!/text\/html|application\/xhtml/i.test(res.headers.get('content-type') ?? 'text/html')) throw new Error('這個網址不是網頁,請貼上個人頁的網址');
   if (res.status === 403 || res.status === 429) throw new Error(`${source} 不允許自動讀取,這個平台請改用手動新增`);
   if (!res.ok) throw new Error(`讀取失敗(${res.status}),請確認網址是公開的個人頁`);
   const html = (await res.text()).slice(0, 6_000_000);

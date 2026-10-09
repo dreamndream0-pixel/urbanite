@@ -1568,7 +1568,7 @@ function ImportPanel({ onClose, onDone }: { onClose: () => void; onDone: () => v
         <p className="text-sm font-semibold">一鍵搬家</p>
         <button type="button" onClick={onClose} className="text-xs text-[#8a7f72]">關閉</button>
       </div>
-      <p className="text-xs leading-5 text-[#8a7f72]">貼上你在 Linktree、Portaly、LINKGOODS、Linkfly、lit.link 等服務的個人頁網址,會讀取頭像、名稱、簡介和所有連結,勾選後匯入。</p>
+      <p className="text-xs leading-5 text-[#8a7f72]">貼上你現在的個人頁網址(Linktree、Portaly、LINKGOODS、Linkfly、Campsite 或任何網站都可以,直接貼分享文字也行),會讀取頭像、名稱、簡介和所有連結,勾選後匯入。</p>
       <div className="flex gap-2">
         <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://linktr.ee/你的帳號" className={`${inputClass} min-w-0 flex-1`} />
         <button type="button" onClick={() => void read()} disabled={busy || !url.trim()} className="shrink-0 rounded-full bg-[#1f1b19] px-4 text-xs font-semibold text-white disabled:opacity-50">

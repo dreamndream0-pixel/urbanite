@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { readImportPage } from '@/lib/card-import';
+import { extractUrl, readImportPage } from '@/lib/card-import';
 import { fillSocialRows, importRows } from '@/lib/card-import-apply';
 import { matchTemplate, templateTheme } from '@/lib/card-template-match';
 import { FREE_LIMITS, FREE_TEMPLATE_KEYS, tierRank } from '@/lib/card-plan';
@@ -13,7 +13,7 @@ export const maxDuration = 30;
 // 只讀取、不存檔;圖片用原網址顯示,真正搬家時才下載到自己的空間
 export async function POST(request: Request) {
   const body = await request.json().catch(() => ({}));
-  const url = normalizeUrl(String(body.url ?? '').trim());
+  const url = normalizeUrl(extractUrl(String(body.url ?? '')));
   if (!url) return NextResponse.json({ error: '請貼上你的個人頁網址' }, { status: 400 });
   let profile;
   try {
