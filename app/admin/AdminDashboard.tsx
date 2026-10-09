@@ -40,6 +40,7 @@ import IntegrationSettings from './IntegrationSettings';
 import ProfileCardManager from './ProfileCardManager';
 import CardMembersManager from './CardMembersManager';
 import ShopsManager from './ShopsManager';
+import { POLICY_LABEL, policyText, stripPolicies, withPolicies } from '@/lib/footer-policies';
 import SiteThemeEditor from './SiteThemeEditor';
 import LineBotManager from './line-bot/LineBotManager';
 import { isCollectOnDelivery } from '@/lib/payment';
@@ -516,7 +517,9 @@ export default function AdminDashboard({
   const [memberStamp, setMemberStamp] = useState(initialSettings?.member_stamp_image ?? '');
   const [stampBusy, setStampBusy] = useState(false);
   const [footerDraft, setFooterDraft] = useState({
-    sections: JSON.stringify(initialSettings?.footer_sections ?? [], null, 2),
+    sections: JSON.stringify(stripPolicies(initialSettings?.footer_sections ?? []), null, 2),
+    privacy: policyText(initialSettings?.footer_sections, 'privacy'),
+    terms: policyText(initialSettings?.footer_sections, 'terms'),
     about: (initialSettings?.footer_about_links ?? [
       '優惠資訊 / Coupon',
       '商店介紹 / Introduction',
@@ -539,11 +542,11 @@ export default function AdminDashboard({
     checkoutLineId: getCheckoutLine(initialSettings).id,
     checkoutLineUrl: getCheckoutLine(initialSettings).url,
     socialLinks: JSON.stringify(
-      initialSettings?.footer_social_links?.length
-        ? initialSettings.footer_social_links.slice(0, 3)
-        : getFooterSocialLinksFromSections(initialSettings?.footer_sections).length
-          ? getFooterSocialLinksFromSections(initialSettings?.footer_sections)
-        : DEFAULT_FOOTER_SOCIAL_LINKS,
+      initialSettings?.footer_sections?.some((section) => section.title === FOOTER_SOCIAL_SECTION_TITLE)
+        ? getFooterSocialLinksFromSections(initialSettings?.footer_sections)
+        : initialSettings?.footer_social_links?.length
+          ? normalizeFooterSocialLinks(initialSettings.footer_social_links)
+          : DEFAULT_FOOTER_SOCIAL_LINKS,
       null,
       2,
     ),
@@ -1473,9 +1476,9 @@ export default function AdminDashboard({
           .split('\n')
           .map((line) => line.trim())
           .filter(Boolean);
-      const footerSections = mergeFooterSocialLinksIntoSections(
-        JSON.parse(footerDraft.sections || '[]'),
-        JSON.parse(footerDraft.socialLinks || '[]'),
+      const footerSections = withPolicies(
+        mergeFooterSocialLinksIntoSections(JSON.parse(footerDraft.sections || '[]'), JSON.parse(footerDraft.socialLinks || '[]')),
+        { privacy: footerDraft.privacy, terms: footerDraft.terms },
       );
       const res = await fetch('/api/settings', {
         method: 'PATCH',
@@ -3147,6 +3150,25 @@ export default function AdminDashboard({
                     value={footerDraft.socialLinks}
                     onChange={(socialLinks) => setFooterDraft({ ...footerDraft, socialLinks })}
                   />
+                  {/* 頁尾最下方的兩個連結 */}
+                  <div className="lg:col-span-2 rounded-lg border border-[#e5ded4] p-4">
+                    <h3 className="text-lg font-bold">隱私權政策 / 使用者條款</h3>
+                    <p className="mt-1 text-sm text-[#8a7f72]">顯示在頁尾最下方,點了會打開完整內容。空白就不顯示該連結;空一行代表換段落。</p>
+                    <div className="mt-4 grid gap-4 md:grid-cols-2">
+                      {(['privacy', 'terms'] as const).map((kind) => (
+                        <label key={kind} className="block text-sm text-[#8a7f72]">
+                          {POLICY_LABEL[kind]}
+                          <textarea
+                            value={footerDraft[kind]}
+                            onChange={(e) => setFooterDraft({ ...footerDraft, [kind]: e.target.value })}
+                            rows={12}
+                            placeholder={`輸入${POLICY_LABEL[kind]}的完整內容`}
+                            className="mt-2 w-full rounded-lg border border-[#e5ded4] px-3 py-2 text-sm leading-6 text-[#1f1b19]"
+                          />
+                        </label>
+                      ))}
+                    </div>
+                  </div>
                 </div>
                 {/* 結帳完成頁的「加入官方 LINE」區塊 */}
                 <div className="mt-6 rounded-xl border border-[#cfe9d6] bg-[#f3fbf5] p-4">
@@ -3775,13 +3797,32 @@ function FooterSocialLinksEditor({ value, onChange }: { value: string; onChange:
   return (
     <div className="lg:col-span-2 rounded-lg border border-[#e5ded4] p-4">
       <div>
-        <h3 className="text-lg font-bold">頁尾三個按鈕</h3>
-        <p className="mt-1 text-sm text-[#8a7f72]">設定頁尾最下方三個圓形按鈕的圖片與連結。</p>
+        <div className="flex flex-wrap items-center gap-3">
+          <h3 className="text-lg font-bold">頁尾社群按鈕</h3>
+          <button
+            type="button"
+            onClick={() => update([...items, { label: '', image: '', url: '' }])}
+            disabled={items.length >= MAX_FOOTER_SOCIAL_LINKS}
+            className="ml-auto rounded-full border border-[#1f1b19] px-4 py-1.5 text-sm font-semibold disabled:opacity-40"
+          >
+            + 新增按鈕
+          </button>
+        </div>
+        <p className="mt-1 text-sm text-[#8a7f72]">頁尾的圓形社群按鈕(Instagram、LINE、Facebook…),可新增、刪除,最多 {MAX_FOOTER_SOCIAL_LINKS} 個;有填連結的才會顯示。</p>
       </div>
+      {items.length === 0 ? <p className="mt-5 rounded-lg bg-[#faf7f2] py-6 text-center text-sm text-[#a99e8f]">目前沒有社群按鈕,頁尾不會顯示這一排。</p> : null}
 
       <div className="mt-5 grid gap-4 md:grid-cols-3">
         {items.map((item, index) => (
-          <div key={index} className="rounded-lg border border-[#e5ded4] bg-white p-4">
+          <div key={index} className="relative rounded-lg border border-[#e5ded4] bg-white p-4">
+            <button
+              type="button"
+              onClick={() => update(items.filter((_, i) => i !== index))}
+              aria-label="刪除這個按鈕"
+              className="absolute right-2 top-2 rounded-full px-2 py-0.5 text-xs text-[#a33a2b] hover:bg-[#fbeaea]"
+            >
+              刪除
+            </button>
             <div className="mx-auto flex h-16 w-16 items-center justify-center overflow-hidden rounded-full bg-[#1f1b19] text-xs font-bold text-white">
               {item.image ? <img src={item.image} alt="" className="h-full w-full object-cover" /> : item.label.slice(0, 4) || '@'}
             </div>
@@ -3842,14 +3883,13 @@ function parseFooterSocialLinks(value: string): FooterSocialDraft[] {
   return normalizeFooterSocialLinks(DEFAULT_FOOTER_SOCIAL_LINKS);
 }
 
+const MAX_FOOTER_SOCIAL_LINKS = 10;
 function normalizeFooterSocialLinks(items: Partial<FooterSocialDraft>[]): FooterSocialDraft[] {
-  const normalized = items.slice(0, 3).map((item, index) => ({
-    label: typeof item.label === 'string' ? item.label : DEFAULT_FOOTER_SOCIAL_LINKS[index]?.label ?? '',
+  return items.slice(0, MAX_FOOTER_SOCIAL_LINKS).map((item) => ({
+    label: typeof item.label === 'string' ? item.label : '',
     image: typeof item.image === 'string' ? item.image : '',
     url: typeof item.url === 'string' ? item.url : '',
   }));
-  while (normalized.length < 3) normalized.push({ ...DEFAULT_FOOTER_SOCIAL_LINKS[normalized.length] });
-  return normalized;
 }
 
 function getFooterSocialLinksFromSections(sections?: SiteSettings['footer_sections']) {

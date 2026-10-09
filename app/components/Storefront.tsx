@@ -13,6 +13,7 @@ import FavoriteFoldButton from '@/app/components/FavoriteFoldButton';
 import CategoryNavigation from '@/app/components/CategoryNavigation';
 import { useLoopCarousel } from '@/app/components/useLoopCarousel';
 import { isProductSoldOut, isVisibleInStore } from '@/lib/product-status';
+import { POLICY_SECTION_TITLE } from '@/lib/footer-policies';
 import { HIDDEN_FOOTER_SECTION_TITLES } from '@/lib/checkout-line';
 import StoreHeader from '@/app/components/StoreHeader';
 
@@ -711,6 +712,7 @@ function Footer({ settings, logoUrl, homeHref }: { settings: SiteSettings | null
     return match ? { label, href: getFooterLinkHref(match.item, match.sectionTitle) } : null;
   }).filter(Boolean) as { label: string; href: string }[];
   const displaySections = sections
+    .filter((section) => section.title !== POLICY_SECTION_TITLE)
     .map((section) => ({
       ...section,
       items: section.items.filter((item) => !isPolicyItem(item.subtitle)),
@@ -761,7 +763,7 @@ function Footer({ settings, logoUrl, homeHref }: { settings: SiteSettings | null
               </>
             )}
           </p>
-          <div className="mt-5 flex justify-center gap-3 lg:justify-start">
+          <div className="mt-5 flex flex-wrap justify-center gap-3 lg:justify-start">
             {socialLinks.map((link, index) => (
               <SocialLink key={`${link.label}-${index}`} href={link.url} label={link.label} image={link.image}>
                 {link.fallback}
@@ -848,7 +850,7 @@ function Footer({ settings, logoUrl, homeHref }: { settings: SiteSettings | null
               </>
             )}
           </p>
-          <div className="mt-5 flex justify-center gap-4">
+          <div className="mt-5 flex flex-wrap justify-center gap-4">
             {socialLinks.map((link, index) => (
               <SocialLink key={`${link.label}-${index}`} href={link.url} label={link.label} image={link.image}>
                 {link.fallback}
@@ -884,7 +886,7 @@ function isPolicyItem(subtitle: string, target?: string) {
 function getFooterSocialLinks(settings: SiteSettings | null) {
   const saved = settings?.footer_social_links
     ?.filter((link) => link.label?.trim() || link.image?.trim() || link.url?.trim())
-    .slice(0, 3)
+    .slice(0, 10)
     .map((link) => ({
       label: link.label.trim() || '社群連結',
       image: link.image.trim(),
@@ -892,17 +894,19 @@ function getFooterSocialLinks(settings: SiteSettings | null) {
       fallback: link.label.trim().slice(0, 4) || '@',
     }));
   if (saved?.some((link) => link.url)) return saved;
-  const sectionSaved = settings?.footer_sections
-    ?.find((section) => section.title === FOOTER_SOCIAL_SECTION_TITLE)
-    ?.items.filter((item) => item.subtitle?.trim() || item.content?.trim() || item.url?.trim())
-    .slice(0, 3)
-    .map((item) => ({
-      label: item.subtitle.trim() || '社群連結',
-      image: item.content.trim(),
-      url: normalizeFooterHref(item.url),
-      fallback: item.subtitle.trim().slice(0, 4) || '@',
-    }));
-  if (sectionSaved?.some((link) => link.url)) return sectionSaved;
+  const socialSection = settings?.footer_sections?.find((section) => section.title === FOOTER_SOCIAL_SECTION_TITLE);
+  if (socialSection) {
+    // 後台存過社群按鈕:只顯示有填連結的(全部刪掉就不顯示這一排)
+    return socialSection.items
+      .slice(0, 10)
+      .map((item) => ({
+        label: item.subtitle.trim() || '社群連結',
+        image: item.content.trim(),
+        url: normalizeFooterHref(item.url),
+        fallback: item.subtitle.trim().slice(0, 4) || '@',
+      }))
+      .filter((link) => link.url);
+  }
   const followItems = settings?.footer_sections?.find((section) => /尋找我們|追蹤我們|follow us/i.test(section.title))?.items ?? [];
   const instagram = findFooterContactLink(followItems, /instagram/i) || normalizeFooterHref(settings?.footer_instagram_url);
   const line = findFooterContactLink(followItems, /line/i) || normalizeFooterHref(settings?.footer_line_url);
