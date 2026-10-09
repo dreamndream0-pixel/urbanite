@@ -84,6 +84,8 @@ export async function POST(request: Request) {
     .select()
     .single();
 
+  // 商品代碼重複:給看得懂的提示
+  if (error?.code === '23505') return NextResponse.json({ error: `商品代碼「${rawId}」已經用過了,請換一個` }, { status: 409 });
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
   return NextResponse.json(data as Product, { status: 201 });
 }

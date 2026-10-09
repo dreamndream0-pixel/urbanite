@@ -343,9 +343,25 @@ function buildCategoryTree(cats: Category[]): { cat: Category; depth: number }[]
   return result;
 }
 
-function blankDraft(campaignId: string | null = null): Draft {
+// 新商品代碼預設:接著最後一個「英文 + 數字」代碼往下編(例:A00001 → A00002),店家前綴(chue-)不顯示
+function suggestProductCode(products: Pick<Product, 'id'>[]) {
+  const codes = new Set(products.map((p) => p.id.replace(/^[a-z0-9]+-(?=[A-Za-z]*d+$)/, '')));
+  let best: { prefix: string; num: number; width: number } | null = null;
+  for (const c of codes) {
+    const m = c.match(/^([A-Za-z]*)(d+)$/);
+    if (m && (!best || Number(m[2]) > best.num)) best = { prefix: m[1], num: Number(m[2]), width: m[2].length };
+  }
+  if (!best) return '';
+  for (let n = best.num + 1; n < best.num + 1000; n++) {
+    const code = `${best.prefix}${String(n).padStart(best.width, '0')}`;
+    if (!codes.has(code)) return code;
+  }
+  return '';
+}
+
+function blankDraft(campaignId: string | null = null, products: Pick<Product, 'id'>[] = []): Draft {
   return {
-    id: '',
+    id: suggestProductCode(products),
     name: '',
     tagline: '',
     price: 0,
@@ -1744,7 +1760,7 @@ export default function AdminDashboard({
                   onClick={() => {
                     setProductsTab('items');
                     changeSection('products');
-                    setEditing(blankDraft());
+                    setEditing(blankDraft(null, products));
                     setIsNew(true);
                   }}
                   className="inline-flex h-14 items-center justify-center gap-3 rounded-xl bg-[#7d1f34] px-4 text-sm font-bold tracking-[0.08em] text-white shadow-[0_8px_20px_rgba(125,31,52,0.18)]"
@@ -1998,7 +2014,7 @@ export default function AdminDashboard({
                 action={
                   <button
                     onClick={() => {
-                      setEditing(blankDraft());
+                      setEditing(blankDraft(null, products));
                       setIsNew(true);
                     }}
                     className="rounded-full bg-[#1f1b19] px-3 py-2 text-sm font-semibold text-white"
@@ -2355,7 +2371,7 @@ export default function AdminDashboard({
                 setIsNew(false);
               }}
               onCreateProduct={() => {
-                setEditing(blankDraft());
+                setEditing(blankDraft(null, products));
                 setIsNew(true);
               }}
             />
@@ -2797,7 +2813,7 @@ export default function AdminDashboard({
               initialCampaigns={initialCampaigns}
               products={products.filter((product) => product.campaign_id)}
               onNewProduct={(campaignId) => {
-                setEditing(blankDraft(campaignId));
+                setEditing(blankDraft(campaignId, products));
                 setIsNew(true);
               }}
               onEditProduct={(product) => {
