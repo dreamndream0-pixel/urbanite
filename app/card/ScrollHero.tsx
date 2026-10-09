@@ -11,6 +11,7 @@ export default function ScrollHero({ children }: { children: ReactNode }) {
     if (!element) return;
     const motion = window.matchMedia("(prefers-reduced-motion: reduce)");
     const compact = window.matchMedia("(max-height: 570px)");
+    const phoneLayout = window.matchMedia("(max-width: 760px)");
     // 量「一定看得到的畫面高度」(100svh)
     const probe = document.createElement("div");
     probe.style.cssText = "position:fixed;top:0;left:0;width:0;height:100vh;height:100svh;visibility:hidden;pointer-events:none";
@@ -27,7 +28,14 @@ export default function ScrollHero({ children }: { children: ReactNode }) {
           : Math.min(1, Math.max(0, -rect.top / distance));
       const reveal = Math.min(1, progress / 0.55);
       const eased = 1 - Math.pow(1 - reveal, 3);
-      element.style.setProperty("--rise", `${(1 - eased) * 21}%`);
+      // 手機版:一開始讓手機示意圖落在畫面裡的手上(手大約在主視覺 82% 高的位置),往下滑再升起
+      const front = element.querySelector<HTMLElement>("[data-hero-phone]");
+      if (phoneLayout.matches && front) {
+        const rest = Math.max(0, stage.offsetHeight * 0.82 - (front.offsetTop + front.offsetHeight));
+        element.style.setProperty("--rise", `${Math.round((1 - eased) * rest)}px`);
+      } else {
+        element.style.setProperty("--rise", `${(1 - eased) * 21}%`);
+      }
       element.style.setProperty("--spread", `${eased * 5}%`);
       element.style.setProperty("--tilt", `${(1 - eased) * 5 + 8}deg`);
       // 主視覺上方還露出公告條 / 表頭時,底部的輸入框與箭頭跟著往上抬

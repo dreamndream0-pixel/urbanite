@@ -117,6 +117,7 @@ export default function HeroScene({
             </div>
             <div
               className={`${styles.phone} ${styles.frontPhone}`}
+              data-hero-phone
               aria-hidden="true"
             >
               <div className={styles.screen}>
