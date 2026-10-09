@@ -4838,7 +4838,7 @@ ${order.note ? `<div class="sec"><h2>備註</h2><p class="muted">${escapeHtml(or
                 {row('帳號後五碼', order.payment_ref)}
                 {row('買家備註', order.payment_proof_note)}
                 {order.payment_proof_url ? (
-                  <a href={order.payment_proof_url} target="_blank" rel="noreferrer" className="inline-block text-sm font-semibold text-[#c84767] underline">
+                  <a href={`/api/orders/${encodeURIComponent(order.id)}/payment-proof`} target="_blank" rel="noreferrer" className="inline-block text-sm font-semibold text-[#c84767] underline">
                     查看付款截圖
                   </a>
                 ) : null}

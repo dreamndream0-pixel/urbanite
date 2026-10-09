@@ -63,8 +63,8 @@ export async function getAdminUser() {
     if (isPlatformShop(shop)) return platform;
     if (platform) return platform;
     if (shop.status === 'suspended') return null;
-    const { data } = await createAdminClient().from('shop_members').select('role').eq('shop_id', shop.id).eq('user_id', user.id).maybeSingle();
-    return data ? user : null;
+    const { data, error } = await createAdminClient().from('shop_members').select('role').eq('shop_id', shop.id).eq('user_id', user.id).maybeSingle();
+    return !error && ['owner', 'staff'].includes(data?.role ?? '') ? user : null;
   } catch {
     return null;
   }

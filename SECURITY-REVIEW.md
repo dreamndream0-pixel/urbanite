@@ -158,3 +158,33 @@ ShopStore Defender. The following remain open:
 No database schema/policy changes, MFA enrollment, secret rotation or firewall
 configuration were applied. Never restore unsigned callbacks, default passwords
 or unauthenticated cron execution to work around deployment configuration errors.
+
+## Private proofs and subscription transaction follow-up
+
+See `supabase/SECURITY-ROLLOUT.md` for deployment prerequisites and remaining
+limits. New proof uploads use an independent private bucket and an authenticated,
+shop-scoped byte-serving endpoint. The locally configured backend's bucket was
+created and verified to deny anonymous/private-download and public-URL access
+using a synthetic image which was then deleted. No existing public proof order
+references were found; other deployments and orphaned objects were not audited.
+
+Subscription settlement now uses a single service-role-only SQL transaction,
+with replay, amount and trade checks. It was verified in isolated PostgreSQL/WASM
+fixtures, including rollback on a forced payment-write failure. The SQL has NOT
+been applied to the configured backend, and the readiness RPC check failed.
+Deployment therefore disables NEW card-plan checkout until the migration is
+applied. Existing successful but unsettled callbacks require retry/reconciliation.
+The browser result now reports pending rather than falsely declaring failure.
+
+Scoped updates cannot change shop_id; staff roles must be owner/staff. Coupon
+claims no longer reset spent/revoked coupons, foreign-shop admin coupon grants
+are rejected, and favorites require a current-shop product. Database triggers,
+sensitive-table restrictive RLS/grants, and restrictive private-storage policy
+are prepared in SQL but NOT applied. No claim is made that production RLS or all
+cross-table relationships have been audited.
+
+Checks: 44 access-control, 32 order-access, 103 hardening, 48 private-payment
+adapter and 19 isolated SQL checks; 9 existing campaign-timing checks also pass.
+Production build and targeted lint pass. Independent-connection concurrency,
+real sandbox gateway round-trips, historical entitlement repair, referral/admin
+entitlement races and storefront settlement transactions remain follow-ups.

@@ -104,7 +104,7 @@ export async function POST(request: Request) {
   }
 
   const expiredAt = d.end_at ?? null;
-  const { data, error } = await supabase
+  const { error } = await supabase
     .from('user_coupons')
     .upsert(
       {
@@ -113,17 +113,12 @@ export async function POST(request: Request) {
         status: 'available',
         expired_at: expiredAt,
       },
-      { onConflict: 'user_id,coupon_id' },
-    )
-    .select('*, coupon:discounts(*)')
-    .single();
-
-  if (error) {
-    if (isSchemaMissing(error.message)) {
-      return NextResponse.json({ error: '會員優惠券資料表尚未建立,請先執行優惠券資料庫遷移' }, { status: 400 });
-    }
-    return NextResponse.json({ error: error.message }, { status: 400 });
-  }
+      { onConflict: 'user_id,coupon_id', ignoreDuplicates: true },
+    );
+  if (error) return NextResponse.json({ error: isSchemaMissing(error.message) ? '會員優惠券資料表尚未建立,請先執行優惠券資料庫遷移' : '領取失敗' }, { status: 400 });
+  const { data, error: readError } = await supabase.from('user_coupons').select('*, coupon:discounts(*)')
+    .eq('user_id', user.id).eq('coupon_id', couponId).single();
+  if (readError) return NextResponse.json({ error: '讀取優惠券失敗' }, { status: 400 });
 
   return NextResponse.json(data as UserCoupon, { status: 201 });
 }

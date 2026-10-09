@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getSessionUser } from '@/lib/supabase/server';
 import { buildMPGParams, getNewebpayConfig } from '@/lib/newebpay';
-import { newCardOrderNo } from '@/lib/card-payment';
+import { newCardOrderNo, cardSettlementReady } from '@/lib/card-payment';
 import { PERIODS, TIERS, type CardPeriod, type PaidTier } from '@/lib/card-plan';
 
 export const dynamic = 'force-dynamic';
@@ -19,6 +19,7 @@ export async function POST(request: Request) {
 
   const cfg = await getNewebpayConfig();
   if (!cfg.merchantId || !cfg.hashKey || !cfg.hashIv) return NextResponse.json({ error: '金流尚未設定,請聯絡客服' }, { status: 503 });
+  if (!(await cardSettlementReady())) return NextResponse.json({ error: '付款系統升級中，請稍後再試；尚未建立付款或扣款。' }, { status: 503 });
 
   const orderNo = newCardOrderNo();
   const { error } = await createAdminClient().from('card_payments').insert({ order_no: orderNo, user_id: user.id, tier, period, amount: price.amount });

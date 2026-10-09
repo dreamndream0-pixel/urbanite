@@ -1,9 +1,31 @@
 import { NextResponse } from 'next/server';
-import { getSessionUser } from '@/lib/supabase/server';
+import { getAdminUser, getSessionUser } from '@/lib/supabase/server';
+import { randomUUID } from 'node:crypto';
 import type { Order } from '@/lib/types';
 import { shopAdminClient } from '@/lib/shop';
 import { sanitizeImage } from '@/lib/safe-image';
 import { limitedFormData } from '@/lib/limited-form';
+import { PAYMENT_PROOF_BUCKET, PRIVATE_PROOF_PREFIX, paymentProofPath, legacyPaymentProofPath } from '@/lib/payment-proof';
+
+export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const headers = { 'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff', 'Content-Security-Policy': "default-src 'none'; frame-ancestors 'none'" };
+  const denied = () => NextResponse.json({ error: '找不到付款證明' }, { status: 404, headers });
+  const user = await getSessionUser();
+  if (!user) return denied();
+  const { id } = await params;
+  const supabase = await shopAdminClient();
+  const { data: order, error } = await supabase.from('orders').select('id, shop_id, user_id, payment_proof_url').eq('id', id).maybeSingle();
+  if (error || !order || (order.user_id !== user.id && !(await getAdminUser()))) return denied();
+  const reference = String(order.payment_proof_url ?? '');
+  const privatePath = paymentProofPath(reference, order.shop_id, order.id);
+  const legacyPath = legacyPaymentProofPath(reference, order.id, process.env.NEXT_PUBLIC_SUPABASE_URL ?? '');
+  if (!privatePath && !legacyPath) return denied();
+  const { data, error: downloadError } = await supabase.storage.from(privatePath ? PAYMENT_PROOF_BUCKET : 'assets').download(privatePath ?? legacyPath!);
+  if (downloadError || !data) return denied();
+  const ext = (privatePath ?? legacyPath!).split('.').pop() ?? '';
+  const mime: Record<string, string> = { png: 'image/png', jpg: 'image/jpeg', webp: 'image/webp', gif: 'image/gif' };
+  return new Response(data, { headers: { ...headers, 'Content-Type': mime[ext] ?? 'application/octet-stream', 'Content-Disposition': 'inline; filename="payment-proof.' + ext + '"' } });
+}
 
 const MAX_SIZE = 5 * 1024 * 1024;
 const ALLOWED = ['image/png', 'image/jpeg', 'image/webp', 'image/gif'];
@@ -24,7 +46,7 @@ export async function POST(
   const supabase = (await shopAdminClient());
   const { data: order } = await supabase
     .from('orders')
-    .select('id, user_id, paid')
+    .select('id, shop_id, user_id, paid')
     .eq('id', id)
     .maybeSingle();
   if (!order || order.user_id !== user.id) {
@@ -50,23 +72,22 @@ export async function POST(
       return NextResponse.json({ error: '截圖請小於 5MB' }, { status: 400 });
     }
     const ext = EXT_BY_TYPE[file.type] ?? 'jpg';
-    const rand = Math.random().toString(36).slice(2, 8);
-    const path = `payment-proofs/${id}-${Date.now()}-${rand}.${ext}`;
+    const path = `${order.shop_id}/${id}/${randomUUID()}.${ext}`;
     let bytes: Buffer;
     try { bytes = await sanitizeImage(new Uint8Array(await file.arrayBuffer()), file.type); }
     catch { return NextResponse.json({ error: '圖片格式無效、尺寸過大或內容損壞' }, { status: 400 }); }
     const { error: upErr } = await supabase.storage
-      .from('assets')
-      .upload(path, bytes, { contentType: file.type, upsert: true });
-    if (upErr) return NextResponse.json({ error: upErr.message }, { status: 400 });
-    update.payment_proof_url = supabase.storage.from('assets').getPublicUrl(path).data.publicUrl;
+      .from(PAYMENT_PROOF_BUCKET)
+      .upload(path, bytes, { contentType: file.type, upsert: false, cacheControl: '0' });
+    if (upErr) return NextResponse.json({ error: '付款證明上傳失敗，請稍後再試' }, { status: 503 });
+    update.payment_proof_url = PRIVATE_PROOF_PREFIX + path;
   }
 
   if (Object.keys(update).length === 0) {
     return NextResponse.json({ error: '請輸入帳號後五碼或上傳截圖' }, { status: 400 });
   }
 
-  const { data, error } = await supabase.from('orders').update(update).eq('id', id).select().single();
+  const { data, error } = await supabase.from('orders').update(update).eq('id', id).eq('user_id', user.id).select().single();
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
 
   await supabase.from('order_status_history').insert({

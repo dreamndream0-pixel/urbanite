@@ -47,6 +47,9 @@ async function main() {
   membership = { role: 'owner' };
   equal(await auth.getAdminUser(), user);
   equal(await auth.getPlatformAdmin(), null);
+  membership = { role: 'viewer' };
+  equal(await auth.getAdminUser(), null);
+  membership = { role: 'owner' };
   shop = { id: 'shop-a', status: 'suspended' };
   equal(await auth.getAdminUser(), null);
   shop = null;

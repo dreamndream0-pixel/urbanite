@@ -14,6 +14,7 @@ export async function POST(request: Request) {
 
   const supabase = (await shopAdminClient());
   const { data: coupon } = await supabase.from('discounts').select('end_at').eq('id', couponId).maybeSingle();
+  if (!coupon) return NextResponse.json({ error: '找不到這家店的優惠券' }, { status: 404 });
   const { data, error } = await supabase
     .from('user_coupons')
     .upsert(

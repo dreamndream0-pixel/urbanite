@@ -100,6 +100,7 @@ export function scopedClient(shopId: string, base: SupabaseClient = createAdminC
               case 'select':
                 return (...args: unknown[]) => fn.apply(b, args).eq('shop_id', shopId);
               case 'update':
+                return (values: unknown, ...args: unknown[]) => fn.apply(b, [withShop(values, shopId), ...args]).eq('shop_id', shopId);
               case 'delete':
                 return (...args: unknown[]) => fn.apply(b, args).eq('shop_id', shopId);
               case 'insert':

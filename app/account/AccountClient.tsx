@@ -1596,7 +1596,7 @@ function OrderModal({
             {order.payment_proof_url ? (
               <div className="flex justify-between gap-3">
                 <span className="shrink-0 text-[var(--c-muted)]">付款截圖</span>
-                <a href={order.payment_proof_url} target="_blank" rel="noreferrer" className="font-semibold text-[var(--c-sale)] underline">已上傳</a>
+                <a href={`/api/orders/${encodeURIComponent(order.id)}/payment-proof`} target="_blank" rel="noreferrer" className="font-semibold text-[var(--c-sale)] underline">已上傳</a>
               </div>
             ) : null}
             <p className="pt-1 text-xs leading-5 text-[var(--c-muted)]">付款指示：{PAYMENT_NOTE}</p>

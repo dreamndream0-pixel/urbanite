@@ -52,6 +52,8 @@ export default function UpgradeClient({ plan, payments, result, table, lineUrl, 
     <div className="mx-auto max-w-5xl px-4 py-10 sm:px-6">
       {result === 'success' ? (
         <p className="mb-6 rounded-xl border border-[#cfe9d6] bg-[#f3fbf5] px-4 py-3 text-sm text-[#1f5a33]">付款完成,方案已經開通。回到「我的名片」就能使用新功能。</p>
+      ) : result === 'pending' ? (
+        <p className="mb-6 rounded-xl border border-[#e5ded4] bg-white px-4 py-3 text-sm text-[#6b6156]">付款結果仍在確認中，請勿重複付款。若已扣款但方案尚未開通，請保留交易紀錄並聯絡客服。</p>
       ) : result === 'fail' ? (
         <p className="mb-6 rounded-xl border border-[#e8c4c4] bg-[#fbf3f0] px-4 py-3 text-sm text-[#a33a2b]">付款沒有完成。如果已經扣款,通常幾分鐘內會自動開通,重新整理這頁就能看到。</p>
       ) : null}

@@ -27,9 +27,11 @@ export async function POST(request: Request) {
   if (!productId) return NextResponse.json({ error: '缺少商品代碼' }, { status: 400 });
 
   const supabase = (await shopAdminClient());
+  const { data: product } = await supabase.from('products').select('id').eq('id', productId).maybeSingle();
+  if (!product) return NextResponse.json({ error: '找不到商品' }, { status: 404 });
   const { error } = await supabase
     .from('favorites')
-    .upsert({ user_id: user.id, product_id: productId }, { onConflict: 'user_id,product_id' });
+    .upsert({ user_id: user.id, product_id: productId }, { onConflict: 'user_id,product_id', ignoreDuplicates: true });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
   return NextResponse.json({ ok: true }, { status: 201 });
