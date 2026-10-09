@@ -10,7 +10,9 @@
 .hero {
   position: sticky;
   top: 0;
-  height: calc(100svh - 140px);
+  /* 滿版:釘住時填滿整個畫面,下方不會露出空白;第一屏超出的部分由 --shift 把輸入框抬上來 */
+  height: 100vh;
+  height: 100lvh;
   min-height: 570px;
   overflow: clip;
   isolation: isolate;
@@ -671,7 +673,8 @@
 }
 @media (max-width: 760px) {
   .hero {
-    height: min(760px, calc(100svh - 110px));
+    height: 100vh;
+    height: 100lvh;
     min-height: 480px;
   }
   .background {
