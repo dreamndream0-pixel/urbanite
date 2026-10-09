@@ -11,6 +11,10 @@ export default function ScrollHero({ children }: { children: ReactNode }) {
     if (!element) return;
     const motion = window.matchMedia("(prefers-reduced-motion: reduce)");
     const compact = window.matchMedia("(max-height: 570px)");
+    // 量「一定看得到的畫面高度」(100svh)
+    const probe = document.createElement("div");
+    probe.style.cssText = "position:fixed;top:0;left:0;width:0;height:100vh;height:100svh;visibility:hidden;pointer-events:none";
+    document.body.appendChild(probe);
     let frame = 0;
     const update = () => {
       frame = 0;
@@ -27,7 +31,9 @@ export default function ScrollHero({ children }: { children: ReactNode }) {
       element.style.setProperty("--spread", `${eased * 5}%`);
       element.style.setProperty("--tilt", `${(1 - eased) * 5 + 8}deg`);
       // 主視覺上方還露出公告條 / 表頭時,底部的輸入框與箭頭跟著往上抬
-      const overflow = rect.top + stage.offsetHeight - window.innerHeight; // 主視覺超出畫面底部多少
+      // 主視覺超出「看得到的畫面」底部多少;iPhone Chrome 的 innerHeight 含底部工具列後方,改用 svh 實際高度
+      const visible = Math.min(window.innerHeight, probe.offsetHeight || window.innerHeight);
+      const overflow = rect.top + stage.offsetHeight - visible;
       element.style.setProperty("--shift", `${Math.max(0, Math.min(Math.round(rect.top), Math.round(overflow)))}px`);
       // 往下滑的提示箭頭:快滑到底時淡出
       element.style.setProperty("--hint", progress > 0.92 ? "0" : "1");
@@ -51,6 +57,7 @@ export default function ScrollHero({ children }: { children: ReactNode }) {
       window.removeEventListener("resize", schedule);
       motion.removeEventListener("change", schedule);
       resize.disconnect();
+      probe.remove();
     };
   }, []);
 

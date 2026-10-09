@@ -10,9 +10,10 @@
 .hero {
   position: sticky;
   top: 0;
-  /* 滿版:釘住時填滿整個畫面,下方不會露出空白;第一屏超出的部分由 --shift 把輸入框抬上來 */
+  /* 釘住時剛好填滿「一定看得到的畫面高度」(svh,扣掉瀏覽器工具列),下方不會露出空白;
+     第一屏被公告條、表頭往下推而超出的部分,由 --shift 把輸入框抬上來 */
   height: 100vh;
-  height: 100lvh;
+  height: 100svh;
   min-height: 570px;
   overflow: clip;
   isolation: isolate;
@@ -674,7 +675,7 @@
 @media (max-width: 760px) {
   .hero {
     height: 100vh;
-    height: 100lvh;
+    height: 100svh;
     min-height: 480px;
   }
   .background {
