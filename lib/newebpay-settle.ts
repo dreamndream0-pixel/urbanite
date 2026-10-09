@@ -1,5 +1,6 @@
 import { isCardOrderNo, settleCardPayment } from '@/lib/card-payment';
 import { scopedClient, URBANITE_SHOP_ID } from '@/lib/shop';
+import { matchesPaymentAmount } from '@/lib/payment-amount';
 
 type NewebpayPayload = {
   Status?: string;
@@ -29,7 +30,7 @@ export async function settleNewebpayPayment(payload: NewebpayPayload): Promise<{
   if (!order) return { ok: false, orderNo, reason: '找不到訂單' };
 
   const amt = Number(result.Amt);
-  if (Number.isFinite(amt) && amt !== Number(order.total)) {
+  if (!matchesPaymentAmount(result.Amt, order.total)) {
     return { ok: false, orderNo, reason: `金額不符:${amt}/${order.total}` };
   }
 

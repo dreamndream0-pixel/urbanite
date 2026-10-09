@@ -70,7 +70,7 @@ export async function decodeNewebpayLogisticsResponse(form: Record<string, FormD
   const encrypted = String(form.EncryptData_ ?? form.EncryptData ?? '');
   const receivedHash = String(form.HashData_ ?? form.HashData ?? '');
   if (!encrypted) throw new Error('缺少藍新物流回傳資料');
-  if (receivedHash && !verifyTradeSha(encrypted, receivedHash, cfg.hashKey, cfg.hashIv)) {
+  if (!receivedHash || !verifyTradeSha(encrypted, receivedHash, cfg.hashKey, cfg.hashIv)) {
     throw new Error('藍新物流回傳驗證失敗');
   }
   return parsePayload(logisticsAesDecrypt(encrypted, cfg.hashKey, cfg.hashIv));

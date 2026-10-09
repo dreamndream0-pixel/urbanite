@@ -45,7 +45,7 @@ import {
 import type { Product } from '@/lib/types';
 import { FREE_TEMPLATE_KEYS, PENDING_IMPORT_KEY, PRO_LIMITS, type CardPlanInfo } from '@/lib/card-plan';
 import { uiAlert, uiConfirm } from '@/lib/ui-dialog';
-import { detectPlatform } from '@/lib/social-fetch';
+import { detectPlatform } from '@/lib/social-platform';
 import { extractUrl, pastedUrl } from '@/lib/extract-url';
 
 const formatter = new Intl.NumberFormat('zh-TW', { style: 'currency', currency: 'TWD', maximumFractionDigits: 0 });

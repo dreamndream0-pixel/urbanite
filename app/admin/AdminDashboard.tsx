@@ -3048,7 +3048,7 @@ export default function AdminDashboard({
                       {uploading ? '上傳中…' : '上傳 Logo 圖片'}
                       <input
                         type="file"
-                        accept="image/png,image/jpeg,image/webp,image/svg+xml,image/gif"
+                        accept="image/png,image/jpeg,image/webp,image/gif"
                         className="hidden"
                         disabled={uploading}
                         onChange={(e) => {
@@ -3059,7 +3059,7 @@ export default function AdminDashboard({
                       />
                     </label>
                     <p className="mt-2 max-w-xs text-xs text-[#8a7f72]">
-                      PNG / JPG / WEBP / SVG,建議寬版、透明背景,小於 3MB。上傳後首頁與後台 Logo 都會更新。
+                      PNG / JPG / WEBP / GIF，建議寬版、透明背景，小於 3MB。SVG 請先轉成 PNG。上傳後首頁與後台 Logo 都會更新。
                     </p>
                   </div>
                 </div>
@@ -3856,7 +3856,7 @@ function FooterSocialLinksEditor({ value, onChange }: { value: string; onChange:
               {uploadingIndex === index ? '上傳中...' : '上傳圖片'}
               <input
                 type="file"
-                accept="image/png,image/jpeg,image/webp,image/svg+xml,image/gif"
+                accept="image/png,image/jpeg,image/webp,image/gif"
                 className="hidden"
                 disabled={uploadingIndex !== null}
                 onChange={(e) => {

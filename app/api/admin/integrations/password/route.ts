@@ -14,7 +14,7 @@ export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => ({}));
   const current = String(body?.current ?? '');
   const next = String(body?.next ?? '');
-  if (next.length < 6) return NextResponse.json({ error: '新密碼至少 6 碼' }, { status: 400 });
+  if (next.length < 12 || next.length > 256) return NextResponse.json({ error: '新密碼需為 12 至 256 碼' }, { status: 400 });
   if (!(await verifyPanelPassword(current))) return NextResponse.json({ error: '目前密碼錯誤' }, { status: 403 });
   try {
     await setPanelPassword(next);

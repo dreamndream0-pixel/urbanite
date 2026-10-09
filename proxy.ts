@@ -2,6 +2,7 @@ import { type NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 import { shopSlugFromHost } from '@/lib/shop-host';
 import { getConfiguredSiteUrl } from '@/lib/site-url';
+import { requestSecurityError } from '@/lib/request-security';
 
 // 每次請求刷新使用者的登入 session(Supabase 官方建議做法)。
 // 尚未設定 Supabase 環境變數時直接放行,方便本機開發。
@@ -9,6 +10,8 @@ import { getConfiguredSiteUrl } from '@/lib/site-url';
 const PLATFORM_ONLY = /^\/(card|mycard|line|shop\/new|@|api\/profile-card|api\/card-import|api\/admin\/card|api\/admin\/line|api\/admin\/shops)/;
 
 export async function proxy(request: NextRequest) {
+  const rejected = requestSecurityError(request);
+  if (rejected) return NextResponse.json({ error: rejected === 413 ? 'Request too large' : 'Forbidden origin' }, { status: rejected });
   const slug = shopSlugFromHost(request.headers.get('x-forwarded-host') || request.headers.get('host'));
   if (slug && PLATFORM_ONLY.test(request.nextUrl.pathname)) {
     const target = new URL(request.nextUrl.pathname + request.nextUrl.search, getConfiguredSiteUrl());
@@ -41,5 +44,5 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)'],
+  matcher: ['/api/:path*', '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)'],
 };

@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { getSessionUser } from '@/lib/supabase/server';
 import type { Order } from '@/lib/types';
 import { shopAdminClient } from '@/lib/shop';
+import { sanitizeImage } from '@/lib/safe-image';
+import { limitedFormData } from '@/lib/limited-form';
 
 const MAX_SIZE = 5 * 1024 * 1024;
 const ALLOWED = ['image/png', 'image/jpeg', 'image/webp', 'image/gif'];
@@ -29,7 +31,9 @@ export async function POST(
     return NextResponse.json({ error: '找不到訂單' }, { status: 404 });
   }
 
-  const form = await request.formData();
+  let form: FormData;
+  try { form = await limitedFormData(request); }
+  catch { return NextResponse.json({ error: '上傳資料無效或過大' }, { status: 400 }); }
   const last5 = String(form.get('last5') ?? '').trim().slice(0, 20);
   const note = String(form.get('note') ?? '').trim().slice(0, 500);
   const file = form.get('file');
@@ -48,7 +52,9 @@ export async function POST(
     const ext = EXT_BY_TYPE[file.type] ?? 'jpg';
     const rand = Math.random().toString(36).slice(2, 8);
     const path = `payment-proofs/${id}-${Date.now()}-${rand}.${ext}`;
-    const bytes = new Uint8Array(await file.arrayBuffer());
+    let bytes: Buffer;
+    try { bytes = await sanitizeImage(new Uint8Array(await file.arrayBuffer()), file.type); }
+    catch { return NextResponse.json({ error: '圖片格式無效、尺寸過大或內容損壞' }, { status: 400 }); }
     const { error: upErr } = await supabase.storage
       .from('assets')
       .upload(path, bytes, { contentType: file.type, upsert: true });

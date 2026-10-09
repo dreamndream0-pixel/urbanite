@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getAdminUser } from '@/lib/supabase/server';
+import { sanitizeImage } from '@/lib/safe-image';
+import { limitedFormData } from '@/lib/limited-form';
 
 const MAX_SIZE = 5 * 1024 * 1024; // 5MB
 const ALLOWED = ['image/png', 'image/jpeg', 'image/webp', 'image/gif'];
@@ -17,7 +19,9 @@ export async function POST(request: Request) {
   const admin = await getAdminUser();
   if (!admin) return NextResponse.json({ error: '未授權' }, { status: 401 });
 
-  const formData = await request.formData();
+  let formData: FormData;
+  try { formData = await limitedFormData(request); }
+  catch { return NextResponse.json({ error: '上傳資料無效或過大' }, { status: 400 }); }
   const file = formData.get('file');
   const productId = String(formData.get('productId') ?? 'new').replace(/[^a-zA-Z0-9_-]/g, '-');
   const folder = String(formData.get('folder') ?? 'products').replace(/[^a-zA-Z0-9_-]/g, '') || 'products';
@@ -36,7 +40,9 @@ export async function POST(request: Request) {
   const ext = EXT_BY_TYPE[file.type] ?? 'jpg';
   const rand = Math.random().toString(36).slice(2, 8);
   const path = `${folder}/${productId || 'new'}-${Date.now()}-${rand}.${ext}`;
-  const bytes = new Uint8Array(await file.arrayBuffer());
+  let bytes: Buffer;
+  try { bytes = await sanitizeImage(new Uint8Array(await file.arrayBuffer()), file.type); }
+  catch { return NextResponse.json({ error: '圖片格式無效、尺寸過大或內容損壞' }, { status: 400 }); }
 
   const { error } = await supabase.storage
     .from('assets')

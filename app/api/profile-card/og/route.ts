@@ -1,31 +1,13 @@
 import { NextResponse } from 'next/server';
-import { lookup } from 'node:dns/promises';
-import { isIP } from 'node:net';
+import { fetchPublic } from '@/lib/public-fetch';
+import { accountRateLimit, rateLimitResponse } from '@/lib/account-rate-limit';
 import { getSessionUser } from '@/lib/supabase/server';
 
 export const dynamic = 'force-dynamic';
 
 const MAX_BYTES = 1024 * 1024;
-const MAX_REDIRECTS = 3;
 
 // 內網 / 本機位址不抓(避免被拿來探測伺服器內部)
-function isPrivateIp(ip: string): boolean {
-  if (isIP(ip) === 6) {
-    const v = ip.toLowerCase();
-    if (v === '::1' || v === '::' || v.startsWith('fc') || v.startsWith('fd') || v.startsWith('fe80')) return true;
-    const mapped = v.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/);
-    return mapped ? isPrivateIp(mapped[1]) : false;
-  }
-  const [a, b] = ip.split('.').map(Number);
-  return a === 10 || a === 127 || a === 0 || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) || (a === 100 && b >= 64 && b <= 127) || a >= 224;
-}
-
-async function assertPublic(url: URL) {
-  if (!['http:', 'https:'].includes(url.protocol)) throw new Error('只支援 http / https 網址');
-  const host = url.hostname.replace(/^\[|\]$/g, '');
-  const addresses = isIP(host) ? [{ address: host }] : await lookup(host, { all: true });
-  if (!addresses.length || addresses.some((a) => isPrivateIp(a.address))) throw new Error('無法讀取這個網址');
-}
 
 function decode(s: string) {
   return s
@@ -64,25 +46,15 @@ async function readLimited(res: Response) {
 
 // GET /api/profile-card/og?url= — 貼上網址後自動帶出標題與圖片
 export async function GET(request: Request) {
-  if (!(await getSessionUser())) return NextResponse.json({ error: '請先登入' }, { status: 401 });
+  const user = await getSessionUser();
+  if (!user) return NextResponse.json({ error: '請先登入' }, { status: 401 });
+  if (!accountRateLimit(user.id, 'url-preview', 30)) return rateLimitResponse();
   const raw = new URL(request.url).searchParams.get('url')?.trim() ?? '';
   if (!raw) return NextResponse.json({ error: '請輸入網址' }, { status: 400 });
   try {
     // 站內路徑(/products/…)以目前網域開啟
-    let target = new URL(raw.startsWith('/') ? raw : /^https?:\/\//i.test(raw) ? raw : `https://${raw}`, request.url);
-    let res: Response | null = null;
-    for (let i = 0; i <= MAX_REDIRECTS; i++) {
-      await assertPublic(target);
-      res = await fetch(target, {
-        redirect: 'manual',
-        signal: AbortSignal.timeout(6000),
-        headers: { 'User-Agent': 'Mozilla/5.0 (compatible; UrbaniteLinkPreview/1.0)', Accept: 'text/html,application/xhtml+xml' },
-      });
-      const next = res.status >= 300 && res.status < 400 ? res.headers.get('location') : null;
-      if (!next) break;
-      target = new URL(next, target);
-      res = null;
-    }
+    const initial = new URL(raw.startsWith('/') ? raw : /^https?:\/\//i.test(raw) ? raw : `https://${raw}`, request.url);
+    const { res, url: target } = await fetchPublic(initial.href, MAX_BYTES);
     if (!res || !res.ok) return NextResponse.json({ title: '', image: '' });
     if (!(res.headers.get('content-type') ?? '').includes('html')) return NextResponse.json({ title: '', image: '' });
     const html = await readLimited(res);

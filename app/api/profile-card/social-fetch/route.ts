@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import sharp from 'sharp';
+import { fetchPublic } from '@/lib/public-fetch';
+import { accountRateLimit, rateLimitResponse } from '@/lib/account-rate-limit';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getSessionUser } from '@/lib/supabase/server';
 import { detectPlatform, fetchSocialProfile } from '@/lib/social-fetch';
@@ -11,6 +13,7 @@ export const dynamic = 'force-dynamic';
 export async function POST(request: Request) {
   const user = await getSessionUser();
   if (!user) return NextResponse.json({ error: '請先登入' }, { status: 401 });
+  if (!accountRateLimit(user.id, 'social-fetch', 10)) return rateLimitResponse();
   const body = await request.json().catch(() => ({}));
   const url = normalizeUrl(String(body.url ?? ''));
   if (!detectPlatform(url)) return NextResponse.json({ error: '目前支援 YouTube、Instagram、TikTok、Threads、Facebook、X、Pinterest 的個人頁網址' }, { status: 400 });
@@ -27,9 +30,9 @@ export async function POST(request: Request) {
   let avatar = '';
   if (profile.image) {
     try {
-      const img = await fetch(profile.image, { signal: AbortSignal.timeout(10000) });
+      const { res: img } = await fetchPublic(profile.image, 5 * 1024 * 1024);
       if (img.ok) {
-        const buf = await sharp(Buffer.from(await img.arrayBuffer())).resize(400, 400, { fit: 'cover' }).webp({ quality: 85 }).toBuffer();
+        const buf = await sharp(Buffer.from(await img.arrayBuffer()), { limitInputPixels: 24_000_000 }).resize(400, 400, { fit: 'cover' }).webp({ quality: 85 }).timeout({ seconds: 10 }).toBuffer();
         const supabase = createAdminClient();
         const path = `profile-card/${user.id}/social-${Date.now()}.webp`;
         const { error } = await supabase.storage.from('assets').upload(path, buf, { contentType: 'image/webp', upsert: false });

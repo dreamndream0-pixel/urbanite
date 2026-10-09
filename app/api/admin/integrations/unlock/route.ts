@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getPlatformAdmin } from '@/lib/supabase/server';
+import { accountRateLimit, rateLimitResponse } from '@/lib/account-rate-limit';
 import {
   createUnlockToken,
   isDefaultPanelPassword,
@@ -24,6 +25,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const admin = await getPlatformAdmin();
   if (!admin?.email) return NextResponse.json({ error: '未授權' }, { status: 401 });
+  if (!accountRateLimit(admin.id, 'panel-unlock', 5)) return rateLimitResponse();
   const body = await request.json().catch(() => ({}));
   const password = String(body?.password ?? '');
   // 減緩暴力嘗試

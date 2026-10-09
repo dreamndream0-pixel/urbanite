@@ -131,9 +131,8 @@ export async function saveIntegrations(updates: Record<string, string>) {
 }
 
 // ---------- 串接設定的開啟密碼 ----------
-// 以 scrypt 雜湊後(再加密)存在同一張表;未設定時預設密碼為 000000。
+// 以 scrypt 雜湊後(再加密)存在同一張表;首次設定使用伺服器環境密碼。
 const PANEL_PASSWORD_KEY = '__PANEL_PASSWORD__';
-export const DEFAULT_PANEL_PASSWORD = '000000';
 export const PANEL_UNLOCK_COOKIE = 'integrations_unlock';
 const UNLOCK_MS = 30 * 60 * 1000; // 解鎖後 30 分鐘自動上鎖
 
@@ -143,11 +142,21 @@ function hashPassword(password: string, salt = crypto.randomBytes(16).toString('
 }
 
 export async function verifyPanelPassword(password: string) {
-  cache = null;
-  // 尚未改過密碼時,與預設密碼比對
-  const stored = (await loadStored()).get(PANEL_PASSWORD_KEY) ?? hashPassword(DEFAULT_PANEL_PASSWORD, 'default');
+  if (!password || password.length > 256) return false;
+  let stored = '';
+  try {
+    const { data, error } = await createAdminClient().from('integration_settings')
+      .select('value').eq('key', PANEL_PASSWORD_KEY).maybeSingle();
+    if (error) return false;
+    if (data) {
+      stored = decrypt(String(data.value ?? ''));
+      if (!stored) return false;
+    }
+  } catch { return false; }
+  const configured = process.env.INTEGRATIONS_PANEL_PASSWORD ?? '';
+  if (!stored && configured.length >= 12 && configured.length <= 256) stored = hashPassword(configured, 'environment');
   const [salt, expected] = stored.split(':');
-  if (!salt || !expected) return false;
+  if (!salt || !/^[a-f0-9]{64}$/.test(expected) || password.length > 256) return false;
   const actual = hashPassword(password, salt).split(':')[1];
   return crypto.timingSafeEqual(Buffer.from(actual, 'hex'), Buffer.from(expected, 'hex'));
 }

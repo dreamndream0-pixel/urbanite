@@ -4,7 +4,9 @@ import { settleNewebpayPayment } from '@/lib/newebpay-settle';
 // POST /api/payment/newebpay/notify — 藍新 NotifyURL 背景付款通知
 // 驗證 TradeSha → AES 解密 TradeInfo → 確認成功與金額 → 更新訂單(冪等)。
 export async function POST(request: Request) {
-  const form = await request.formData();
+  let form: FormData;
+  try { form = await request.formData(); }
+  catch { return new Response('INVALID FORM', { status: 400 }); }
   const tradeInfo = String(form.get('TradeInfo') ?? '');
   const receivedSha = String(form.get('TradeSha') ?? '');
   const cfg = await getNewebpayConfig();
@@ -26,6 +28,7 @@ export async function POST(request: Request) {
   if (!settled.ok) {
     console.warn('[NewebPay notify] 未完成入帳', settled.orderNo, settled.reason);
     if (settled.reason?.startsWith('金額不符')) return new Response('AMOUNT MISMATCH', { status: 400 });
+    if (payload.Status === 'SUCCESS') return new Response('SETTLEMENT PENDING', { status: 503 });
   }
 
   return new Response('OK');

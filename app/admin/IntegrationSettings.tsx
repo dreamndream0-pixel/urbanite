@@ -20,7 +20,7 @@ export default function IntegrationSettings() {
   const [draft, setDraft] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  // 串接設定需另外輸入密碼才能開啟(預設 000000,可在下方修改)
+  // 串接設定需另外輸入專用密碼才能開啟。
   const [unlocked, setUnlocked] = useState(false);
   const [defaultPassword, setDefaultPassword] = useState(false);
   const [password, setPassword] = useState('');
@@ -136,7 +136,6 @@ export default function IntegrationSettings() {
         >
           <input
             type="password"
-            inputMode="numeric"
             autoComplete="off"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
@@ -165,7 +164,7 @@ export default function IntegrationSettings() {
         </button>
       </div>
       {defaultPassword && (
-        <p className="rounded-lg bg-[#fdecec] px-4 py-2.5 text-sm text-[#c0392b]">目前仍是預設密碼 000000，建議到最下方修改密碼。</p>
+        <p className="rounded-lg bg-[#fdecec] px-4 py-2.5 text-sm text-[#c0392b]">目前使用環境設定的初始密碼，請到最下方設定專用密碼（至少 12 碼）。</p>
       )}
       <div className="rounded-xl border border-[#e5ded4] bg-[#faf7f2] p-4 text-sm leading-6 text-[#6b6156]">
         金流、物流、LINE 的金鑰都可以在這裡設定，存檔後立即生效，不需要到 Vercel。
@@ -246,7 +245,7 @@ function ChangePassword({ onChanged, onLocked }: { onChanged: () => void; onLock
   const [busy, setBusy] = useState(false);
 
   async function submit() {
-    if (next.length < 6) return void uiAlert('新密碼至少 6 碼');
+    if (next.length < 12 || next.length > 256) return void uiAlert('新密碼需為 12 至 256 碼');
     if (next !== confirm) return void uiAlert('兩次輸入的新密碼不一致');
     setBusy(true);
     try {
@@ -277,7 +276,7 @@ function ChangePassword({ onChanged, onLocked }: { onChanged: () => void; onLock
   return (
     <section className="rounded-xl border border-[#e5ded4] bg-white p-4 sm:p-5">
       <h3 className="font-semibold">修改串接設定密碼</h3>
-      <p className="mt-1 text-xs leading-5 text-[#8a7f72]">開啟本頁時需輸入的密碼,至少 6 碼。</p>
+      <p className="mt-1 text-xs leading-5 text-[#8a7f72]">開啟本頁時需輸入的密碼，需為 12 至 256 碼。</p>
       <form
         className="mt-4 grid gap-3 sm:grid-cols-3"
         onSubmit={(e) => {

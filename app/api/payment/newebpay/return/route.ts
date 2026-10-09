@@ -12,7 +12,7 @@ export async function POST(request: Request) {
     const tradeInfo = String(form.get('TradeInfo') ?? '');
     const tradeSha = String(form.get('TradeSha') ?? '');
     if (tradeInfo) {
-      if (tradeSha && !verifyTradeSha(tradeInfo, tradeSha, cfg.hashKey, cfg.hashIv)) {
+      if (!tradeSha || !verifyTradeSha(tradeInfo, tradeSha, cfg.hashKey, cfg.hashIv)) {
         throw new Error('SHA ERROR');
       }
       const payload = JSON.parse(aesDecrypt(tradeInfo, cfg.hashKey, cfg.hashIv));

@@ -1,4 +1,5 @@
 import { extractUrl } from '@/lib/extract-url';
+import { fetchPublic } from '@/lib/public-fetch';
 export { extractUrl };
 // 一鍵搬家:讀取會員自己在其他名片服務(Linktree、Portaly…)的頁面,轉成我們的區塊
 // 只接受下列名片服務的網址(避免被拿來讀任意網站)
@@ -74,42 +75,6 @@ export function importSource(url: string) {
 }
 
 // 只讀公開網站:擋掉 localhost、內網與保留位址(避免被拿來探測伺服器內部)
-function privateIp(ip: string) {
-  if (/^::1$|^::$|^fe80:|^fc|^fd/i.test(ip)) return true;
-  const v4 = ip.replace(/^::ffff:/i, '');
-  const m = v4.match(/^(\d+)\.(\d+)\.(\d+)\.(\d+)$/);
-  if (!m) return false;
-  const [a, b] = [Number(m[1]), Number(m[2])];
-  return a === 0 || a === 10 || a === 127 || a >= 224 || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) || (a === 100 && b >= 64 && b <= 127);
-}
-async function assertPublicUrl(raw: string) {
-  const u = new URL(raw);
-  if (!/^https?:$/.test(u.protocol)) throw new Error('請貼上 http 或 https 開頭的網址');
-  const host = u.hostname.toLowerCase().replace(/^\[|\]$/g, '');
-  if (host === 'localhost' || host.endsWith('.localhost') || host.endsWith('.local') || host.endsWith('.internal') || !host.includes('.')) throw new Error('這個網址無法讀取');
-  const { lookup } = await import('node:dns/promises');
-  const addrs = await lookup(host, { all: true }).catch(() => []);
-  if (!addrs.length) throw new Error('找不到這個網站,請確認網址是否正確');
-  if (addrs.some((a) => privateIp(a.address))) throw new Error('這個網址無法讀取');
-}
-
-// 一步一步跟著轉址,每一步都檢查是公開網站
-async function fetchPublic(url: string) {
-  let current = url;
-  for (let i = 0; i < 5; i++) {
-    await assertPublicUrl(current);
-    const res = await fetch(current, {
-      headers: { 'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0 Safari/537.36', 'accept-language': 'zh-TW,zh;q=0.9,en;q=0.8' },
-      redirect: 'manual',
-      signal: AbortSignal.timeout(15000),
-      cache: 'no-store',
-    });
-    const next = res.status >= 300 && res.status < 400 ? res.headers.get('location') : null;
-    if (!next) return { res, url: current };
-    current = new URL(next, current).toString();
-  }
-  throw new Error('轉址太多次,請改貼最終的個人頁網址');
-}
 
 export const SUPPORTED_SOURCES = SOURCES.map(([, name]) => name);
 
@@ -506,7 +471,7 @@ async function parseLinkfly(html: string): Promise<ImportedProfile | null> {
   const socials: { type: string; value: string }[] = [];
   if (bioId) {
     const get = async (url: string) => {
-      const res = await fetch(url, { signal: AbortSignal.timeout(10000), headers: { 'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0 Safari/537.36' }, cache: 'no-store' });
+      const { res } = await fetchPublic(url);
       return res.ok ? ((await res.json()) as Obj) : null;
     };
     const file = await get(`https://fly.linkcdn.cc/upload/lnkcmpts/${bioId}.json?lnkcmpt=${String(data.vt ?? '')}`).catch(() => null);

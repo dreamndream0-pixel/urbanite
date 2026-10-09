@@ -1,4 +1,5 @@
 import { createAdminClient } from '@/lib/supabase/admin';
+import { matchesPaymentAmount } from '@/lib/payment-amount';
 import { PERIODS, tierRank, type CardPeriod, type CardTier } from '@/lib/card-plan';
 
 // 名片 Pro 方案付款(藍新):單號 CP 開頭,和商店訂單共用藍新的 Notify,入帳時依單號分流
@@ -21,17 +22,18 @@ export async function settleCardPayment(payload: Payload): Promise<{ ok: boolean
   const supabase = createAdminClient();
   const { data: pay } = await supabase.from('card_payments').select('*').eq('order_no', orderNo).maybeSingle();
   if (!pay) return { ok: false, orderNo, reason: '找不到付款紀錄' };
-  if (pay.status === 'paid') return { ok: true, orderNo };
   const amt = Number(result.Amt);
-  if (Number.isFinite(amt) && amt !== Number(pay.amount)) return { ok: false, orderNo, reason: `金額不符:${amt}/${pay.amount}` };
+  if (!matchesPaymentAmount(result.Amt, pay.amount)) return { ok: false, orderNo, reason: `金額不符:${amt}/${pay.amount}` };
+  if (pay.status === 'paid') return { ok: true, orderNo };
 
   // 先把狀態改成 paid(只成功一次),再延長方案,避免通知重送時重複加天數
-  const { data: claimed } = await supabase
+  const { data: claimed, error: claimError } = await supabase
     .from('card_payments')
     .update({ status: 'paid', paid_at: new Date().toISOString(), trade_no: String(result.TradeNo ?? '') })
     .eq('id', pay.id)
     .neq('status', 'paid')
     .select('id');
+  if (claimError) return { ok: false, orderNo, reason: '付款狀態更新失敗' };
   if (!claimed?.length) return { ok: true, orderNo };
 
   const days = PERIODS[pay.period as CardPeriod]?.days ?? 31;

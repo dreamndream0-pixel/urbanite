@@ -1,26 +1,12 @@
 // 社群追蹤卡片:從個人頁網址抓名稱、頭像、追蹤數、簡介
 // 用分享預覽(Open Graph)的方式讀取,只接受下列社群平台的網址
 
+import { fetchPublic } from '@/lib/public-fetch';
+import { detectPlatform } from '@/lib/social-platform';
+export { detectPlatform };
+
 export type SocialProfile = { platform: string; name: string; avatar: string; statA: string; statB: string; bio: string };
 
-const HOSTS: [RegExp, string][] = [
-  [/(^|\.)youtube\.com$|(^|\.)youtu\.be$/, 'youtube'],
-  [/(^|\.)instagram\.com$/, 'instagram'],
-  [/(^|\.)tiktok\.com$/, 'tiktok'],
-  [/(^|\.)threads\.(net|com)$/, 'threads'],
-  [/(^|\.)facebook\.com$|(^|\.)fb\.com$/, 'facebook'],
-  [/(^|\.)x\.com$|(^|\.)twitter\.com$/, 'x'],
-  [/(^|\.)pinterest\.[a-z.]+$/, 'pinterest'],
-];
-
-export function detectPlatform(url: string) {
-  try {
-    const host = new URL(url).hostname.toLowerCase();
-    return HOSTS.find(([re]) => re.test(host))?.[1] ?? '';
-  } catch {
-    return '';
-  }
-}
 
 function decode(s: string) {
   return s
@@ -107,16 +93,7 @@ function parse(platform: string, html: string): Omit<SocialProfile, 'avatar'> & 
 export async function fetchSocialProfile(url: string): Promise<(Omit<SocialProfile, 'avatar'> & { image: string }) | null> {
   const platform = detectPlatform(url);
   if (!platform) return null;
-  const res = await fetch(url, {
-    headers: {
-      // 用分享預覽的 User-Agent,社群平台才會回傳公開的預覽資訊
-      'user-agent': 'facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)',
-      'accept-language': 'zh-TW,zh;q=0.9,en;q=0.8',
-    },
-    redirect: 'follow',
-    signal: AbortSignal.timeout(12000),
-    cache: 'no-store',
-  });
+  const { res } = await fetchPublic(url, 4_000_000, 'facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)');
   if (!res.ok) throw new Error(`讀取失敗(${res.status})`);
   const html = (await res.text()).slice(0, 4_000_000);
   return parse(platform, html);
