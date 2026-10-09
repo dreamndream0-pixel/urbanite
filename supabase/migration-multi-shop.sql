@@ -45,32 +45,13 @@ begin
   end loop;
 end $$;
 
--- 原本「全站唯一」的欄位改成「同一家店內唯一」
-do $$
-declare r record;
-begin
-  -- 找出單一欄位的唯一限制並移除(主鍵不動)
-  for r in
-    select c.conname, c.conrelid::regclass::text as tbl
-    from pg_constraint c
-    join pg_attribute a on a.attrelid = c.conrelid and a.attnum = c.conkey[1]
-    where c.contype = 'u' and array_length(c.conkey, 1) = 1
-      and ((c.conrelid = 'public.discounts'::regclass and a.attname = 'code')
-        or (c.conrelid = 'public.categories'::regclass and a.attname = 'slug')
-        or (c.conrelid = 'public.campaigns'::regclass and a.attname = 'slug')
-        or (c.conrelid = 'public.customers'::regclass and a.attname = 'user_id'))
-  loop
-    execute format('alter table %s drop constraint %I', r.tbl, r.conname);
-  end loop;
-end $$;
-
+-- 同一家店內唯一(舊的全站唯一限制在上線時由 migration-multi-shop-cutover.sql 移除)
 create unique index if not exists discounts_shop_code_key on public.discounts (shop_id, code);
 create unique index if not exists categories_shop_slug_key on public.categories (shop_id, slug);
 create unique index if not exists campaigns_shop_slug_key on public.campaigns (shop_id, slug);
 create unique index if not exists customers_shop_user_key on public.customers (shop_id, user_id);
 
--- LINE 綁定:同一家店內唯一
-drop index if exists public.customers_line_user_id_key;
+-- LINE 綁定:同一家店內唯一(舊索引上線時移除)
 create unique index if not exists customers_shop_line_user_key on public.customers (shop_id, line_user_id) where line_user_id is not null;
 
 -- 網站設定:每家店一筆(原本固定 id = 1,且有「只能一筆」的限制)
