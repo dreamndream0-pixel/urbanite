@@ -6,6 +6,7 @@ import styles from "./landing.module.css";
 import HeroScene from "./HeroScene";
 import ProductShowcase from "./ProductShowcase";
 import PromoBar from "./PromoBar";
+import RefCapture from "./RefCapture";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
@@ -18,6 +19,7 @@ export default async function CardServicePage() {
   const startHref = user ? "/mycard" : "/card/register";
   return (
     <main className={styles.page}>
+      <RefCapture />
       <PromoBar href={startHref} />
       <HeroScene startHref={startHref} loggedIn={Boolean(user)} />
 
