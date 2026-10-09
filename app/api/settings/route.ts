@@ -44,7 +44,7 @@ export async function GET() {
     .single();
 
   const shop = await getCurrentShop();
-  const shopInfo = { shop_name: shop?.name || 'URBANITE', shop_slug: shop?.slug || 'urbanite', platform: isPlatformShop(shop) };
+  const shopInfo = { shop_name: shop?.name ?? '', shop_slug: shop?.slug ?? '', platform: isPlatformShop(shop) };
   return NextResponse.json({ ...DEFAULT_SETTINGS, ...(data ?? {}), ...shopInfo } as SiteSettings, {
     headers: { 'Cache-Control': 'no-store, max-age=0' },
   });

@@ -67,7 +67,8 @@ export class ShopNotFoundError extends Error {
   }
 }
 
-export const isPlatformShop = (shop: Pick<Shop, 'id'> | null | undefined) => !shop || shop.id === URBANITE_SHOP_ID;
+// 是不是主網站(URBANITE);找不到店家(網址打錯)一律不是
+export const isPlatformShop = (shop: Pick<Shop, 'id'> | null | undefined) => Boolean(shop) && shop!.id === URBANITE_SHOP_ID;
 
 // ---------- 店家範圍的資料庫 client ----------
 // 這些資料表屬於某一家店:讀、改、刪自動加上 shop_id 條件,新增自動帶入 shop_id

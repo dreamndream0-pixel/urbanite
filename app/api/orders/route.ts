@@ -71,9 +71,14 @@ export async function POST(request: Request) {
   if (!shippingMethod || !paymentMethod) {
     return NextResponse.json({ error: '請選擇付款與送貨方式' }, { status: 400 });
   }
-  // 其他店家(U Pro):只能轉帳匯款、自行寄件;線上金流與超商物流是 URBANITE 的帳號,不能用
-  if (!isPlatformShop(await getCurrentShop()) && (isOnlinePayment(paymentMethod) || isStorePickup(shippingMethod))) {
-    return NextResponse.json({ error: '這家店目前只提供轉帳匯款與宅配寄送' }, { status: 400 });
+  // 其他店家(U Pro):只能用這家店開啟的付款 / 寄送方式,而且不能是線上金流或超商物流(那是 URBANITE 的帳號)
+  if (!isPlatformShop(await getCurrentShop())) {
+    const { data: shopSettings } = await (await shopAdminClient()).from('site_settings').select('enabled_payment_methods, enabled_shipping_methods').maybeSingle();
+    const pays = ((shopSettings?.enabled_payment_methods as string[] | null) ?? ['轉帳匯款']).filter((m) => !isOnlinePayment(m));
+    const ships = ((shopSettings?.enabled_shipping_methods as string[] | null) ?? ['宅配到府']).filter((m) => !isStorePickup(m));
+    if (!pays.includes(paymentMethod) || !ships.includes(shippingMethod)) {
+      return NextResponse.json({ error: '這家店目前只提供轉帳匯款與宅配寄送' }, { status: 400 });
+    }
   }
   if (isStorePickup(shippingMethod) && !pickupStore.store_id) {
     return NextResponse.json({ error: '請先選擇超商取貨門市' }, { status: 400 });

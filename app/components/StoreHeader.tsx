@@ -10,6 +10,7 @@ const STORE_NAME = process.env.NEXT_PUBLIC_STORE_NAME || 'URBANITE';
 export default function StoreHeader({
   homeHref,
   logoUrl,
+  brandName = '',
   favoriteCount,
   cartCount,
   cartIconRef,
@@ -24,6 +25,7 @@ export default function StoreHeader({
 }: {
   homeHref: string;
   logoUrl: string;
+  brandName?: string; // 沒有 Logo 的店家:顯示店名
   favoriteCount: number;
   cartCount: number;
   cartIconRef?: Ref<HTMLButtonElement>;
@@ -52,7 +54,9 @@ export default function StoreHeader({
         {/* 中:Logo(載入完成前先留白,避免先閃文字再換成 Logo 圖)*/}
         <Link href={homeHref} className="justify-self-center px-2 text-center">
           {logoUrl ? (
-            <img src={logoUrl} alt={STORE_NAME} className="site-logo mx-auto h-8 w-auto object-contain sm:h-10" />
+            <img src={logoUrl} alt={brandName || STORE_NAME} className="site-logo mx-auto h-8 w-auto object-contain sm:h-10" />
+          ) : brandName ? (
+            <span className="font-serif-tc text-lg font-semibold tracking-[0.12em] text-[var(--c-text)] sm:text-2xl">{brandName}</span>
           ) : (
             <span className="inline-block h-8 w-28 sm:h-10 sm:w-36" aria-hidden />
           )}

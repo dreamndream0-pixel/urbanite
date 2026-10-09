@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
-import { ROOT_DOMAIN, shopSlugFromHost } from '@/lib/shop-host';
+import { shopSlugFromHost } from '@/lib/shop-host';
+import { getConfiguredSiteUrl } from '@/lib/site-url';
 
 // 每次請求刷新使用者的登入 session(Supabase 官方建議做法)。
 // 尚未設定 Supabase 環境變數時直接放行,方便本機開發。
@@ -10,7 +11,7 @@ const PLATFORM_ONLY = /^\/(card|mycard|line|shop\/new|@|api\/profile-card|api\/c
 export async function proxy(request: NextRequest) {
   const slug = shopSlugFromHost(request.headers.get('x-forwarded-host') || request.headers.get('host'));
   if (slug && PLATFORM_ONLY.test(request.nextUrl.pathname)) {
-    const target = new URL(request.nextUrl.pathname + request.nextUrl.search, process.env.NEXT_PUBLIC_SITE_URL || `https://www.${ROOT_DOMAIN}`);
+    const target = new URL(request.nextUrl.pathname + request.nextUrl.search, getConfiguredSiteUrl());
     return NextResponse.redirect(target);
   }
 

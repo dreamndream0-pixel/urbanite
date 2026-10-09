@@ -156,7 +156,11 @@ export default function Storefront({ campaign = null, preview = false }: { campa
 
     fetch('/api/categories')
       .then((res) => (res.ok ? res.json() : []))
-      .then((data: Category[]) => setDbCategories(data))
+      .then((data: Category[]) => {
+        setDbCategories(data);
+        // 預設分類(spring)是 URBANITE 的;其他店家沒有這個分類時改顯示全部商品
+        setCategory((c) => (c === 'all' || data.some((cat) => cat.slug === c) ? c : 'all'));
+      })
       .catch(() => setDbCategories([]));
 
     fetch('/api/settings', { cache: 'no-store' })
@@ -455,6 +459,7 @@ export default function Storefront({ campaign = null, preview = false }: { campa
       <StoreHeader
         homeHref={homeHref}
         logoUrl={logoUrl}
+        brandName={settings && !settings.logo_url ? settings.shop_name ?? '' : ''}
         favoriteCount={confirmedFavorites.size}
         cartCount={cartCount}
         cartIconRef={cartIconRef}
