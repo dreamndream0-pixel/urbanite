@@ -1,18 +1,18 @@
 import { NextResponse } from 'next/server';
-import { createAdminClient } from '@/lib/supabase/admin';
-import { getAdminUser } from '@/lib/supabase/server';
+import { getPlatformAdmin } from '@/lib/supabase/server';
 import { loadBotConfig, pushMessages, toLineMessages } from '@/lib/line-bot';
 import type { MessageSet } from '@/lib/line-bot-types';
+import { scopedClient, URBANITE_SHOP_ID } from '@/lib/shop';
 
 export const dynamic = 'force-dynamic';
 
 // POST /api/admin/line-bot/test { content } — 傳送給自己(管理員已綁定的 LINE)預覽
 export async function POST(request: Request) {
-  const admin = await getAdminUser();
+  const admin = await getPlatformAdmin();
   if (!admin) return NextResponse.json({ error: '未授權' }, { status: 401 });
   const { content } = (await request.json().catch(() => ({}))) as { content?: MessageSet };
   if (!content?.messages?.length) return NextResponse.json({ error: '沒有內容' }, { status: 400 });
-  const { data: me } = await createAdminClient().from('customers').select('name, line_user_id, line_display_name').eq('user_id', admin.id).maybeSingle();
+  const { data: me } = await scopedClient(URBANITE_SHOP_ID).from('customers').select('name, line_user_id, line_display_name').eq('user_id', admin.id).maybeSingle();
   if (!me?.line_user_id) return NextResponse.json({ error: '你的管理員帳號還沒綁定 LINE,請先到會員中心按「加入 LINE」' }, { status: 400 });
   try {
     const { config } = await loadBotConfig();

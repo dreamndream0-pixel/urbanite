@@ -1,13 +1,13 @@
 import { NextResponse } from 'next/server';
-import { createAdminClient } from '@/lib/supabase/admin';
 import { getSessionUser } from '@/lib/supabase/server';
+import { shopAdminClient } from '@/lib/shop';
 
 // GET /api/favorites — 取得目前登入者的收藏商品代碼清單
 export async function GET() {
   const user = await getSessionUser();
   if (!user) return NextResponse.json({ productIds: [] });
 
-  const supabase = createAdminClient();
+  const supabase = (await shopAdminClient());
   const { data, error } = await supabase
     .from('favorites')
     .select('product_id')
@@ -26,7 +26,7 @@ export async function POST(request: Request) {
   const productId = String(body?.productId ?? '').trim();
   if (!productId) return NextResponse.json({ error: '缺少商品代碼' }, { status: 400 });
 
-  const supabase = createAdminClient();
+  const supabase = (await shopAdminClient());
   const { error } = await supabase
     .from('favorites')
     .upsert({ user_id: user.id, product_id: productId }, { onConflict: 'user_id,product_id' });
@@ -43,7 +43,7 @@ export async function DELETE(request: Request) {
   const productId = new URL(request.url).searchParams.get('productId')?.trim();
   if (!productId) return NextResponse.json({ error: '缺少商品代碼' }, { status: 400 });
 
-  const supabase = createAdminClient();
+  const supabase = (await shopAdminClient());
   const { error } = await supabase
     .from('favorites')
     .delete()

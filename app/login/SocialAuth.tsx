@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import type { Provider } from '@supabase/supabase-js';
 import { createBrowserSupabase } from '@/lib/supabase/client';
 import { getBrowserAuthOrigin } from '@/lib/site-url';
+import { shopSlugFromHost } from '@/lib/shop-host';
 
 export type LoginMethod = 'line' | 'facebook' | 'google' | 'email';
 const LAST_LOGIN_KEY = 'ul_last_login';
@@ -62,6 +63,11 @@ export default function SocialAuthButtons({
 }) {
   const [busy, setBusy] = useState<string | null>(null);
   const last = useLastLogin();
+  // 店家子網域不顯示 LINE 登入(LINE 登入頻道只接受主網站網址)
+  const [shopDomain, setShopDomain] = useState(false);
+  useEffect(() => {
+    if (shopSlugFromHost(window.location.hostname)) Promise.resolve().then(() => setShopDomain(true));
+  }, []);
 
   async function start(provider: Exclude<LoginMethod, 'email'>) {
     setBusy(provider);
@@ -86,7 +92,7 @@ export default function SocialAuthButtons({
 
   return (
     <div className="flex items-center justify-center gap-5">
-      {PROVIDERS.map((p) => (
+      {PROVIDERS.filter((p) => !(shopDomain && p.key === 'line')).map((p) => (
         <button
           key={p.key}
           type="button"

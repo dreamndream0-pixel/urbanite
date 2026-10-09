@@ -4,7 +4,6 @@ import { refreshStaleSocialBlocks } from '@/lib/social-refresh';
 import { getPlanInfo } from '@/lib/card-access';
 import { applyFreeView } from '@/lib/card-free-view';
 import { notFound } from 'next/navigation';
-import { createAdminClient } from '@/lib/supabase/admin';
 import { getAdminUser, getSessionUser } from '@/lib/supabase/server';
 import { getAdminEmails } from '@/lib/integrations';
 import ProfileCardView, { type CardProduct } from '@/app/components/ProfileCardView';
@@ -12,12 +11,13 @@ import CardMenu from '@/app/card/CardMenu';
 import type { ProfileCard, ProfileCardBlock } from '@/lib/profile-card';
 import type { SiteSettings } from '@/lib/types';
 import { getCheckoutLine, lineAddFriendUrl } from '@/lib/checkout-line';
+import { scopedClient, URBANITE_SHOP_ID } from '@/lib/shop';
 
 export const dynamic = 'force-dynamic';
 
 // 對外網址為 /@代稱(next.config 改寫到這裡)
 async function load(slug: string) {
-  const supabase = createAdminClient();
+  const supabase = scopedClient(URBANITE_SHOP_ID);
   const { data: card } = await supabase.from('profile_cards').select('*').eq('slug', slug.toLowerCase()).maybeSingle();
   if (!card) return null;
   const [{ data: blocks }, { data: settings }] = await Promise.all([

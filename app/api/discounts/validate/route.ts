@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
-import { createAdminClient } from '@/lib/supabase/admin';
 import { getSessionUser } from '@/lib/supabase/server';
 import { evaluateCoupon } from '@/lib/discount';
 import type { Discount, OrderItem, Product } from '@/lib/types';
+import { shopAdminClient } from '@/lib/shop';
 
 // POST /api/discounts/validate — 前台結帳驗證折扣碼(公開)
 // body: { code, subtotal } → 回 { discount, code } 或 error
@@ -15,7 +15,7 @@ export async function POST(request: Request) {
   const userCouponId = String(body?.user_coupon_id ?? '').trim();
   if (!code) return NextResponse.json({ error: '請輸入折扣碼' }, { status: 400 });
 
-  const supabase = createAdminClient();
+  const supabase = (await shopAdminClient());
   const user = await getSessionUser();
   const productIds = [...new Set(items.map((item) => String(item.productId)).filter(Boolean))];
   const { data: products } = productIds.length

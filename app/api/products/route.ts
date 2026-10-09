@@ -1,15 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createAdminClient } from '@/lib/supabase/admin';
 import { getAdminUser } from '@/lib/supabase/server';
 import { isCampaignLive } from '@/lib/campaign';
 import type { Campaign, Product } from '@/lib/types';
+import { isPlatformShop, requireCurrentShop, shopAdminClient } from '@/lib/shop';
 
 // GET /api/products — 取得商品(前台與後台共用)
 //   預設:主站商品(不含活動頁商品)
 //   ?campaign=<id>:該活動頁的商品
 //   ?cart=1:結帳用,主站商品 + 仍在活動期間內的活動頁商品
 export async function GET(request: NextRequest) {
-  const supabase = createAdminClient();
+  const supabase = (await shopAdminClient());
   const campaignId = request.nextUrl.searchParams.get('campaign') ?? '';
   const forCart = request.nextUrl.searchParams.get('cart') === '1';
   let query = supabase.from('products').select('*').order('sort_order', { ascending: true });
@@ -43,11 +43,15 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: '缺少必填欄位(id / name / price)' }, { status: 400 });
   }
 
-  const supabase = createAdminClient();
+  const supabase = (await shopAdminClient());
+  // 商品代碼全站唯一:其他店家自動加上店家代稱前綴(例如 bonsucre-love-set),避免和別家店撞號
+  const shop = await requireCurrentShop();
+  const rawId = String(body.id).trim();
+  const productId = isPlatformShop(shop) || rawId.startsWith(`${shop.slug}-`) ? rawId : `${shop.slug}-${rawId}`;
   const { data, error } = await supabase
     .from('products')
     .insert({
-      id: String(body.id).trim(),
+      id: productId,
       name: body.name,
       tagline: body.tagline ?? '',
       price: body.price,

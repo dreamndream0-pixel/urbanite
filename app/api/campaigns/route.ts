@@ -1,14 +1,14 @@
 import { NextResponse } from 'next/server';
-import { createAdminClient } from '@/lib/supabase/admin';
 import { getAdminUser } from '@/lib/supabase/server';
 import type { Campaign } from '@/lib/types';
+import { shopAdminClient } from '@/lib/shop';
 
 const slugPattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 export async function GET() {
   const admin = await getAdminUser();
   if (!admin) return NextResponse.json({ error: '未授權' }, { status: 401 });
-  const { data, error } = await createAdminClient()
+  const { data, error } = await (await shopAdminClient())
     .from('campaigns')
     .select('*')
     .order('created_at', { ascending: false });
@@ -25,7 +25,7 @@ export async function POST(request: Request) {
   if (!name || !slugPattern.test(slug)) {
     return NextResponse.json({ error: '請填寫活動名稱，網址只能使用小寫英文、數字與連字號' }, { status: 400 });
   }
-  const { data, error } = await createAdminClient().from('campaigns').insert({
+  const { data, error } = await (await shopAdminClient()).from('campaigns').insert({
     name,
     slug,
     eyebrow: String(body?.eyebrow ?? 'LIMITED EDITION'),

@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server';
-import { createAdminClient } from '@/lib/supabase/admin';
 import { getAdminUser } from '@/lib/supabase/server';
 import type { Category } from '@/lib/types';
+import { shopAdminClient } from '@/lib/shop';
 
 // GET /api/categories — 取得所有分類(前台與後台共用)
 export async function GET() {
-  const supabase = createAdminClient();
+  const supabase = (await shopAdminClient());
   const { data, error } = await supabase
     .from('categories')
     .select('*')
@@ -29,7 +29,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: '請填寫代碼(slug)與名稱' }, { status: 400 });
   }
 
-  const supabase = createAdminClient();
+  const supabase = (await shopAdminClient());
   const { data, error } = await supabase
     .from('categories')
     .insert({

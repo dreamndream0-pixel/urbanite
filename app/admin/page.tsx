@@ -1,6 +1,5 @@
 import { redirect } from 'next/navigation';
 import { getAdminUser, getSessionUser } from '@/lib/supabase/server';
-import { createAdminClient } from '@/lib/supabase/admin';
 import { expireOverdueOrders } from '@/lib/order-expiry';
 import AdminDashboard from './AdminDashboard';
 import type {
@@ -17,6 +16,7 @@ import type {
   Shipment,
   Campaign,
 } from '@/lib/types';
+import { getCurrentShop, isPlatformShop, shopAdminClient } from '@/lib/shop';
 
 export const dynamic = 'force-dynamic';
 
@@ -39,7 +39,8 @@ export default async function AdminPage() {
   }
 
   // 已是管理員 → 讀取初始資料並顯示後台
-  const supabase = createAdminClient();
+  const shop = await getCurrentShop();
+  const supabase = (await shopAdminClient());
   // 逾期未付款的訂單先自動轉為取消,再讀取訂單
   await expireOverdueOrders(supabase).catch(() => {});
   const [
@@ -60,7 +61,7 @@ export default async function AdminPage() {
     supabase.from('orders').select('*').order('created_at', { ascending: false }),
     supabase.from('shipments').select('*').order('created_at', { ascending: false }),
     supabase.from('categories').select('*').order('sort_order', { ascending: true }),
-    supabase.from('site_settings').select('*').eq('id', 1).maybeSingle(),
+    supabase.from('site_settings').select('*').maybeSingle(),
     supabase.from('discounts').select('*').order('created_at', { ascending: false }),
     supabase.from('customers').select('*').order('created_at', { ascending: false }),
     supabase.from('banners').select('*').order('sort_order', { ascending: true }),
@@ -85,6 +86,8 @@ export default async function AdminPage() {
       initialLogoUrl={settings?.logo_url ?? ''}
       initialSettings={settings as SiteSettings | null}
       userEmail={user.email ?? ''}
+      platform={isPlatformShop(shop)}
+      shopName={shop?.name || 'URBANITE'}
     />
   );
 }

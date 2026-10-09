@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-import { createAdminClient } from '@/lib/supabase/admin';
 import { getAdminUser } from '@/lib/supabase/server';
+import { shopAdminClient } from '@/lib/shop';
 
 // POST /api/products/methods — 批次把「可用付款 / 物流方式」套用到多個商品(限管理員)
 // body: {
@@ -25,7 +25,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: '請選擇分類' }, { status: 400 });
   }
 
-  const supabase = createAdminClient();
+  const supabase = (await shopAdminClient());
   let query = supabase.from('products').update({ [field]: methods });
   query = scope === 'category' ? query.eq('category', category) : query.neq('id', '');
   const { data, error } = await query.select('id');

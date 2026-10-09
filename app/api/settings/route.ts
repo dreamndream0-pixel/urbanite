@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
-import { createAdminClient } from '@/lib/supabase/admin';
 import { getAdminUser } from '@/lib/supabase/server';
 import type { SiteSettings } from '@/lib/types';
 import { revalidateTag } from 'next/cache';
 import { resolveSiteTheme } from '@/lib/site-theme';
+import { getCurrentShop, isPlatformShop, shopAdminClient } from '@/lib/shop';
 
 const DEFAULT_SETTINGS: SiteSettings = {
   id: 1,
@@ -37,14 +37,15 @@ const DEFAULT_SETTINGS: SiteSettings = {
 
 // GET /api/settings — 取得網站設定(前台與後台共用,公開)
 export async function GET() {
-  const supabase = createAdminClient();
+  const supabase = (await shopAdminClient());
   const { data } = await supabase
     .from('site_settings')
     .select('*')
-    .eq('id', 1)
     .single();
 
-  return NextResponse.json({ ...DEFAULT_SETTINGS, ...(data ?? {}) } as SiteSettings, {
+  const shop = await getCurrentShop();
+  const shopInfo = { shop_name: shop?.name || 'URBANITE', shop_slug: shop?.slug || 'urbanite', platform: isPlatformShop(shop) };
+  return NextResponse.json({ ...DEFAULT_SETTINGS, ...(data ?? {}), ...shopInfo } as SiteSettings, {
     headers: { 'Cache-Control': 'no-store, max-age=0' },
   });
 }
@@ -55,8 +56,8 @@ export async function PATCH(request: Request) {
   if (!admin) return NextResponse.json({ error: '未授權' }, { status: 401 });
 
   const body = (await request.json()) as Record<string, unknown>;
+  // 每家店一筆網站設定(以 shop_id 判斷新增或更新)
   const update: Record<string, unknown> = {
-    id: 1,
     updated_at: new Date().toISOString(),
   };
 
@@ -89,10 +90,10 @@ export async function PATCH(request: Request) {
   if ('site_theme' in body) update.site_theme = resolveSiteTheme(body.site_theme);
   if ('category_image_style' in body) update.category_image_style = ['square', 'cutout'].includes(String(body.category_image_style)) ? String(body.category_image_style) : 'circle';
 
-  const supabase = createAdminClient();
+  const supabase = (await shopAdminClient());
   const { data, error } = await supabase
     .from('site_settings')
-    .upsert(update)
+    .upsert(update, { onConflict: 'shop_id' })
     .select()
     .single();
 

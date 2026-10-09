@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
-import { createAdminClient } from '@/lib/supabase/admin';
 import { getSessionUser } from '@/lib/supabase/server';
 import type { OrderStatusHistory } from '@/lib/types';
+import { shopAdminClient } from '@/lib/shop';
 
 // GET /api/orders/[id]/history — 取得本人訂單的狀態更新紀錄(依時間排序)
 export async function GET(
@@ -12,7 +12,7 @@ export async function GET(
   if (!user) return NextResponse.json({ error: '請先登入' }, { status: 401 });
 
   const { id } = await params;
-  const supabase = createAdminClient();
+  const supabase = (await shopAdminClient());
   const { data: order } = await supabase
     .from('orders')
     .select('id, user_id')

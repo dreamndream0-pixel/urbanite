@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAdminUser } from '@/lib/supabase/server';
+import { getPlatformAdmin } from '@/lib/supabase/server';
 import { listIntegrationStatus, PANEL_UNLOCK_COOKIE, saveIntegrations, verifyUnlockToken } from '@/lib/integrations';
 
 export const dynamic = 'force-dynamic';
 
 // 需為管理員,且已輸入串接設定密碼解鎖
 async function authorize(request: NextRequest) {
-  const admin = await getAdminUser();
+  const admin = await getPlatformAdmin();
   if (!admin?.email) return NextResponse.json({ error: '未授權' }, { status: 401 });
   if (!verifyUnlockToken(request.cookies.get(PANEL_UNLOCK_COOKIE)?.value, admin.email)) {
     return NextResponse.json({ error: '請先輸入串接設定密碼', locked: true }, { status: 423 });

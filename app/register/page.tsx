@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation';
 import { getSessionUser } from '@/lib/supabase/server';
-import { createAdminClient } from '@/lib/supabase/admin';
 import RegisterClient from './RegisterClient';
+import { shopAdminClient } from '@/lib/shop';
 
 export const dynamic = 'force-dynamic';
 
@@ -28,10 +28,9 @@ export default async function RegisterPage({
     const sessionUser = await getSessionUser();
     if (sessionUser) redirect(nextPath);
     try {
-      const { data } = await createAdminClient()
+      const { data } = await (await shopAdminClient())
         .from('site_settings')
         .select('logo_url')
-        .eq('id', 1)
         .maybeSingle();
       logoUrl = data?.logo_url ?? '';
     } catch {

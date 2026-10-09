@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
-import { createAdminClient } from '@/lib/supabase/admin';
 import { getAdminUser } from '@/lib/supabase/server';
 import type { UserCoupon } from '@/lib/types';
+import { shopAdminClient } from '@/lib/shop';
 
 export async function POST(request: Request) {
   const admin = await getAdminUser();
@@ -12,7 +12,7 @@ export async function POST(request: Request) {
   const couponId = String(body?.coupon_id ?? '').trim();
   if (!userId || !couponId) return NextResponse.json({ error: '缺少會員或優惠券' }, { status: 400 });
 
-  const supabase = createAdminClient();
+  const supabase = (await shopAdminClient());
   const { data: coupon } = await supabase.from('discounts').select('end_at').eq('id', couponId).maybeSingle();
   const { data, error } = await supabase
     .from('user_coupons')
@@ -44,7 +44,7 @@ export async function PATCH(request: Request) {
   const id = String(body?.id ?? '').trim();
   if (!id) return NextResponse.json({ error: '缺少會員優惠券' }, { status: 400 });
 
-  const supabase = createAdminClient();
+  const supabase = (await shopAdminClient());
   const { data: current, error: readError } = await supabase
     .from('user_coupons')
     .select('*')

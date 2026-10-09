@@ -1,5 +1,5 @@
-import { createAdminClient } from '@/lib/supabase/admin';
 import { isCardOrderNo, settleCardPayment } from '@/lib/card-payment';
+import { scopedClient, URBANITE_SHOP_ID } from '@/lib/shop';
 
 type NewebpayPayload = {
   Status?: string;
@@ -19,7 +19,7 @@ export async function settleNewebpayPayment(payload: NewebpayPayload): Promise<{
   if (isCardOrderNo(orderNo)) return settleCardPayment(payload);
   if (payload.Status !== 'SUCCESS') return { ok: false, orderNo, reason: payload.Message || '付款未成功' };
 
-  const supabase = createAdminClient();
+  const supabase = scopedClient(URBANITE_SHOP_ID);
   const { data: order, error } = await supabase
     .from('orders')
     .select('id, paid, total, payment_status, status')

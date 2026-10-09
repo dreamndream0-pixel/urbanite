@@ -1,14 +1,14 @@
 import { NextResponse } from 'next/server';
-import { createAdminClient } from '@/lib/supabase/admin';
 import { getAdminUser } from '@/lib/supabase/server';
 import type { StockMovement, Variant } from '@/lib/types';
+import { shopAdminClient } from '@/lib/shop';
 
 // GET /api/stock-movements — 進出庫紀錄(限管理員)
 export async function GET() {
   const admin = await getAdminUser();
   if (!admin) return NextResponse.json({ error: '未授權' }, { status: 401 });
 
-  const supabase = createAdminClient();
+  const supabase = (await shopAdminClient());
   const { data, error } = await supabase
     .from('stock_movements')
     .select('*')
@@ -34,7 +34,7 @@ export async function POST(request: Request) {
   if (!productId) return NextResponse.json({ error: '請選擇品項' }, { status: 400 });
   if (!quantity) return NextResponse.json({ error: '數量需大於 0' }, { status: 400 });
 
-  const supabase = createAdminClient();
+  const supabase = (await shopAdminClient());
   const { data: product, error: prodErr } = await supabase
     .from('products')
     .select('*')
@@ -86,7 +86,7 @@ export async function DELETE(request: Request) {
   const id = new URL(request.url).searchParams.get('id')?.trim();
   if (!id) return NextResponse.json({ error: '缺少紀錄 id' }, { status: 400 });
 
-  const supabase = createAdminClient();
+  const supabase = (await shopAdminClient());
   const { data: movement, error: mvReadErr } = await supabase
     .from('stock_movements')
     .select('*')

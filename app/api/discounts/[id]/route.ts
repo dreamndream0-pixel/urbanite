@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
-import { createAdminClient } from '@/lib/supabase/admin';
 import { getAdminUser } from '@/lib/supabase/server';
 import { taipeiInputToISO } from '@/lib/taipei-time';
 import type { Discount } from '@/lib/types';
+import { shopAdminClient } from '@/lib/shop';
 
 function list(value: unknown): string[] {
   if (Array.isArray(value)) return value.map((item) => String(item).trim()).filter(Boolean);
@@ -47,7 +47,7 @@ export async function PATCH(
     return NextResponse.json({ error: '沒有可更新的欄位' }, { status: 400 });
   }
 
-  const supabase = createAdminClient();
+  const supabase = (await shopAdminClient());
   const { data, error } = await supabase
     .from('discounts')
     .update(update)
@@ -68,7 +68,7 @@ export async function DELETE(
   if (!admin) return NextResponse.json({ error: '未授權' }, { status: 401 });
 
   const { id } = await params;
-  const supabase = createAdminClient();
+  const supabase = (await shopAdminClient());
   const { error } = await supabase.from('discounts').delete().eq('id', id);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });

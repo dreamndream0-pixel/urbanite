@@ -39,6 +39,7 @@ export default function ShopHeader({
 }: ShopHeaderProps) {
   const router = useRouter();
   const [resolvedLogoUrl, setResolvedLogoUrl] = useState(logoUrl);
+  const [shopName, setShopName] = useState(''); // 沒有 Logo 的店家:顯示店名
   // 未指定時回到顧客原本所在的商店(主站或活動頁)
   const shopHome = useShopHome();
   const backHref = leftHref ?? shopHome;
@@ -56,6 +57,7 @@ export default function ShopHeader({
       .then((res) => (res.ok ? res.json() : null))
       .then((settings) => {
         if (settings?.logo_url) setResolvedLogoUrl(settings.logo_url);
+        else if (settings?.shop_name) setShopName(settings.shop_name);
       })
       .catch(() => {});
   }, [logoUrl]);
@@ -82,6 +84,8 @@ export default function ShopHeader({
 
   const logo = resolvedLogoUrl ? (
     <img src={resolvedLogoUrl} alt={STORE_NAME} className="mx-auto h-8 w-auto object-contain sm:h-10" />
+  ) : shopName ? (
+    <span className="font-serif-tc text-lg font-semibold tracking-[0.12em] sm:text-2xl">{shopName}</span>
   ) : (
     <span className="inline-block h-8 w-28 sm:h-10 sm:w-36" aria-hidden />
   );

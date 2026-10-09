@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation';
 import { getAdminUser, getSessionUser } from '@/lib/supabase/server';
-import { createAdminClient } from '@/lib/supabase/admin';
 import LoginClient from './LoginClient';
+import { shopAdminClient } from '@/lib/shop';
 
 export const dynamic = 'force-dynamic';
 
@@ -40,10 +40,9 @@ export default async function LoginPage({
     }
     // 伺服器端先讀好 Logo,避免前台先閃一下文字再換成圖片
     try {
-      const { data } = await createAdminClient()
+      const { data } = await (await shopAdminClient())
         .from('site_settings')
         .select('logo_url')
-        .eq('id', 1)
         .maybeSingle();
       logoUrl = data?.logo_url ?? '';
     } catch {

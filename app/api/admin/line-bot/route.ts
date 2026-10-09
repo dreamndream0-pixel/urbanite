@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { getAdminUser } from '@/lib/supabase/server';
+import { getPlatformAdmin } from '@/lib/supabase/server';
 import { getFollowerCount, getQuota, loadBotConfig, loadRules, saveBotConfig } from '@/lib/line-bot';
 import { getMessagingConfig } from '@/lib/line-messaging';
 import { resolveBotConfig } from '@/lib/line-bot-types';
@@ -9,7 +9,7 @@ export const dynamic = 'force-dynamic';
 
 // GET /api/admin/line-bot — 機器人全部設定(設定、規則、選單、推播、額度)
 export async function GET() {
-  if (!(await getAdminUser())) return NextResponse.json({ error: '未授權' }, { status: 401 });
+  if (!(await getPlatformAdmin())) return NextResponse.json({ error: '未授權' }, { status: 401 });
   const supabase = createAdminClient();
   const [{ config, raw }, rules, { data: menus }, { data: broadcasts }, quota, followers, messaging] = await Promise.all([
     loadBotConfig(),
@@ -34,7 +34,7 @@ export async function GET() {
 
 // PUT /api/admin/line-bot — 儲存設定(歡迎訊息、預設回覆、內建查詢、訂單通知)
 export async function PUT(request: Request) {
-  if (!(await getAdminUser())) return NextResponse.json({ error: '未授權' }, { status: 401 });
+  if (!(await getPlatformAdmin())) return NextResponse.json({ error: '未授權' }, { status: 401 });
   const body = await request.json().catch(() => ({}));
   const config = resolveBotConfig(body.config);
   try {

@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
-import { createAdminClient } from '@/lib/supabase/admin';
 import { getAdminUser } from '@/lib/supabase/server';
 import { deriveStatuses } from '@/lib/order-status';
 import { restoreOrderStock } from '@/lib/inventory';
 import type { Order, Payment, Shipment, ShipmentEvent, OrderStatusHistory, ReturnRequest, Refund } from '@/lib/types';
+import { shopAdminClient } from '@/lib/shop';
 
 // GET /api/orders/[id] — 取得訂單完整資訊(主檔 + 付款 + 物流 + 歷程),限管理員
 export async function GET(
@@ -14,7 +14,7 @@ export async function GET(
   if (!admin) return NextResponse.json({ error: '未授權' }, { status: 401 });
 
   const { id } = await params;
-  const supabase = createAdminClient();
+  const supabase = (await shopAdminClient());
 
   const [orderRes, payRes, shipRes, histRes, retRes, refRes] = await Promise.all([
     supabase.from('orders').select('*').eq('id', id).maybeSingle(),
@@ -65,7 +65,7 @@ export async function PATCH(
   const { id } = await params;
   const body = await request.json();
 
-  const supabase = createAdminClient();
+  const supabase = (await shopAdminClient());
   const { data: current } = await supabase
     .from('orders')
     .select('status, paid, total, order_status, payment_status, fulfillment_status')

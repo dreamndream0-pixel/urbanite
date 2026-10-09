@@ -4,6 +4,7 @@ import { getSessionUser } from '@/lib/supabase/server';
 import { getAdminEmails } from '@/lib/integrations';
 import { FREE_LIMITS, PRO_LIMITS, RESERVED_SLUGS, tierRank, type CardPlanInfo, type CardTier } from '@/lib/card-plan';
 import { getCardPromo, promoActive } from '@/lib/card-promo';
+import { scopedClient, URBANITE_SHOP_ID } from '@/lib/shop';
 import { SLUG_PATTERN, type ProfileCard } from '@/lib/profile-card';
 
 // 名片服務:誰可以編輯哪張名片、目前方案
@@ -64,7 +65,8 @@ export async function getOwnedCard(user: User, create = true): Promise<ProfileCa
   const { data: own } = await supabase.from('profile_cards').select('*').eq('owner_user_id', user.id).maybeSingle();
   if (own) return own as ProfileCard;
   if (!create) return null;
-  const { data: customer } = await supabase.from('customers').select('name').eq('user_id', user.id).maybeSingle();
+  // 名片服務屬於平台(主網站):會員名稱取 URBANITE 的會員資料
+  const { data: customer } = await scopedClient(URBANITE_SHOP_ID).from('customers').select('name').eq('user_id', user.id).maybeSingle();
   const name = customer?.name || (user.user_metadata?.full_name as string) || (user.user_metadata?.name as string) || '';
   const { data, error } = await supabase
     .from('profile_cards')

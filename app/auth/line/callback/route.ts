@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 import { createServerSupabase } from '@/lib/supabase/server';
-import { createAdminClient } from '@/lib/supabase/admin';
 import { bindLineToUser } from '@/lib/line-messaging';
 import { getServerRedirectOrigin } from '@/lib/site-url';
 import {
@@ -12,6 +11,7 @@ import {
   upsertLineCustomer,
   verifyLineState,
 } from '@/lib/line-login';
+import { scopedClient, URBANITE_SHOP_ID } from '@/lib/shop';
 
 export const dynamic = 'force-dynamic';
 
@@ -29,7 +29,7 @@ function loginError(origin: string, next: string, message: string) {
 
 // 這個 LINE 是否已綁定「用其他方式註冊」的會員(Google / Email…)
 async function boundMemberEmail(lineUserId: string) {
-  const admin = createAdminClient();
+  const admin = scopedClient(URBANITE_SHOP_ID);
   const { data } = await admin.from('customers').select('user_id').eq('line_user_id', lineUserId).maybeSingle();
   if (!data?.user_id) return '';
   const { data: auth } = await admin.auth.admin.getUserById(data.user_id as string);
@@ -72,7 +72,7 @@ export async function GET(request: Request) {
       const linked = new URL('/line/linked', redirectOrigin);
       linked.searchParams.set('next', next);
       try {
-        const admin = createAdminClient();
+        const admin = scopedClient(URBANITE_SHOP_ID);
         const { data: member } = await admin.auth.admin.getUserById(lineState.uid);
         if (!member.user) throw new Error('找不到會員帳號,請重新操作');
         // 一次性:這個連結發出後帳號已經綁定過,代表連結用過了(避免連結被轉傳重複使用)
@@ -97,7 +97,7 @@ export async function GET(request: Request) {
     // 這個 LINE 已綁定其他登入方式的會員 → 直接登入該會員,不另開 LINE 帳號
     const boundEmail = await boundMemberEmail(profile.userId);
     if (boundEmail) {
-      const { data: link, error: linkError } = await createAdminClient().auth.admin.generateLink({ type: 'magiclink', email: boundEmail });
+      const { data: link, error: linkError } = await scopedClient(URBANITE_SHOP_ID).auth.admin.generateLink({ type: 'magiclink', email: boundEmail });
       const tokenHash = link?.properties?.hashed_token;
       if (linkError || !tokenHash) return loginError(redirectOrigin, next, linkError?.message ?? '無法登入綁定的會員帳號');
       const { error } = await supabase.auth.verifyOtp({ type: 'magiclink', token_hash: tokenHash });

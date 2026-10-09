@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { getAdminUser } from '@/lib/supabase/server';
+import { getPlatformAdmin } from '@/lib/supabase/server';
 import { sendBroadcast } from '@/lib/line-bot';
 import { cleanBroadcast } from '../clean';
 
@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic';
 
 // PATCH /api/admin/line-bot/broadcasts/[id] — 編輯草稿 / 排程
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  if (!(await getAdminUser())) return NextResponse.json({ error: '未授權' }, { status: 401 });
+  if (!(await getPlatformAdmin())) return NextResponse.json({ error: '未授權' }, { status: 401 });
   const { id } = await params;
   const supabase = createAdminClient();
   const { data: current } = await supabase.from('line_broadcasts').select('status').eq('id', id).maybeSingle();
@@ -23,7 +23,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
 // POST /api/admin/line-bot/broadcasts/[id] — 立即傳送
 export async function POST(_request: Request, { params }: { params: Promise<{ id: string }> }) {
-  if (!(await getAdminUser())) return NextResponse.json({ error: '未授權' }, { status: 401 });
+  if (!(await getPlatformAdmin())) return NextResponse.json({ error: '未授權' }, { status: 401 });
   const { id } = await params;
   try {
     const recipients = await sendBroadcast(id);
@@ -36,7 +36,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
 
 // DELETE /api/admin/line-bot/broadcasts/[id]
 export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
-  if (!(await getAdminUser())) return NextResponse.json({ error: '未授權' }, { status: 401 });
+  if (!(await getPlatformAdmin())) return NextResponse.json({ error: '未授權' }, { status: 401 });
   const { id } = await params;
   const { error } = await createAdminClient().from('line_broadcasts').delete().eq('id', id);
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });

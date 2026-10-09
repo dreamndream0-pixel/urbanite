@@ -1,7 +1,7 @@
-import { createAdminClient } from '@/lib/supabase/admin';
 import { buildMPGParams } from '@/lib/newebpay';
 import type { Order } from '@/lib/types';
 import { canAccessOrder } from '@/lib/order-access';
+import { getCurrentShop, isPlatformShop, shopAdminClient } from '@/lib/shop';
 
 // GET /api/payment/newebpay/checkout?order=<order_no>
 // 依訂單組出藍新 MPG 參數,回傳自動送出的表單(瀏覽器跳轉到藍新付款頁)。
@@ -9,8 +9,10 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const orderNo = String(searchParams.get('order') ?? '').trim();
   if (!orderNo) return htmlError('缺少訂單編號');
+  // 藍新金流是 URBANITE 的帳號:其他店家不能使用
+  if (!isPlatformShop(await getCurrentShop())) return htmlError('這家店目前只提供轉帳匯款', 400);
 
-  const supabase = createAdminClient();
+  const supabase = (await shopAdminClient());
   const { data: order } = await supabase
     .from('orders')
     .select('*')

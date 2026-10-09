@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAdminUser } from '@/lib/supabase/server';
+import { getPlatformAdmin } from '@/lib/supabase/server';
 import {
   createUnlockToken,
   isDefaultPanelPassword,
@@ -14,7 +14,7 @@ const cookieOptions = { httpOnly: true, secure: true, sameSite: 'strict' as cons
 
 // GET — 目前是否已解鎖
 export async function GET(request: NextRequest) {
-  const admin = await getAdminUser();
+  const admin = await getPlatformAdmin();
   if (!admin?.email) return NextResponse.json({ error: '未授權' }, { status: 401 });
   const unlocked = verifyUnlockToken(request.cookies.get(PANEL_UNLOCK_COOKIE)?.value, admin.email);
   return NextResponse.json({ unlocked, defaultPassword: unlocked ? await isDefaultPanelPassword() : undefined });
@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
 
 // POST { password } — 輸入密碼解鎖(30 分鐘)
 export async function POST(request: NextRequest) {
-  const admin = await getAdminUser();
+  const admin = await getPlatformAdmin();
   if (!admin?.email) return NextResponse.json({ error: '未授權' }, { status: 401 });
   const body = await request.json().catch(() => ({}));
   const password = String(body?.password ?? '');

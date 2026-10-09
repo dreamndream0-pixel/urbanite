@@ -684,6 +684,7 @@ function FavoritesDrawer({
 function Footer({ settings, logoUrl, homeHref }: { settings: SiteSettings | null; logoUrl: string; homeHref: string }) {
   const copyrightStartYear = 2025;
   const copyrightEndYear = Math.max(copyrightStartYear, new Date().getFullYear());
+  const brandName = settings?.shop_name || STORE_NAME;
   const aboutLinks = settings?.footer_about_links?.length ? settings.footer_about_links : ['優惠資訊 / Coupon', '商店介紹 / Introduction', '與我們合作 / Cooperation'];
   const serviceLinks = settings?.footer_service_links?.length ? settings.footer_service_links : ['加入會員享折扣 / VIP', '挑選尺寸 / About Size', '購物須知 / How To Buy', '退換貨政策 / After-sales Service', '使用者條款 / Terms', '隱私權政策 / Privacy'];
   const savedSections = (settings?.footer_sections ?? [])
@@ -737,15 +738,23 @@ function Footer({ settings, logoUrl, homeHref }: { settings: SiteSettings | null
         <section className="text-center lg:text-left">
           <Link href={homeHref} aria-label="回首頁" className="inline-flex">
             {logoUrl ? (
-              <img src={logoUrl} alt={STORE_NAME} className="site-logo h-10 w-auto object-contain" />
+              <img src={logoUrl} alt={brandName} className="site-logo h-10 w-auto object-contain" />
+            ) : settings?.shop_name ? (
+              <span className="font-serif-tc text-xl font-semibold tracking-[0.12em]">{settings.shop_name}</span>
             ) : (
               <span className="inline-block h-10 w-32" aria-hidden />
             )}
           </Link>
           <p className="mt-5 text-sm leading-7 text-[var(--c-text2)]">
-            簡約、質感、日常。
-            <br />
-            打造屬於你的穿搭風格。
+            {settings?.platform === false ? (
+              settings.footer_company_name || ''
+            ) : (
+              <>
+                簡約、質感、日常。
+                <br />
+                打造屬於你的穿搭風格。
+              </>
+            )}
           </p>
           <div className="mt-5 flex justify-center gap-3 lg:justify-start">
             {socialLinks.map((link, index) => (
@@ -816,15 +825,23 @@ function Footer({ settings, logoUrl, homeHref }: { settings: SiteSettings | null
         <section className="border-b border-[var(--c-border)] py-8 text-center">
           <Link href={homeHref} aria-label="回首頁" className="inline-flex justify-center">
             {logoUrl ? (
-              <img src={logoUrl} alt={STORE_NAME} className="site-logo h-11 w-auto object-contain" />
+              <img src={logoUrl} alt={brandName} className="site-logo h-11 w-auto object-contain" />
+            ) : settings?.shop_name ? (
+              <span className="font-serif-tc text-xl font-semibold tracking-[0.12em]">{settings.shop_name}</span>
             ) : (
               <span className="inline-block h-11 w-32" aria-hidden />
             )}
           </Link>
           <p className="mt-5 text-sm leading-7 text-[var(--c-text2)]">
-            簡約 × 質感 × 日常
-            <br />
-            打造屬於你的穿搭風格。
+            {settings?.platform === false ? (
+              settings.footer_company_name || ''
+            ) : (
+              <>
+                簡約 × 質感 × 日常
+                <br />
+                打造屬於你的穿搭風格。
+              </>
+            )}
           </p>
           <div className="mt-5 flex justify-center gap-4">
             {socialLinks.map((link, index) => (
@@ -837,7 +854,7 @@ function Footer({ settings, logoUrl, homeHref }: { settings: SiteSettings | null
       </div>
       <div className="border-t border-[var(--c-border)] px-6 py-5 sm:px-8">
         <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-4 text-xs text-[var(--c-text2)] sm:flex-row">
-          <p>Copyright © {copyrightStartYear}-{copyrightEndYear} URBANITE-TW. All rights reserved.</p>
+          <p>Copyright © {copyrightStartYear}-{copyrightEndYear} {settings && settings.platform === false ? brandName : 'URBANITE-TW'}. All rights reserved.</p>
           <div className="flex gap-6">
             {footerPolicyLinks.map((link) => (
               <a key={link.label} href={link.href} className="hover:text-[var(--c-text)]">{link.label}</a>

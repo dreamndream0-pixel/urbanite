@@ -1,6 +1,5 @@
 import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
-import { createAdminClient } from '@/lib/supabase/admin';
 import { getSessionUser } from '@/lib/supabase/server';
 import { getOwnedCard, getPlanInfo } from '@/lib/card-access';
 import { tierInfo } from '@/lib/card-plan';
@@ -8,6 +7,7 @@ import ProfileCardManager from '@/app/admin/ProfileCardManager';
 import CardServiceHeader from '@/app/card/CardServiceHeader';
 import PromoBar from '@/app/card/PromoBar';
 import DismissibleNotice from '@/app/card/DismissibleNotice';
+import { scopedClient, URBANITE_SHOP_ID } from '@/lib/shop';
 
 export const dynamic = 'force-dynamic';
 export const metadata: Metadata = { title: { absolute: '我的名片 | URBANLINKS' }, robots: { index: false } };
@@ -25,7 +25,7 @@ export default async function MyCardPage() {
   const card = await getOwnedCard(user);
   if (card && card.onboarded === false) redirect('/mycard/setup');
   const [{ data: settings }, plan] = await Promise.all([
-    createAdminClient().from('site_settings').select('logo_url').eq('id', 1).maybeSingle(),
+    scopedClient(URBANITE_SHOP_ID).from('site_settings').select('logo_url').eq('id', 1).maybeSingle(),
     getPlanInfo(user),
   ]);
   const days = daysLeft(plan.expiresAt);

@@ -1,7 +1,7 @@
 import crypto from 'crypto';
 import type { User } from '@supabase/supabase-js';
-import { createAdminClient } from '@/lib/supabase/admin';
 import { getIntegrations } from '@/lib/integrations';
+import { scopedClient, URBANITE_SHOP_ID } from '@/lib/shop';
 
 export type LineProfile = {
   userId: string;
@@ -145,7 +145,7 @@ export async function fetchLineProfile(accessToken: string): Promise<LineProfile
 }
 
 export async function upsertLineAuthUser(profile: LineProfile, channelSecret: string): Promise<{ user: User; password: string; email: string }> {
-  const admin = createAdminClient();
+  const admin = scopedClient(URBANITE_SHOP_ID);
   const email = getLineSyntheticEmail(profile.userId);
   const password = getLineSyntheticPassword(profile.userId, channelSecret);
   const metadata = {
@@ -187,7 +187,7 @@ export async function upsertLineAuthUser(profile: LineProfile, channelSecret: st
 
 // 第一次 LINE 登入才建立會員資料;之後登入不覆蓋會員自己填的手機、地址
 export async function upsertLineCustomer(userId: string, email: string, profile: LineProfile) {
-  const admin = createAdminClient();
+  const admin = scopedClient(URBANITE_SHOP_ID);
   const { data: existing } = await admin.from('customers').select('user_id, name').eq('user_id', userId).maybeSingle();
   if (existing) {
     if (!existing.name) await admin.from('customers').update({ name: profile.displayName }).eq('user_id', userId);

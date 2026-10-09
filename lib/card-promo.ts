@@ -1,6 +1,6 @@
 import { cache } from 'react';
-import { createAdminClient } from '@/lib/supabase/admin';
 import type { CardTier } from '@/lib/card-plan';
+import { scopedClient, URBANITE_SHOP_ID } from '@/lib/shop';
 export { promoActive } from './card-promo-state';
 
 // 名片方案限時免費:活動期間所有會員都能使用指定等級(目前開放 U Plus)
@@ -40,7 +40,7 @@ export function promoDate(iso: string) {
 // 同一次請求只讀一次
 export const getCardPromo = cache(async (): Promise<CardPromo> => {
   try {
-    const { data } = await createAdminClient().from('site_settings').select('card_promo').eq('id', 1).maybeSingle();
+    const { data } = await scopedClient(URBANITE_SHOP_ID).from('site_settings').select('card_promo').eq('id', 1).maybeSingle();
     return cleanPromo(data?.card_promo);
   } catch {
     return EMPTY_PROMO;

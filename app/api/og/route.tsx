@@ -1,5 +1,5 @@
 import { ImageResponse } from 'next/og';
-import { createAdminClient } from '@/lib/supabase/admin';
+import { shopAdminClient } from '@/lib/shop';
 
 export const runtime = 'nodejs';
 
@@ -7,8 +7,8 @@ export const runtime = 'nodejs';
 export async function GET() {
   let logo = '';
   try {
-    const supabase = createAdminClient();
-    const { data } = await supabase.from('site_settings').select('logo_url').eq('id', 1).maybeSingle();
+    const supabase = (await shopAdminClient());
+    const { data } = await supabase.from('site_settings').select('logo_url').maybeSingle();
     logo = data?.logo_url || '';
   } catch {
     /* 使用文字後備 */

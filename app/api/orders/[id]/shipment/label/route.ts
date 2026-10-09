@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
-import { createAdminClient } from '@/lib/supabase/admin';
 import { getAdminUser } from '@/lib/supabase/server';
 import { buildNewebpayLogisticsForm } from '@/lib/newebpay-logistics';
+import { shopAdminClient } from '@/lib/shop';
 
 function errorPage(title: string, message: string, detail = '') {
   const esc = (s: string) => s.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c] || c));
@@ -27,7 +27,7 @@ export async function GET(
 
   const { id } = await params;
   const shipmentId = new URL(request.url).searchParams.get('shipment_id') || '';
-  const supabase = createAdminClient();
+  const supabase = (await shopAdminClient());
   const [{ data: order }, { data: shipment }] = await Promise.all([
     supabase.from('orders').select('id, order_no').eq('id', id).maybeSingle(),
     supabase.from('shipments').select('*').eq('id', shipmentId).eq('order_id', id).maybeSingle(),

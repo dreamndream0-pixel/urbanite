@@ -1,10 +1,14 @@
 import { NextResponse } from 'next/server';
-import { createAdminClient } from '@/lib/supabase/admin';
 import { getAdminUser, getSessionUser } from '@/lib/supabase/server';
 import { canRequestReturn } from '@/lib/order-status';
 import type { Order, OrderItem, ReturnItem, ReturnRequest } from '@/lib/types';
+import { shopAdminClient } from '@/lib/shop';
+import { createAdminClient } from '@/lib/supabase/admin';
+import type { SupabaseClient } from '@supabase/supabase-js';
 
-async function genNo(supabase: ReturnType<typeof createAdminClient>, table: string, prefix: string) {
+// 退貨 / 退款單號全站唯一:跨所有店家計數
+async function genNo(_supabase: SupabaseClient, table: string, prefix: string) {
+  const supabase = createAdminClient();
   const tw = new Date(Date.now() + 8 * 3600 * 1000);
   const ymd = tw.toISOString().slice(0, 10).replace(/-/g, '');
   const p = `${prefix}${ymd}`;
@@ -19,7 +23,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
-  const supabase = createAdminClient();
+  const supabase = (await shopAdminClient());
   const { data: order } = await supabase.from('orders').select('user_id').eq('id', id).maybeSingle();
   if (!order) return NextResponse.json({ error: '找不到訂單' }, { status: 404 });
 
@@ -45,7 +49,7 @@ export async function POST(
   const reason = String(body?.reason ?? '').trim();
   const picked = Array.isArray(body?.items) ? body.items : [];
 
-  const supabase = createAdminClient();
+  const supabase = (await shopAdminClient());
   const { data: order } = await supabase.from('orders').select('*').eq('id', id).maybeSingle();
   if (!order || order.user_id !== user.id) return NextResponse.json({ error: '找不到訂單' }, { status: 404 });
   if (!canRequestReturn(order as Order)) return NextResponse.json({ error: '此訂單目前無法申請退貨' }, { status: 409 });
@@ -104,7 +108,7 @@ export async function PATCH(
   const action = String(body?.action ?? '').trim();
   const response = String(body?.response ?? '').trim();
 
-  const supabase = createAdminClient();
+  const supabase = (await shopAdminClient());
   const { data: order } = await supabase.from('orders').select('id, user_id, total, refund_amount, paid').eq('id', id).maybeSingle();
   if (!order) return NextResponse.json({ error: '找不到訂單' }, { status: 404 });
   const { data: ret } = await supabase.from('returns').select('*').eq('id', returnId).eq('order_id', id).maybeSingle();
@@ -195,7 +199,7 @@ export async function PATCH(
 
 // 依退貨品項回補庫存(以 orders.items 的 productId 對應)
 async function restockReturnItems(
-  supabase: ReturnType<typeof createAdminClient>,
+  supabase: SupabaseClient,
   orderId: string,
   items: ReturnItem[],
   actor: string,

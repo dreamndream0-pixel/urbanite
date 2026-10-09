@@ -12,10 +12,10 @@ import {
 } from '@/lib/newebpay-logistics';
 import { getConfiguredSiteUrl } from '@/lib/site-url';
 import { finalizePickedUp } from '@/lib/pickup-complete';
-import { createAdminClient } from '@/lib/supabase/admin';
 import { isCollectOnDelivery } from '@/lib/payment';
 import { getAdminUser } from '@/lib/supabase/server';
 import type { Shipment } from '@/lib/types';
+import { getCurrentShop, isPlatformShop, shopAdminClient } from '@/lib/shop';
 
 function firstSuccessRow(payload: Record<string, unknown> | null): Record<string, unknown> {
   const success = payload?.SUCCESS;
@@ -45,8 +45,12 @@ export async function POST(
   const trackingNumber = String(body?.tracking_number ?? '').trim();
   const useNewebpay = Boolean(body?.use_newebpay);
   const homeDelivery = Boolean(body?.home_delivery); // 宅配出貨:已交寄物流公司
+  // 其他店家(U Pro):藍新物流是 URBANITE 的帳號,只能自行寄件、手動填物流單號
+  if (useNewebpay && !isPlatformShop(await getCurrentShop())) {
+    return NextResponse.json({ error: '這家店請自行寄件,填寫物流公司與單號即可' }, { status: 400 });
+  }
 
-  const supabase = createAdminClient();
+  const supabase = (await shopAdminClient());
   const { data: order } = await supabase
     .from('orders')
     .select('id, order_no, customer_name, phone, email, total, paid, items, status, fulfillment_status, shipping_method, payment_method, store_id, store_name, store_phone, store_address, store_ship_type, store_lgs_type')
@@ -237,11 +241,14 @@ export async function PATCH(
   const location = String(body?.location ?? '').trim();
   const action = String(body?.action ?? '').trim();
   const apiActions = ['trace', 'query', 'modify', 'getno', 'at_store', 'picked_up'];
+  if (['trace', 'query', 'modify', 'getno'].includes(action) && !isPlatformShop(await getCurrentShop())) {
+    return NextResponse.json({ error: '這家店沒有串接藍新物流' }, { status: 400 });
+  }
   if (!shipmentId || (!status && !description && !apiActions.includes(action))) {
     return NextResponse.json({ error: '請填寫物流狀態或說明' }, { status: 400 });
   }
 
-  const supabase = createAdminClient();
+  const supabase = (await shopAdminClient());
   // 確認該物流屬於此訂單
   const { data: shipment } = await supabase
     .from('shipments')

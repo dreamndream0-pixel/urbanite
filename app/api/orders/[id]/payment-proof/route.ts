@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
-import { createAdminClient } from '@/lib/supabase/admin';
 import { getSessionUser } from '@/lib/supabase/server';
 import type { Order } from '@/lib/types';
+import { shopAdminClient } from '@/lib/shop';
 
 const MAX_SIZE = 5 * 1024 * 1024;
 const ALLOWED = ['image/png', 'image/jpeg', 'image/webp', 'image/gif'];
@@ -19,7 +19,7 @@ export async function POST(
   if (!user) return NextResponse.json({ error: '請先登入' }, { status: 401 });
 
   const { id } = await params;
-  const supabase = createAdminClient();
+  const supabase = (await shopAdminClient());
   const { data: order } = await supabase
     .from('orders')
     .select('id, user_id, paid')

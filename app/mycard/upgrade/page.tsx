@@ -1,6 +1,5 @@
 import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
-import { createAdminClient } from '@/lib/supabase/admin';
 import { getSessionUser } from '@/lib/supabase/server';
 import { getPlanInfo } from '@/lib/card-access';
 import CardServiceHeader from '@/app/card/CardServiceHeader';
@@ -9,6 +8,7 @@ import TierTable from '@/app/card/TierTable';
 import PromoBar from '@/app/card/PromoBar';
 import { getCardPromo, promoActive } from '@/lib/card-promo';
 import { CONTACT_LINE_URL, type PaidTier } from '@/lib/card-plan';
+import { scopedClient, URBANITE_SHOP_ID } from '@/lib/shop';
 
 export const dynamic = 'force-dynamic';
 export const metadata: Metadata = { title: { absolute: '方案 | URBANLINKS' }, robots: { index: false } };
@@ -25,7 +25,7 @@ export default async function UpgradePage({ searchParams }: { searchParams: Prom
     if (selectedPeriod) query.set('period', selectedPeriod);
     redirect(`/card/login?next=${encodeURIComponent(`/mycard/upgrade${query.size ? `?${query}` : ''}`)}`);
   }
-  const supabase = createAdminClient();
+  const supabase = scopedClient(URBANITE_SHOP_ID);
   const [{ data: settings }, plan, { data: payments }, promo] = await Promise.all([
     supabase.from('site_settings').select('logo_url').eq('id', 1).maybeSingle(),
     getPlanInfo(user),

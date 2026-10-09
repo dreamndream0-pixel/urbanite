@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server';
-import { createAdminClient } from '@/lib/supabase/admin';
 import { getAdminUser } from '@/lib/supabase/server';
 import type { Banner } from '@/lib/types';
+import { shopAdminClient } from '@/lib/shop';
 
 // GET /api/banners — 取得輪播圖(前台與後台共用)
 export async function GET() {
-  const supabase = createAdminClient();
+  const supabase = (await shopAdminClient());
   const { data, error } = await supabase
     .from('banners')
     .select('*')
@@ -26,7 +26,7 @@ export async function POST(request: Request) {
   const image = String(body?.image ?? '').trim();
   if (!image) return NextResponse.json({ error: '請提供圖片' }, { status: 400 });
 
-  const supabase = createAdminClient();
+  const supabase = (await shopAdminClient());
   const { data, error } = await supabase
     .from('banners')
     .insert({

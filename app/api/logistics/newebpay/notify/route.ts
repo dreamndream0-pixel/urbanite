@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
-import { createAdminClient } from '@/lib/supabase/admin';
 import { decodeNewebpayLogisticsResponse, retToFulfillmentStatus } from '@/lib/newebpay-logistics';
 import { finalizePickedUp } from '@/lib/pickup-complete';
+import { scopedClient, URBANITE_SHOP_ID } from '@/lib/shop';
 
 export async function POST(request: Request) {
   try {
@@ -10,7 +10,7 @@ export async function POST(request: Request) {
     const orderNo = String(payload.MerchantOrderNo ?? '');
     if (!orderNo) return new NextResponse('0|Missing MerchantOrderNo', { status: 400 });
 
-    const supabase = createAdminClient();
+    const supabase = scopedClient(URBANITE_SHOP_ID);
     const { data: order } = await supabase.from('orders')
       .select('id, total, paid, payment_status, fulfillment_status, shipping_method, payment_method')
       .eq('order_no', orderNo).maybeSingle();

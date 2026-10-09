@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { getAdminUser } from '@/lib/supabase/server';
+import { getPlatformAdmin } from '@/lib/supabase/server';
 import { publishRichMenu, unpublishRichMenu } from '@/lib/line-bot';
 import type { RichMenu } from '@/lib/line-bot-types';
 import { cleanMenu } from '../clean';
@@ -9,7 +9,7 @@ export const dynamic = 'force-dynamic';
 
 // PATCH /api/admin/line-bot/menus/[id] — 儲存草稿
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  if (!(await getAdminUser())) return NextResponse.json({ error: '未授權' }, { status: 401 });
+  if (!(await getPlatformAdmin())) return NextResponse.json({ error: '未授權' }, { status: 401 });
   const { id } = await params;
   const body = await request.json().catch(() => ({}));
   const { data, error } = await createAdminClient().from('line_rich_menus').update(cleanMenu(body)).eq('id', id).select().single();
@@ -19,7 +19,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
 // POST /api/admin/line-bot/menus/[id]?action=publish|unpublish — 上線 / 下架
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  if (!(await getAdminUser())) return NextResponse.json({ error: '未授權' }, { status: 401 });
+  if (!(await getPlatformAdmin())) return NextResponse.json({ error: '未授權' }, { status: 401 });
   const { id } = await params;
   const action = new URL(request.url).searchParams.get('action');
   const supabase = createAdminClient();
@@ -37,7 +37,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
 // DELETE /api/admin/line-bot/menus/[id]
 export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
-  if (!(await getAdminUser())) return NextResponse.json({ error: '未授權' }, { status: 401 });
+  if (!(await getPlatformAdmin())) return NextResponse.json({ error: '未授權' }, { status: 401 });
   const { id } = await params;
   const supabase = createAdminClient();
   const { data: menu } = await supabase.from('line_rich_menus').select('*').eq('id', id).maybeSingle();

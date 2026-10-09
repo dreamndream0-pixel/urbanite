@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
-import { createAdminClient } from '@/lib/supabase/admin';
 import { getAdminUser, getSessionUser } from '@/lib/supabase/server';
 import { canRequestCancel, deriveStatuses } from '@/lib/order-status';
 import { restoreOrderStock } from '@/lib/inventory';
 import type { Order } from '@/lib/types';
+import { shopAdminClient } from '@/lib/shop';
 
 // POST /api/orders/[id]/cancel — 客人提出取消申請(需登入且為本人訂單)
 export async function POST(
@@ -17,7 +17,7 @@ export async function POST(
   const body = await request.json().catch(() => ({}));
   const reason = String(body?.reason ?? '').trim();
 
-  const supabase = createAdminClient();
+  const supabase = (await shopAdminClient());
   const { data: order } = await supabase
     .from('orders')
     .select('id, user_id, status, paid, fulfillment_status, cancel_status')
@@ -65,7 +65,7 @@ export async function PATCH(
     return NextResponse.json({ error: '請指定 approve 或 reject' }, { status: 400 });
   }
 
-  const supabase = createAdminClient();
+  const supabase = (await shopAdminClient());
   const { data: order } = await supabase
     .from('orders')
     .select('id, status, paid, total, cancel_status')

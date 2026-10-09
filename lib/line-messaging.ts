@@ -1,8 +1,8 @@
 import crypto from 'crypto';
-import { createAdminClient } from '@/lib/supabase/admin';
 import { getIntegrations } from '@/lib/integrations';
 import { getConfiguredSiteUrl } from '@/lib/site-url';
 import type { Discount, Order } from '@/lib/types';
+import { scopedClient, URBANITE_SHOP_ID } from '@/lib/shop';
 
 // LINE 官方帳號(Messaging API):會員綁定 LINE userId,綁定後可在 LINE 查詢自己的資料
 
@@ -81,7 +81,7 @@ type BoundCustomer = { user_id: string; email: string | null; name: string | nul
 
 // 找出綁定這個 LINE 的會員(只看已綁定的;LINE 登入時會自動綁定)
 export async function findCustomerByLine(lineUserId: string): Promise<BoundCustomer | null> {
-  const supabase = createAdminClient();
+  const supabase = scopedClient(URBANITE_SHOP_ID);
   const { data } = await supabase.from('customers').select('user_id, email, name, phone, line_display_name').eq('line_user_id', lineUserId).maybeSingle();
   return data?.user_id ? (data as BoundCustomer) : null;
 }
@@ -94,7 +94,7 @@ export async function bindLineToUser(
   profile: { displayName?: string; pictureUrl?: string } | null,
   { transfer = false }: { transfer?: boolean } = {},
 ) {
-  const supabase = createAdminClient();
+  const supabase = scopedClient(URBANITE_SHOP_ID);
   // 舊帳號可能還沒有會員資料列,先補建
   const { data: mine } = await supabase.from('customers').select('user_id').eq('user_id', userId).maybeSingle();
   if (!mine) await supabase.from('customers').insert({ user_id: userId, email, name: '', phone: '' });
@@ -125,7 +125,7 @@ const dateText = (iso?: string | null) => (iso ? new Date(iso).toLocaleDateStrin
 
 // intro:後台「內建查詢」設定的開頭文字(空白時用預設)
 export async function ordersText(userId: string, intro = '') {
-  const supabase = createAdminClient();
+  const supabase = scopedClient(URBANITE_SHOP_ID);
   const { data } = await supabase
     .from('orders')
     .select('order_no, status, total, created_at, items')
@@ -148,7 +148,7 @@ function couponValue(c: Discount) {
 }
 
 export async function couponsText(userId: string, intro = '') {
-  const supabase = createAdminClient();
+  const supabase = scopedClient(URBANITE_SHOP_ID);
   const { data } = await supabase
     .from('user_coupons')
     .select('status, expired_at, coupon:discounts(name, code, type, value, min_spend, end_at)')
@@ -182,7 +182,7 @@ const maskEmail = (e: string) => {
 };
 
 export async function memberText(customer: BoundCustomer, intro = '') {
-  const supabase = createAdminClient();
+  const supabase = scopedClient(URBANITE_SHOP_ID);
   const [{ count: orderCount }, { count: couponCount }] = await Promise.all([
     supabase.from('orders').select('id', { count: 'exact', head: true }).eq('user_id', customer.user_id),
     supabase.from('user_coupons').select('id', { count: 'exact', head: true }).eq('user_id', customer.user_id).eq('status', 'available'),

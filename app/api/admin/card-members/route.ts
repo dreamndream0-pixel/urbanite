@@ -1,13 +1,13 @@
 import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { getAdminUser } from '@/lib/supabase/server';
+import { getPlatformAdmin } from '@/lib/supabase/server';
 import { TIERS } from '@/lib/card-plan';
 import { getAdminEmails } from '@/lib/integrations';
 
 // 後台:名片服務的會員列表、手動開通方案
 
 export async function GET() {
-  if (!(await getAdminUser())) return NextResponse.json({ error: '未授權' }, { status: 401 });
+  if (!(await getPlatformAdmin())) return NextResponse.json({ error: '未授權' }, { status: 401 });
   const supabase = createAdminClient();
   const [{ data: cards }, { data: subs }, { data: blocks }, { data: payments }] = await Promise.all([
     supabase
@@ -73,7 +73,7 @@ export async function GET() {
 
 // POST { user_id, tier, days } 延長/開通;tier = 'free' 立即取消方案
 export async function POST(request: Request) {
-  if (!(await getAdminUser())) return NextResponse.json({ error: '未授權' }, { status: 401 });
+  if (!(await getPlatformAdmin())) return NextResponse.json({ error: '未授權' }, { status: 401 });
   const body = await request.json().catch(() => ({}));
   const userId = String(body.user_id ?? '');
   const tier = String(body.tier ?? '');

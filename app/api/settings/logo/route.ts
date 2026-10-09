@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-import { createAdminClient } from '@/lib/supabase/admin';
 import { getAdminUser } from '@/lib/supabase/server';
+import { shopAdminClient } from '@/lib/shop';
 
 const MAX_SIZE = 3 * 1024 * 1024; // 3MB
 const ALLOWED = ['image/png', 'image/jpeg', 'image/webp', 'image/svg+xml', 'image/gif'];
@@ -22,7 +22,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: '檔案請小於 3MB' }, { status: 400 });
   }
 
-  const supabase = createAdminClient();
+  const supabase = (await shopAdminClient());
   const ext = (file.name.split('.').pop() || 'png').toLowerCase();
   const path = `logo/logo-${Date.now()}.${ext}`;
   const bytes = new Uint8Array(await file.arrayBuffer());
@@ -37,7 +37,7 @@ export async function POST(request: Request) {
 
   const { error: dbErr } = await supabase
     .from('site_settings')
-    .upsert({ id: 1, logo_url, updated_at: new Date().toISOString() });
+    .upsert({ logo_url, updated_at: new Date().toISOString() }, { onConflict: 'shop_id' });
   if (dbErr) return NextResponse.json({ error: dbErr.message }, { status: 400 });
 
   return NextResponse.json({ logo_url });

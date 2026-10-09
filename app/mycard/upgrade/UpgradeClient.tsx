@@ -130,9 +130,14 @@ export default function UpgradeClient({ plan, payments, result, table, lineUrl, 
             </>
           ) : (
             <>
-              {/* U Pro / U Max:官網由專員協助建立(限時免費期間也要能聯絡) */}
-              <ContactLineButton href={lineUrl} label="聯絡專員建立官網" className="mt-5 py-3 text-sm" />
-              <p className="mt-2 text-center text-[11px] text-[#a99e8f]">{chosen.name} 的品牌官網由專員協助建立,加入官方 LINE 告訴我們你的需求</p>
+              {/* U Pro / U Max:已經有這個等級(含限時免費)就能自己開官網;也可以請專員協助 */}
+              {plan.isAdmin || tierRank(plan.tier) >= tierRank('pro') ? (
+                <a href="/shop/new" className="mt-5 block w-full rounded-full bg-[#121b33] py-3 text-center text-sm font-semibold text-[#dcbc84] transition hover:bg-[#1d2a4d]">
+                  立即開設官網
+                </a>
+              ) : null}
+              <ContactLineButton href={lineUrl} label="聯絡專員建立官網" className="mt-3 py-3 text-sm" />
+              <p className="mt-2 text-center text-[11px] text-[#a99e8f]">可以自己開店架站,或加入官方 LINE 請專員協助建立 {chosen.name} 官網</p>
             </>
           )}
         </section>

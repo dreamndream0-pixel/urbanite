@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
-import { createAdminClient } from '@/lib/supabase/admin';
 import { getAdminEmails } from '@/lib/integrations';
 import { getSessionUser } from '@/lib/supabase/server';
+import { shopAdminClient } from '@/lib/shop';
 
 // POST /api/customers — 把目前登入者寫進顧客系統(註冊/登入後呼叫,重複呼叫安全)
 export async function POST() {
@@ -21,12 +21,12 @@ export async function POST() {
     user.phone ||
     '';
 
-  const supabase = createAdminClient();
+  const supabase = (await shopAdminClient());
   const { error } = await supabase
     .from('customers')
     .upsert(
       { user_id: user.id, email: user.email ?? '', name, phone: user.phone ?? '', address: '' },
-      { onConflict: 'user_id' },
+      { onConflict: 'shop_id,user_id' },
     );
 
   if (error && /address|schema cache/i.test(error.message)) {
@@ -34,7 +34,7 @@ export async function POST() {
       .from('customers')
       .upsert(
         { user_id: user.id, email: user.email ?? '', name, phone: user.phone ?? '' },
-        { onConflict: 'user_id' },
+        { onConflict: 'shop_id,user_id' },
       );
     if (retry.error) return NextResponse.json({ error: retry.error.message }, { status: 400 });
     return NextResponse.json({ ok: true });
@@ -60,10 +60,10 @@ export async function PATCH(request: Request) {
   if (body.marketing && typeof body.marketing === 'object') update.marketing = body.marketing;
   if (body.privacy && typeof body.privacy === 'object') update.privacy = body.privacy;
 
-  const supabase = createAdminClient();
+  const supabase = (await shopAdminClient());
   const { error } = await supabase
     .from('customers')
-    .upsert(update, { onConflict: 'user_id' });
+    .upsert(update, { onConflict: 'shop_id,user_id' });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
   return NextResponse.json({ ok: true });

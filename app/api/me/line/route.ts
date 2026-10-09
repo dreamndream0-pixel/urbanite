@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server';
-import { createAdminClient } from '@/lib/supabase/admin';
 import { getSessionUser } from '@/lib/supabase/server';
 import { getCheckoutLine, lineAddFriendUrl } from '@/lib/checkout-line';
 import { bindLineToUser, fetchBotProfile, getMessagingConfig, verifyBindToken } from '@/lib/line-messaging';
 import { createLinkToken, getLineLoginConfig } from '@/lib/line-login';
 import { syncMemberMenu } from '@/lib/line-bot';
+import { scopedClient, URBANITE_SHOP_ID } from '@/lib/shop';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,7 +14,7 @@ export async function GET(request: Request) {
   const nextParam = new URL(request.url).searchParams.get('next') ?? '/account';
   const next = nextParam.startsWith('/') && !nextParam.startsWith('//') ? nextParam : '/account';
   if (!user) return NextResponse.json({ error: '請先登入' }, { status: 401 });
-  const supabase = createAdminClient();
+  const supabase = scopedClient(URBANITE_SHOP_ID);
   const [{ data: customer }, { data: settings }] = await Promise.all([
     supabase.from('customers').select('line_user_id, line_display_name, line_picture_url, line_bound_at').eq('user_id', user.id).maybeSingle(),
     supabase.from('site_settings').select('footer_sections').eq('id', 1).maybeSingle(),
@@ -56,7 +56,7 @@ export async function POST(request: Request) {
 export async function DELETE() {
   const user = await getSessionUser();
   if (!user) return NextResponse.json({ error: '請先登入' }, { status: 401 });
-  const supabase = createAdminClient();
+  const supabase = scopedClient(URBANITE_SHOP_ID);
   const { data: before } = await supabase.from('customers').select('line_user_id').eq('user_id', user.id).maybeSingle();
   const { error } = await supabase
     .from('customers')

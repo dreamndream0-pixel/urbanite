@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
-import { createAdminClient } from '@/lib/supabase/admin';
 import { getSessionUser } from '@/lib/supabase/server';
 import type { Discount, UserCoupon } from '@/lib/types';
+import { shopAdminClient } from '@/lib/shop';
 
 function isSchemaMissing(message = '') {
   return /user_coupons|coupon_usages|schema cache|does not exist/i.test(message);
@@ -26,7 +26,7 @@ export async function GET() {
   const user = await getSessionUser();
   if (!user) return NextResponse.json({ owned: [], claimable: [] });
 
-  const supabase = createAdminClient();
+  const supabase = (await shopAdminClient());
   const { data: owned, error: ownedError } = await supabase
     .from('user_coupons')
     .select('*, coupon:discounts(*)')
@@ -82,7 +82,7 @@ export async function POST(request: Request) {
   const couponId = String(body?.coupon_id ?? '').trim();
   if (!couponId) return NextResponse.json({ error: '缺少優惠券' }, { status: 400 });
 
-  const supabase = createAdminClient();
+  const supabase = (await shopAdminClient());
   const { data: coupon, error: couponError } = await supabase
     .from('discounts')
     .select('*')

@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server';
-import { createAdminClient } from '@/lib/supabase/admin';
 import { getAdminUser, getSessionUser } from '@/lib/supabase/server';
 import { evaluateCoupon } from '@/lib/discount';
 import { isStorePickup, shipTypeFromMethod } from '@/lib/newebpay-logistics';
@@ -9,13 +8,16 @@ import { createOrderAccessToken, orderAccessCookieName, ORDER_ACCESS_MAX_AGE } f
 import { computeShipping, resolveMethodFee } from '@/lib/shipping';
 import { isCampaignLive } from '@/lib/campaign';
 import type { Campaign, Discount, Order, OrderItem, Product, Shipment } from '@/lib/types';
+import { getCurrentShop, isPlatformShop, shopAdminClient } from '@/lib/shop';
+import { isOnlinePayment } from '@/lib/payment';
+import { createAdminClient } from '@/lib/supabase/admin';
 
 // GET /api/orders — 取得所有訂單(限管理員)
 export async function GET() {
   const admin = await getAdminUser();
   if (!admin) return NextResponse.json({ error: '未授權' }, { status: 401 });
 
-  const supabase = createAdminClient();
+  const supabase = (await shopAdminClient());
   const [{ data, error }, { data: shipments }] = await Promise.all([
     supabase.from('orders').select('*').order('created_at', { ascending: false }),
     supabase.from('shipments').select('*').order('created_at', { ascending: false }),
@@ -69,11 +71,15 @@ export async function POST(request: Request) {
   if (!shippingMethod || !paymentMethod) {
     return NextResponse.json({ error: '請選擇付款與送貨方式' }, { status: 400 });
   }
+  // 其他店家(U Pro):只能轉帳匯款、自行寄件;線上金流與超商物流是 URBANITE 的帳號,不能用
+  if (!isPlatformShop(await getCurrentShop()) && (isOnlinePayment(paymentMethod) || isStorePickup(shippingMethod))) {
+    return NextResponse.json({ error: '這家店目前只提供轉帳匯款與宅配寄送' }, { status: 400 });
+  }
   if (isStorePickup(shippingMethod) && !pickupStore.store_id) {
     return NextResponse.json({ error: '請先選擇超商取貨門市' }, { status: 400 });
   }
 
-  const supabase = createAdminClient();
+  const supabase = (await shopAdminClient());
 
   // 一次查出所有相關商品
   const productIds = [...new Set(items.map((i) => String(i.productId)))] as string[];
@@ -124,7 +130,7 @@ export async function POST(request: Request) {
     });
   }
 
-  const { data: shipSettings } = await supabase.from('site_settings').select('shipping_fees').eq('id', 1).maybeSingle();
+  const { data: shipSettings } = await supabase.from('site_settings').select('shipping_fees').maybeSingle();
   const shipping = computeShipping(subtotal, items, products, shippingMethod, resolveMethodFee(shipSettings, shippingMethod));
 
   // 折扣碼(可選):由後端重新驗證計算,避免竄改
@@ -232,7 +238,8 @@ export async function POST(request: Request) {
   const tw = new Date(Date.now() + 8 * 3600 * 1000);
   const ymd = tw.toISOString().slice(0, 10).replace(/-/g, '');
   const prefix = `UR${ymd}`;
-  const { count: todayCount } = await supabase
+  // 單號全站唯一:跨所有店家計數
+  const { count: todayCount } = await createAdminClient()
     .from('orders')
     .select('order_no', { count: 'exact', head: true })
     .like('order_no', `${prefix}%`);

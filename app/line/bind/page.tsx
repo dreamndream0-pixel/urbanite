@@ -1,9 +1,9 @@
 import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import { getSessionUser } from '@/lib/supabase/server';
-import { createAdminClient } from '@/lib/supabase/admin';
 import { fetchBotProfile, getMessagingConfig, verifyBindToken } from '@/lib/line-messaging';
 import BindClient from './BindClient';
+import { scopedClient, URBANITE_SHOP_ID } from '@/lib/shop';
 
 export const dynamic = 'force-dynamic';
 export const metadata: Metadata = { title: '綁定 LINE', robots: { index: false } };
@@ -28,7 +28,7 @@ export default async function LineBindPage({ searchParams }: { searchParams: Pro
   let alreadyMine = false;
   let boundElsewhere = false;
   if (user && lineUserId) {
-    const supabase = createAdminClient();
+    const supabase = scopedClient(URBANITE_SHOP_ID);
     const { data } = await supabase.from('customers').select('user_id').eq('line_user_id', lineUserId).maybeSingle();
     alreadyMine = data?.user_id === user.id;
     boundElsewhere = Boolean(data?.user_id && data.user_id !== user.id);

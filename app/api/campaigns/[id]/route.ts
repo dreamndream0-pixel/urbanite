@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
-import { createAdminClient } from '@/lib/supabase/admin';
 import { getAdminUser } from '@/lib/supabase/server';
 import type { Campaign } from '@/lib/types';
+import { shopAdminClient } from '@/lib/shop';
 
 const editable: (keyof Campaign)[] = [
   'name', 'slug', 'eyebrow', 'title', 'description', 'hero_image',
@@ -18,7 +18,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   if (typeof update.slug === 'string' && !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(update.slug)) {
     return NextResponse.json({ error: '網址只能使用小寫英文、數字與連字號' }, { status: 400 });
   }
-  const { data, error } = await createAdminClient().from('campaigns').update(update).eq('id', id).select().single();
+  const { data, error } = await (await shopAdminClient()).from('campaigns').update(update).eq('id', id).select().single();
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
   return NextResponse.json(data as Campaign);
 }
@@ -27,7 +27,7 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
   const admin = await getAdminUser();
   if (!admin) return NextResponse.json({ error: '未授權' }, { status: 401 });
   const { id } = await params;
-  const { error } = await createAdminClient().from('campaigns').delete().eq('id', id);
+  const { error } = await (await shopAdminClient()).from('campaigns').delete().eq('id', id);
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
   return NextResponse.json({ ok: true });
 }

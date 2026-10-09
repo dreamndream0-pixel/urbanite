@@ -1,9 +1,9 @@
 import { redirect } from 'next/navigation';
 import { getSessionUser } from '@/lib/supabase/server';
-import { createAdminClient } from '@/lib/supabase/admin';
 import { expireOverdueOrders } from '@/lib/order-expiry';
 import AccountClient from './AccountClient';
 import type { Customer, Discount, Order, Product } from '@/lib/types';
+import { shopAdminClient } from '@/lib/shop';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,7 +17,7 @@ export default async function AccountPage() {
     redirect('/login?next=/account');
   }
 
-  const supabase = createAdminClient();
+  const supabase = (await shopAdminClient());
   // 逾期未付款的訂單先自動轉為取消,再讀取訂單
   await expireOverdueOrders(supabase, { userId: user.id }).catch(() => {});
   const [

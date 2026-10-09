@@ -39,6 +39,7 @@ import FixedBannerCropModal from './FixedBannerCropModal';
 import IntegrationSettings from './IntegrationSettings';
 import ProfileCardManager from './ProfileCardManager';
 import CardMembersManager from './CardMembersManager';
+import ShopsManager from './ShopsManager';
 import SiteThemeEditor from './SiteThemeEditor';
 import LineBotManager from './line-bot/LineBotManager';
 import { isCollectOnDelivery } from '@/lib/payment';
@@ -96,11 +97,13 @@ const NAV = [
   { key: 'profile-card', label: '個人名片', Icon: IconIdCard },
   { key: 'card-members', label: '名片會員', Icon: IconUsers },
   { key: 'line-bot', label: 'LINE 機器人', Icon: IconChat },
+  { key: 'shops', label: '店家管理', Icon: IconGrid },
   { key: 'reports', label: '報表及分析', Icon: IconChart },
   { key: 'settings', label: '系統設定', Icon: IconGear },
 ] as const;
 
 type SectionKey = (typeof NAV)[number]['key'];
+const PLATFORM_SECTIONS = new Set<string>(['profile-card', 'card-members', 'line-bot', 'shops']);
 
 type Draft = {
   id: string;
@@ -414,6 +417,8 @@ export default function AdminDashboard({
   initialLogoUrl,
   initialSettings,
   userEmail,
+  platform = true,
+  shopName = 'URBANITE',
 }: {
   initialProducts: Product[];
   initialOrders: Order[];
@@ -428,13 +433,17 @@ export default function AdminDashboard({
   initialLogoUrl: string;
   initialSettings: SiteSettings | null;
   userEmail: string;
+  platform?: boolean; // 主網站(URBANITE)= 平台;店家子網域 = false
+  shopName?: string;
 }) {
+  // 店家後台不顯示平台功能(名片服務、LINE 機器人、店家管理)
+  const nav = platform ? NAV : NAV.filter((n) => !PLATFORM_SECTIONS.has(n.key));
   const router = useRouter();
   const [section, setSection] = useState<SectionKey>('overview');
   // 重新整理停留在目前分頁:進頁時讀網址 ?section=,切換時寫回網址
   useEffect(() => {
     const s = new URLSearchParams(window.location.search).get('section');
-    if (s && NAV.some((n) => n.key === s)) setSection(s as SectionKey);
+    if (s && nav.some((n) => n.key === s)) setSection(s as SectionKey);
   }, []);
   const changeSection = (key: SectionKey) => {
     setSection(key);
@@ -1553,7 +1562,7 @@ export default function AdminDashboard({
     void uiAlert(`已套用到 ${data.updated} 件商品。`);
   }
 
-  const activeNav = NAV.find((n) => n.key === section) ?? NAV[0];
+  const activeNav = nav.find((n) => n.key === section) ?? nav[0];
 
   return (
     <div className="admin-root min-h-screen bg-[#f6f2ec] text-[#1f1b19]">
@@ -1573,7 +1582,7 @@ export default function AdminDashboard({
             {logoUrl ? (
               <img src={logoUrl} alt="Logo" className="mx-auto h-8 w-auto object-contain sm:h-10" />
             ) : (
-              <span className="font-serif text-2xl italic tracking-wide sm:text-3xl">URBANITE</span>
+              <span className="font-serif text-2xl italic tracking-wide sm:text-3xl">{shopName}</span>
             )}
           </Link>
 
@@ -1617,7 +1626,7 @@ export default function AdminDashboard({
             </button>
           </div>
           <nav className="flex flex-col gap-1 p-3">
-            {NAV.map((n) => (
+            {nav.map((n) => (
               <button
                 key={n.key}
                 onClick={() => {
@@ -2777,6 +2786,7 @@ export default function AdminDashboard({
           {/* ===== 報表及分析 ===== */}
           {section === 'line-bot' && <LineBotManager products={products} coupons={discounts} logoUrl={logoUrl} />}
           {section === 'card-members' && <CardMembersManager />}
+          {section === 'shops' && platform && <ShopsManager />}
           {section === 'profile-card' && <ProfileCardManager products={products} lineUrl={lineAddFriendUrl(getCheckoutLine(initialSettings))} />}
 
           {section === 'campaign-pages' && (
@@ -2834,7 +2844,7 @@ export default function AdminDashboard({
                   { key: 'payments', label: '金流設定' },
                   { key: 'shippings', label: '物流設定' },
                   { key: 'integrations', label: '串接設定' },
-                ] as const).map((t) => (
+                ] as const).filter((t) => platform || t.key !== 'integrations').map((t) => (
                   <button
                     key={t.key}
                     onClick={() => setSettingsTab(t.key)}

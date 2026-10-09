@@ -69,6 +69,10 @@ export type SiteSettings = {
   footer_line_url?: string;
   footer_social_links?: { label: string; image: string; url: string }[];
   payment_methods?: string[];
+  // 由 /api/settings 帶出:目前店家的名稱、代稱、是否為平台(URBANITE)
+  shop_name?: string;
+  shop_slug?: string;
+  platform?: boolean;
   shipping_methods?: string[];
   enabled_payment_methods?: string[];
   enabled_shipping_methods?: string[];

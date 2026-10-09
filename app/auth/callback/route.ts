@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
 import { createServerSupabase } from '@/lib/supabase/server';
-import { createAdminClient } from '@/lib/supabase/admin';
 import { getAdminEmails } from '@/lib/integrations';
 import { getServerRedirectOrigin } from '@/lib/site-url';
+import { shopAdminClient } from '@/lib/shop';
 
 // 社群登入完成後,Supabase 會把使用者導回這裡,換取登入 session。
 export async function GET(request: Request) {
@@ -43,10 +43,10 @@ export async function GET(request: Request) {
           (user.user_metadata?.full_name as string) ||
           user.email ||
           '';
-        const admin = createAdminClient();
+        const admin = (await shopAdminClient());
         await admin
           .from('customers')
-          .upsert({ user_id: user.id, email: user.email, name }, { onConflict: 'user_id' });
+          .upsert({ user_id: user.id, email: user.email, name }, { onConflict: 'shop_id,user_id' });
       }
     }
   }

@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
-import { createAdminClient } from '@/lib/supabase/admin';
 import { getAdminUser } from '@/lib/supabase/server';
 import { taipeiInputToISO } from '@/lib/taipei-time';
 import type { Discount } from '@/lib/types';
+import { shopAdminClient } from '@/lib/shop';
 
 function list(value: unknown): string[] {
   if (Array.isArray(value)) return value.map((item) => String(item).trim()).filter(Boolean);
@@ -39,7 +39,7 @@ export async function GET() {
   const admin = await getAdminUser();
   if (!admin) return NextResponse.json({ error: '未授權' }, { status: 401 });
 
-  const supabase = createAdminClient();
+  const supabase = (await shopAdminClient());
   const { data, error } = await supabase
     .from('discounts')
     .select('*')
@@ -58,7 +58,7 @@ export async function POST(request: Request) {
   const code = String(body?.code ?? '').trim().toUpperCase();
   if (!code) return NextResponse.json({ error: '請填寫折扣碼' }, { status: 400 });
 
-  const supabase = createAdminClient();
+  const supabase = (await shopAdminClient());
   const insert = discountPayload(body, code);
   let { data, error } = await supabase
     .from('discounts')

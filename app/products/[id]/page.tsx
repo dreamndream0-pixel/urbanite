@@ -1,11 +1,11 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
-import { createAdminClient } from '@/lib/supabase/admin';
 import { getAdminUser } from '@/lib/supabase/server';
 import { campaignHomeHref, isCampaignLive } from '@/lib/campaign';
 import { isVisibleInStore } from '@/lib/product-status';
 import type { Campaign, Product } from '@/lib/types';
 import ProductDetailClient from './ProductDetailClient';
+import { shopAdminClient } from '@/lib/shop';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,7 +15,7 @@ export async function generateMetadata({
   params: Promise<{ id: string }>;
 }): Promise<Metadata> {
   const { id } = await params;
-  const supabase = createAdminClient();
+  const supabase = (await shopAdminClient());
   const { data } = await supabase.from('products').select('*').eq('id', id).maybeSingle();
   const product = data as Product | null;
 
@@ -34,7 +34,7 @@ export async function generateMetadata({
 
 export default async function ProductPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const supabase = createAdminClient();
+  const supabase = (await shopAdminClient());
   const { data } = await supabase.from('products').select('*').eq('id', id).maybeSingle();
   const product = data as Product | null;
 

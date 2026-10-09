@@ -1,9 +1,9 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { createAdminClient } from '@/lib/supabase/admin';
 import type { Banner, SiteSettings } from '@/lib/types';
 import ShopHeader from '@/app/components/ShopHeader';
 import { HIDDEN_FOOTER_SECTION_TITLES } from '@/lib/checkout-line';
+import { shopAdminClient } from '@/lib/shop';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,9 +15,9 @@ export default async function FooterContentPage({ params }: { params: Promise<{ 
   const sectionTitle = decodeURIComponent(section);
   const itemTitle = decodeURIComponent(item);
   if (sectionTitle === FOOTER_SOCIAL_SECTION_TITLE || HIDDEN_FOOTER_SECTION_TITLES.includes(sectionTitle)) notFound();
-  const supabase = createAdminClient();
+  const supabase = (await shopAdminClient());
   const [{ data: settingsData }, { data: bannerData }] = await Promise.all([
-    supabase.from('site_settings').select('footer_sections,logo_url').eq('id', 1).single(),
+    supabase.from('site_settings').select('footer_sections,logo_url').single(),
     supabase.from('banners').select('image,title').eq('active', true).order('sort_order', { ascending: true }).limit(1).maybeSingle(),
   ]);
   const settings = settingsData as Pick<SiteSettings, 'footer_sections' | 'logo_url'> | null;

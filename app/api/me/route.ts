@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getSessionUser } from '@/lib/supabase/server';
 import { getAdminEmails } from '@/lib/integrations';
-import { createAdminClient } from '@/lib/supabase/admin';
+import { shopAdminClient } from '@/lib/shop';
 
 // GET /api/me — 目前登入者資訊,含是否為主管理員(白名單判斷)
 export async function GET() {
@@ -16,7 +16,7 @@ export async function GET() {
     user.email ||
     '';
 
-  const supabase = createAdminClient();
+  const supabase = (await shopAdminClient());
   const { data: customer } = await supabase
     .from('customers')
     .select('*')

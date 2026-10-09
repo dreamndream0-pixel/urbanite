@@ -1,5 +1,4 @@
 import crypto from 'crypto';
-import { createAdminClient } from '@/lib/supabase/admin';
 import { getConfiguredSiteUrl } from '@/lib/site-url';
 import { bindUrl, createBindToken, getMessagingConfig, type LineMessage } from '@/lib/line-messaging';
 import {
@@ -17,6 +16,7 @@ import {
   type RichMenu,
 } from '@/lib/line-bot-types';
 import type { Discount } from '@/lib/types';
+import { scopedClient, URBANITE_SHOP_ID } from '@/lib/shop';
 
 const API = 'https://api.line.me/v2/bot';
 const DATA_API = 'https://api-data.line.me/v2/bot';
@@ -24,13 +24,13 @@ const formatter = new Intl.NumberFormat('zh-TW', { style: 'currency', currency: 
 
 // ---------- 設定 ----------
 export async function loadBotConfig(): Promise<{ config: BotConfig; raw: Record<string, unknown> }> {
-  const { data } = await createAdminClient().from('line_bot_config').select('data').eq('id', 1).maybeSingle();
+  const { data } = await scopedClient(URBANITE_SHOP_ID).from('line_bot_config').select('data').eq('id', 1).maybeSingle();
   const raw = (data?.data ?? {}) as Record<string, unknown>;
   return { config: resolveBotConfig(raw), raw };
 }
 
 export async function saveBotConfig(patch: Record<string, unknown>) {
-  const supabase = createAdminClient();
+  const supabase = scopedClient(URBANITE_SHOP_ID);
   const { raw } = await loadBotConfig();
   const next = { ...raw, ...patch };
   const { error } = await supabase.from('line_bot_config').upsert({ id: 1, data: next, updated_at: new Date().toISOString() });
@@ -39,7 +39,7 @@ export async function saveBotConfig(patch: Record<string, unknown>) {
 }
 
 export async function loadRules(onlyEnabled = false): Promise<BotRule[]> {
-  let q = createAdminClient().from('line_bot_rules').select('*').order('sort_order').order('created_at');
+  let q = scopedClient(URBANITE_SHOP_ID).from('line_bot_rules').select('*').order('sort_order').order('created_at');
   if (onlyEnabled) q = q.eq('enabled', true);
   const { data } = await q;
   return (data ?? []) as BotRule[];
@@ -48,7 +48,7 @@ export async function loadRules(onlyEnabled = false): Promise<BotRule[]> {
 // ---------- 事件紀錄 ----------
 export async function logEvent(type: string, lineUserId: string | null, key = '') {
   try {
-    await createAdminClient().from('line_events').insert({ type, line_user_id: lineUserId, key: key.slice(0, 200) });
+    await scopedClient(URBANITE_SHOP_ID).from('line_events').insert({ type, line_user_id: lineUserId, key: key.slice(0, 200) });
   } catch {
     /* 紀錄失敗不影響回覆 */
   }
@@ -187,7 +187,7 @@ function quickReply(items: string[]) {
 
 export async function toLineMessages(set: MessageSet, ctx: SendContext, brand: string): Promise<LineMessage[]> {
   const { channelSecret } = await getMessagingConfig();
-  const supabase = createAdminClient();
+  const supabase = scopedClient(URBANITE_SHOP_ID);
   const out: LineMessage[] = [];
   for (const m of set.messages.slice(0, 5)) {
     if (m.type === 'text') {
@@ -313,7 +313,7 @@ export async function getFollowerCount() {
 
 // ---------- 推播對象 ----------
 export async function audienceUserIds(audience: BroadcastAudience): Promise<string[]> {
-  const supabase = createAdminClient();
+  const supabase = scopedClient(URBANITE_SHOP_ID);
   const { data: members } = await supabase.from('customers').select('user_id, line_user_id, birthday').not('line_user_id', 'is', null);
   const list = (members ?? []) as { user_id: string; line_user_id: string; birthday: string | null }[];
   if (audience === 'members' || audience === 'all') return list.map((m) => m.line_user_id);
@@ -348,7 +348,7 @@ export async function audienceUserIds(audience: BroadcastAudience): Promise<stri
 const BROADCAST_VARS = { LINE名稱: '你', 會員姓名: '你' };
 
 export async function sendBroadcast(id: string) {
-  const supabase = createAdminClient();
+  const supabase = scopedClient(URBANITE_SHOP_ID);
   const { data: b } = await supabase.from('line_broadcasts').select('*').eq('id', id).maybeSingle();
   if (!b) throw new Error('找不到推播');
   if (b.status === 'sent' || b.status === 'sending') throw new Error('這則推播已經送出');
@@ -393,7 +393,7 @@ function notifyKeyOf(r: HistoryRow): NotifyKey | null {
 }
 
 export async function processOrderNotifications() {
-  const supabase = createAdminClient();
+  const supabase = scopedClient(URBANITE_SHOP_ID);
   const { config, raw } = await loadBotConfig();
   const cursor = typeof raw.notifyCursor === 'string' ? raw.notifyCursor : '';
   if (!cursor) {
@@ -465,7 +465,7 @@ function menuAction(action: BotAction, labelText: string, secret: string, key: s
 }
 
 export async function publishRichMenu(menu: RichMenu) {
-  const supabase = createAdminClient();
+  const supabase = scopedClient(URBANITE_SHOP_ID);
   const { channelSecret } = await getMessagingConfig();
   const layout = MENU_LAYOUTS.find((l) => l.key === menu.layout);
   if (!layout) throw new Error('格局設定錯誤');
@@ -513,7 +513,7 @@ export async function publishRichMenu(menu: RichMenu) {
 }
 
 export async function unpublishRichMenu(menu: RichMenu) {
-  const supabase = createAdminClient();
+  const supabase = scopedClient(URBANITE_SHOP_ID);
   if (menu.line_rich_menu_id) {
     if (menu.audience === 'guest') await lineFetch('/user/all/richmenu', { method: 'DELETE' }).catch(() => {});
     else {
@@ -528,7 +528,7 @@ export async function unpublishRichMenu(menu: RichMenu) {
 // 綁定 / 解除綁定時切換會員選單
 export async function syncMemberMenu(lineUserId: string, bound: boolean) {
   try {
-    const { data } = await createAdminClient().from('line_rich_menus').select('line_rich_menu_id').eq('audience', 'member').not('line_rich_menu_id', 'is', null).maybeSingle();
+    const { data } = await scopedClient(URBANITE_SHOP_ID).from('line_rich_menus').select('line_rich_menu_id').eq('audience', 'member').not('line_rich_menu_id', 'is', null).maybeSingle();
     if (bound && data?.line_rich_menu_id) await lineFetch(`/user/${lineUserId}/richmenu/${data.line_rich_menu_id}`, { method: 'POST' });
     if (!bound) await lineFetch(`/user/${lineUserId}/richmenu`, { method: 'DELETE' });
   } catch {
