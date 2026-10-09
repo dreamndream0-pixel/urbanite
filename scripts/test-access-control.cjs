@@ -20,7 +20,10 @@ const unexpected = new Proxy({}, { get: () => () => { throw new Error('Protected
 
 async function main() {
   let user = null, error = null, allow = [], fail = false;
+  let shop = { id: 'platform', status: 'active' }, membership = null;
   const auth = load('lib/supabase/server.ts', {
+    '@/lib/shop': { getCurrentShop: async () => shop, isPlatformShop: value => value?.id === 'platform' },
+    '@/lib/supabase/admin': { createAdminClient: () => ({ from: () => ({ select: () => ({ eq: () => ({ eq: () => ({ maybeSingle: async () => ({ data: membership }) }) }) }) }) }) },
     '@supabase/ssr': { createServerClient: () => ({ auth: { getUser: async () => ({ data: { user }, error }) } }) },
     'next/headers': { cookies: async () => ({ getAll: () => [] }) },
     '@/lib/integrations': { getAdminEmails: async () => { if (fail) throw new Error('unavailable'); return allow; } },
@@ -38,6 +41,15 @@ async function main() {
   error = null; fail = true;
   equal(await auth.getAdminUser(), null);
   fail = false; allow = [];
+  equal(await auth.getAdminUser(), null);
+  shop = { id: 'shop-a', status: 'active' };
+  equal(await auth.getAdminUser(), null);
+  membership = { role: 'owner' };
+  equal(await auth.getAdminUser(), user);
+  equal(await auth.getPlatformAdmin(), null);
+  shop = { id: 'shop-a', status: 'suspended' };
+  equal(await auth.getAdminUser(), null);
+  shop = null;
   equal(await auth.getAdminUser(), null);
 
   let result = { data: null, error: null };
@@ -83,7 +95,7 @@ async function main() {
     const imports = [...source.matchAll(/from ['"]([^'"]+)['"]/g)].map(match => match[1]);
     const mocks = Object.fromEntries(imports.map(name => [name, unexpected]));
     mocks['next/server'] = next;
-    mocks['@/lib/supabase/server'] = { getAdminUser: async () => null, getSessionUser: async () => null };
+    mocks['@/lib/supabase/server'] = { getAdminUser: async () => null, getPlatformAdmin: async () => null, getSessionUser: async () => null };
     const handlers = load(file, mocks);
     for (const method of methods) {
       const response = await handlers[method](new Request('https://example.test/api', { method }), { params: Promise.resolve({ id: 'foreign' }) });
@@ -128,7 +140,7 @@ async function main() {
   const history = load('app/api/orders/[id]/history/route.ts', {
     'next/server': next,
     '@/lib/supabase/server': { getSessionUser: async () => ({ id: 'member' }) },
-    '@/lib/supabase/admin': { createAdminClient: () => ({ from: table => {
+    '@/lib/shop': { shopAdminClient: async () => ({ from: table => {
       if (table === 'orders') return { select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { id: 'order', user_id: orderOwner } }) }) }) };
       historyReads++;
       return { select: () => ({ eq: (key, value) => {

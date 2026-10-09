@@ -89,7 +89,7 @@ async function main() {
   const db = { from: () => ({ select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { id: 'test', total: 100, amount: 100, status: 'paid' } }) }) }), update: () => { writes++; throw new Error('Unexpected write'); } }) };
   const paymentMocks = { '@/lib/supabase/admin': { createAdminClient: () => db }, '@/lib/payment-amount': amount };
   const card = load('lib/card-payment.ts', { ...paymentMocks, '@/lib/card-plan': { PERIODS: {}, tierRank: () => 0 } });
-  const order = load('lib/newebpay-settle.ts', { ...paymentMocks, '@/lib/card-payment': card });
+  const order = load('lib/newebpay-settle.ts', { ...paymentMocks, '@/lib/card-payment': card, '@/lib/shop': { scopedClient: () => db, URBANITE_SHOP_ID: 'platform' } });
   for (const Amt of [undefined, null, '', false, {}, 'invalid', 101]) {
     equal((await order.settleNewebpayPayment({ Status: 'SUCCESS', Result: { MerchantOrderNo: 'ORDER1', Amt } })).ok, false);
     equal((await card.settleCardPayment({ Status: 'SUCCESS', Result: { MerchantOrderNo: 'CP1', Amt } })).ok, false);

@@ -128,8 +128,11 @@ Implemented in this batch:
   braces/micromatch/fast-glob/Next ESLint chain. The suggested forced downgrade to
   Next ESLint 14 was not applied because it is incompatible with the Next 16 setup.
 
-Validation: existing 38 access-control and 32 order-access checks, plus the new
-`scripts/test-security-hardening.cjs` negative-case tests. These use mocked
+Validation after integrating the concurrent multi-shop changes: 43 access-control,
+32 order-access and 103 `scripts/test-security-hardening.cjs` checks (178 total).
+Updated fixtures preserve platform-admin versus shop-admin authorization and
+scoped database clients; this is not a complete audit of the new multi-shop code.
+These use mocked
 databases/transports and real image decoding; no live payment, customer mutation
 or production attack probes. Production build succeeded during this batch.
 

@@ -58,7 +58,7 @@ async function main() {
     let builds = 0;
     const mocks = {
       '@/lib/order-access': access,
-      '@/lib/supabase/admin': { createAdminClient: () => ({ from: () => ({ select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: record }) }) }) }) }) },
+      '@/lib/shop': { getCurrentShop: async () => ({ id: 'platform' }), isPlatformShop: () => true, shopAdminClient: async () => ({ from: () => ({ select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: record }) }) }) }) }) },
       'next/server': { NextResponse: { json: (data, init) => Response.json(data, init) } },
       '@/lib/newebpay': { buildMPGParams: async () => { builds++; return { params: {}, action: 'https://example.test/gateway' }; } },
     };
