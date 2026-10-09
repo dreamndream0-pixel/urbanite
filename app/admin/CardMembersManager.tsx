@@ -203,7 +203,7 @@ export default function CardMembersManager() {
           placeholder="搜尋名稱、網址代稱、Email"
           className="w-full rounded-xl border border-[#e5ded4] bg-white px-3.5 py-2.5 text-sm outline-none focus:border-[#1f1b19]/40 sm:max-w-xs"
         />
-        <div className="flex gap-1.5 overflow-x-auto [scrollbar-width:none]">
+        <div className="flex gap-1.5 overflow-x-auto overflow-y-hidden [scrollbar-width:none]">
           {(['all', ...TIERS.map((t) => t.key)] as ('all' | CardTier)[]).map((k) => {
             const n = k === 'all' ? members.length : members.filter((m) => m.tier === k).length;
             return (

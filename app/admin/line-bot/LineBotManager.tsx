@@ -95,7 +95,7 @@ export default function LineBotManager({ products, coupons, logoUrl }: { product
         </p>
       ) : null}
 
-      <div className="flex gap-1 overflow-x-auto rounded-xl border border-[#e5ded4] bg-white p-1 [scrollbar-width:none]">
+      <div className="flex gap-1 overflow-x-auto overflow-y-hidden rounded-xl border border-[#e5ded4] bg-white p-1 [scrollbar-width:none]">
         {TABS.map((t) => (
           <button
             key={t.key}

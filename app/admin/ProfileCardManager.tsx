@@ -872,7 +872,7 @@ function BlockTypeSwitcher({ block, dirty, onChange }: { block: ProfileCardBlock
   return (
     <div className="border-t border-[#f3eee7] px-3.5 pt-3">
       <span className="mb-1.5 block text-xs text-[#8a7f72]">區塊類型{dirty ? '(會先儲存目前的內容)' : ''}</span>
-      <div className="-mx-3.5 flex gap-1.5 overflow-x-auto px-3.5 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div className="-mx-3.5 flex gap-1.5 overflow-x-auto overflow-y-hidden px-3.5 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {types.map((t) => {
           const on = t.type === block.type;
           return (
