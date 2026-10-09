@@ -52,7 +52,7 @@ export const FREE_LIMITS: PlanLimits = { maxBlocks: 8, allTemplates: false, cust
 export const PRO_LIMITS: PlanLimits = { maxBlocks: 100, allTemplates: true, customStyle: true, timed: true, seo: true, hideFooter: true, statsDays: 30, sources: true };
 
 // 免費版可用的樣板
-// ivory 是新名片的預設值(不在樣板列表);實際可選 8 款
+// ivory 是新名片的預設值(不在樣板列表);實際可選 9 款
 export const FREE_TEMPLATE_KEYS = ['ivory', 'cream-plain', 'gray-note', 'hero-sun', 'polaroid-green', 'label-sand', 'float-latte', 'framed-wood', 'mag-mono', 'news'];
 
 // pro:名片付費功能是否開啟(U Plus 以上)
@@ -66,7 +66,7 @@ export const TIER_FEATURES: { group: string; rows: { label: string; values: [str
     rows: [
       { label: '專屬網址 /@代稱', values: ['✓', '✓', '✓', '✓'] },
       { label: '連結與區塊', values: ['8 個', '不限', '不限', '不限'] },
-      { label: '樣板', values: ['8 款', '25 款', '25 款', '25 款'] },
+      { label: '樣板', values: ['9 款', '26 款', '26 款', '26 款'] },
       { label: '自訂背景、文字、按鈕樣式', values: ['—', '✓', '✓', '✓'] },
       { label: '限時顯示、自訂分享預覽', values: ['—', '✓', '✓', '✓'] },
       { label: '隱藏頁尾 URBANLINKS 標誌', values: ['—', '✓', '✓', '✓'] },
