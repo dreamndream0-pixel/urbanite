@@ -67,13 +67,13 @@ export default function StorefrontBlocks({ blocks, products, categories, banners
       const sectionStyle = { background: block.background || undefined, color: foreground(block.background), paddingBlock: block.spacing, '--block-columns': block.columns, '--block-ratio': ratio } as CSSProperties;
       return <section key={block.id} id={block.id === firstProduct && !preview ? 'store-products' : undefined} data-block-id={block.id} data-block-type={block.type} className={`${styles.block} ${styles[`type_${block.type}`] ?? ''}`} style={sectionStyle}>
         {block.type === 'hero' && <div className={styles.heroFrame}>
-          <div className={`${styles.hero} ${image ? styles.withImage : ''}`}>
+          <div className={`${styles.hero} ${image ? styles.withImage : ''}`} data-pos={block.copyPos} style={{ alignItems: { t: 'flex-start', m: 'center', b: 'flex-end' }[block.copyPos[0]], justifyContent: { l: 'flex-start', c: 'center', r: 'flex-end' }[block.copyPos[1]], textAlign: ({ l: 'left', c: 'center', r: 'right' } as const)[block.copyPos[1] as 'l' | 'c' | 'r'] }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             {image && <img src={image} alt="" className={styles.cover} />}
             <div className={styles.heroCopy}>
               {block.title && <h1 className={styles.serif}>{block.title}</h1>}
               {block.text && <p className={styles.heroText}>{block.text}</p>}
-              {block.action && <a href={href} onClick={go(block.href)} className={styles.pill}>{block.action}<ArrowRight size={16} /></a>}
+              {block.action && <a href={href} onClick={go(block.href)} className={styles.pill} style={image ? { background: `rgb(255 255 255 / ${block.buttonOpacity}%)`, color: block.buttonOpacity >= 60 ? "#1f1b19" : "#fff" } : undefined}>{block.action}<ArrowRight size={16} /></a>}
             </div>
           </div>
         </div>}

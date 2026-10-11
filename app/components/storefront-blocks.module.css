@@ -137,3 +137,6 @@
 .carousel { max-width: 1152px; margin: auto; }
 .editorial .carousel, .gallery .carousel, .campaign .carousel { padding-inline: var(--tpl-inset); }
 .editorial .carousel > section, .gallery .carousel > section, .campaign .carousel > section { border-radius: var(--tpl-radius); }
+/* 文字在上方時,照片漸層改從上往下;在中間時整張微暗 */
+.hero.withImage[data-pos^='t']::after { background: linear-gradient(180deg, rgb(0 0 0 / 45%), rgb(0 0 0 / 8%) 60%, transparent); }
+.hero.withImage[data-pos^='m']::after { background: rgb(0 0 0 / 22%); }

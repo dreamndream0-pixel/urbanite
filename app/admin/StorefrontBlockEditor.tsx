@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
 import { ArrowDown, ArrowUp, ChevronDown, Copy, Eye, EyeOff, GripVertical, ImagePlus, Plus, Trash2, X } from 'lucide-react';
-import { BLOCK_TYPES, MAX_BLOCKS, createBlock, moveBlock, safeBlockUrl, type BlockType, type StorefrontBlock } from '@/lib/storefront-blocks';
+import { BLOCK_TYPES, COPY_POSITIONS, MAX_BLOCKS, createBlock, moveBlock, safeBlockUrl, type BlockType, type CopyPosition, type StorefrontBlock } from '@/lib/storefront-blocks';
 import type { Banner, Product } from '@/lib/types';
 import type { DesignCategory } from '@/app/components/StorefrontDesign';
 import NumberInput from './NumberInput';
@@ -102,6 +102,10 @@ function BlockFields({ block, patch, categories, products, banners, uploading, o
     case 'hero': return <div className="grid gap-3 sm:grid-cols-2">
       <div className="space-y-3">{title('大標題(可換行)', 2)}<TextField label="副標題" value={block.text} max={160} onChange={(v) => patch({ text: v })} /><TextField label="按鈕文字" placeholder="留空就不顯示按鈕" value={block.action} max={40} onChange={(v) => patch({ action: v })} />{link}</div>
       <div className="space-y-3">{sizeSelect}{image('主視覺圖片', '建議用沒有文字的照片,標題會疊在照片上。')}</div>
+      <div className="grid grid-cols-2 gap-3 sm:col-span-2">
+        <label className="text-sm">文字與按鈕位置<select value={block.copyPos} onChange={(e) => patch({ copyPos: e.target.value as CopyPosition })} className={input}>{COPY_POSITIONS.map((p) => <option key={p.key} value={p.key}>{p.label}</option>)}</select></label>
+        <label className="text-sm">按鈕不透明度(%)<NumberInput min={0} max={100} value={block.buttonOpacity} onChange={(e) => patch({ buttonOpacity: Math.min(100, Math.max(0, Number(e.target.value) || 0)) })} className={input} /><span className="mt-1 block text-[11px] text-[#a99e8f]">0 = 透明、100 = 白色實底(有照片時)</span></label>
+      </div>
     </div>;
     case 'products': return <div className="grid gap-3 sm:grid-cols-2">
       {title('區塊標題')}
