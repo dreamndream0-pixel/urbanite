@@ -18,7 +18,7 @@
 .hero h1 { font-size: 34px; line-height: 1.2; white-space: pre-line; }
 .heroText { margin-top: 10px; font-size: 14px; line-height: 1.7; white-space: pre-line; opacity: .92; }
 .pill { display: inline-flex; align-items: center; gap: 10px; margin-top: 18px; padding: 9px 18px; border-radius: 999px; background: #fff; color: #1f1b19; font-size: 14px; font-weight: 600; box-shadow: 0 6px 18px rgb(0 0 0 / 12%); max-width: 100%; }
-.hero:not(.withImage) { aspect-ratio: auto; min-height: 260px; }
+
 .hero:not(.withImage) .pill { background: var(--c-button, #222); color: var(--c-button-text, #fff); }
 
 /* 商品區 */
