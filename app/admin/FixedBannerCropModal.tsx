@@ -3,8 +3,6 @@
 import { useEffect, useRef, useState } from 'react';
 
 // 輪播圖統一輸出尺寸(4:5,手機版完整顯示;電腦版同一張圖以中央裁切滿版)
-const OUTPUT_W = 1080;
-const OUTPUT_H = 1350;
 const MAX_ZOOM = 4;
 
 type Point = { x: number; y: number };
@@ -15,12 +13,18 @@ export default function FixedBannerCropModal({
   file,
   busy,
   title = '輪播圖 — 固定首頁比例取景',
+  outputW: OUTPUT_W = 1080,
+  outputH: OUTPUT_H = 1350,
+  hint,
   onCancel,
   onConfirm,
 }: {
   file: File;
   busy: boolean;
   title?: string;
+  outputW?: number; // 輸出尺寸(決定取景框比例),預設 4:5
+  outputH?: number;
+  hint?: string;
   onCancel: () => void;
   onConfirm: (blob: Blob, filename: string) => void;
 }) {
@@ -36,7 +40,6 @@ export default function FixedBannerCropModal({
   const pointers = useRef(new Map<number, Point>());
   const gesture = useRef<{ pan: Point; zoom: number; mid: Point; dist: number } | null>(null);
 
-  useEffect(() => () => URL.revokeObjectURL(url), [url]);
   useEffect(() => {
     const previous = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
@@ -154,12 +157,12 @@ export default function FixedBannerCropModal({
       <div className="max-h-[92vh] w-full max-w-lg overflow-auto rounded-2xl bg-white p-5 sm:p-6">
         <h2 className="text-xl font-semibold">{title}</h2>
         <p className="mt-1 text-sm text-[#6b6156]">
-          取景框固定 4:5（輸出 1080 × 1350 px）。拖曳照片移動位置，雙指或滑桿縮放；手機版完整顯示框內範圍，電腦版以中央為基準自動裁切成滿版，模特兒與主要商品請放在中央。
+          {hint ?? '取景框固定 4:5（輸出 1080 × 1350 px）。拖曳照片移動位置，雙指或滑桿縮放；手機版完整顯示框內範圍，電腦版以中央為基準自動裁切成滿版，模特兒與主要商品請放在中央。'}
         </p>
         <div
           ref={frameRef}
-          className="relative mx-auto mt-5 aspect-[4/5] w-full max-w-sm cursor-grab touch-none select-none overflow-hidden rounded-md border-2 border-[#1f1b19] active:cursor-grabbing"
-          style={{ backgroundColor: background }}
+          className="relative mx-auto mt-5 w-full max-w-sm cursor-grab touch-none select-none overflow-hidden rounded-md border-2 border-[#1f1b19] active:cursor-grabbing"
+          style={{ backgroundColor: background, aspectRatio: `${OUTPUT_W} / ${OUTPUT_H}` }}
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
           onPointerUp={onPointerEnd}
@@ -172,7 +175,8 @@ export default function FixedBannerCropModal({
             src={url}
             alt=""
             draggable={false}
-            onLoad={(e) => setNatural({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight })}
+            // 載入後才釋放暫存網址(在 effect 清除會被 React 開發模式的重複掛載提早釋放)
+            onLoad={(e) => { setNatural({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight }); URL.revokeObjectURL(url); }}
             className="pointer-events-none absolute max-w-none"
             style={{
               visibility: ready ? 'visible' : 'hidden',

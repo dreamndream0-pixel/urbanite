@@ -6,6 +6,7 @@ import { BLOCK_TYPES, MAX_BLOCKS, createBlock, moveBlock, safeBlockUrl, type Blo
 import type { Banner, Product } from '@/lib/types';
 import type { DesignCategory } from '@/app/components/StorefrontDesign';
 import NumberInput from './NumberInput';
+import FixedBannerCropModal from './FixedBannerCropModal';
 import { uiAlert, uiConfirm } from '@/lib/ui-dialog';
 
 const input = 'mt-1 block w-full min-w-0 rounded-lg border border-[#e5ded4] bg-white px-3 py-2 text-sm';
@@ -89,12 +90,14 @@ function BlockFields({ block, patch, categories, products, banners, uploading, o
     ? <label className="block text-sm">{label}<textarea value={block.title} maxLength={120} rows={rows} onChange={(e) => patch({ title: e.target.value })} className={input} /></label>
     : <TextField label={label} value={block.title} max={120} onChange={(v) => patch({ title: v })} />;
   const text = (label: string, rows = 2) => <label className="block text-sm">{label}<textarea value={block.text} maxLength={2000} rows={rows} onChange={(e) => patch({ text: e.target.value })} className={input} /></label>;
-  const image = (label: string, hint?: string) => <ImageField label={label} hint={hint} value={block.image} uploading={uploading} onUpload={onUpload} onChange={(v) => patch({ image: v })} />;
+  // 上傳前先依板塊比例裁切(順便把手機大照片壓小)
+  const output: [number, number] = block.type === 'imageText' ? [1600, 800] : block.ratio === 'portrait' ? [1080, 1350] : block.ratio === 'square' ? [1200, 1200] : [1600, 900];
+  const image = (label: string, hint?: string) => <ImageField label={label} hint={hint} value={block.image} output={output} uploading={uploading} onUpload={onUpload} onChange={(v) => patch({ image: v })} />;
   const link = <TextField label="點擊後前往" placeholder="留空 = 顯示全部商品" value={block.href === '#store-products' ? '' : block.href} max={2048} onChange={(v) => patch({ href: v || '#store-products' })} url />;
   switch (block.type) {
     case 'hero': return <div className="grid gap-3 sm:grid-cols-2">
       <div className="space-y-3">{title('大標題(可換行)', 2)}<TextField label="副標題" value={block.text} max={160} onChange={(v) => patch({ text: v })} /><TextField label="按鈕文字" placeholder="留空就不顯示按鈕" value={block.action} max={40} onChange={(v) => patch({ action: v })} />{link}</div>
-      {image('主視覺圖片', '建議上傳沒有文字的直式照片,標題會疊在照片上')}
+      {image('主視覺圖片', '建議上傳沒有文字的照片,標題會疊在照片上。比例在下方「圖片比例」切換')}
     </div>;
     case 'products': return <div className="grid gap-3 sm:grid-cols-2">
       {title('區塊標題')}
@@ -131,8 +134,9 @@ function BlockFields({ block, patch, categories, products, banners, uploading, o
   }
 }
 
-function ImageField({ label, hint, value, uploading, onUpload, onChange }: { label: string; hint?: string; value: string; uploading: boolean; onUpload: (file?: File) => void; onChange: (value: string) => void }) {
+function ImageField({ label, hint, value, output, uploading, onUpload, onChange }: { label: string; hint?: string; value: string; output: [number, number]; uploading: boolean; onUpload: (file?: File) => void; onChange: (value: string) => void }) {
   const file = useRef<HTMLInputElement>(null);
+  const [crop, setCrop] = useState<File | null>(null);
   return <div className="text-sm">
     <p>{label}</p>
     <div className="mt-1 flex items-start gap-3">
@@ -148,7 +152,8 @@ function ImageField({ label, hint, value, uploading, onUpload, onChange }: { lab
         {hint && <p className="text-[11px] leading-4 text-[#a99e8f]">{hint}</p>}
         <details className="text-xs text-[#8a7f72]"><summary className="cursor-pointer">或貼上圖片網址</summary><input value={value} maxLength={2048} onChange={(e) => onChange(e.target.value)} placeholder="https://..." className={input} /></details>
       </div>
-      <input ref={file} type="file" hidden accept="image/png,image/jpeg,image/webp,image/gif" onChange={(e) => { onUpload(e.target.files?.[0]); e.target.value = ''; }} />
+      <input ref={file} type="file" hidden accept="image/png,image/jpeg,image/webp,image/gif" onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) setCrop(f); }} />
+      {crop && <FixedBannerCropModal file={crop} busy={uploading} title={`${label} — 裁切取景`} outputW={output[0]} outputH={output[1]} hint={`取景框 ${output[0]} × ${output[1]} px。拖曳照片移動位置,雙指或滑桿縮放。`} onCancel={() => setCrop(null)} onConfirm={(blob, name) => { setCrop(null); onUpload(new File([blob], name, { type: 'image/jpeg' })); }} />}
     </div>
   </div>;
 }

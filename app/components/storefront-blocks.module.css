@@ -10,7 +10,7 @@
 
 /* 主視覺 */
 .heroFrame { max-width: 1152px; margin: auto; }
-.hero { position: relative; isolation: isolate; overflow: hidden; display: flex; align-items: flex-end; min-height: 320px; aspect-ratio: var(--block-ratio); background: var(--c-soft); color: var(--c-text); }
+.hero { position: relative; isolation: isolate; overflow: hidden; display: flex; align-items: flex-end; aspect-ratio: var(--block-ratio); background: var(--c-soft); color: var(--c-text); }
 .hero .cover { z-index: -2; }
 .hero.withImage { color: #fff; }
 .hero.withImage::after { content: ''; position: absolute; inset: 0; z-index: -1; background: linear-gradient(10deg, rgb(0 0 0 / 50%), rgb(0 0 0 / 8%) 60%, transparent); }
@@ -74,7 +74,6 @@
 .video { width: 100%; aspect-ratio: var(--block-ratio); max-height: 620px; object-fit: contain; background: #111; border-radius: var(--tpl-radius); }
 
 /* ---- 01 經典商城型:滿版主視覺、圓形分類、熱銷商品、日常系列橫幅 ---- */
-.classic .hero { min-height: 340px; }
 
 /* ---- 02 品牌雜誌型:圓角大圖、Pick for you 置中三欄、Lookbook ---- */
 .editorial .heroFrame { padding-inline: var(--tpl-inset); }
@@ -123,7 +122,7 @@
   .root { --tpl-inset: 24px; }
   .grid { grid-template-columns: repeat(var(--block-columns), minmax(0, 1fr)); gap: 24px; }
   .editorial .grid { grid-template-columns: repeat(var(--block-columns), minmax(0, 1fr)); }
-  .hero { min-height: 460px; max-height: 640px; aspect-ratio: auto; }
+  .hero { max-height: 82vh; }
   .heroCopy { padding: 48px; }
   .hero h1 { font-size: 54px; }
   .heading { font-size: 22px; }
