@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
 import { ArrowDown, ArrowUp, ChevronDown, Copy, Eye, EyeOff, GripVertical, ImagePlus, Plus, Trash2, X } from 'lucide-react';
 import { BLOCK_TYPES, MAX_BLOCKS, createBlock, moveBlock, safeBlockUrl, type BlockType, type StorefrontBlock } from '@/lib/storefront-blocks';
 import type { Banner, Product } from '@/lib/types';
@@ -19,8 +19,7 @@ export default function StorefrontBlockEditor({ blocks, onChange, categories, pr
 }) {
   const [type, setType] = useState<BlockType>('imageText');
   const [active, setActive] = useState<string | null>(null);
-  const [dragged, setDragged] = useState<string | null>(null);
-  const [target, setTarget] = useState<string | null>(null);
+  const { listRef, sorting, start: startSort, swallowClick } = useLongPressSort(blocks, onChange);
   const [uploading, setUploading] = useState(false);
   const patch = (id: string, value: Partial<StorefrontBlock>) => onChange(blocks.map((block) => block.id === id ? { ...block, ...value } : block));
   async function upload(id: string, file?: File) {
@@ -38,15 +37,14 @@ export default function StorefrontBlockEditor({ blocks, onChange, categories, pr
   }
   return <fieldset disabled={uploading} className="min-w-0 space-y-3">
     <legend className="sr-only">首頁板塊</legend>
-    <ol className="space-y-2">
+    <ol ref={listRef} className="space-y-2">
       {blocks.map((block, index) => {
         const open = active === block.id;
-        return <li key={block.id} data-editor-block={block.id}
-          onDragOver={(e) => { if (dragged) { e.preventDefault(); setTarget(block.id); } }}
-          onDrop={(e) => { e.preventDefault(); if (dragged) onChange(moveBlock(blocks, blocks.findIndex((b) => b.id === dragged), index)); setDragged(null); setTarget(null); }}
-          className={`rounded-xl border bg-white ${open ? 'border-[#1f1b19]/40 shadow-sm' : 'border-[#e5ded4]'} ${target === block.id ? 'ring-2 ring-[#1f1b19]/30' : ''} ${block.visible ? '' : 'opacity-60'}`}>
-          <div className="flex items-center gap-1 px-1.5 py-1.5">
-            <button type="button" draggable={!uploading} aria-label={`拖曳板塊 ${index + 1}`} title="拖曳排序" onDragStart={(e) => { e.dataTransfer.setData('text/plain', block.id); e.dataTransfer.effectAllowed = 'move'; setDragged(block.id); }} onDragEnd={() => { setDragged(null); setTarget(null); }} className="hidden h-9 w-7 shrink-0 cursor-grab items-center justify-center text-[#b8ad9f] sm:flex"><GripVertical size={18} /></button>
+        const dragging = sorting === block.id;
+        return <li key={block.id} data-editor-block={block.id} onClickCapture={swallowClick}
+          className={`select-none rounded-xl border bg-white transition-shadow [-webkit-touch-callout:none] ${open ? 'border-[#1f1b19]/40 shadow-sm' : 'border-[#e5ded4]'} ${dragging ? 'relative z-10 scale-[1.02] shadow-lg ring-2 ring-[#1f1b19]/30' : ''} ${block.visible ? '' : 'opacity-60'}`}>
+          <div className="flex items-center gap-1 px-1.5 py-1.5" onPointerDown={(e) => startSort(e, block.id, false)}>
+            <span aria-hidden="true" title="按住拖曳排序" onPointerDown={(e) => { e.stopPropagation(); startSort(e, block.id, true); }} className="flex h-9 w-6 shrink-0 cursor-grab touch-none items-center justify-center text-[#b8ad9f]"><GripVertical size={18} /></span>
             <button type="button" onClick={() => setActive(open ? null : block.id)} aria-expanded={open} className="flex min-w-0 flex-1 items-center gap-2 py-1.5 text-left">
               <span className="shrink-0 rounded-full bg-[#efe8dd] px-2 py-0.5 text-[11px] text-[#6b6156]">{typeLabel(block.type)}</span>
               <span className="min-w-0 truncate text-sm font-medium">{block.type === 'carousel' ? `輪播圖${block.group}` : block.title.split('\n').join(' ') || <span className="text-[#a99e8f]">(未命名)</span>}</span>
@@ -160,4 +158,68 @@ function IconButton({ label, disabled, onClick, children }: { label: string; dis
 function TextField({ label, value, max, onChange, url = false, placeholder }: { label: string; value: string; max: number; onChange: (value: string) => void; url?: boolean; placeholder?: string }) {
   const invalid = url && !!value && !safeBlockUrl(value);
   return <label className="block text-sm">{label}<input value={value} maxLength={max} placeholder={placeholder} onChange={(e) => onChange(e.target.value)} aria-invalid={invalid} className={input} />{invalid && <span className="text-xs text-red-700">請用 https:// 開頭、站內路徑(/...)或 #錨點</span>}</label>;
+}
+
+// 長按(或按住左邊握把)後上下拖曳排序;手機、電腦都能用。拖曳中鎖住頁面捲動,放開後不會誤觸展開
+function useLongPressSort(blocks: StorefrontBlock[], onChange: (blocks: StorefrontBlock[]) => void) {
+  const listRef = useRef<HTMLOListElement>(null);
+  const [sorting, setSorting] = useState<string | null>(null);
+  const state = useRef<{ id: string; x: number; y: number; timer: number; active: boolean } | null>(null);
+  const latest = useRef({ blocks, onChange });
+  const swallow = useRef(false);
+  useEffect(() => { latest.current = { blocks, onChange }; });
+
+  useEffect(() => {
+    // iOS 要在 touchmove 擋掉預設才不會捲動頁面(必須是 passive: false)
+    const blockScroll = (e: TouchEvent) => { if (state.current?.active) e.preventDefault(); };
+    const move = (e: PointerEvent) => {
+      const s = state.current;
+      if (!s) return;
+      if (!s.active) {
+        if (Math.hypot(e.clientX - s.x, e.clientY - s.y) > 8) { clearTimeout(s.timer); state.current = null; }
+        return;
+      }
+      const rows = [...(listRef.current?.querySelectorAll<HTMLElement>('[data-editor-block]') ?? [])];
+      const { blocks: list, onChange: change } = latest.current;
+      const from = list.findIndex((b) => b.id === s.id);
+      let to = rows.findIndex((row) => { const r = row.getBoundingClientRect(); return e.clientY < r.top + r.height / 2; });
+      if (to < 0) to = rows.length - 1;
+      if (to > from) to -= 1; // 自己那列還在,往下拖要扣掉
+      if (from >= 0 && to !== from) change(moveBlock(list, from, to));
+    };
+    const end = () => {
+      const s = state.current;
+      if (!s) return;
+      clearTimeout(s.timer);
+      if (s.active) { swallow.current = true; setTimeout(() => { swallow.current = false; }, 50); }
+      state.current = null;
+      setSorting(null);
+    };
+    document.addEventListener('touchmove', blockScroll, { passive: false });
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', end);
+    window.addEventListener('pointercancel', end);
+    return () => {
+      document.removeEventListener('touchmove', blockScroll);
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', end);
+      window.removeEventListener('pointercancel', end);
+    };
+  }, []);
+
+  function start(e: ReactPointerEvent, id: string, immediate: boolean) {
+    if (e.button !== 0) return;
+    if (!immediate && (e.target as HTMLElement).closest('input,select,textarea')) return;
+    const activate = () => {
+      if (!state.current) return;
+      state.current.active = true;
+      setSorting(id);
+      navigator.vibrate?.(12);
+    };
+    state.current = { id, x: e.clientX, y: e.clientY, timer: immediate ? 0 : window.setTimeout(activate, 400), active: false };
+    if (immediate) activate();
+  }
+  // 拖完放開時,不要觸發展開或按鈕
+  const swallowClick = (e: React.MouseEvent) => { if (swallow.current) { e.preventDefault(); e.stopPropagation(); } };
+  return { listRef, sorting, start, swallowClick };
 }
