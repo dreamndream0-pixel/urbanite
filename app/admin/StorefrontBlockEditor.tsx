@@ -60,7 +60,7 @@ export default function StorefrontBlockEditor({ blocks, onChange, categories, pr
             <div className="rounded-lg bg-[#faf8f5] px-3 py-2.5 text-sm">
               <p className="text-xs text-[#8a7f72]">版面設定</p>
               <div className="mt-2 grid gap-3 sm:grid-cols-2">
-                {['hero', 'products', 'video'].includes(block.type) && <label className="text-sm">{block.type === 'products' ? '商品圖片比例' : '圖片比例'}<select value={block.ratio} onChange={(e) => patch(block.id, { ratio: e.target.value as StorefrontBlock['ratio'] })} className={input}><option value="portrait">直式 4:5</option><option value="square">正方形 1:1</option><option value="wide">橫式 16:9</option></select></label>}
+                {block.type === 'products' && <label className="text-sm">{'商品圖片比例'}<select value={block.ratio} onChange={(e) => patch(block.id, { ratio: e.target.value as StorefrontBlock['ratio'] })} className={input}><option value="portrait">直式 4:5</option><option value="square">正方形 1:1</option><option value="wide">橫式 16:9</option></select></label>}
                 {block.type === 'products' && <label className="text-sm">電腦版欄數<select value={block.columns} onChange={(e) => patch(block.id, { columns: Number(e.target.value) })} className={input}>{[2, 3, 4].map((count) => <option key={count} value={count}>{count} 欄</option>)}</select></label>}
                 <label className="text-sm">上下間距 {block.spacing}px<input type="range" min={0} max={96} step={4} value={block.spacing} onChange={(e) => patch(block.id, { spacing: Number(e.target.value) })} className="mt-2 block w-full" /></label>
                 <div className="flex items-center gap-3 text-sm"><label className="flex items-center gap-2">背景色<input type="color" value={block.background || '#ffffff'} onChange={(e) => patch(block.id, { background: e.target.value })} className="h-9 w-10" /></label><label className="flex items-center gap-1"><input type="checkbox" checked={!block.background} onChange={(e) => patch(block.id, { background: e.target.checked ? '' : '#ffffff' })} />沿用全站</label></div>
@@ -92,12 +92,16 @@ function BlockFields({ block, patch, categories, products, banners, uploading, o
   const text = (label: string, rows = 2) => <label className="block text-sm">{label}<textarea value={block.text} maxLength={2000} rows={rows} onChange={(e) => patch({ text: e.target.value })} className={input} /></label>;
   // 上傳前先依板塊比例裁切(順便把手機大照片壓小)
   const output: [number, number] = block.type === 'imageText' ? [1600, 800] : block.ratio === 'portrait' ? [1080, 1350] : block.ratio === 'square' ? [1200, 1200] : [1600, 900];
-  const image = (label: string, hint?: string) => <ImageField label={label} hint={hint} value={block.image} output={output} uploading={uploading} onUpload={onUpload} onChange={(v) => patch({ image: v })} />;
+  const ratioName = block.type === 'imageText' ? '橫式 2:1' : block.ratio === 'portrait' ? '直式 4:5' : block.ratio === 'square' ? '正方形 1:1' : '橫式 16:9';
+  const spec = `上傳規格:${output[0]} × ${output[1]} px(${ratioName}),JPG / PNG / WEBP。選好照片後可拖曳裁切,大照片會自動壓縮。`;
+  const image = (label: string, hint?: string) => <ImageField label={label} spec={spec} hint={hint} value={block.image} output={output} uploading={uploading} onUpload={onUpload} onChange={(v) => patch({ image: v })} />;
+  // 先選圖片尺寸,再上傳圖片
+  const sizeSelect = <label className="block text-sm">圖片尺寸<select value={block.ratio} onChange={(e) => patch({ ratio: e.target.value as StorefrontBlock['ratio'] })} className={input}><option value="portrait">直式 4:5(1080 × 1350 px)</option><option value="square">正方形 1:1(1200 × 1200 px)</option><option value="wide">橫式 16:9(1600 × 900 px)</option></select></label>;
   const link = <TextField label="點擊後前往" placeholder="留空 = 顯示全部商品" value={block.href === '#store-products' ? '' : block.href} max={2048} onChange={(v) => patch({ href: v || '#store-products' })} url />;
   switch (block.type) {
     case 'hero': return <div className="grid gap-3 sm:grid-cols-2">
       <div className="space-y-3">{title('大標題(可換行)', 2)}<TextField label="副標題" value={block.text} max={160} onChange={(v) => patch({ text: v })} /><TextField label="按鈕文字" placeholder="留空就不顯示按鈕" value={block.action} max={40} onChange={(v) => patch({ action: v })} />{link}</div>
-      {image('主視覺圖片', '建議上傳沒有文字的照片,標題會疊在照片上。比例在下方「圖片比例」切換')}
+      <div className="space-y-3">{sizeSelect}{image('主視覺圖片', '建議用沒有文字的照片,標題會疊在照片上。')}</div>
     </div>;
     case 'products': return <div className="grid gap-3 sm:grid-cols-2">
       {title('區塊標題')}
@@ -109,7 +113,7 @@ function BlockFields({ block, patch, categories, products, banners, uploading, o
     case 'categories': return <div className="space-y-2">{title('區塊標題(選填)')}<p className="text-xs text-[#a99e8f]">會自動列出所有主分類。樣式在上方「分類樣式」切換,分類圖片在「商品及分類 → 分類管理」上傳。</p></div>;
     case 'imageText': return <div className="grid gap-3 sm:grid-cols-2">
       <div className="space-y-3">{title('大字(例:Daily Wear)')}<TextField label="小字(例:日常系列)" value={block.text} max={200} onChange={(v) => patch({ text: v })} />{link}</div>
-      {image('橫幅圖片', '建議上傳沒有文字的橫式照片')}
+      {image('橫幅圖片', '建議用沒有文字的照片。')}
     </div>;
     case 'countdown': return <div className="grid gap-3 sm:grid-cols-2">
       {title('標題')}
@@ -129,12 +133,12 @@ function BlockFields({ block, patch, categories, products, banners, uploading, o
     }
     case 'video': return <div className="grid gap-3 sm:grid-cols-2">
       <div className="space-y-3">{title('標題')}<TextField label="影片網址(MP4 / WebM)" value={block.video} max={2048} onChange={(v) => patch({ video: v })} url />{text('說明(選填)')}</div>
-      {image('影片封面')}
+      <div className="space-y-3">{sizeSelect}{image('影片封面')}</div>
     </div>;
   }
 }
 
-function ImageField({ label, hint, value, output, uploading, onUpload, onChange }: { label: string; hint?: string; value: string; output: [number, number]; uploading: boolean; onUpload: (file?: File) => void; onChange: (value: string) => void }) {
+function ImageField({ label, spec, hint, value, output, uploading, onUpload, onChange }: { label: string; spec: string; hint?: string; value: string; output: [number, number]; uploading: boolean; onUpload: (file?: File) => void; onChange: (value: string) => void }) {
   const file = useRef<HTMLInputElement>(null);
   const [crop, setCrop] = useState<File | null>(null);
   return <div className="text-sm">
@@ -149,6 +153,7 @@ function ImageField({ label, hint, value, output, uploading, onUpload, onChange 
           <button type="button" onClick={() => file.current?.click()} className="rounded-md border border-[#d7c9bd] px-3 py-1.5 text-xs">{uploading ? '上傳中...' : value ? '更換圖片' : '上傳圖片'}</button>
           {value && <button type="button" onClick={() => onChange('')} className="flex items-center gap-1 rounded-md px-2 py-1.5 text-xs text-[#8a7f72] hover:bg-[#f6f2ec]"><X size={13} />移除</button>}
         </div>
+        <p className="text-[11px] leading-4 text-[#6b6156]">{spec}</p>
         {hint && <p className="text-[11px] leading-4 text-[#a99e8f]">{hint}</p>}
         <details className="text-xs text-[#8a7f72]"><summary className="cursor-pointer">或貼上圖片網址</summary><input value={value} maxLength={2048} onChange={(e) => onChange(e.target.value)} placeholder="https://..." className={input} /></details>
       </div>
