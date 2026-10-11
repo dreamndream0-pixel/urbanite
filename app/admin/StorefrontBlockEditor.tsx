@@ -77,7 +77,7 @@ export default function StorefrontBlockEditor({ blocks, onChange, categories, pr
     </ol>
     <div className="flex flex-wrap items-center gap-2">
       <select aria-label="新增板塊類型" value={type} onChange={(e) => setType(e.target.value as BlockType)} className="rounded-lg border border-[#e5ded4] bg-white px-3 py-2 text-sm">{BLOCK_TYPES.map((option) => <option key={option.key} value={option.key}>{option.label}</option>)}</select>
-      <button type="button" disabled={blocks.length >= MAX_BLOCKS} onClick={() => { const next = createBlock(type, crypto.randomUUID()); if (type === 'products' || type === 'imageText') next.href = '#store-products'; if (type === 'carousel') { next.title = ''; next.spacing = 0; } onChange([...blocks, next]); setActive(next.id); }} className="flex items-center gap-1.5 rounded-lg bg-[#1f1b19] px-3 py-2 text-sm text-white disabled:opacity-40"><Plus size={16} />新增板塊</button>
+      <button type="button" disabled={blocks.length >= MAX_BLOCKS} onClick={() => { const next = createBlock(type, crypto.randomUUID()); if (type === 'products' || type === 'imageText') next.href = '#store-products'; if (type === 'carousel') next.title = ''; onChange([...blocks, next]); setActive(next.id); }} className="flex items-center gap-1.5 rounded-lg bg-[#1f1b19] px-3 py-2 text-sm text-white disabled:opacity-40"><Plus size={16} />新增板塊</button>
       <span className="text-xs text-[#a99e8f]">{blocks.length} / {MAX_BLOCKS}</span>
     </div>
   </fieldset>;

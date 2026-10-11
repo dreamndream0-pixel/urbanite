@@ -26,7 +26,7 @@ export function safeBlockUrl(value: unknown) {
   try { const parsed = new URL(url); return parsed.protocol === 'https:' && !parsed.username && !parsed.password ? url : ''; } catch { return ''; }
 }
 export function createBlock(type: BlockType, id: string): StorefrontBlock {
-  return { id, type, visible: true, title: BLOCK_TYPES.find((t) => t.key === type)?.label ?? '', text: '', image: '', video: '', action: '', href: '', columns: 2, spacing: 24, background: '', ratio: 'wide', source: 'all', category: '', productIds: [], limit: 8, endsAt: '', group: 1 };
+  return { id, type, visible: true, title: BLOCK_TYPES.find((t) => t.key === type)?.label ?? '', text: '', image: '', video: '', action: '', href: '', columns: 2, spacing: 0, background: '', ratio: 'wide', source: 'all', category: '', productIds: [], limit: 8, endsAt: '', group: 1 };
 }
 export function resolveBlocks(raw: unknown): StorefrontBlock[] | undefined {
   if (!Array.isArray(raw)) return undefined;
@@ -46,7 +46,7 @@ export function resolveBlocks(raw: unknown): StorefrontBlock[] | undefined {
     for (const field of ['image', 'video', 'href'] as const) block[field] = safeBlockUrl(value[field]);
     block.background = typeof value.background === 'string' && /^#[0-9a-f]{6}$/i.test(value.background) ? value.background : '';
     block.columns = [1, 2, 3, 4].includes(Number(value.columns)) ? Number(value.columns) : 2;
-    block.spacing = typeof value.spacing === 'number' && Number.isFinite(value.spacing) ? Math.min(96, Math.max(0, Math.round(value.spacing))) : 24;
+    block.spacing = typeof value.spacing === 'number' && Number.isFinite(value.spacing) ? Math.min(96, Math.max(0, Math.round(value.spacing))) : 0;
     block.limit = typeof value.limit === 'number' && Number.isFinite(value.limit) ? Math.min(24, Math.max(1, Math.round(value.limit))) : 8;
     if (value.ratio === 'square' || value.ratio === 'portrait') block.ratio = value.ratio;
     if (value.source === 'category' || value.source === 'selected') block.source = value.source;
@@ -76,12 +76,6 @@ export function starterBlocks(design: Pick<StorefrontDesign, 'style'>): Storefro
   const products = { ...createBlock('products', 'products'), title: copy.productsTitle, columns: style === 'editorial' ? 3 : style === 'campaign' ? 2 : 4, limit: style === 'editorial' ? 6 : 8, ratio: 'portrait' as const };
   const feature = { ...createBlock('imageText', 'feature'), title: copy.featureTitle, text: copy.featureText, action: '看更多', href: '#store-products' };
   const countdown = { ...createBlock('countdown', 'countdown'), title: copy.countdownTitle ?? '限時優惠倒數', endsAt: weekLater() };
-  // 間距:滿版主視覺貼齊頁首,其他板塊留白
-  hero.spacing = style === 'classic' ? 0 : 12;
-  categories.spacing = 20;
-  products.spacing = 24;
-  feature.spacing = 16;
-  countdown.spacing = 16;
   switch (style) {
     case 'editorial': return [hero, products, feature];
     case 'gallery': return [hero, categories, feature, products];

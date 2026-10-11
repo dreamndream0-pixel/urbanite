@@ -37,7 +37,7 @@ assert.equal(new Set(blocks.resolveBlocks([list[0], list[0]]).map((b) => b.id)).
 for (const url of ['javascript:alert(1)', 'data:text/html,hi', '//evil.test', '/\\evil.test', 'https://user:pass@evil.test', 'http://example.com']) assert.equal(blocks.safeBlockUrl(url), '');
 for (const url of ['https://example.com/image.png', '/products/123', '#store-products']) assert.equal(blocks.safeBlockUrl(url), url);
 const bounded = blocks.resolveBlocks([{ ...list[0], spacing: Infinity, columns: 9, limit: -1, background: 'red; color:blue', title: 'x'.repeat(999) }])[0];
-assert.equal(bounded.spacing, 24);
+assert.equal(bounded.spacing, 0);
 assert.equal(bounded.columns, 2);
 assert.equal(bounded.limit, 1);
 assert.equal(bounded.background, '');
