@@ -56,15 +56,15 @@ export default function StorefrontBlockEditor({ blocks, onChange, categories, pr
           </div>
           {open && <div className="space-y-3 border-t border-[#efe8dd] px-3 pb-3 pt-3">
             <BlockFields block={block} patch={(value) => patch(block.id, value)} categories={categories} products={products} banners={banners} uploading={uploading} onUpload={(file) => void upload(block.id, file)} />
-            <details className="rounded-lg bg-[#faf8f5] px-3 py-2 text-sm">
-              <summary className="cursor-pointer text-xs text-[#8a7f72]">進階設定(比例、間距、背景色)</summary>
-              <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            <div className="rounded-lg bg-[#faf8f5] px-3 py-2.5 text-sm">
+              <p className="text-xs text-[#8a7f72]">版面設定</p>
+              <div className="mt-2 grid gap-3 sm:grid-cols-2">
                 {['hero', 'products', 'video'].includes(block.type) && <label className="text-sm">{block.type === 'products' ? '商品圖片比例' : '圖片比例'}<select value={block.ratio} onChange={(e) => patch(block.id, { ratio: e.target.value as StorefrontBlock['ratio'] })} className={input}><option value="portrait">直式 4:5</option><option value="square">正方形 1:1</option><option value="wide">橫式 16:9</option></select></label>}
                 {block.type === 'products' && <label className="text-sm">電腦版欄數<select value={block.columns} onChange={(e) => patch(block.id, { columns: Number(e.target.value) })} className={input}>{[2, 3, 4].map((count) => <option key={count} value={count}>{count} 欄</option>)}</select></label>}
                 <label className="text-sm">上下間距 {block.spacing}px<input type="range" min={0} max={96} step={4} value={block.spacing} onChange={(e) => patch(block.id, { spacing: Number(e.target.value) })} className="mt-2 block w-full" /></label>
                 <div className="flex items-center gap-3 text-sm"><label className="flex items-center gap-2">背景色<input type="color" value={block.background || '#ffffff'} onChange={(e) => patch(block.id, { background: e.target.value })} className="h-9 w-10" /></label><label className="flex items-center gap-1"><input type="checkbox" checked={!block.background} onChange={(e) => patch(block.id, { background: e.target.checked ? '' : '#ffffff' })} />沿用全站</label></div>
               </div>
-            </details>
+            </div>
             <div className="flex justify-end gap-1">
               <button type="button" disabled={blocks.length >= MAX_BLOCKS} onClick={() => { const next = { ...block, id: crypto.randomUUID() }; onChange([...blocks.slice(0, index + 1), next, ...blocks.slice(index + 1)]); setActive(next.id); }} className="flex items-center gap-1 rounded-md px-2.5 py-1.5 text-xs text-[#6b6156] hover:bg-[#f6f2ec] disabled:opacity-30"><Copy size={14} />複製</button>
               <button type="button" onClick={async () => { if (await uiConfirm('刪除這個板塊?發布前不會影響正式官網。')) onChange(blocks.filter((b) => b.id !== block.id)); }} className="flex items-center gap-1 rounded-md px-2.5 py-1.5 text-xs text-[#b42318] hover:bg-[#fdecea]"><Trash2 size={14} />刪除</button>
