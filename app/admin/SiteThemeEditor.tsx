@@ -25,7 +25,7 @@ import {
 import { uiAlert, uiConfirm } from '@/lib/ui-dialog';
 
 // 後台 系統設定 → 一般設定 → 網站外觀:6 種樣板+全部顏色選擇器+版面配置,即時預覽
-export default function SiteThemeEditor({ initial, onSaved }: { initial: unknown; onSaved?: (theme: unknown) => void }) {
+export default function SiteThemeEditor({ initial, onSaved, categoryImageStyle = 'circle' }: { initial: unknown; onSaved?: (theme: unknown) => void; categoryImageStyle?: 'circle' | 'square' | 'cutout' }) {
   const [saved, setSaved] = useState<SiteTheme>(() => editableSiteTheme(initial));
   const [published, setPublished] = useState<SiteTheme>(() => resolveSiteTheme(initial));
   const [draft, setDraft] = useState<SiteTheme>(() => {
@@ -142,7 +142,7 @@ export default function SiteThemeEditor({ initial, onSaved }: { initial: unknown
                 </label>
               ))}
             </div>
-            <StorefrontBlockEditor blocks={design.blocks ?? []} onChange={(blocks) => setDraft({ ...draft, storefront: { ...design, blocks } })} categories={previewCategories} products={previewProducts} onUploading={setUploading} />
+            <StorefrontBlockEditor designStyle={design.style} blocks={design.blocks ?? []} onChange={(blocks) => setDraft({ ...draft, storefront: { ...design, blocks } })} categories={previewCategories} products={previewProducts} onUploading={setUploading} />
           </fieldset>
           {/* 樣板 */}
           <div>
@@ -223,7 +223,7 @@ export default function SiteThemeEditor({ initial, onSaved }: { initial: unknown
           <button type="button" autoFocus onClick={() => setPreviewOpen(false)} aria-label="關閉預覽" title="關閉預覽" className="flex h-10 w-10 items-center justify-center rounded-full hover:bg-neutral-100"><X size={20} /></button>
         </div>
           <div className={`${previewStyles.preview} max-h-[calc(90dvh-65px)] overflow-y-auto overflow-x-hidden overscroll-contain bg-[var(--c-bg)] text-[var(--c-text)]`} data-card={draft.layout.card} data-radius={draft.layout.radius} data-heading={draft.layout.heading} onClickCapture={(event) => { if ((event.target as HTMLElement).closest('a')) event.preventDefault(); }} style={Object.fromEntries(COLOR_FIELDS.map((f) => [cssVar(f.key), draft.colors[f.key]])) as CSSProperties}>
-            {design.enabled ? <StorefrontBlocks blocks={resolveBlocks(design.blocks) ?? []} products={previewProducts} categories={previewCategories} images={previewImages} onCategory={() => {}} preview renderProduct={(product) => <ProductCard product={product} favorited={false} favoritePending={false} favoritesLoaded onFavoriteChange={() => {}} onAdd={() => {}} />} /> : <StorePreview theme={draft} images={previewImages} />}
+            {design.enabled ? <StorefrontBlocks designStyle={design.style} categoryImageStyle={categoryImageStyle} blocks={resolveBlocks(design.blocks) ?? []} products={previewProducts} categories={previewCategories} images={previewImages} onCategory={() => {}} preview renderProduct={(product) => <ProductCard product={product} favorited={false} favoritePending={false} favoritesLoaded onFavoriteChange={() => {}} onAdd={() => {}} />} /> : <StorePreview theme={draft} images={previewImages} />}
           </div>
       </dialog>
     </section>

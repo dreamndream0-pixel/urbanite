@@ -1,4 +1,6 @@
 .root { container-type: inline-size; }
+.categoryStrip { min-width: 0; }
+.categoryStrip :global(.store-category-row) { justify-content: safe center; flex-wrap: nowrap; }
 .block { scroll-margin-top: 100px; overflow-wrap: anywhere; }
 .inner { max-width: 1152px; margin: auto; padding-inline: 20px; }
 .inner h2 { font-size: 24px; line-height: 1.4; margin-bottom: 16px; white-space: pre-line; }

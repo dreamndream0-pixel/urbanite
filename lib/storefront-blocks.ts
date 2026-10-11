@@ -11,6 +11,7 @@ export type StorefrontBlock = {
   image: string; video: string; action: string; href: string;
   columns: number; spacing: number; background: string; ratio: 'square' | 'portrait' | 'wide';
   source: 'all' | 'category' | 'selected'; category: string; productIds: string[]; limit: number;
+  categoryImageStyle?: 'circle' | 'square' | 'cutout';
 };
 export const MAX_BLOCKS = 20;
 const object = (value: unknown): Record<string, unknown> => value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
@@ -34,6 +35,7 @@ export function resolveBlocks(raw: unknown): StorefrontBlock[] | undefined {
     while (ids.has(id)) id += `-${index}`;
     ids.add(id);
     const block = createBlock(value.type as BlockType, id);
+    if (value.categoryImageStyle === 'circle' || value.categoryImageStyle === 'square' || value.categoryImageStyle === 'cutout') block.categoryImageStyle = value.categoryImageStyle;
     block.visible = value.visible !== false;
     for (const field of ['title', 'text', 'action', 'category'] as const) block[field] = text(value[field], field === 'text' ? 2000 : field === 'action' ? 40 : 120);
     for (const field of ['image', 'video', 'href'] as const) block[field] = safeBlockUrl(value[field]);

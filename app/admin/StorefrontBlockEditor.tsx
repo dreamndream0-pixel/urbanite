@@ -7,9 +7,10 @@ import type { Product } from '@/lib/types';
 import type { DesignCategory } from '@/app/components/StorefrontDesign';
 import { uiAlert, uiConfirm } from '@/lib/ui-dialog';
 
-export default function StorefrontBlockEditor({ blocks, onChange, categories, products, onUploading }: {
+export default function StorefrontBlockEditor({ blocks, onChange, categories, products, onUploading, designStyle }: {
   blocks: StorefrontBlock[]; onChange: (blocks: StorefrontBlock[]) => void;
   categories: DesignCategory[]; products: Product[]; onUploading: (busy: boolean) => void;
+  designStyle?: string;
 }) {
   const [type, setType] = useState<BlockType>('imageText');
   const [active, setActive] = useState<string | null>(null);
@@ -65,8 +66,9 @@ export default function StorefrontBlockEditor({ blocks, onChange, categories, pr
             {block.source === 'selected' && <fieldset className="max-h-48 overflow-y-auto border-y py-2"><legend className="text-sm">選取商品（最多 24 件）</legend>{products.map((p) => <label key={p.id} className="flex items-center gap-2 py-1 text-sm"><input type="checkbox" checked={block.productIds.includes(p.id)} disabled={!block.productIds.includes(p.id) && block.productIds.length >= 24} onChange={(e) => patch(block.id, { productIds: e.target.checked ? [...block.productIds, p.id] : block.productIds.filter((id) => id !== p.id) })} />{p.name}</label>)}</fieldset>}
             <label className="text-sm">顯示件數<input type="number" min={1} max={24} value={block.limit} onChange={(e) => patch(block.id, { limit: Math.min(24, Math.max(1, Number(e.target.value))) })} className="mt-1 block w-full rounded-md border p-2" /></label>
           </>}
-          {['products', 'categories'].includes(block.type) && <label className="text-sm">電腦欄數<select value={block.columns} onChange={(e) => patch(block.id, { columns: Number(e.target.value) })} className="mt-1 block w-full rounded-md border p-2">{[1, 2, 3, 4].map((count) => <option key={count} value={count}>{count} 欄</option>)}</select></label>}
-          {block.type !== 'announcement' && <label className="text-sm">圖片比例<select value={block.ratio} onChange={(e) => patch(block.id, { ratio: e.target.value as StorefrontBlock['ratio'] })} className="mt-1 block w-full rounded-md border p-2"><option value="wide">橫式 16:9</option><option value="square">正方形 1:1</option><option value="portrait">直式 4:5</option></select></label>}
+          {block.type === 'categories' && designStyle === 'classic' && <label className="text-sm">分類圖片樣式<select value={block.categoryImageStyle ?? 'inherit'} onChange={(e) => patch(block.id, { categoryImageStyle: e.target.value === 'inherit' ? undefined : e.target.value as StorefrontBlock['categoryImageStyle'] })} className="mt-1 block w-full rounded-md border p-2"><option value="inherit">沿用一般設定</option><option value="circle">圓形</option><option value="square">方形</option><option value="cutout">去背 PNG</option></select></label>}
+          {(block.type === 'products' || (block.type === 'categories' && designStyle !== 'classic')) && <label className="text-sm">電腦欄數<select value={block.columns} onChange={(e) => patch(block.id, { columns: Number(e.target.value) })} className="mt-1 block w-full rounded-md border p-2">{[1, 2, 3, 4].map((count) => <option key={count} value={count}>{count} 欄</option>)}</select></label>}
+          {block.type !== 'announcement' && !(block.type === 'categories' && designStyle === 'classic') && <label className="text-sm">圖片比例<select value={block.ratio} onChange={(e) => patch(block.id, { ratio: e.target.value as StorefrontBlock['ratio'] })} className="mt-1 block w-full rounded-md border p-2"><option value="wide">橫式 16:9</option><option value="square">正方形 1:1</option><option value="portrait">直式 4:5</option></select></label>}
           <label className="text-sm">上下間距 {block.spacing}px<input type="range" min={0} max={96} step={4} value={block.spacing} onChange={(e) => patch(block.id, { spacing: Number(e.target.value) })} className="mt-2 block w-full" /></label>
           <div className="flex items-center gap-3 text-sm"><label className="flex items-center gap-2">背景色<input type="color" value={block.background || '#ffffff'} onChange={(e) => patch(block.id, { background: e.target.value })} className="h-9 w-10" /></label><label className="flex items-center gap-1"><input type="checkbox" checked={!block.background} onChange={(e) => patch(block.id, { background: e.target.checked ? '' : '#ffffff' })} />沿用全站</label></div>
         </div>}

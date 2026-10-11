@@ -50,3 +50,6 @@ assert.deepEqual(state.editableSiteTheme(stored), draft);
 assert.equal('draft' in theme.resolveSiteTheme(stored), false);
 assert.deepEqual(theme.resolveSiteTheme(draft), draft);
 console.log('Block validation, ordering, URL safety and draft isolation: 25 checks passed');
+for (const categoryImageStyle of ['circle', 'square', 'cutout']) assert.equal(blocks.resolveBlocks([{ ...list[1], categoryImageStyle }])[0].categoryImageStyle, categoryImageStyle);
+assert.equal(blocks.resolveBlocks([{ ...list[1], categoryImageStyle: 'invalid' }])[0].categoryImageStyle, undefined);
+console.log('Category image style validation: 4 checks passed');

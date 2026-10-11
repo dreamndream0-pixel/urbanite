@@ -3009,7 +3009,7 @@ export default function AdminDashboard({
                 </Card>
               )}
 
-              <div hidden={settingsTab !== 'templates'}><SiteThemeEditor initial={siteTheme} onSaved={setSiteTheme} /></div>
+              <div hidden={settingsTab !== 'templates'}><SiteThemeEditor initial={siteTheme} onSaved={setSiteTheme} categoryImageStyle={categoryImageStyle} /></div>
 
               {settingsTab === 'general' && (
               <Card title="首頁商品分類版型">
