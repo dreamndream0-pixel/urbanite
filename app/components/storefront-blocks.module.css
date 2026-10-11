@@ -19,6 +19,8 @@
 .heroText { margin-top: 10px; font-size: 14px; line-height: 1.7; white-space: pre-line; opacity: .92; }
 .pill { display: inline-flex; align-items: center; gap: 10px; margin-top: 18px; padding: 9px 18px; border-radius: 999px; background: #fff; color: #1f1b19; font-size: 14px; font-weight: 600; box-shadow: 0 6px 18px rgb(0 0 0 / 12%); max-width: 100%; }
 
+/* 主視覺有照片時:文字與按鈕靠下,按鈕 30% 半透明白 */
+.hero.withImage .pill { background: rgb(255 255 255 / 30%); color: #fff; border: 1px solid rgb(255 255 255 / 45%); box-shadow: none; -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); }
 .hero:not(.withImage) .pill { background: var(--c-button, #222); color: var(--c-button-text, #fff); }
 
 /* 商品區 */
@@ -77,7 +79,7 @@
 
 /* ---- 02 品牌雜誌型:圓角大圖、Pick for you 置中三欄、Lookbook ---- */
 .editorial .heroFrame { padding-inline: var(--tpl-inset); }
-.editorial .hero { border-radius: 6px; align-items: center; }
+.editorial .hero { border-radius: 6px; }
 .editorial .hero h1 { font-size: 36px; }
 .editorial .heroText { font-size: 11px; letter-spacing: .18em; text-transform: uppercase; }
 .editorial .sectionHead { justify-content: center; }
@@ -90,8 +92,7 @@
 
 /* ---- 03 視覺圖冊型:大圖拼貼、點擊進入分類 ---- */
 .gallery .heroFrame { padding-inline: var(--tpl-inset); }
-.gallery .hero { border-radius: 4px; align-items: flex-start; }
-.gallery .hero.withImage::after { background: linear-gradient(180deg, rgb(0 0 0 / 40%), transparent 60%); }
+.gallery .hero { border-radius: 4px; }
 .gallery .hero h1 { font-size: 32px; }
 .gallery .banner { aspect-ratio: 16 / 9; border-radius: 4px; }
 .gallery .bannerCopy strong { letter-spacing: .12em; }
@@ -99,8 +100,7 @@
 
 /* ---- 05 主題活動型:活動主視覺、倒數、精選商品、送禮橫幅 ---- */
 .campaign .heroFrame { padding-inline: var(--tpl-inset); }
-.campaign .hero { border-radius: var(--tpl-radius); align-items: flex-start; }
-.campaign .hero.withImage::after { background: linear-gradient(180deg, rgb(0 0 0 / 35%), transparent 55%); }
+.campaign .hero { border-radius: var(--tpl-radius); }
 .campaign .hero h1 { font-size: 38px; }
 .campaign .pill { background: var(--c-button, #3c3028); color: var(--c-button-text, #fff); }
 
