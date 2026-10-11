@@ -31,6 +31,7 @@ import {
   buildProgress,
 } from '@/lib/order-status';
 import { uiToast } from '@/lib/ui-toast';
+import NumberInput from './NumberInput';
 import { uiAlert, uiConfirm, uiPrompt } from '@/lib/ui-dialog';
 import { OrderCardBadges, orderNeedsAttention, AttentionDot, isPaymentReported } from '@/app/components/OrderStatusBadge';
 import { COUPON_PRESETS } from '@/lib/coupon-presets';
@@ -2753,13 +2754,13 @@ export default function AdminDashboard({
                   <Labeled label="優惠碼"><input value={newDiscount.code} onChange={(e) => setNewDiscount({ ...newDiscount, code: e.target.value })} className="w-full rounded border border-[#e5ded4] px-3 py-2" /></Labeled>
                   <Labeled label="狀態"><select value={newDiscount.status} onChange={(e) => setNewDiscount({ ...newDiscount, status: e.target.value as DiscountDraft['status'] })} className="w-full rounded border border-[#e5ded4] px-3 py-2">{['草稿', '啟用', '停用', '已結束'].map((s) => <option key={s}>{s}</option>)}</select></Labeled>
                   <Labeled label="優惠類型"><select value={newDiscount.type} onChange={(e) => setNewDiscount({ ...newDiscount, type: e.target.value as DiscountDraft['type'] })} className="w-full rounded border border-[#e5ded4] px-3 py-2"><option value="percent">百分比</option><option value="amount">固定金額</option><option value="free_shipping">免運</option></select></Labeled>
-                  <Labeled label="折扣值"><input type="number" value={newDiscount.value} onChange={(e) => setNewDiscount({ ...newDiscount, value: Number(e.target.value) })} disabled={newDiscount.type === 'free_shipping'} className="w-full rounded border border-[#e5ded4] px-3 py-2 disabled:bg-[#f6f2ec]" /></Labeled>
-                  <Labeled label="最低消費"><input type="number" value={newDiscount.min_spend} onChange={(e) => setNewDiscount({ ...newDiscount, min_spend: Number(e.target.value) })} className="w-full rounded border border-[#e5ded4] px-3 py-2" /></Labeled>
-                  <Labeled label="最高折抵"><input type="number" value={newDiscount.max_discount} onChange={(e) => setNewDiscount({ ...newDiscount, max_discount: Number(e.target.value) })} className="w-full rounded border border-[#e5ded4] px-3 py-2" /></Labeled>
+                  <Labeled label="折扣值"><NumberInput value={newDiscount.value} onChange={(e) => setNewDiscount({ ...newDiscount, value: Number(e.target.value) })} disabled={newDiscount.type === 'free_shipping'} className="w-full rounded border border-[#e5ded4] px-3 py-2 disabled:bg-[#f6f2ec]" /></Labeled>
+                  <Labeled label="最低消費"><NumberInput value={newDiscount.min_spend} onChange={(e) => setNewDiscount({ ...newDiscount, min_spend: Number(e.target.value) })} className="w-full rounded border border-[#e5ded4] px-3 py-2" /></Labeled>
+                  <Labeled label="最高折抵"><NumberInput value={newDiscount.max_discount} onChange={(e) => setNewDiscount({ ...newDiscount, max_discount: Number(e.target.value) })} className="w-full rounded border border-[#e5ded4] px-3 py-2" /></Labeled>
                   <Labeled label="開始時間"><input type="datetime-local" value={newDiscount.start_at} onChange={(e) => setNewDiscount({ ...newDiscount, start_at: e.target.value })} className="w-full rounded border border-[#e5ded4] px-3 py-2" /></Labeled>
                   <Labeled label="結束時間"><input type="datetime-local" value={newDiscount.end_at} onChange={(e) => setNewDiscount({ ...newDiscount, end_at: e.target.value })} className="w-full rounded border border-[#e5ded4] px-3 py-2" /></Labeled>
-                  <Labeled label="發放 / 使用上限"><input type="number" value={newDiscount.total_limit} onChange={(e) => setNewDiscount({ ...newDiscount, total_limit: Number(e.target.value) })} className="w-full rounded border border-[#e5ded4] px-3 py-2" /></Labeled>
-                  <Labeled label="每會員限用"><input type="number" value={newDiscount.per_user_limit} onChange={(e) => setNewDiscount({ ...newDiscount, per_user_limit: Number(e.target.value) })} className="w-full rounded border border-[#e5ded4] px-3 py-2" /></Labeled>
+                  <Labeled label="發放 / 使用上限"><NumberInput value={newDiscount.total_limit} onChange={(e) => setNewDiscount({ ...newDiscount, total_limit: Number(e.target.value) })} className="w-full rounded border border-[#e5ded4] px-3 py-2" /></Labeled>
+                  <Labeled label="每會員限用"><NumberInput value={newDiscount.per_user_limit} onChange={(e) => setNewDiscount({ ...newDiscount, per_user_limit: Number(e.target.value) })} className="w-full rounded border border-[#e5ded4] px-3 py-2" /></Labeled>
                   <Labeled label="適用會員"><select value={newDiscount.applicable_users} onChange={(e) => setNewDiscount({ ...newDiscount, applicable_users: e.target.value as DiscountDraft['applicable_users'] })} className="w-full rounded border border-[#e5ded4] px-3 py-2"><option value="all">全部</option><option value="new">新會員</option><option value="vip">VIP</option></select></Labeled>
                   <Labeled label="適用商品代碼"><textarea value={newDiscount.applicable_products} onChange={(e) => setNewDiscount({ ...newDiscount, applicable_products: e.target.value })} rows={3} placeholder="一行一個商品代碼,空白代表全站" className="w-full rounded border border-[#e5ded4] px-3 py-2" /></Labeled>
                   <Labeled label="適用分類代碼"><textarea value={newDiscount.applicable_categories} onChange={(e) => setNewDiscount({ ...newDiscount, applicable_categories: e.target.value })} rows={3} placeholder="一行一個分類 slug,空白代表全站" className="w-full rounded border border-[#e5ded4] px-3 py-2" /></Labeled>
@@ -4072,8 +4073,7 @@ function ShippingMethodsEditor({
               <span className={`min-w-0 flex-1 text-sm ${on ? 'font-semibold text-[#1f1b19]' : 'text-[#8a7f72]'}`}>{method}</span>
               <span className="flex items-center gap-1 text-sm text-[#8a7f72]">
                 NT$
-                <input
-                  type="number"
+                <NumberInput
                   min={0}
                   value={fees.find((f) => f.name === method)?.fee ?? 0}
                   onChange={(e) => setFee(method, Number(e.target.value))}
@@ -5710,8 +5710,7 @@ function InventorySection({
                     <td className="px-2 py-2 text-right font-semibold">{r.inv}</td>
                     <td className="px-2 py-2 text-right text-[#8a7f72]">
                       {r.key ? (
-                        <input
-                          type="number"
+                        <NumberInput
                           min={0}
                           defaultValue={r.safety || ''}
                           placeholder="0"
@@ -5733,8 +5732,7 @@ function InventorySection({
                     </td>
                     <td className="px-2 py-2 text-right">
                       {r.key ? (
-                        <input
-                          type="number"
+                        <NumberInput
                           min={0}
                           defaultValue={r.cost || ''}
                           placeholder="0"
@@ -5957,8 +5955,7 @@ function InventorySection({
                         )}
                       </td>
                       <td className="px-3 py-3 text-right">
-                        <input
-                          type="number"
+                        <NumberInput
                           min={1}
                           value={line.quantity}
                           onChange={(e) => updateMovementLine(line.id, { quantity: Math.max(1, Number(e.target.value) || 1) })}
@@ -5966,8 +5963,7 @@ function InventorySection({
                         />
                       </td>
                       <td className="px-3 py-3 text-right">
-                        <input
-                          type="number"
+                        <NumberInput
                           min={0}
                           value={line.unit_price}
                           onChange={(e) => updateMovementLine(line.id, { unit_price: Math.max(0, Number(e.target.value) || 0) })}
@@ -6692,8 +6688,7 @@ function ProductModal({
 	          </div>
 	          <div className="grid grid-cols-2 gap-3">
             <Field label="售價">
-              <input
-                type="number"
+              <NumberInput
                 inputMode="numeric"
                 placeholder="0"
                 className="w-full rounded-lg border border-[#e5ded4] px-3 py-2"
@@ -6703,8 +6698,7 @@ function ProductModal({
               />
             </Field>
             <Field label="原價(可空)">
-              <input
-                type="number"
+              <NumberInput
                 className="w-full rounded-lg border border-[#e5ded4] px-3 py-2"
                 value={draft.original_price ?? ''}
                 onChange={(e) => set('original_price', e.target.value === '' ? null : Number(e.target.value))}
@@ -6875,8 +6869,7 @@ function ProductModal({
                         </label>
                         <div className="flex items-center gap-1 text-[#8a7f72]">
                           <span>運費 NT$</span>
-                          <input
-                            type="number"
+                          <NumberInput
                             min={0}
                             value={override ?? ''}
                             placeholder={String(baseFee ?? 120)}
@@ -6995,8 +6988,7 @@ function ProductModal({
 	          </section>
 		          <div className="grid gap-3 sm:grid-cols-3">
             <Field label="排序(小的在前)">
-              <input
-                type="number"
+              <NumberInput
                 className="w-full rounded-lg border border-[#e5ded4] px-3 py-2"
                 value={draft.sort_order}
                 onChange={(e) => set('sort_order', Number(e.target.value))}

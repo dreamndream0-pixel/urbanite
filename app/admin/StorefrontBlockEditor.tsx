@@ -5,6 +5,7 @@ import { ArrowDown, ArrowUp, ChevronDown, Copy, Eye, EyeOff, GripVertical, Image
 import { BLOCK_TYPES, MAX_BLOCKS, createBlock, moveBlock, safeBlockUrl, type BlockType, type StorefrontBlock } from '@/lib/storefront-blocks';
 import type { Product } from '@/lib/types';
 import type { DesignCategory } from '@/app/components/StorefrontDesign';
+import NumberInput from './NumberInput';
 import { uiAlert, uiConfirm } from '@/lib/ui-dialog';
 
 const input = 'mt-1 block w-full min-w-0 rounded-lg border border-[#e5ded4] bg-white px-3 py-2 text-sm';
@@ -99,7 +100,7 @@ function BlockFields({ block, patch, categories, products, uploading, onUpload }
     </div>;
     case 'products': return <div className="grid gap-3 sm:grid-cols-2">
       {title('區塊標題')}
-      <label className="text-sm">顯示件數<input type="number" min={1} max={24} value={block.limit} onChange={(e) => patch({ limit: Math.min(24, Math.max(1, Number(e.target.value) || 1)) })} className={input} /></label>
+      <label className="text-sm">顯示件數<NumberInput min={1} max={24} value={block.limit} onChange={(e) => patch({ limit: Math.min(24, Math.max(1, Number(e.target.value) || 1)) })} className={input} /></label>
       <label className="text-sm">商品來源<select value={block.source} onChange={(e) => patch({ source: e.target.value as StorefrontBlock['source'] })} className={input}><option value="all">全部上架商品</option><option value="category">指定分類</option><option value="selected">自己挑選商品</option></select></label>
       {block.source === 'category' && <label className="text-sm">商品分類<select value={block.category} onChange={(e) => patch({ category: e.target.value })} className={input}><option value="">選擇分類</option>{categories.map((c) => <option key={c.slug} value={c.slug}>{c.name}</option>)}</select></label>}
       {block.source === 'selected' && <fieldset className="max-h-56 overflow-y-auto rounded-lg border border-[#e5ded4] px-3 py-2 sm:col-span-2"><legend className="px-1 text-xs text-[#8a7f72]">勾選商品(最多 24 件,依勾選順序顯示)</legend>{products.map((p) => <label key={p.id} className="flex items-center gap-2 py-1 text-sm"><input type="checkbox" checked={block.productIds.includes(p.id)} disabled={!block.productIds.includes(p.id) && block.productIds.length >= 24} onChange={(e) => patch({ productIds: e.target.checked ? [...block.productIds, p.id] : block.productIds.filter((id) => id !== p.id) })} />{p.name}</label>)}</fieldset>}

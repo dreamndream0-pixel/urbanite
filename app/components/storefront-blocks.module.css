@@ -40,9 +40,10 @@
 .cardCircle { width: 72%; aspect-ratio: 1; border-radius: 999px; }
 .cardName { font-size: 14px; font-weight: 600; }
 /* 視覺圖冊型:錯落圖塊 */
-.masonry { columns: 2; column-gap: 10px; }
-.tile { position: relative; isolation: isolate; display: block; width: 100%; margin-bottom: 10px; overflow: hidden; break-inside: avoid; border-radius: 4px; aspect-ratio: 1; background: var(--c-soft); color: var(--c-text); text-align: left; }
-.tile:nth-child(4n + 1), .tile:nth-child(4n + 4) { aspect-ratio: 3 / 4; }
+/* 用格線排(iPhone 的 CSS columns 會把圖塊擠到同一欄):長、短、長、短交錯 */
+.masonry { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: 120px; grid-auto-flow: dense; gap: 10px; }
+.tile { position: relative; isolation: isolate; display: block; width: 100%; height: 100%; overflow: hidden; border-radius: 4px; background: var(--c-soft); color: var(--c-text); text-align: left; }
+.tile:nth-child(4n + 1), .tile:nth-child(4n + 3) { grid-row: span 2; }
 .tile .cover { z-index: -2; transition: transform .5s ease; }
 .tile:hover .cover { transform: scale(1.04); }
 .tile:has(img) { color: #fff; }
@@ -127,7 +128,7 @@
   .hero h1 { font-size: 54px; }
   .heading { font-size: 22px; }
   .cards { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-  .masonry { columns: 3; }
+  .masonry { grid-template-columns: repeat(4, minmax(0, 1fr)); grid-auto-rows: 170px; gap: 14px; }
   .banner { aspect-ratio: 16 / 5; padding: 40px 48px; }
   .bannerCopy strong { font-size: 38px; }
   .minimal .hero { min-height: 560px; }
@@ -139,5 +140,11 @@
 .editorial .grid :global(.product-card) :global(.h-10) { height: 28px; min-width: 28px; width: 28px; }
 .editorial .grid :global(.product-card) :global(.h-10) svg { width: 14px; height: 14px; }
 .editorial .grid :global(.product-card) :global(.mt-3) { margin-top: 6px; }
-.tile:not(:has(img)) { aspect-ratio: 2 / 1; }
+
 .hero .cover { object-position: center 30%; }
+/* 圖冊拼貼收尾:分類數不是 4 的倍數時,最後一格補滿,不留空洞 */
+@container (max-width: 699px) {
+  .tile:last-child:nth-child(4n + 1) { grid-column: 1 / -1; grid-row: span 1; }
+  .tile:last-child:nth-child(4n + 2) { grid-row: span 2; }
+  .tile:last-child:nth-child(4n + 3) { grid-row: span 1; }
+}
