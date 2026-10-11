@@ -96,11 +96,6 @@
 .gallery .banner { aspect-ratio: 16 / 9; border-radius: 4px; }
 .gallery .bannerCopy strong { letter-spacing: .12em; }
 
-/* ---- 04 分類導購型:圓角主視覺、分類方卡、熱銷推薦 ---- */
-.category .heroFrame { padding-inline: var(--tpl-inset); }
-.category .hero { min-height: 240px; aspect-ratio: 16 / 10; border-radius: var(--tpl-radius); align-items: center; }
-.category .hero h1 { font-size: 28px; }
-.category .pill { background: rgb(60 48 40 / 85%); color: #fff; box-shadow: none; }
 
 /* ---- 05 主題活動型:活動主視覺、倒數、精選商品、送禮橫幅 ---- */
 .campaign .heroFrame { padding-inline: var(--tpl-inset); }
@@ -109,14 +104,6 @@
 .campaign .hero h1 { font-size: 38px; }
 .campaign .pill { background: var(--c-button, #3c3028); color: var(--c-button-text, #fff); }
 
-/* ---- 06 極簡精品型:大量留白、少量商品 ---- */
-.minimal { --tpl-inset: 20px; }
-.minimal .hero { min-height: 420px; align-items: center; }
-.minimal .hero h1 { font-size: 38px; }
-.minimal .pill { background: transparent; color: inherit; border: 1px solid currentColor; box-shadow: none; font-size: 12px; letter-spacing: .14em; }
-.minimal .grid { gap: 28px 18px; }
-.minimal .heading { font-family: 'Noto Serif TC', Georgia, serif; font-weight: 400; font-size: 20px; }
-.minimal .banner { border-radius: 2px; }
 
 @container (min-width: 700px) {
   .root { --tpl-inset: 24px; }
@@ -130,7 +117,6 @@
   .masonry { grid-template-columns: repeat(4, minmax(0, 1fr)); grid-auto-rows: 170px; gap: 14px; }
   .banner { aspect-ratio: 16 / 5; padding: 40px 48px; }
   .bannerCopy strong { font-size: 38px; }
-  .minimal .hero { min-height: 560px; }
 }
 
 /* 三欄小卡(品牌雜誌型):只留圖、名稱、價格,購物車按鈕縮小 */
