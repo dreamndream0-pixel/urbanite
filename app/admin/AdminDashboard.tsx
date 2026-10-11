@@ -489,7 +489,7 @@ export default function AdminDashboard({
   const [customers] = useState<Customer[]>(initialCustomers);
   const [banners, setBanners] = useState<Banner[]>(initialBanners);
   const [uploadingBanner, setUploadingBanner] = useState(false);
-  const [settingsTab, setSettingsTab] = useState<'general' | 'banners' | 'footer' | 'payments' | 'shippings' | 'integrations'>('general');
+  const [settingsTab, setSettingsTab] = useState<'general' | 'templates' | 'banners' | 'footer' | 'payments' | 'shippings' | 'integrations'>('general');
   const [orderFilter, setOrderFilter] = useState<string>('全部');
   const [orderSearch, setOrderSearch] = useState('');
   const [orderPaidFilter, setOrderPaidFilter] = useState<'全部' | '已付款' | '未付款'>('全部');
@@ -2860,6 +2860,7 @@ export default function AdminDashboard({
               <div className="flex gap-2 overflow-x-auto overflow-y-hidden overscroll-x-contain border-b border-[#e5ded4] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                 {([
                   { key: 'general', label: '一般設定' },
+                  { key: 'templates', label: '模板設定' },
                   { key: 'banners', label: '輪播圖' },
                   { key: 'footer', label: '頁尾資訊' },
                   { key: 'payments', label: '金流設定' },
@@ -3007,7 +3008,7 @@ export default function AdminDashboard({
                 </Card>
               )}
 
-              {settingsTab === 'general' && <SiteThemeEditor initial={initialSettings?.site_theme} />}
+              <div hidden={settingsTab !== 'templates'}><SiteThemeEditor initial={initialSettings?.site_theme} /></div>
 
               {settingsTab === 'general' && (
               <Card title="首頁商品分類版型">

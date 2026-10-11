@@ -16,6 +16,9 @@ import { isProductSoldOut, isVisibleInStore } from '@/lib/product-status';
 import { POLICY_SECTION_TITLE } from '@/lib/footer-policies';
 import { HIDDEN_FOOTER_SECTION_TITLES } from '@/lib/checkout-line';
 import StoreHeader from '@/app/components/StoreHeader';
+import { resolveSiteTheme } from '@/lib/site-theme';
+import { resolveStorefront } from '@/lib/storefront-template';
+import { StorefrontDesignHero, StorefrontDesignFeature } from './StorefrontDesign';
 
 // 購物車存在瀏覽器本機的 key(結帳頁會讀同一份)
 const CART_KEY = 'cart';
@@ -451,6 +454,11 @@ export default function Storefront({ campaign = null, preview = false }: { campa
     }
   }
 
+  const design = resolveStorefront(resolveSiteTheme(settings?.site_theme).storefront);
+  const customDesign = design.enabled && !campaign;
+  const browseProducts = () => document.getElementById('store-products')?.scrollIntoView({ behavior: 'smooth' });
+  const browseCategory = (slug: string) => { setCategory(slug); browseProducts(); };
+
   return (
     <main className="min-h-screen bg-[var(--c-bg)] text-[var(--c-text)]">
       {preview && (
@@ -473,15 +481,15 @@ export default function Storefront({ campaign = null, preview = false }: { campa
         onCart={() => setCartOpen(true)}
       />
 
-      <HeroCarousel banners={heroBanners} />
+      {customDesign ? <StorefrontDesignHero design={design} image={heroBanners[0]?.image || products.find(isVisibleInStore)?.image} categories={categoryTabs.filter((c) => c.slug !== 'all')} onCategory={browseCategory} onBrowse={browseProducts} /> : <HeroCarousel banners={heroBanners} />}
       <CategoryNavigation categories={categoryTabs} value={category} onSelect={setCategory} imageStyle={settings?.category_image_style ?? 'circle'} />
 
       <div className="mx-auto max-w-6xl px-4 pb-8 sm:px-6">
         {/* 商品格狀排列 */}
-        <section className="mt-6">
+        <section id="store-products" className="mt-6 scroll-mt-24">
           <div className="mb-5">
             <h1 className="store-title text-2xl font-semibold tracking-wide sm:text-3xl">
-              {activeCategory.slug === 'all' ? '全部商品' : activeCategory.name}
+              {customDesign && !query && (category === 'all' || category === 'spring') ? design.productsTitle : activeCategory.slug === 'all' ? '全部商品' : activeCategory.name}
             </h1>
           </div>
           {loading ? (
@@ -490,7 +498,7 @@ export default function Storefront({ campaign = null, preview = false }: { campa
             <p className="py-20 text-center text-[var(--c-muted)]">這個分類目前沒有商品。</p>
           ) : (
             <>
-              <div className="store-grid grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+              <div className={customDesign && design.style === 'editorial' ? 'grid grid-cols-2 gap-5 md:grid-cols-3' : customDesign && design.style === 'minimal' ? 'grid grid-cols-2 gap-6 md:gap-10' : 'store-grid grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4'}>
                 {shown.map((product) => (
                   <ProductCard
                     key={product.id}
@@ -511,6 +519,7 @@ export default function Storefront({ campaign = null, preview = false }: { campa
         </section>
       </div>
 
+      {customDesign && <StorefrontDesignFeature design={design} image={heroBanners[1]?.image} onBrowse={browseProducts} />}
       <Footer settings={settings} logoUrl={logoUrl} homeHref={homeHref} />
 
       {/* 左側分類選單 */}

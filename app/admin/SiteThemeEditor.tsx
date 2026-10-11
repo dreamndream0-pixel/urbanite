@@ -1,6 +1,10 @@
 'use client';
 
-import { useState, type CSSProperties } from 'react';
+import { useEffect, useState, type CSSProperties, type ReactNode } from 'react';
+import { STOREFRONT_TEMPLATES, STOREFRONT_TEXT_FIELDS, resolveStorefront } from '@/lib/storefront-template';
+import { StorefrontDesignHero, StorefrontDesignFeature, type DesignCategory } from '@/app/components/StorefrontDesign';
+import type { Banner, Product } from '@/lib/types';
+import { cssVar } from '@/lib/site-theme';
 import {
   COLOR_FIELDS,
   LAYOUT_OPTIONS,
@@ -17,6 +21,28 @@ export default function SiteThemeEditor({ initial }: { initial: unknown }) {
   const [saved, setSaved] = useState<SiteTheme>(() => resolveSiteTheme(initial));
   const [draft, setDraft] = useState<SiteTheme>(saved);
   const [saving, setSaving] = useState(false);
+  const [previewImages, setPreviewImages] = useState<string[]>([]);
+  const [previewCategories, setPreviewCategories] = useState<DesignCategory[]>([]);
+  const design = resolveStorefront(draft.storefront);
+  useEffect(() => {
+    let active = true;
+    async function load() {
+      try {
+        const bannersRes = await fetch('/api/banners');
+        const banners: Banner[] = bannersRes.ok ? await bannersRes.json() : [];
+        const productsRes = await fetch('/api/products');
+        const products: Product[] = productsRes.ok ? await productsRes.json() : [];
+        const categoriesRes = await fetch('/api/categories');
+        const categories: DesignCategory[] = categoriesRes.ok ? await categoriesRes.json() : [];
+        if (active) {
+          setPreviewImages([...banners.filter((b) => b.active).map((b) => b.image), ...products.map((p) => p.image)].filter(Boolean));
+          setPreviewCategories(categories);
+        }
+      } catch { /* Preview assets are optional; saved settings remain editable. */ }
+    }
+    void load();
+    return () => { active = false; };
+  }, []);
   const dirty = JSON.stringify(draft) !== JSON.stringify(saved);
 
   const setColor = (key: ColorKey, value: string) => setDraft({ ...draft, template: 'custom', colors: { ...draft.colors, [key]: value } });
@@ -46,14 +72,14 @@ export default function SiteThemeEditor({ initial }: { initial: unknown }) {
   async function reset() {
     if (!(await uiConfirm('恢復成預設的經典米白配色與版面?'))) return;
     const t = SITE_TEMPLATES[0];
-    setDraft({ template: t.key, colors: { ...t.colors }, layout: { ...t.layout } });
+    setDraft({ ...draft, template: t.key, colors: { ...t.colors }, layout: { ...t.layout } });
   }
 
   return (
     <section className="rounded-xl border border-[#e5ded4] bg-white p-5 shadow-sm">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-lg font-semibold">網站外觀</h2>
+          <h2 className="text-lg font-semibold">官網模板與外觀</h2>
           <p className="mt-1 text-xs text-[#8a7f72]">選一個樣板快速套用,或自行調整每一個顏色與版面。儲存後前台全站套用。</p>
         </div>
         <div className="flex items-center gap-2">
@@ -66,6 +92,29 @@ export default function SiteThemeEditor({ initial }: { initial: unknown }) {
 
       <div className="mt-5 grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="space-y-6">
+          <fieldset disabled={saving} className="space-y-4">
+            <legend className="mb-3 text-sm font-semibold">官網模板</legend>
+            <label className="flex items-center gap-2 text-sm">
+              <input type="checkbox" checked={design.enabled} onChange={(e) => setDraft({ ...draft, storefront: { ...design, enabled: e.target.checked } })} />
+              啟用官網模板
+            </label>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3" role="radiogroup" aria-label="官網排版">
+              {STOREFRONT_TEMPLATES.map((t) => (
+                <label key={t.key} className={`cursor-pointer rounded-lg border p-3 text-sm ${design.style === t.key ? 'border-black bg-neutral-100' : 'border-neutral-200'}`}>
+                  <input type="radio" name="storefront-template" value={t.key} checked={design.style === t.key} onChange={() => setDraft({ ...draft, storefront: { ...design, enabled: true, style: t.key } })} className="mr-2" />
+                  {t.name}
+                </label>
+              ))}
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {STOREFRONT_TEXT_FIELDS.map((field) => (
+                <label key={field.key} className="block text-sm">
+                  {field.label}
+                  <textarea rows={field.key === 'featureText' ? 3 : 2} maxLength={field.max} value={design[field.key]} onChange={(e) => setDraft({ ...draft, storefront: { ...design, [field.key]: e.target.value } })} className="mt-1 block w-full resize-y rounded-md border border-neutral-300 bg-white p-2" />
+                </label>
+              ))}
+            </div>
+          </fieldset>
           {/* 樣板 */}
           <div>
             <p className="mb-2 text-sm font-semibold">樣板</p>
@@ -76,7 +125,7 @@ export default function SiteThemeEditor({ initial }: { initial: unknown }) {
                   <button
                     key={t.key}
                     type="button"
-                    onClick={() => setDraft({ template: t.key, colors: { ...t.colors }, layout: { ...t.layout } })}
+                    onClick={() => setDraft({ ...draft, template: t.key, colors: { ...t.colors }, layout: { ...t.layout } })}
                     className={`overflow-hidden rounded-xl border text-left transition ${selected ? 'border-[#1f1b19] ring-2 ring-[#1f1b19]/15' : 'border-[#e5ded4] hover:border-[#1f1b19]/30'}`}
                   >
                     <div className="pointer-events-none h-36 overflow-hidden">
@@ -133,8 +182,9 @@ export default function SiteThemeEditor({ initial }: { initial: unknown }) {
         {/* 即時預覽 */}
         <div className="lg:sticky lg:top-24 lg:self-start">
           <p className="mb-2 text-center text-xs text-[#a99e8f]">即時預覽</p>
-          <div className="overflow-hidden rounded-[28px] border-[8px] border-[#1f1b19]">
-            <StorePreview theme={draft} />
+          <div className="max-h-[760px] overflow-y-auto overflow-x-hidden rounded-[28px] border-[8px] border-[#1f1b19]" style={Object.fromEntries(COLOR_FIELDS.map((f) => [cssVar(f.key), draft.colors[f.key]])) as CSSProperties}>
+            <StorePreview theme={draft} images={previewImages} hero={design.enabled ? <StorefrontDesignHero design={design} image={previewImages[0]} categories={previewCategories} onCategory={() => {}} onBrowse={() => {}} /> : undefined} />
+            {design.enabled && <StorefrontDesignFeature design={design} image={previewImages[1]} onBrowse={() => {}} />}
           </div>
         </div>
       </div>
@@ -163,7 +213,7 @@ function OptionRow<T extends string>({ label, value, options, onChange }: { labe
 }
 
 // 前台縮小示意:頁首、分類列、商品卡(依配色與版面配置)
-function StorePreview({ theme, compact = false }: { theme: SiteTheme; compact?: boolean }) {
+function StorePreview({ theme, compact = false, images = [], hero }: { theme: SiteTheme; compact?: boolean; images?: string[]; hero?: ReactNode }) {
   const c = theme.colors;
   const l = theme.layout;
   const cols = l.columns === '1-3' ? 1 : 2;
@@ -187,6 +237,7 @@ function StorePreview({ theme, compact = false }: { theme: SiteTheme; compact?: 
         <span className="text-sm font-bold tracking-[0.08em]" style={serif}>urbanite</span>
         <span className="text-[13px]" style={{ color: c.text }}>⌂</span>
       </div>
+      {hero}
       <div className="flex gap-3 px-3 py-2 text-[10px]" style={{ background: c.header, borderBottom: `1px solid ${c.border}`, color: c.text2 }}>
         <span className="border-b-2 pb-0.5 font-semibold" style={{ color: c.brand, borderColor: c.brand }}>全部商品</span>
         <span>上衣</span>
@@ -194,12 +245,15 @@ function StorePreview({ theme, compact = false }: { theme: SiteTheme; compact?: 
         <span>配件</span>
       </div>
       <div className="px-3 pb-4 pt-3">
-        <p className="mb-2 text-sm font-semibold" style={serif}>全部商品</p>
+        <p className="mb-2 text-sm font-semibold" style={serif}>{theme.storefront?.enabled ? theme.storefront.productsTitle : '全部商品'}</p>
         <div className="grid gap-2.5" style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}>
           {items.map((i) => (
             <div key={i} style={cardStyle}>
               <div className={cols === 1 ? 'aspect-[4/3]' : 'aspect-[4/5]'} style={{ background: c.surface, borderRadius: imgRadius }}>
-                <div className="h-full w-full opacity-80" style={{ background: `radial-gradient(circle at 50% 55%, ${swatch[i % 4]} 0 34%, transparent 35%)` }} />
+                {images[i] ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={images[i]} alt="" className="h-full w-full object-cover" />
+                ) : <div className="h-full w-full opacity-80" style={{ background: `radial-gradient(circle at 50% 55%, ${swatch[i % 4]} 0 34%, transparent 35%)` }} />}
               </div>
               <p className="mt-1.5 truncate text-[10px] font-semibold" style={serif}>城市印花 T-shirt</p>
               <p className="truncate text-[9px]" style={{ color: c.muted }}>純棉 · 寬鬆版型</p>

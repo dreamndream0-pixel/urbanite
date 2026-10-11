@@ -1,5 +1,7 @@
 // 網站外觀(前台):配色與版面配置。存在 site_settings.site_theme,由根版面輸出成 CSS 變數
 
+import { resolveStorefront, type StorefrontDesign } from './storefront-template';
+
 export type ColorKey =
   | 'bg' | 'header' | 'surface' | 'card' | 'text' | 'text2' | 'muted' | 'border' | 'borderStrong'
   | 'soft' | 'brand' | 'sale' | 'gold' | 'button' | 'buttonText';
@@ -55,7 +57,7 @@ export const LAYOUT_OPTIONS = {
   ] as { key: HeadingFont; label: string }[],
 };
 
-export type SiteTheme = { template: string; colors: Record<ColorKey, string>; layout: SiteLayout };
+export type SiteTheme = { template: string; colors: Record<ColorKey, string>; layout: SiteLayout; storefront?: StorefrontDesign };
 
 export const DEFAULT_COLORS: Record<ColorKey, string> = {
   bg: '#f6f2ec',
@@ -130,6 +132,7 @@ export function resolveSiteTheme(raw: unknown): SiteTheme {
   return {
     template: typeof t.template === 'string' ? t.template : 'urbanite',
     colors,
+    storefront: resolveStorefront(t.storefront),
     layout: {
       card: pick(l.card, LAYOUT_OPTIONS.card, DEFAULT_LAYOUT.card),
       columns: pick(l.columns, LAYOUT_OPTIONS.columns, DEFAULT_LAYOUT.columns),
