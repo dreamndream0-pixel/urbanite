@@ -1,3 +1,5 @@
+import { resolveBlocks, type StorefrontBlock } from './storefront-blocks';
+
 export const STOREFRONT_TEMPLATES = [
   { key: 'classic', name: '經典商城型' },
   { key: 'editorial', name: '品牌雜誌型' },
@@ -16,7 +18,7 @@ export const STOREFRONT_TEXT_FIELDS = [
   { key: 'featureText', label: '品牌專題內文', max: 240 },
 ] as const;
 export type StorefrontTextKey = typeof STOREFRONT_TEXT_FIELDS[number]['key'];
-export type StorefrontDesign = { enabled: boolean; style: StorefrontTemplate } & Record<StorefrontTextKey, string>;
+export type StorefrontDesign = { enabled: boolean; style: StorefrontTemplate; blocks?: StorefrontBlock[] } & Record<StorefrontTextKey, string>;
 export const DEFAULT_STOREFRONT: StorefrontDesign = {
   enabled: false, style: 'classic', title: 'New Collection', subtitle: '日常裡的選擇',
   action: '探索商品', productsTitle: '精選商品', featureTitle: '品牌日常', featureText: '找到屬於你的生活風格。',
@@ -25,6 +27,8 @@ export function resolveStorefront(raw: unknown): StorefrontDesign {
   const value = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
   const result = { ...DEFAULT_STOREFRONT };
   result.enabled = value.enabled === true;
+  const blocks = resolveBlocks(value.blocks);
+  if (blocks !== undefined) result.blocks = blocks;
   if (STOREFRONT_TEMPLATES.some((t) => t.key === value.style)) result.style = value.style as StorefrontTemplate;
   for (const field of STOREFRONT_TEXT_FIELDS) {
     if (typeof value[field.key] === 'string') result[field.key] = (value[field.key] as string).trim().slice(0, field.max);

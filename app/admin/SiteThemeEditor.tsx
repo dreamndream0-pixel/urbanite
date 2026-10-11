@@ -1,9 +1,16 @@
 'use client';
 
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
-import { Eye, X } from 'lucide-react';
-import { STOREFRONT_TEMPLATES, STOREFRONT_TEXT_FIELDS, resolveStorefront } from '@/lib/storefront-template';
-import { StorefrontDesignHero, StorefrontDesignFeature, type DesignCategory } from '@/app/components/StorefrontDesign';
+import { Eye, X, Monitor, Smartphone, Save, Send } from 'lucide-react';
+import { STOREFRONT_TEMPLATES, resolveStorefront } from '@/lib/storefront-template';
+import type { DesignCategory } from '@/app/components/StorefrontDesign';
+import previewStyles from './site-theme-preview.module.css';
+import StorefrontBlocks from '@/app/components/StorefrontBlocks';
+import { ProductCard } from '@/app/components/Storefront';
+import StorefrontBlockEditor from './StorefrontBlockEditor';
+import { starterBlocks, resolveBlocks, safeBlockUrl } from '@/lib/storefront-blocks';
+import { editableSiteTheme } from '@/lib/site-theme-state';
+import { isVisibleInStore } from '@/lib/product-status';
 import type { Banner, Product } from '@/lib/types';
 import { cssVar } from '@/lib/site-theme';
 import {
@@ -18,10 +25,17 @@ import {
 import { uiAlert, uiConfirm } from '@/lib/ui-dialog';
 
 // 後台 系統設定 → 一般設定 → 網站外觀:6 種樣板+全部顏色選擇器+版面配置,即時預覽
-export default function SiteThemeEditor({ initial }: { initial: unknown }) {
-  const [saved, setSaved] = useState<SiteTheme>(() => resolveSiteTheme(initial));
-  const [draft, setDraft] = useState<SiteTheme>(saved);
+export default function SiteThemeEditor({ initial, onSaved }: { initial: unknown; onSaved?: (theme: unknown) => void }) {
+  const [saved, setSaved] = useState<SiteTheme>(() => editableSiteTheme(initial));
+  const [published, setPublished] = useState<SiteTheme>(() => resolveSiteTheme(initial));
+  const [draft, setDraft] = useState<SiteTheme>(() => {
+    const theme = editableSiteTheme(initial);
+    const design = resolveStorefront(theme.storefront);
+    return { ...theme, storefront: { ...design, blocks: design.blocks ?? starterBlocks(design) } };
+  });
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [previewDevice, setPreviewDevice] = useState<'mobile' | 'desktop'>('mobile');
   const [previewOpen, setPreviewOpen] = useState(false);
   const previewDialog = useRef<HTMLDialogElement>(null);
   useEffect(() => {
@@ -37,7 +51,8 @@ export default function SiteThemeEditor({ initial }: { initial: unknown }) {
   }, [previewOpen]);
   const [previewImages, setPreviewImages] = useState<string[]>([]);
   const [previewCategories, setPreviewCategories] = useState<DesignCategory[]>([]);
-  const design = resolveStorefront(draft.storefront);
+  const [previewProducts, setPreviewProducts] = useState<Product[]>([]);
+  const design = draft.storefront ?? resolveStorefront(null);
   useEffect(() => {
     let active = true;
     async function load() {
@@ -49,8 +64,9 @@ export default function SiteThemeEditor({ initial }: { initial: unknown }) {
         const categoriesRes = await fetch('/api/categories');
         const categories: DesignCategory[] = categoriesRes.ok ? await categoriesRes.json() : [];
         if (active) {
-          setPreviewImages([...banners.filter((b) => b.active).map((b) => b.image), ...products.map((p) => p.image)].filter(Boolean));
-          setPreviewCategories(categories);
+          setPreviewImages([...banners.filter((b) => b.active).map((b) => b.image), ...products.filter(isVisibleInStore).map((p) => p.image)].filter(Boolean));
+          setPreviewCategories(categories.filter((c) => c.sort_order === undefined || c.sort_order >= 0));
+          setPreviewProducts(products);
         }
       } catch { /* Preview assets are optional; saved settings remain editable. */ }
     }
@@ -58,24 +74,30 @@ export default function SiteThemeEditor({ initial }: { initial: unknown }) {
     return () => { active = false; };
   }, []);
   const dirty = JSON.stringify(draft) !== JSON.stringify(saved);
+  const unpublished = JSON.stringify(draft) !== JSON.stringify(published);
+  const invalidLinks = design.blocks?.some((b) => [b.image, b.video, b.href].some((url) => !!url && !safeBlockUrl(url)));
 
   const setColor = (key: ColorKey, value: string) => setDraft({ ...draft, template: 'custom', colors: { ...draft.colors, [key]: value } });
   const setLayout = (patch: Partial<SiteLayout>) => setDraft({ ...draft, template: 'custom', layout: { ...draft.layout, ...patch } });
 
-  async function save() {
+  async function save(publish: boolean) {
+    if (invalidLinks) { void uiAlert('請先修正板塊中的網址'); return; }
+    if (publish && !(await uiConfirm('將目前模板與板塊發布至正式官網？'))) return;
     setSaving(true);
     try {
       const res = await fetch('/api/settings', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ site_theme: draft }),
+        body: JSON.stringify(publish ? { site_theme: draft } : { site_theme_draft: draft }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? '儲存失敗');
-      const next = resolveSiteTheme(data.site_theme);
+      const next = editableSiteTheme(data.site_theme);
       setSaved(next);
       setDraft(next);
-      void uiAlert('網站外觀已更新,前台重新整理後就會套用。');
+      onSaved?.(data.site_theme);
+      if (publish) setPublished(next);
+      void uiAlert(publish ? '已發布至官網。' : '草稿已儲存，正式官網尚未變更。');
     } catch (e) {
       void uiAlert(e instanceof Error ? e.message : '儲存失敗');
     } finally {
@@ -91,16 +113,16 @@ export default function SiteThemeEditor({ initial }: { initial: unknown }) {
 
   return (
     <section className="rounded-xl border border-[#e5ded4] bg-white p-5 pb-28 shadow-sm">
+      <fieldset disabled={saving || uploading} className="min-w-0">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold">官網模板與外觀</h2>
-          <p className="mt-1 text-xs text-[#8a7f72]">選一個樣板快速套用,或自行調整每一個顏色與版面。儲存後前台全站套用。</p>
+          <p className="mt-1 text-xs text-[#8a7f72]" role="status">{dirty ? '有未儲存的變更' : unpublished ? '草稿已儲存，尚未發布' : '已發布'}</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <button type="button" onClick={reset} className="rounded-full border border-[#d7c9bd] px-4 py-2 text-sm text-[#6b6156] hover:bg-[#f6f2ec]">恢復預設</button>
-          <button type="button" onClick={save} disabled={saving || !dirty} className="rounded-full bg-[#1f1b19] px-5 py-2 text-sm font-semibold text-white disabled:opacity-40">
-            {saving ? '儲存中…' : dirty ? '儲存外觀' : '已儲存'}
-          </button>
+          <button type="button" onClick={() => void save(false)} disabled={saving || !dirty || invalidLinks} className="flex items-center gap-2 rounded-md border border-neutral-300 px-4 py-2 text-sm disabled:opacity-40"><Save size={16} />儲存草稿</button>
+          <button type="button" onClick={() => void save(true)} disabled={saving || !unpublished || invalidLinks} className="flex items-center gap-2 rounded-md bg-neutral-900 px-4 py-2 text-sm text-white disabled:opacity-40"><Send size={16} />{saving ? '處理中...' : '發布官網'}</button>
         </div>
       </div>
 
@@ -115,19 +137,12 @@ export default function SiteThemeEditor({ initial }: { initial: unknown }) {
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3" role="radiogroup" aria-label="官網排版">
               {STOREFRONT_TEMPLATES.map((t) => (
                 <label key={t.key} className={`cursor-pointer rounded-lg border p-3 text-sm ${design.style === t.key ? 'border-black bg-neutral-100' : 'border-neutral-200'}`}>
-                  <input type="radio" name="storefront-template" value={t.key} checked={design.style === t.key} onChange={() => setDraft({ ...draft, storefront: { ...design, enabled: true, style: t.key } })} className="mr-2" />
+                  <input type="radio" name="storefront-template" value={t.key} checked={design.style === t.key} onChange={async () => { if (!(await uiConfirm('套用此模板的起始板塊？目前板塊將被取代，發布前不影響官網。'))) return; const next = { ...design, enabled: true, style: t.key }; setDraft({ ...draft, storefront: { ...next, blocks: starterBlocks(next) } }); }} className="mr-2" />
                   {t.name}
                 </label>
               ))}
             </div>
-            <div className="grid gap-3 sm:grid-cols-2">
-              {STOREFRONT_TEXT_FIELDS.map((field) => (
-                <label key={field.key} className="block text-sm">
-                  {field.label}
-                  <textarea rows={field.key === 'featureText' ? 3 : 2} maxLength={field.max} value={design[field.key]} onChange={(e) => setDraft({ ...draft, storefront: { ...design, [field.key]: e.target.value } })} className="mt-1 block w-full resize-y rounded-md border border-neutral-300 bg-white p-2" />
-                </label>
-              ))}
-            </div>
+            <StorefrontBlockEditor blocks={design.blocks ?? []} onChange={(blocks) => setDraft({ ...draft, storefront: { ...design, blocks } })} categories={previewCategories} products={previewProducts} onUploading={setUploading} />
           </fieldset>
           {/* 樣板 */}
           <div>
@@ -194,17 +209,21 @@ export default function SiteThemeEditor({ initial }: { initial: unknown }) {
         </div>
 
       </div>
+      </fieldset>
       <button type="button" onClick={() => setPreviewOpen(true)} aria-haspopup="dialog" className="fixed bottom-[calc(20px+env(safe-area-inset-bottom))] left-1/2 z-50 flex min-h-12 -translate-x-1/2 items-center gap-2 rounded-full border border-white/30 bg-neutral-600/75 px-6 py-3 text-base text-white shadow-lg backdrop-blur-md transition hover:bg-neutral-600/90 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-neutral-600">
         <Eye size={20} aria-hidden="true" />預覽
       </button>
-      <dialog ref={previewDialog} aria-labelledby="storefront-preview-title" onCancel={() => setPreviewOpen(false)} onClose={() => setPreviewOpen(false)} onClick={(event) => { if (event.target === event.currentTarget) setPreviewOpen(false); }} className="fixed inset-0 m-auto max-h-[90dvh] w-[calc(100%-24px)] max-w-[430px] overflow-hidden rounded-lg border border-neutral-200 bg-white p-0 text-neutral-900 shadow-2xl backdrop:bg-black/45 backdrop:backdrop-blur-sm">
+      <dialog ref={previewDialog} aria-labelledby="storefront-preview-title" onCancel={() => setPreviewOpen(false)} onClose={() => setPreviewOpen(false)} onClick={(event) => { if (event.target === event.currentTarget) setPreviewOpen(false); }} style={{ maxWidth: previewDevice === 'mobile' ? 430 : 1200 }} className="fixed inset-0 m-auto max-h-[90dvh] w-[calc(100%-24px)] overflow-hidden rounded-lg border border-neutral-200 bg-white p-0 text-neutral-900 shadow-2xl backdrop:bg-black/45 backdrop:backdrop-blur-sm">
         <div className="flex items-center justify-between border-b border-neutral-200 bg-white px-4 py-3">
           <h2 id="storefront-preview-title" className="text-sm font-semibold">官網預覽</h2>
+          <div className="flex gap-1" role="group" aria-label="預覽尺寸">
+            <button type="button" title="手機預覽" aria-label="手機預覽" aria-pressed={previewDevice === 'mobile'} onClick={() => setPreviewDevice('mobile')} className="rounded-md p-2 aria-pressed:bg-neutral-200"><Smartphone size={18} /></button>
+            <button type="button" title="桌面預覽" aria-label="桌面預覽" aria-pressed={previewDevice === 'desktop'} onClick={() => setPreviewDevice('desktop')} className="rounded-md p-2 aria-pressed:bg-neutral-200"><Monitor size={18} /></button>
+          </div>
           <button type="button" autoFocus onClick={() => setPreviewOpen(false)} aria-label="關閉預覽" title="關閉預覽" className="flex h-10 w-10 items-center justify-center rounded-full hover:bg-neutral-100"><X size={20} /></button>
         </div>
-          <div className="max-h-[calc(90dvh-65px)] overflow-y-auto overflow-x-hidden overscroll-contain" style={Object.fromEntries(COLOR_FIELDS.map((f) => [cssVar(f.key), draft.colors[f.key]])) as CSSProperties}>
-            <StorePreview theme={draft} images={previewImages} hero={design.enabled ? <StorefrontDesignHero design={design} image={previewImages[0]} categories={previewCategories} onCategory={() => {}} onBrowse={() => {}} /> : undefined} />
-            {design.enabled && <StorefrontDesignFeature design={design} image={previewImages[1]} onBrowse={() => {}} />}
+          <div className={`${previewStyles.preview} max-h-[calc(90dvh-65px)] overflow-y-auto overflow-x-hidden overscroll-contain bg-[var(--c-bg)] text-[var(--c-text)]`} data-card={draft.layout.card} data-radius={draft.layout.radius} data-heading={draft.layout.heading} onClickCapture={(event) => { if ((event.target as HTMLElement).closest('a')) event.preventDefault(); }} style={Object.fromEntries(COLOR_FIELDS.map((f) => [cssVar(f.key), draft.colors[f.key]])) as CSSProperties}>
+            {design.enabled ? <StorefrontBlocks blocks={resolveBlocks(design.blocks) ?? []} products={previewProducts} categories={previewCategories} images={previewImages} onCategory={() => {}} preview renderProduct={(product) => <ProductCard product={product} favorited={false} favoritePending={false} favoritesLoaded onFavoriteChange={() => {}} onAdd={() => {}} />} /> : <StorePreview theme={draft} images={previewImages} />}
           </div>
       </dialog>
     </section>

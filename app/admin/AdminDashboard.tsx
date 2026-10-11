@@ -529,6 +529,7 @@ export default function AdminDashboard({
   const [couponUsages] = useState<CouponUsage[]>(initialCouponUsages);
   const [manualCouponByUser, setManualCouponByUser] = useState<Record<string, string>>({});
   const [logoUrl, setLogoUrl] = useState(initialLogoUrl);
+  const [siteTheme, setSiteTheme] = useState(initialSettings?.site_theme);
   const [couponHero, setCouponHero] = useState(initialSettings?.coupon_hero_image ?? '');
   const [heroBusy, setHeroBusy] = useState(false);
   const [memberStamp, setMemberStamp] = useState(initialSettings?.member_stamp_image ?? '');
@@ -3008,7 +3009,7 @@ export default function AdminDashboard({
                 </Card>
               )}
 
-              <div hidden={settingsTab !== 'templates'}><SiteThemeEditor initial={initialSettings?.site_theme} /></div>
+              <div hidden={settingsTab !== 'templates'}><SiteThemeEditor initial={siteTheme} onSaved={setSiteTheme} /></div>
 
               {settingsTab === 'general' && (
               <Card title="首頁商品分類版型">

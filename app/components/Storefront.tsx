@@ -19,6 +19,7 @@ import StoreHeader from '@/app/components/StoreHeader';
 import { resolveSiteTheme } from '@/lib/site-theme';
 import { resolveStorefront } from '@/lib/storefront-template';
 import { StorefrontDesignHero, StorefrontDesignFeature } from './StorefrontDesign';
+import StorefrontBlocks from './StorefrontBlocks';
 
 // 購物車存在瀏覽器本機的 key(結帳頁會讀同一份)
 const CART_KEY = 'cart';
@@ -171,7 +172,10 @@ export default function Storefront({ campaign = null, preview = false }: { campa
       .then((res) => (res.ok ? res.json() : null))
       .then((s) => {
         if (s?.logo_url) setLogoUrl(s.logo_url);
-        if (s) setSettings(s);
+        if (s) {
+          setSettings(s);
+          if (!campaign && resolveSiteTheme(s.site_theme).storefront?.blocks !== undefined) setCategory((current) => current === 'spring' ? 'all' : current);
+        }
       })
       .catch(() => {});
 
@@ -456,8 +460,10 @@ export default function Storefront({ campaign = null, preview = false }: { campa
 
   const design = resolveStorefront(resolveSiteTheme(settings?.site_theme).storefront);
   const customDesign = design.enabled && !campaign;
+  const modularDesign = customDesign && design.blocks !== undefined;
+  const showBlocks = modularDesign && !query && category === 'all';
   const browseProducts = () => document.getElementById('store-products')?.scrollIntoView({ behavior: 'smooth' });
-  const browseCategory = (slug: string) => { setCategory(slug); browseProducts(); };
+  const browseCategory = (slug: string) => { setCategory(slug); requestAnimationFrame(browseProducts); };
 
   return (
     <main className="min-h-screen bg-[var(--c-bg)] text-[var(--c-text)]">
@@ -481,7 +487,8 @@ export default function Storefront({ campaign = null, preview = false }: { campa
         onCart={() => setCartOpen(true)}
       />
 
-      {customDesign ? <StorefrontDesignHero design={design} image={heroBanners[0]?.image || products.find(isVisibleInStore)?.image} categories={categoryTabs.filter((c) => c.slug !== 'all')} onCategory={browseCategory} onBrowse={browseProducts} /> : <HeroCarousel banners={heroBanners} />}
+      {showBlocks ? <StorefrontBlocks blocks={design.blocks!} products={products} categories={categoryTabs.filter((c) => c.slug !== 'all')} images={[...heroBanners.map((b) => b.image), ...liveProducts.map((p) => p.image)].filter(Boolean)} onCategory={browseCategory} loading={loading} renderProduct={(product) => <ProductCard product={product} favorited={favorites.has(product.id)} favoritePending={favoritePending.has(product.id)} favoritesLoaded={favoritesLoaded} onFavoriteChange={(next) => setFavoriteSaved(product.id, next)} onAdd={() => setQuickAdd(product)} />} /> : <>
+      {customDesign && !modularDesign ? <StorefrontDesignHero design={design} image={heroBanners[0]?.image || products.find(isVisibleInStore)?.image} categories={categoryTabs.filter((c) => c.slug !== 'all')} onCategory={browseCategory} onBrowse={browseProducts} /> : !modularDesign ? <HeroCarousel banners={heroBanners} /> : null}
       <CategoryNavigation categories={categoryTabs} value={category} onSelect={setCategory} imageStyle={settings?.category_image_style ?? 'circle'} />
 
       <div className="mx-auto max-w-6xl px-4 pb-8 sm:px-6">
@@ -519,7 +526,8 @@ export default function Storefront({ campaign = null, preview = false }: { campa
         </section>
       </div>
 
-      {customDesign && <StorefrontDesignFeature design={design} image={heroBanners[1]?.image} onBrowse={browseProducts} />}
+      {customDesign && !modularDesign && <StorefrontDesignFeature design={design} image={heroBanners[1]?.image} onBrowse={browseProducts} />}
+      </>}
       <Footer settings={settings} logoUrl={logoUrl} homeHref={homeHref} />
 
       {/* 左側分類選單 */}
@@ -1059,7 +1067,7 @@ function SocialLink({ href, label, image, children }: { href?: string; label: st
   );
 }
 
-function ProductCard({
+export function ProductCard({
   product,
   favorited,
   favoritePending,

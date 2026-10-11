@@ -4,7 +4,7 @@ import { ArrowRight } from 'lucide-react';
 import type { StorefrontDesign as Design } from '@/lib/storefront-template';
 import styles from './storefront-design.module.css';
 
-export type DesignCategory = { slug: string; name: string; image?: string };
+export type DesignCategory = { slug: string; name: string; image?: string; parent_id?: string | null; sort_order?: number };
 type Props = { design: Design; image?: string; categories: DesignCategory[]; onCategory: (slug: string) => void; onBrowse: () => void };
 
 export function StorefrontDesignHero({ design, image, categories, onCategory, onBrowse }: Props) {
