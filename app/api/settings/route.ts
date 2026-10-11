@@ -90,7 +90,7 @@ export async function PATCH(request: Request) {
   }
   // 網站外觀:只保留合法的顏色與選項
   if ('site_theme' in body) update.site_theme = resolveSiteTheme(body.site_theme);
-  if ('category_image_style' in body) update.category_image_style = ['square', 'cutout'].includes(String(body.category_image_style)) ? String(body.category_image_style) : 'circle';
+  if ('category_image_style' in body) update.category_image_style = ['text', 'square', 'cutout'].includes(String(body.category_image_style)) ? String(body.category_image_style) : 'circle';
 
   const supabase = (await shopAdminClient());
   if ('site_theme_draft' in body) {

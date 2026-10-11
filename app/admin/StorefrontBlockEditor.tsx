@@ -1,13 +1,17 @@
 'use client';
 
-import { useState } from 'react';
-import { ArrowDown, ArrowUp, Copy, GripVertical, Plus, Trash2, Upload } from 'lucide-react';
+import { useRef, useState, type ReactNode } from 'react';
+import { ArrowDown, ArrowUp, ChevronDown, Copy, Eye, EyeOff, GripVertical, ImagePlus, Plus, Trash2, X } from 'lucide-react';
 import { BLOCK_TYPES, MAX_BLOCKS, createBlock, moveBlock, safeBlockUrl, type BlockType, type StorefrontBlock } from '@/lib/storefront-blocks';
 import type { Product } from '@/lib/types';
 import type { DesignCategory } from '@/app/components/StorefrontDesign';
 import { uiAlert, uiConfirm } from '@/lib/ui-dialog';
 
-export default function StorefrontBlockEditor({ blocks, onChange, categories, products, onUploading, designStyle }: {
+const input = 'mt-1 block w-full min-w-0 rounded-lg border border-[#e5ded4] bg-white px-3 py-2 text-sm';
+const typeLabel = (type: BlockType) => BLOCK_TYPES.find((t) => t.key === type)?.label ?? type;
+
+// 後台 模板設定 → 首頁內容:一個板塊一列,點開只顯示該類型需要的欄位,進階設定收起來
+export default function StorefrontBlockEditor({ blocks, onChange, categories, products, onUploading }: {
   blocks: StorefrontBlock[]; onChange: (blocks: StorefrontBlock[]) => void;
   categories: DesignCategory[]; products: Product[]; onUploading: (busy: boolean) => void;
   designStyle?: string;
@@ -31,55 +35,121 @@ export default function StorefrontBlockEditor({ blocks, onChange, categories, pr
     } catch (error) { void uiAlert(error instanceof Error ? error.message : '圖片上傳失敗'); }
     finally { setUploading(false); onUploading(false); }
   }
-  return <fieldset disabled={uploading} className="min-w-0 space-y-4">
-    <legend className="mb-3 text-base font-semibold">首頁板塊 <span className="text-xs font-normal text-neutral-500">{blocks.length} / {MAX_BLOCKS}</span></legend>
-    <div className="flex flex-wrap items-center gap-2">
-      <label className="text-sm">板塊類型 <select value={type} onChange={(e) => setType(e.target.value as BlockType)} className="ml-2 rounded-md border border-neutral-300 bg-white p-2">{BLOCK_TYPES.map((option) => <option key={option.key} value={option.key}>{option.label}</option>)}</select></label>
-      <button type="button" disabled={blocks.length >= MAX_BLOCKS} onClick={() => { const next = createBlock(type, crypto.randomUUID()); onChange([...blocks, next]); setActive(next.id); }} className="flex items-center gap-2 rounded-md bg-neutral-900 px-3 py-2 text-sm text-white disabled:opacity-40"><Plus size={16} />新增板塊</button>
-    </div>
-    <div className="divide-y divide-neutral-200 border-y border-neutral-200">
-      {blocks.map((block, index) => <div key={block.id} data-editor-block={block.id} onDragOver={(e) => { if (dragged) { e.preventDefault(); setTarget(block.id); } }} onDrop={(e) => { e.preventDefault(); if (dragged) onChange(moveBlock(blocks, blocks.findIndex((b) => b.id === dragged), index)); setDragged(null); setTarget(null); }} className={`py-3 ${target === block.id ? 'border-t-2 border-t-neutral-800' : ''}`}>
-        <div className="flex flex-wrap items-center gap-1.5">
-          <button type="button" draggable={!uploading} aria-label={`拖曳板塊 ${index + 1}`} title="拖曳排序" onDragStart={(e) => { e.dataTransfer.setData('text/plain', block.id); e.dataTransfer.effectAllowed = 'move'; setDragged(block.id); }} onDragEnd={() => { setDragged(null); setTarget(null); }} className="flex h-9 w-8 shrink-0 cursor-grab items-center justify-center text-neutral-500"><GripVertical size={18} /></button>
-          <button type="button" onClick={() => setActive(active === block.id ? null : block.id)} aria-expanded={active === block.id} className="min-w-0 flex-1 break-words text-left text-sm font-medium">{index + 1}. {block.title || BLOCK_TYPES.find((t) => t.key === block.type)?.label}</button>
-          <label className="flex items-center gap-1 text-xs"><input type="checkbox" checked={block.visible} onChange={(e) => patch(block.id, { visible: e.target.checked })} aria-label={`顯示板塊 ${index + 1}`} />顯示</label>
-          <div className="flex shrink-0">
+  return <fieldset disabled={uploading} className="min-w-0 space-y-3">
+    <legend className="sr-only">首頁板塊</legend>
+    <ol className="space-y-2">
+      {blocks.map((block, index) => {
+        const open = active === block.id;
+        return <li key={block.id} data-editor-block={block.id}
+          onDragOver={(e) => { if (dragged) { e.preventDefault(); setTarget(block.id); } }}
+          onDrop={(e) => { e.preventDefault(); if (dragged) onChange(moveBlock(blocks, blocks.findIndex((b) => b.id === dragged), index)); setDragged(null); setTarget(null); }}
+          className={`rounded-xl border bg-white ${open ? 'border-[#1f1b19]/40 shadow-sm' : 'border-[#e5ded4]'} ${target === block.id ? 'ring-2 ring-[#1f1b19]/30' : ''} ${block.visible ? '' : 'opacity-60'}`}>
+          <div className="flex items-center gap-1 px-1.5 py-1.5">
+            <button type="button" draggable={!uploading} aria-label={`拖曳板塊 ${index + 1}`} title="拖曳排序" onDragStart={(e) => { e.dataTransfer.setData('text/plain', block.id); e.dataTransfer.effectAllowed = 'move'; setDragged(block.id); }} onDragEnd={() => { setDragged(null); setTarget(null); }} className="hidden h-9 w-7 shrink-0 cursor-grab items-center justify-center text-[#b8ad9f] sm:flex"><GripVertical size={18} /></button>
+            <button type="button" onClick={() => setActive(open ? null : block.id)} aria-expanded={open} className="flex min-w-0 flex-1 items-center gap-2 py-1.5 text-left">
+              <span className="shrink-0 rounded-full bg-[#efe8dd] px-2 py-0.5 text-[11px] text-[#6b6156]">{typeLabel(block.type)}</span>
+              <span className="min-w-0 truncate text-sm font-medium">{block.title.split('\n').join(' ') || <span className="text-[#a99e8f]">(未命名)</span>}</span>
+              <ChevronDown size={16} className={`ml-auto shrink-0 text-[#a99e8f] transition ${open ? 'rotate-180' : ''}`} />
+            </button>
+            <IconButton label={block.visible ? `隱藏板塊 ${index + 1}` : `顯示板塊 ${index + 1}`} onClick={() => patch(block.id, { visible: !block.visible })}>{block.visible ? <Eye size={16} /> : <EyeOff size={16} />}</IconButton>
             <IconButton label={`上移板塊 ${index + 1}`} disabled={index === 0} onClick={() => onChange(moveBlock(blocks, index, index - 1))}><ArrowUp size={16} /></IconButton>
             <IconButton label={`下移板塊 ${index + 1}`} disabled={index === blocks.length - 1} onClick={() => onChange(moveBlock(blocks, index, index + 1))}><ArrowDown size={16} /></IconButton>
-            <IconButton label={`複製板塊 ${index + 1}`} disabled={blocks.length >= MAX_BLOCKS} onClick={() => { const next = { ...block, id: crypto.randomUUID() }; onChange([...blocks.slice(0, index + 1), next, ...blocks.slice(index + 1)]); setActive(next.id); }}><Copy size={16} /></IconButton>
-            <IconButton label={`刪除板塊 ${index + 1}`} onClick={async () => { if (await uiConfirm('刪除這個板塊？發布前不會影響正式官網。')) onChange(blocks.filter((b) => b.id !== block.id)); }}><Trash2 size={16} /></IconButton>
           </div>
-        </div>
-        {active === block.id && <div className="grid gap-4 px-2 pb-2 pt-4 sm:grid-cols-2">
-          <TextField label="板塊標題" value={block.title} max={120} onChange={(title) => patch(block.id, { title })} />
-          <label className="text-sm">內文<textarea value={block.text} maxLength={2000} rows={3} onChange={(e) => patch(block.id, { text: e.target.value })} className="mt-1 block w-full rounded-md border border-neutral-300 p-2" /></label>
-          {['hero', 'imageText', 'video'].includes(block.type) && <>
-            <TextField label={block.type === 'video' ? '影片封面網址' : '圖片網址'} value={block.image} max={2048} onChange={(image) => patch(block.id, { image })} url />
-            <label className="flex items-center gap-2 self-center text-sm"><Upload size={16} />{uploading ? '上傳中...' : '上傳圖片'}<input type="file" accept="image/png,image/jpeg,image/webp,image/gif" onChange={(e) => { void upload(block.id, e.target.files?.[0]); e.target.value = ''; }} className="min-w-0 max-w-full text-xs" /></label>
-          </>}
-          {block.type === 'video' && <TextField label="影片網址（MP4 / WebM）" value={block.video} max={2048} onChange={(video) => patch(block.id, { video })} url />}
-          <TextField label="按鈕文字" value={block.action} max={40} onChange={(action) => patch(block.id, { action })} />
-          <TextField label="按鈕連結" value={block.href} max={2048} onChange={(href) => patch(block.id, { href })} url />
-          {block.type === 'products' && <>
-            <label className="text-sm">商品來源<select value={block.source} onChange={(e) => patch(block.id, { source: e.target.value as StorefrontBlock['source'] })} className="mt-1 block w-full rounded-md border p-2"><option value="all">全部上架商品</option><option value="category">指定分類</option><option value="selected">指定商品</option></select></label>
-            {block.source === 'category' && <label className="text-sm">商品分類<select value={block.category} onChange={(e) => patch(block.id, { category: e.target.value })} className="mt-1 block w-full rounded-md border p-2"><option value="">選擇分類</option>{categories.map((c) => <option key={c.slug} value={c.slug}>{c.name}</option>)}</select></label>}
-            {block.source === 'selected' && <fieldset className="max-h-48 overflow-y-auto border-y py-2"><legend className="text-sm">選取商品（最多 24 件）</legend>{products.map((p) => <label key={p.id} className="flex items-center gap-2 py-1 text-sm"><input type="checkbox" checked={block.productIds.includes(p.id)} disabled={!block.productIds.includes(p.id) && block.productIds.length >= 24} onChange={(e) => patch(block.id, { productIds: e.target.checked ? [...block.productIds, p.id] : block.productIds.filter((id) => id !== p.id) })} />{p.name}</label>)}</fieldset>}
-            <label className="text-sm">顯示件數<input type="number" min={1} max={24} value={block.limit} onChange={(e) => patch(block.id, { limit: Math.min(24, Math.max(1, Number(e.target.value))) })} className="mt-1 block w-full rounded-md border p-2" /></label>
-          </>}
-          {block.type === 'categories' && designStyle === 'classic' && <label className="text-sm">分類圖片樣式<select value={block.categoryImageStyle ?? 'inherit'} onChange={(e) => patch(block.id, { categoryImageStyle: e.target.value === 'inherit' ? undefined : e.target.value as StorefrontBlock['categoryImageStyle'] })} className="mt-1 block w-full rounded-md border p-2"><option value="inherit">沿用一般設定</option><option value="circle">圓形</option><option value="square">方形</option><option value="cutout">去背 PNG</option></select></label>}
-          {(block.type === 'products' || (block.type === 'categories' && designStyle !== 'classic')) && <label className="text-sm">電腦欄數<select value={block.columns} onChange={(e) => patch(block.id, { columns: Number(e.target.value) })} className="mt-1 block w-full rounded-md border p-2">{[1, 2, 3, 4].map((count) => <option key={count} value={count}>{count} 欄</option>)}</select></label>}
-          {block.type !== 'announcement' && !(block.type === 'categories' && designStyle === 'classic') && <label className="text-sm">圖片比例<select value={block.ratio} onChange={(e) => patch(block.id, { ratio: e.target.value as StorefrontBlock['ratio'] })} className="mt-1 block w-full rounded-md border p-2"><option value="wide">橫式 16:9</option><option value="square">正方形 1:1</option><option value="portrait">直式 4:5</option></select></label>}
-          <label className="text-sm">上下間距 {block.spacing}px<input type="range" min={0} max={96} step={4} value={block.spacing} onChange={(e) => patch(block.id, { spacing: Number(e.target.value) })} className="mt-2 block w-full" /></label>
-          <div className="flex items-center gap-3 text-sm"><label className="flex items-center gap-2">背景色<input type="color" value={block.background || '#ffffff'} onChange={(e) => patch(block.id, { background: e.target.value })} className="h-9 w-10" /></label><label className="flex items-center gap-1"><input type="checkbox" checked={!block.background} onChange={(e) => patch(block.id, { background: e.target.checked ? '' : '#ffffff' })} />沿用全站</label></div>
-        </div>}
-      </div>)}
+          {open && <div className="space-y-3 border-t border-[#efe8dd] px-3 pb-3 pt-3">
+            <BlockFields block={block} patch={(value) => patch(block.id, value)} categories={categories} products={products} uploading={uploading} onUpload={(file) => void upload(block.id, file)} />
+            <details className="rounded-lg bg-[#faf8f5] px-3 py-2 text-sm">
+              <summary className="cursor-pointer text-xs text-[#8a7f72]">進階設定(比例、間距、背景色)</summary>
+              <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                {['hero', 'products', 'video'].includes(block.type) && <label className="text-sm">{block.type === 'products' ? '商品圖片比例' : '圖片比例'}<select value={block.ratio} onChange={(e) => patch(block.id, { ratio: e.target.value as StorefrontBlock['ratio'] })} className={input}><option value="portrait">直式 4:5</option><option value="square">正方形 1:1</option><option value="wide">橫式 16:9</option></select></label>}
+                {block.type === 'products' && <label className="text-sm">電腦版欄數<select value={block.columns} onChange={(e) => patch(block.id, { columns: Number(e.target.value) })} className={input}>{[2, 3, 4].map((count) => <option key={count} value={count}>{count} 欄</option>)}</select></label>}
+                <label className="text-sm">上下間距 {block.spacing}px<input type="range" min={0} max={96} step={4} value={block.spacing} onChange={(e) => patch(block.id, { spacing: Number(e.target.value) })} className="mt-2 block w-full" /></label>
+                <div className="flex items-center gap-3 text-sm"><label className="flex items-center gap-2">背景色<input type="color" value={block.background || '#ffffff'} onChange={(e) => patch(block.id, { background: e.target.value })} className="h-9 w-10" /></label><label className="flex items-center gap-1"><input type="checkbox" checked={!block.background} onChange={(e) => patch(block.id, { background: e.target.checked ? '' : '#ffffff' })} />沿用全站</label></div>
+              </div>
+            </details>
+            <div className="flex justify-end gap-1">
+              <button type="button" disabled={blocks.length >= MAX_BLOCKS} onClick={() => { const next = { ...block, id: crypto.randomUUID() }; onChange([...blocks.slice(0, index + 1), next, ...blocks.slice(index + 1)]); setActive(next.id); }} className="flex items-center gap-1 rounded-md px-2.5 py-1.5 text-xs text-[#6b6156] hover:bg-[#f6f2ec] disabled:opacity-30"><Copy size={14} />複製</button>
+              <button type="button" onClick={async () => { if (await uiConfirm('刪除這個板塊?發布前不會影響正式官網。')) onChange(blocks.filter((b) => b.id !== block.id)); }} className="flex items-center gap-1 rounded-md px-2.5 py-1.5 text-xs text-[#b42318] hover:bg-[#fdecea]"><Trash2 size={14} />刪除</button>
+            </div>
+          </div>}
+        </li>;
+      })}
+    </ol>
+    <div className="flex flex-wrap items-center gap-2">
+      <select aria-label="新增板塊類型" value={type} onChange={(e) => setType(e.target.value as BlockType)} className="rounded-lg border border-[#e5ded4] bg-white px-3 py-2 text-sm">{BLOCK_TYPES.map((option) => <option key={option.key} value={option.key}>{option.label}</option>)}</select>
+      <button type="button" disabled={blocks.length >= MAX_BLOCKS} onClick={() => { const next = createBlock(type, crypto.randomUUID()); if (type === 'products' || type === 'imageText') next.href = '#store-products'; onChange([...blocks, next]); setActive(next.id); }} className="flex items-center gap-1.5 rounded-lg bg-[#1f1b19] px-3 py-2 text-sm text-white disabled:opacity-40"><Plus size={16} />新增板塊</button>
+      <span className="text-xs text-[#a99e8f]">{blocks.length} / {MAX_BLOCKS}</span>
     </div>
   </fieldset>;
 }
-function IconButton({ label, disabled, onClick, children }: { label: string; disabled?: boolean; onClick: () => void; children: React.ReactNode }) {
-  return <button type="button" title={label} aria-label={label} disabled={disabled} onClick={onClick} className="flex h-9 w-9 items-center justify-center rounded-md hover:bg-neutral-100 disabled:opacity-25">{children}</button>;
+
+function BlockFields({ block, patch, categories, products, uploading, onUpload }: {
+  block: StorefrontBlock; patch: (value: Partial<StorefrontBlock>) => void; categories: DesignCategory[]; products: Product[];
+  uploading: boolean; onUpload: (file?: File) => void;
+}) {
+  const title = (label: string, rows = 1) => rows > 1
+    ? <label className="block text-sm">{label}<textarea value={block.title} maxLength={120} rows={rows} onChange={(e) => patch({ title: e.target.value })} className={input} /></label>
+    : <TextField label={label} value={block.title} max={120} onChange={(v) => patch({ title: v })} />;
+  const text = (label: string, rows = 2) => <label className="block text-sm">{label}<textarea value={block.text} maxLength={2000} rows={rows} onChange={(e) => patch({ text: e.target.value })} className={input} /></label>;
+  const image = (label: string, hint?: string) => <ImageField label={label} hint={hint} value={block.image} uploading={uploading} onUpload={onUpload} onChange={(v) => patch({ image: v })} />;
+  const link = <TextField label="點擊後前往" placeholder="留空 = 顯示全部商品" value={block.href === '#store-products' ? '' : block.href} max={2048} onChange={(v) => patch({ href: v || '#store-products' })} url />;
+  switch (block.type) {
+    case 'hero': return <div className="grid gap-3 sm:grid-cols-2">
+      <div className="space-y-3">{title('大標題(可換行)', 2)}<TextField label="副標題" value={block.text} max={160} onChange={(v) => patch({ text: v })} /><TextField label="按鈕文字" placeholder="留空就不顯示按鈕" value={block.action} max={40} onChange={(v) => patch({ action: v })} />{link}</div>
+      {image('主視覺圖片', '建議上傳沒有文字的直式照片,標題會疊在照片上')}
+    </div>;
+    case 'products': return <div className="grid gap-3 sm:grid-cols-2">
+      {title('區塊標題')}
+      <label className="text-sm">顯示件數<input type="number" min={1} max={24} value={block.limit} onChange={(e) => patch({ limit: Math.min(24, Math.max(1, Number(e.target.value) || 1)) })} className={input} /></label>
+      <label className="text-sm">商品來源<select value={block.source} onChange={(e) => patch({ source: e.target.value as StorefrontBlock['source'] })} className={input}><option value="all">全部上架商品</option><option value="category">指定分類</option><option value="selected">自己挑選商品</option></select></label>
+      {block.source === 'category' && <label className="text-sm">商品分類<select value={block.category} onChange={(e) => patch({ category: e.target.value })} className={input}><option value="">選擇分類</option>{categories.map((c) => <option key={c.slug} value={c.slug}>{c.name}</option>)}</select></label>}
+      {block.source === 'selected' && <fieldset className="max-h-56 overflow-y-auto rounded-lg border border-[#e5ded4] px-3 py-2 sm:col-span-2"><legend className="px-1 text-xs text-[#8a7f72]">勾選商品(最多 24 件,依勾選順序顯示)</legend>{products.map((p) => <label key={p.id} className="flex items-center gap-2 py-1 text-sm"><input type="checkbox" checked={block.productIds.includes(p.id)} disabled={!block.productIds.includes(p.id) && block.productIds.length >= 24} onChange={(e) => patch({ productIds: e.target.checked ? [...block.productIds, p.id] : block.productIds.filter((id) => id !== p.id) })} />{p.name}</label>)}</fieldset>}
+    </div>;
+    case 'categories': return <div className="space-y-2">{title('區塊標題(選填)')}<p className="text-xs text-[#a99e8f]">會自動列出所有主分類。樣式在上方「分類樣式」切換,分類圖片在「商品及分類 → 分類管理」上傳。</p></div>;
+    case 'imageText': return <div className="grid gap-3 sm:grid-cols-2">
+      <div className="space-y-3">{title('大字(例:Daily Wear)')}<TextField label="小字(例:日常系列)" value={block.text} max={200} onChange={(v) => patch({ text: v })} />{link}</div>
+      {image('橫幅圖片', '建議上傳沒有文字的橫式照片')}
+    </div>;
+    case 'countdown': return <div className="grid gap-3 sm:grid-cols-2">
+      {title('標題')}
+      <label className="text-sm">結束時間<input type="datetime-local" value={block.endsAt} onChange={(e) => patch({ endsAt: e.target.value })} className={input} /></label>
+      <div className="sm:col-span-2">{text('補充說明(選填)')}</div>
+    </div>;
+    case 'announcement': return <div className="grid gap-3 sm:grid-cols-2">
+      {title('標題')}<TextField label="按鈕文字(選填)" value={block.action} max={40} onChange={(v) => patch({ action: v })} />
+      <div className="sm:col-span-2">{text('內容', 3)}</div>{block.action && link}
+    </div>;
+    case 'video': return <div className="grid gap-3 sm:grid-cols-2">
+      <div className="space-y-3">{title('標題')}<TextField label="影片網址(MP4 / WebM)" value={block.video} max={2048} onChange={(v) => patch({ video: v })} url />{text('說明(選填)')}</div>
+      {image('影片封面')}
+    </div>;
+  }
 }
-function TextField({ label, value, max, onChange, url = false }: { label: string; value: string; max: number; onChange: (value: string) => void; url?: boolean }) {
+
+function ImageField({ label, hint, value, uploading, onUpload, onChange }: { label: string; hint?: string; value: string; uploading: boolean; onUpload: (file?: File) => void; onChange: (value: string) => void }) {
+  const file = useRef<HTMLInputElement>(null);
+  return <div className="text-sm">
+    <p>{label}</p>
+    <div className="mt-1 flex items-start gap-3">
+      <button type="button" onClick={() => file.current?.click()} className="relative flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-dashed border-[#d7c9bd] bg-[#faf8f5] text-[#a99e8f] hover:border-[#1f1b19]/40" aria-label={`上傳${label}`}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        {value ? <img src={value} alt="" className="h-full w-full object-cover" /> : <ImagePlus size={22} />}
+      </button>
+      <div className="min-w-0 flex-1 space-y-1.5">
+        <div className="flex flex-wrap gap-1.5">
+          <button type="button" onClick={() => file.current?.click()} className="rounded-md border border-[#d7c9bd] px-3 py-1.5 text-xs">{uploading ? '上傳中...' : value ? '更換圖片' : '上傳圖片'}</button>
+          {value && <button type="button" onClick={() => onChange('')} className="flex items-center gap-1 rounded-md px-2 py-1.5 text-xs text-[#8a7f72] hover:bg-[#f6f2ec]"><X size={13} />移除</button>}
+        </div>
+        {hint && <p className="text-[11px] leading-4 text-[#a99e8f]">{hint}</p>}
+        <details className="text-xs text-[#8a7f72]"><summary className="cursor-pointer">或貼上圖片網址</summary><input value={value} maxLength={2048} onChange={(e) => onChange(e.target.value)} placeholder="https://..." className={input} /></details>
+      </div>
+      <input ref={file} type="file" hidden accept="image/png,image/jpeg,image/webp,image/gif" onChange={(e) => { onUpload(e.target.files?.[0]); e.target.value = ''; }} />
+    </div>
+  </div>;
+}
+function IconButton({ label, disabled, onClick, children }: { label: string; disabled?: boolean; onClick: () => void; children: ReactNode }) {
+  return <button type="button" title={label} aria-label={label} disabled={disabled} onClick={onClick} className="flex h-9 w-8 shrink-0 items-center justify-center rounded-md text-[#6b6156] hover:bg-[#f6f2ec] disabled:opacity-25">{children}</button>;
+}
+function TextField({ label, value, max, onChange, url = false, placeholder }: { label: string; value: string; max: number; onChange: (value: string) => void; url?: boolean; placeholder?: string }) {
   const invalid = url && !!value && !safeBlockUrl(value);
-  return <label className="text-sm">{label}<input value={value} maxLength={max} onChange={(e) => onChange(e.target.value)} aria-invalid={invalid} className="mt-1 block w-full min-w-0 rounded-md border border-neutral-300 p-2" />{invalid && <span className="text-xs text-red-700">請使用 HTTPS、站內路徑或 #錨點連結</span>}</label>;
+  return <label className="block text-sm">{label}<input value={value} maxLength={max} placeholder={placeholder} onChange={(e) => onChange(e.target.value)} aria-invalid={invalid} className={input} />{invalid && <span className="text-xs text-red-700">請用 https:// 開頭、站內路徑(/...)或 #錨點</span>}</label>;
 }

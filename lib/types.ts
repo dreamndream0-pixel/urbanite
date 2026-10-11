@@ -52,7 +52,7 @@ export type Product = {
   created_at?: string;
 };
 
-export type CategoryImageStyle = 'circle' | 'square' | 'cutout';
+export type CategoryImageStyle = 'text' | 'circle' | 'square' | 'cutout';
 
 export type SiteSettings = {
   id: number;

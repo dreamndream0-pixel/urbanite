@@ -53,3 +53,13 @@ console.log('Block validation, ordering, URL safety and draft isolation: 25 chec
 for (const categoryImageStyle of ['circle', 'square', 'cutout']) assert.equal(blocks.resolveBlocks([{ ...list[1], categoryImageStyle }])[0].categoryImageStyle, categoryImageStyle);
 assert.equal(blocks.resolveBlocks([{ ...list[1], categoryImageStyle: 'invalid' }])[0].categoryImageStyle, undefined);
 console.log('Category image style validation: 4 checks passed');
+for (const template of design.STOREFRONT_TEMPLATES) assert.ok(blocks.starterBlocks({ style: template.key }).length >= 3);
+const custom = blocks.starterBlocks({ style: 'classic' }).map((b) => b.type === 'hero' ? { ...b, title: '我的店', image: 'https://example.com/a.jpg' } : b);
+const switched = blocks.switchTemplate(custom, 'classic', 'editorial');
+assert.equal(switched[0].title, '我的店');
+assert.equal(switched[0].image, 'https://example.com/a.jpg');
+assert.equal(switched.find((b) => b.type === 'products').title, 'Pick for you');
+assert.equal(switched.some((b) => b.type === 'categories'), false);
+assert.equal(blocks.resolveBlocks([{ type: 'countdown', endsAt: '2026-12-31T23:59' }])[0].endsAt, '2026-12-31T23:59');
+assert.equal(blocks.resolveBlocks([{ type: 'countdown', endsAt: 'tomorrow' }])[0].endsAt, '');
+console.log('Template switching and countdown: 12 checks passed');

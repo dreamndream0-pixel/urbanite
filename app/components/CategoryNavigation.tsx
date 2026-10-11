@@ -14,7 +14,7 @@ export default function CategoryNavigation({ categories, value, onSelect, imageS
   categories: NavigationCategory[];
   value: string;
   onSelect: (slug: string) => void;
-  imageStyle?: 'circle' | 'square' | 'cutout'; // 圓形 / 方形 / 去背 PNG
+  imageStyle?: 'text' | 'circle' | 'square' | 'cutout'; // 文字 / 圓形 / 方形 / 去背 PNG
 }) {
   const [open, setOpen] = useState<string | null>(null);
   const [position, setPosition] = useState({ left: 0, top: 0, maxHeight: 320 });
@@ -25,7 +25,7 @@ export default function CategoryNavigation({ categories, value, onSelect, imageS
   const menuId = useId();
   const expanded = categories.find(category => category.slug === open);
   // 有任何分類上傳了圖片 → 改成圓形圖片 + 名稱的樣式
-  const withImages = categories.some(category => category.image);
+  const withImages = imageStyle !== 'text' && categories.some(category => category.image);
 
   useEffect(() => {
     const active = row.current?.querySelector<HTMLElement>('[aria-current="page"]');

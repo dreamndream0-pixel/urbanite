@@ -8,10 +8,10 @@ import previewStyles from './site-theme-preview.module.css';
 import StorefrontBlocks from '@/app/components/StorefrontBlocks';
 import { ProductCard } from '@/app/components/Storefront';
 import StorefrontBlockEditor from './StorefrontBlockEditor';
-import { starterBlocks, resolveBlocks, safeBlockUrl } from '@/lib/storefront-blocks';
+import { starterBlocks, switchTemplate, resolveBlocks, safeBlockUrl } from '@/lib/storefront-blocks';
 import { editableSiteTheme } from '@/lib/site-theme-state';
 import { isVisibleInStore } from '@/lib/product-status';
-import type { Banner, Product } from '@/lib/types';
+import type { Banner, CategoryImageStyle, Product } from '@/lib/types';
 import { cssVar } from '@/lib/site-theme';
 import {
   COLOR_FIELDS,
@@ -25,7 +25,7 @@ import {
 import { uiAlert, uiConfirm } from '@/lib/ui-dialog';
 
 // 後台 系統設定 → 一般設定 → 網站外觀:6 種樣板+全部顏色選擇器+版面配置,即時預覽
-export default function SiteThemeEditor({ initial, onSaved, categoryImageStyle = 'circle' }: { initial: unknown; onSaved?: (theme: unknown) => void; categoryImageStyle?: 'circle' | 'square' | 'cutout' }) {
+export default function SiteThemeEditor({ initial, onSaved, categoryImageStyle = 'circle', onCategoryImageStyle }: { initial: unknown; onSaved?: (theme: unknown) => void; categoryImageStyle?: CategoryImageStyle; onCategoryImageStyle?: (style: CategoryImageStyle) => void }) {
   const [saved, setSaved] = useState<SiteTheme>(() => editableSiteTheme(initial));
   const [published, setPublished] = useState<SiteTheme>(() => resolveSiteTheme(initial));
   const [draft, setDraft] = useState<SiteTheme>(() => {
@@ -128,25 +128,61 @@ export default function SiteThemeEditor({ initial, onSaved, categoryImageStyle =
 
       <div className="mt-5">
         <div className="space-y-6">
-          <fieldset disabled={saving} className="space-y-4">
-            <legend className="mb-3 text-sm font-semibold">官網模板</legend>
-            <label className="flex items-center gap-2 text-sm">
-              <input type="checkbox" checked={design.enabled} onChange={(e) => setDraft({ ...draft, storefront: { ...design, enabled: e.target.checked } })} />
-              啟用官網模板
-            </label>
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3" role="radiogroup" aria-label="官網排版">
-              {STOREFRONT_TEMPLATES.map((t) => (
-                <label key={t.key} className={`cursor-pointer rounded-lg border p-3 text-sm ${design.style === t.key ? 'border-black bg-neutral-100' : 'border-neutral-200'}`}>
-                  <input type="radio" name="storefront-template" value={t.key} checked={design.style === t.key} onChange={async () => { if (!(await uiConfirm('套用此模板的起始板塊？目前板塊將被取代，發布前不影響官網。'))) return; const next = { ...design, enabled: true, style: t.key }; setDraft({ ...draft, storefront: { ...next, blocks: starterBlocks(next) } }); }} className="mr-2" />
-                  {t.name}
-                </label>
-              ))}
+          <fieldset disabled={saving} className="space-y-5">
+            <legend className="sr-only">官網模板</legend>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-sm font-semibold">1. 選擇首頁排版</p>
+              <label className="flex items-center gap-2 text-sm text-[#6b6156]">
+                <input type="checkbox" checked={design.enabled} onChange={(e) => setDraft({ ...draft, storefront: { ...design, enabled: e.target.checked } })} />
+                使用模板首頁{design.enabled ? '' : '(目前為原本的輪播首頁)'}
+              </label>
+            </div>
+            <div className="grid grid-cols-2 gap-2.5 lg:grid-cols-3" role="radiogroup" aria-label="官網排版">
+              {STOREFRONT_TEMPLATES.map((t, index) => {
+                const on = design.enabled && design.style === t.key;
+                return (
+                  <button
+                    key={t.key}
+                    type="button"
+                    role="radio"
+                    aria-checked={on}
+                    onClick={() => { if (on) return; const blocks = switchTemplate(design.blocks ?? [], design.style, t.key); setDraft({ ...draft, storefront: { ...design, enabled: true, style: t.key, blocks } }); }}
+                    className={`rounded-xl border p-3 text-left transition ${on ? 'border-[#1f1b19] bg-[#f6f2ec] ring-2 ring-[#1f1b19]/10' : 'border-[#e5ded4] hover:border-[#1f1b19]/30'}`}
+                  >
+                    <span className="flex items-center gap-2">
+                      <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] ${on ? 'bg-[#1f1b19] text-white' : 'bg-[#efe8dd] text-[#6b6156]'}`}>{String(index + 1).padStart(2, '0')}</span>
+                      <span className="min-w-0">
+                        <span className="block text-sm font-semibold">{t.name}</span>
+                        <span className="block text-[11px] tracking-wide text-[#a99e8f]">{t.en}</span>
+                      </span>
+                    </span>
+                    <span className="mt-2 block text-xs leading-5 text-[#8a7f72]">{t.note}</span>
+                  </button>
+                );
+              })}
+            </div>
+            <p className="text-xs text-[#a99e8f]">換排版會保留你改過的文字、圖片和商品設定;按畫面下方「預覽」可以看手機和電腦的樣子。</p>
+            <div className="flex flex-wrap items-center gap-3">
+              <label className="flex items-center gap-2 text-sm font-semibold">
+                2. 分類樣式
+                <select value={categoryImageStyle} onChange={(e) => onCategoryImageStyle?.(e.target.value as CategoryImageStyle)} className="rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm font-normal">
+                  <option value="text">預設文字</option>
+                  <option value="circle">圓形</option>
+                  <option value="square">方形</option>
+                  <option value="cutout">去背</option>
+                </select>
+              </label>
+              <span className="text-xs text-[#a99e8f]">首頁分類列的樣式,選了立即套用。分類圖片在「商品及分類 → 分類管理」上傳。</span>
+            </div>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-sm font-semibold">3. 編輯首頁內容</p>
+              <button type="button" onClick={async () => { if (await uiConfirm('把首頁內容恢復成這個排版的預設文字與板塊?')) setDraft({ ...draft, storefront: { ...design, blocks: starterBlocks(design) } }); }} className="text-xs text-[#8a7f72] underline">恢復此排版預設內容</button>
             </div>
             <StorefrontBlockEditor designStyle={design.style} blocks={design.blocks ?? []} onChange={(blocks) => setDraft({ ...draft, storefront: { ...design, blocks } })} categories={previewCategories} products={previewProducts} onUploading={setUploading} />
           </fieldset>
           {/* 樣板 */}
           <div>
-            <p className="mb-2 text-sm font-semibold">樣板</p>
+            <p className="mb-2 text-sm font-semibold">4. 配色樣板</p>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
               {SITE_TEMPLATES.map((t) => {
                 const selected = draft.template === t.key;
@@ -178,7 +214,7 @@ export default function SiteThemeEditor({ initial, onSaved, categoryImageStyle =
 
           {/* 版面配置 */}
           <div className="space-y-4">
-            <p className="text-sm font-semibold">版面配置</p>
+            <p className="text-sm font-semibold">5. 商品卡與字體</p>
             <OptionRow label="商品卡樣式" value={draft.layout.card} options={LAYOUT_OPTIONS.card} onChange={(v) => setLayout({ card: v })} />
             <OptionRow label="商品欄數" value={draft.layout.columns} options={LAYOUT_OPTIONS.columns} onChange={(v) => setLayout({ columns: v })} />
             <OptionRow label="圓角" value={draft.layout.radius} options={LAYOUT_OPTIONS.radius} onChange={(v) => setLayout({ radius: v })} />
@@ -187,7 +223,7 @@ export default function SiteThemeEditor({ initial, onSaved, categoryImageStyle =
 
           {/* 顏色 */}
           <div>
-            <p className="mb-2 text-sm font-semibold">配色</p>
+            <p className="mb-2 text-sm font-semibold">6. 自訂顏色</p>
             <div className="grid gap-2 sm:grid-cols-2">
               {COLOR_FIELDS.map((f) => (
                 <label key={f.key} className="flex items-center gap-3 rounded-xl border border-[#efe8dd] px-3 py-2">

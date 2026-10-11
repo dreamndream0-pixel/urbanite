@@ -1,29 +1,143 @@
-.root { container-type: inline-size; }
-.categoryStrip { min-width: 0; }
-.categoryStrip :global(.store-category-row) { justify-content: safe center; flex-wrap: nowrap; }
+/* 官網模板板塊:6 種版型共用結構,樣式差異用 .classic / .editorial ... 切換 */
+.root { container-type: inline-size; --tpl-radius: 14px; --tpl-inset: 16px; }
 .block { scroll-margin-top: 100px; overflow-wrap: anywhere; }
-.inner { max-width: 1152px; margin: auto; padding-inline: 20px; }
-.inner h2 { font-size: 24px; line-height: 1.4; margin-bottom: 16px; white-space: pre-line; }
-.text { white-space: pre-line; line-height: 1.8; margin-bottom: 20px; }
-.grid { display: grid; grid-template-columns: repeat(var(--block-mobile-columns), minmax(0, 1fr)); gap: 16px; }
+.inner { max-width: 1152px; margin: auto; padding-inline: var(--tpl-inset); }
+.serif { font-family: 'Noto Serif TC', Georgia, serif; font-weight: 400; letter-spacing: 0; }
+.cover { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.heading { font-size: 18px; font-weight: 600; line-height: 1.4; white-space: pre-line; }
+.text { white-space: pre-line; line-height: 1.8; margin-top: 12px; color: var(--c-text2, inherit); }
+.empty { padding: 32px 20px; text-align: center; color: var(--c-muted); }
+
+/* 主視覺 */
+.heroFrame { max-width: 1152px; margin: auto; }
+.hero { position: relative; isolation: isolate; overflow: hidden; display: flex; align-items: flex-end; min-height: 320px; aspect-ratio: var(--block-ratio); background: var(--c-soft); color: var(--c-text); }
+.hero .cover { z-index: -2; }
+.hero.withImage { color: #fff; }
+.hero.withImage::after { content: ''; position: absolute; inset: 0; z-index: -1; background: linear-gradient(10deg, rgb(0 0 0 / 50%), rgb(0 0 0 / 8%) 60%, transparent); }
+.heroCopy { padding: 28px 22px; max-width: 640px; }
+.hero h1 { font-size: 34px; line-height: 1.2; white-space: pre-line; }
+.heroText { margin-top: 10px; font-size: 14px; line-height: 1.7; white-space: pre-line; opacity: .92; }
+.pill { display: inline-flex; align-items: center; gap: 10px; margin-top: 18px; padding: 9px 18px; border-radius: 999px; background: #fff; color: #1f1b19; font-size: 14px; font-weight: 600; box-shadow: 0 6px 18px rgb(0 0 0 / 12%); max-width: 100%; }
+.hero:not(.withImage) { aspect-ratio: auto; min-height: 260px; }
+.hero:not(.withImage) .pill { background: var(--c-button, #222); color: var(--c-button-text, #fff); }
+
+/* 商品區 */
+.sectionHead { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+.more { display: inline-flex; align-items: center; gap: 2px; font-size: 13px; color: var(--c-text2, inherit); white-space: nowrap; }
+.grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
 .product { min-width: 0; }
 .product :global(.aspect-\[4\/5\]) { aspect-ratio: var(--block-ratio); }
-.hero { position: relative; isolation: isolate; display: flex; align-items: end; width: 100%; min-width: 0; min-height: 320px; aspect-ratio: var(--block-ratio); }
-.heroImage { position: absolute; inset: 0; height: 100%; width: 100%; object-fit: cover; z-index: -2; }
-.withImage::after { position: absolute; inset: 0; content: ''; background: linear-gradient(0deg, rgb(0 0 0 / 65%), transparent 85%); z-index: -1; }
-.withImage { color: white; }
-.heroCopy { padding: 28px 20px; width: 100%; min-width: 0; max-width: 760px; }
-.hero h1 { font-size: 36px; line-height: 1.25; white-space: pre-line; letter-spacing: 0; }
-.hero p { margin-top: 16px; white-space: pre-line; line-height: 1.7; }
-.action { display: inline-flex; align-items: center; gap: 16px; margin-top: 20px; padding: 12px 20px; background: var(--c-button, #222); color: var(--c-button-text, white); border-radius: 4px; max-width: 100%; }
-.category { min-width: 0; border: 1px solid var(--c-border); border-radius: 8px; overflow: hidden; text-align: left; }
-.category img { width: 100%; aspect-ratio: var(--block-ratio); object-fit: cover; }
-.category span { padding: 12px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.featureImage, .video { width: 100%; aspect-ratio: var(--block-ratio); max-height: 620px; object-fit: cover; }
-.video { object-fit: contain; background: #111; }
-.empty { padding: 32px 20px; text-align: center; }
+
+/* 分類:圓形/方形/去背/文字 橫向列 */
+.categoryStrip { min-width: 0; margin-inline: calc(var(--tpl-inset) * -1); }
+.categoryStrip :global(.store-category-row) { justify-content: safe center; flex-wrap: nowrap; }
+/* 分類導購型:方卡 */
+.cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.card { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; min-height: 64px; padding: 14px 10px 12px; border-radius: var(--tpl-radius); background: var(--c-soft); color: var(--c-text); }
+.cardImage { display: flex; align-items: center; justify-content: center; width: 100%; aspect-ratio: 4 / 3; overflow: hidden; border-radius: 10px; }
+.cardImage img { width: 100%; height: 100%; object-fit: cover; }
+.cardImage img.cutout { object-fit: contain; filter: drop-shadow(0 8px 10px rgb(0 0 0 / 14%)); }
+.cardCircle { width: 72%; aspect-ratio: 1; border-radius: 999px; }
+.cardName { font-size: 14px; font-weight: 600; }
+/* 視覺圖冊型:錯落圖塊 */
+.masonry { columns: 2; column-gap: 10px; }
+.tile { position: relative; isolation: isolate; display: block; width: 100%; margin-bottom: 10px; overflow: hidden; break-inside: avoid; border-radius: 4px; aspect-ratio: 1; background: var(--c-soft); color: var(--c-text); text-align: left; }
+.tile:nth-child(4n + 1), .tile:nth-child(4n + 4) { aspect-ratio: 3 / 4; }
+.tile .cover { z-index: -2; transition: transform .5s ease; }
+.tile:hover .cover { transform: scale(1.04); }
+.tile:has(img) { color: #fff; }
+.tile:has(img)::after { content: ''; position: absolute; inset: 0; z-index: -1; background: linear-gradient(0deg, rgb(0 0 0 / 38%), transparent 55%); }
+.tile span { position: absolute; left: 14px; right: 14px; bottom: 12px; font-size: 20px; line-height: 1.3; }
+
+/* 圖文橫幅 */
+.banner { position: relative; isolation: isolate; display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 150px; aspect-ratio: 16 / 7; overflow: hidden; border-radius: var(--tpl-radius); padding: 22px; background: var(--c-soft); color: var(--c-text); }
+.banner .cover { z-index: -2; }
+.banner:not(.withImage) { aspect-ratio: auto; min-height: 120px; }
+.banner.withImage { color: #fff; }
+.banner.withImage::after { content: ''; position: absolute; inset: 0; z-index: -1; background: linear-gradient(90deg, rgb(0 0 0 / 42%), rgb(0 0 0 / 5%)); }
+.bannerCopy { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.bannerCopy strong { font-size: 26px; line-height: 1.2; }
+.bannerCopy span { font-size: 13px; opacity: .92; }
+.arrow { flex: none; display: flex; align-items: center; justify-content: center; width: 42px; height: 42px; border-radius: 999px; background: rgb(255 255 255 / 92%); color: #1f1b19; }
+
+/* 倒數計時 */
+.countdown { padding: 20px 16px; border-radius: var(--tpl-radius); background: var(--c-soft); text-align: center; }
+.countdown .heading { font-size: 16px; }
+.timer { display: flex; justify-content: center; gap: 10px; margin-top: 12px; }
+.timerUnit { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.timerUnit b { min-width: 46px; padding: 8px 0; border-radius: 8px; background: var(--c-surface, #fff); font-size: 22px; font-variant-numeric: tabular-nums; box-shadow: 0 1px 3px rgb(0 0 0 / 8%); }
+.timerUnit small { font-size: 11px; color: var(--c-muted); }
+
+.announcement { padding: 28px 20px; border-radius: var(--tpl-radius); background: var(--c-soft); text-align: center; }
+.announcement .pill { background: var(--c-button, #222); color: var(--c-button-text, #fff); }
+.video { width: 100%; aspect-ratio: var(--block-ratio); max-height: 620px; object-fit: contain; background: #111; border-radius: var(--tpl-radius); }
+
+/* ---- 01 經典商城型:滿版主視覺、圓形分類、熱銷商品、日常系列橫幅 ---- */
+.classic .hero { min-height: 340px; }
+
+/* ---- 02 品牌雜誌型:圓角大圖、Pick for you 置中三欄、Lookbook ---- */
+.editorial .heroFrame { padding-inline: var(--tpl-inset); }
+.editorial .hero { border-radius: 6px; align-items: center; }
+.editorial .hero h1 { font-size: 36px; }
+.editorial .heroText { font-size: 11px; letter-spacing: .18em; text-transform: uppercase; }
+.editorial .sectionHead { justify-content: center; }
+.editorial .type_products .heading { font-family: 'Noto Serif TC', Georgia, serif; font-weight: 400; font-size: 22px; }
+.editorial .grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; font-size: 13px; }
+.editorial .banner { aspect-ratio: 4 / 3; border-radius: 6px; justify-content: center; text-align: center; }
+.editorial .bannerCopy { align-items: center; }
+.editorial .bannerCopy strong { font-size: 32px; }
+.editorial .arrow { display: none; }
+
+/* ---- 03 視覺圖冊型:大圖拼貼、點擊進入分類 ---- */
+.gallery .heroFrame { padding-inline: var(--tpl-inset); }
+.gallery .hero { border-radius: 4px; align-items: flex-start; }
+.gallery .hero.withImage::after { background: linear-gradient(180deg, rgb(0 0 0 / 40%), transparent 60%); }
+.gallery .hero h1 { font-size: 32px; }
+.gallery .banner { aspect-ratio: 16 / 9; border-radius: 4px; }
+.gallery .bannerCopy strong { letter-spacing: .12em; }
+
+/* ---- 04 分類導購型:圓角主視覺、分類方卡、熱銷推薦 ---- */
+.category .heroFrame { padding-inline: var(--tpl-inset); }
+.category .hero { min-height: 240px; aspect-ratio: 16 / 10; border-radius: var(--tpl-radius); align-items: center; }
+.category .hero h1 { font-size: 28px; }
+.category .pill { background: rgb(60 48 40 / 85%); color: #fff; box-shadow: none; }
+
+/* ---- 05 主題活動型:活動主視覺、倒數、精選商品、送禮橫幅 ---- */
+.campaign .heroFrame { padding-inline: var(--tpl-inset); }
+.campaign .hero { border-radius: var(--tpl-radius); align-items: flex-start; }
+.campaign .hero.withImage::after { background: linear-gradient(180deg, rgb(0 0 0 / 35%), transparent 55%); }
+.campaign .hero h1 { font-size: 38px; }
+.campaign .pill { background: var(--c-button, #3c3028); color: var(--c-button-text, #fff); }
+
+/* ---- 06 極簡精品型:大量留白、少量商品 ---- */
+.minimal { --tpl-inset: 20px; }
+.minimal .hero { min-height: 420px; align-items: center; }
+.minimal .hero h1 { font-size: 38px; }
+.minimal .pill { background: transparent; color: inherit; border: 1px solid currentColor; box-shadow: none; font-size: 12px; letter-spacing: .14em; }
+.minimal .grid { gap: 28px 18px; }
+.minimal .heading { font-family: 'Noto Serif TC', Georgia, serif; font-weight: 400; font-size: 20px; }
+.minimal .banner { border-radius: 2px; }
+
 @container (min-width: 700px) {
+  .root { --tpl-inset: 24px; }
   .grid { grid-template-columns: repeat(var(--block-columns), minmax(0, 1fr)); gap: 24px; }
-  .heroCopy { margin-left: max(0px, calc((100% - 1152px) / 2)); padding: 40px 20px; }
-  .hero h1 { font-size: 52px; }
+  .editorial .grid { grid-template-columns: repeat(var(--block-columns), minmax(0, 1fr)); }
+  .hero { min-height: 460px; max-height: 640px; aspect-ratio: auto; }
+  .heroCopy { padding: 48px; }
+  .hero h1 { font-size: 54px; }
+  .heading { font-size: 22px; }
+  .cards { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .masonry { columns: 3; }
+  .banner { aspect-ratio: 16 / 5; padding: 40px 48px; }
+  .bannerCopy strong { font-size: 38px; }
+  .minimal .hero { min-height: 560px; }
 }
+
+/* 三欄小卡(品牌雜誌型):只留圖、名稱、價格,購物車按鈕縮小 */
+.editorial .grid :global(.product-card) { padding: 0; background: transparent; box-shadow: none; }
+.editorial .grid :global(.product-card) h3 + p { display: none; }
+.editorial .grid :global(.product-card) :global(.h-10) { height: 28px; min-width: 28px; width: 28px; }
+.editorial .grid :global(.product-card) :global(.h-10) svg { width: 14px; height: 14px; }
+.editorial .grid :global(.product-card) :global(.mt-3) { margin-top: 6px; }
+.tile:not(:has(img)) { aspect-ratio: 2 / 1; }
+.hero .cover { object-position: center 30%; }

@@ -84,6 +84,8 @@ export default function Storefront({ campaign = null, preview = false }: { campa
   const [loading, setLoading] = useState(true);
   // 主站開啟頁面預設停在「精選商品」;活動頁預設顯示全部活動商品
   const [category, setCategory] = useState(campaign ? 'all' : 'spring');
+  // 官網模板首頁按「查看更多」→ 改顯示全部商品列表
+  const [browseAll, setBrowseAll] = useState(false);
   const [displayCount, setDisplayCount] = useState(12);
   const [menuOpen, setMenuOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -461,9 +463,10 @@ export default function Storefront({ campaign = null, preview = false }: { campa
   const design = resolveStorefront(resolveSiteTheme(settings?.site_theme).storefront);
   const customDesign = design.enabled && !campaign;
   const modularDesign = customDesign && design.blocks !== undefined;
-  const showBlocks = modularDesign && !query && category === 'all';
+  const showBlocks = modularDesign && !query && category === 'all' && !browseAll;
   const browseProducts = () => document.getElementById('store-products')?.scrollIntoView({ behavior: 'smooth' });
-  const browseCategory = (slug: string) => { setCategory(slug); requestAnimationFrame(browseProducts); };
+  const browseCategory = (slug: string) => { if (slug === 'all') setBrowseAll(true); setCategory(slug); requestAnimationFrame(browseProducts); };
+  const browseAllProducts = () => { setBrowseAll(true); setCategory('all'); requestAnimationFrame(browseProducts); };
 
   return (
     <main className="min-h-screen bg-[var(--c-bg)] text-[var(--c-text)]">
@@ -487,7 +490,7 @@ export default function Storefront({ campaign = null, preview = false }: { campa
         onCart={() => setCartOpen(true)}
       />
 
-      {showBlocks ? <StorefrontBlocks designStyle={design.style} categoryImageStyle={settings?.category_image_style} blocks={design.blocks!} products={products} categories={categoryTabs.filter((c) => c.slug !== 'all')} images={[...heroBanners.map((b) => b.image), ...liveProducts.map((p) => p.image)].filter(Boolean)} onCategory={browseCategory} loading={loading} renderProduct={(product) => <ProductCard product={product} favorited={favorites.has(product.id)} favoritePending={favoritePending.has(product.id)} favoritesLoaded={favoritesLoaded} onFavoriteChange={(next) => setFavoriteSaved(product.id, next)} onAdd={() => setQuickAdd(product)} />} /> : <>
+      {showBlocks ? <StorefrontBlocks designStyle={design.style} categoryImageStyle={settings?.category_image_style} onBrowseAll={browseAllProducts} blocks={design.blocks!} products={products} categories={categoryTabs.filter((c) => c.slug !== 'all')} images={[...heroBanners.map((b) => b.image), ...liveProducts.map((p) => p.image)].filter(Boolean)} onCategory={browseCategory} loading={loading} renderProduct={(product) => <ProductCard product={product} favorited={favorites.has(product.id)} favoritePending={favoritePending.has(product.id)} favoritesLoaded={favoritesLoaded} onFavoriteChange={(next) => setFavoriteSaved(product.id, next)} onAdd={() => setQuickAdd(product)} />} /> : <>
       {customDesign && !modularDesign ? <StorefrontDesignHero design={design} image={heroBanners[0]?.image || products.find(isVisibleInStore)?.image} categories={categoryTabs.filter((c) => c.slug !== 'all')} onCategory={browseCategory} onBrowse={browseProducts} /> : !modularDesign ? <HeroCarousel banners={heroBanners} /> : null}
       <CategoryNavigation categories={categoryTabs} value={category} onSelect={setCategory} imageStyle={settings?.category_image_style ?? 'circle'} />
 
