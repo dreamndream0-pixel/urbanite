@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useState, type CSSProperties, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { Eye, X } from 'lucide-react';
 import { STOREFRONT_TEMPLATES, STOREFRONT_TEXT_FIELDS, resolveStorefront } from '@/lib/storefront-template';
 import { StorefrontDesignHero, StorefrontDesignFeature, type DesignCategory } from '@/app/components/StorefrontDesign';
 import type { Banner, Product } from '@/lib/types';
@@ -21,6 +22,19 @@ export default function SiteThemeEditor({ initial }: { initial: unknown }) {
   const [saved, setSaved] = useState<SiteTheme>(() => resolveSiteTheme(initial));
   const [draft, setDraft] = useState<SiteTheme>(saved);
   const [saving, setSaving] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const previewDialog = useRef<HTMLDialogElement>(null);
+  useEffect(() => {
+    if (!previewOpen) return;
+    const dialog = previewDialog.current;
+    const previousOverflow = document.body.style.overflow;
+    dialog?.showModal();
+    document.body.style.overflow = 'hidden';
+    return () => {
+      dialog?.close();
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [previewOpen]);
   const [previewImages, setPreviewImages] = useState<string[]>([]);
   const [previewCategories, setPreviewCategories] = useState<DesignCategory[]>([]);
   const design = resolveStorefront(draft.storefront);
@@ -76,7 +90,7 @@ export default function SiteThemeEditor({ initial }: { initial: unknown }) {
   }
 
   return (
-    <section className="rounded-xl border border-[#e5ded4] bg-white p-5 shadow-sm">
+    <section className="rounded-xl border border-[#e5ded4] bg-white p-5 pb-28 shadow-sm">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold">官網模板與外觀</h2>
@@ -90,7 +104,7 @@ export default function SiteThemeEditor({ initial }: { initial: unknown }) {
         </div>
       </div>
 
-      <div className="mt-5 grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+      <div className="mt-5">
         <div className="space-y-6">
           <fieldset disabled={saving} className="space-y-4">
             <legend className="mb-3 text-sm font-semibold">官網模板</legend>
@@ -179,15 +193,20 @@ export default function SiteThemeEditor({ initial }: { initial: unknown }) {
           </div>
         </div>
 
-        {/* 即時預覽 */}
-        <div className="lg:sticky lg:top-24 lg:self-start">
-          <p className="mb-2 text-center text-xs text-[#a99e8f]">即時預覽</p>
-          <div className="max-h-[760px] overflow-y-auto overflow-x-hidden rounded-[28px] border-[8px] border-[#1f1b19]" style={Object.fromEntries(COLOR_FIELDS.map((f) => [cssVar(f.key), draft.colors[f.key]])) as CSSProperties}>
+      </div>
+      <button type="button" onClick={() => setPreviewOpen(true)} aria-haspopup="dialog" className="fixed bottom-[calc(20px+env(safe-area-inset-bottom))] left-1/2 z-50 flex min-h-12 -translate-x-1/2 items-center gap-2 rounded-full border border-white/30 bg-neutral-600/75 px-6 py-3 text-base text-white shadow-lg backdrop-blur-md transition hover:bg-neutral-600/90 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-neutral-600">
+        <Eye size={20} aria-hidden="true" />預覽
+      </button>
+      <dialog ref={previewDialog} aria-labelledby="storefront-preview-title" onCancel={() => setPreviewOpen(false)} onClose={() => setPreviewOpen(false)} onClick={(event) => { if (event.target === event.currentTarget) setPreviewOpen(false); }} className="fixed inset-0 m-auto max-h-[90dvh] w-[calc(100%-24px)] max-w-[430px] overflow-hidden rounded-lg border border-neutral-200 bg-white p-0 text-neutral-900 shadow-2xl backdrop:bg-black/45 backdrop:backdrop-blur-sm">
+        <div className="flex items-center justify-between border-b border-neutral-200 bg-white px-4 py-3">
+          <h2 id="storefront-preview-title" className="text-sm font-semibold">官網預覽</h2>
+          <button type="button" autoFocus onClick={() => setPreviewOpen(false)} aria-label="關閉預覽" title="關閉預覽" className="flex h-10 w-10 items-center justify-center rounded-full hover:bg-neutral-100"><X size={20} /></button>
+        </div>
+          <div className="max-h-[calc(90dvh-65px)] overflow-y-auto overflow-x-hidden overscroll-contain" style={Object.fromEntries(COLOR_FIELDS.map((f) => [cssVar(f.key), draft.colors[f.key]])) as CSSProperties}>
             <StorePreview theme={draft} images={previewImages} hero={design.enabled ? <StorefrontDesignHero design={design} image={previewImages[0]} categories={previewCategories} onCategory={() => {}} onBrowse={() => {}} /> : undefined} />
             {design.enabled && <StorefrontDesignFeature design={design} image={previewImages[1]} onBrowse={() => {}} />}
           </div>
-        </div>
-      </div>
+      </dialog>
     </section>
   );
 }
