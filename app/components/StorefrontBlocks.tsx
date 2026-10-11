@@ -3,11 +3,12 @@
 import { useEffect, useState, type CSSProperties, type MouseEvent, type ReactNode } from 'react';
 import { ArrowRight, ChevronRight } from 'lucide-react';
 import type { StorefrontBlock } from '@/lib/storefront-blocks';
-import type { CategoryImageStyle, Product } from '@/lib/types';
+import type { Banner, CategoryImageStyle, Product } from '@/lib/types';
 import { isVisibleInStore } from '@/lib/product-status';
 import type { DesignCategory } from './StorefrontDesign';
 import styles from './storefront-blocks.module.css';
 import CategoryNavigation from './CategoryNavigation';
+import HeroCarousel from './HeroCarousel';
 
 export function blockProducts(block: StorefrontBlock, products: Product[]) {
   const live = products.filter(isVisibleInStore);
@@ -41,8 +42,8 @@ function Countdown({ endsAt }: { endsAt: string }) {
   </div>;
 }
 
-export default function StorefrontBlocks({ blocks, products, categories, renderProduct, onCategory, onBrowseAll, preview = false, loading = false, designStyle = 'classic', categoryImageStyle = 'circle' }: {
-  blocks: StorefrontBlock[]; products: Product[]; categories: DesignCategory[]; images?: string[];
+export default function StorefrontBlocks({ blocks, products, categories, banners = [], renderProduct, onCategory, onBrowseAll, preview = false, loading = false, designStyle = 'classic', categoryImageStyle = 'circle' }: {
+  blocks: StorefrontBlock[]; products: Product[]; categories: DesignCategory[]; images?: string[]; banners?: Banner[];
   renderProduct: (product: Product) => ReactNode; onCategory: (slug: string) => void; onBrowseAll?: () => void;
   preview?: boolean; loading?: boolean; designStyle?: string; categoryImageStyle?: CategoryImageStyle;
 }) {
@@ -119,6 +120,12 @@ export default function StorefrontBlocks({ blocks, products, categories, renderP
             <span className={styles.arrow} aria-hidden="true"><ArrowRight size={18} /></span>
           </a>
         </div>}
+
+        {block.type === 'carousel' && (() => {
+          const slides = banners.filter((b) => b.active && (b.group_no ?? 1) === block.group);
+          return slides.length ? <div className={styles.carousel}><HeroCarousel banners={slides} /></div>
+            : preview ? <div className={styles.inner}><p className={styles.empty}>輪播圖{block.group} 還沒有圖片,請到「系統設定 → 輪播圖」上傳</p></div> : null;
+        })()}
 
         {block.type === 'countdown' && <div className={styles.inner}>
           <div className={styles.countdown}>

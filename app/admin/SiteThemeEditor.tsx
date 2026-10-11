@@ -52,6 +52,7 @@ export default function SiteThemeEditor({ initial, onSaved, categoryImageStyle =
   const [previewImages, setPreviewImages] = useState<string[]>([]);
   const [previewCategories, setPreviewCategories] = useState<DesignCategory[]>([]);
   const [previewProducts, setPreviewProducts] = useState<Product[]>([]);
+  const [previewBanners, setPreviewBanners] = useState<Banner[]>([]);
   const design = draft.storefront ?? resolveStorefront(null);
   useEffect(() => {
     let active = true;
@@ -67,6 +68,7 @@ export default function SiteThemeEditor({ initial, onSaved, categoryImageStyle =
           setPreviewImages([...banners.filter((b) => b.active).map((b) => b.image), ...products.filter(isVisibleInStore).map((p) => p.image)].filter(Boolean));
           setPreviewCategories(categories.filter((c) => c.sort_order === undefined || c.sort_order >= 0));
           setPreviewProducts(products);
+          setPreviewBanners(banners);
         }
       } catch { /* Preview assets are optional; saved settings remain editable. */ }
     }
@@ -178,7 +180,7 @@ export default function SiteThemeEditor({ initial, onSaved, categoryImageStyle =
               <p className="text-sm font-semibold">3. 編輯首頁內容</p>
               <button type="button" onClick={async () => { if (await uiConfirm('把首頁內容恢復成這個排版的預設文字與板塊?')) setDraft({ ...draft, storefront: { ...design, blocks: starterBlocks(design) } }); }} className="text-xs text-[#8a7f72] underline">恢復此排版預設內容</button>
             </div>
-            <StorefrontBlockEditor designStyle={design.style} blocks={design.blocks ?? []} onChange={(blocks) => setDraft({ ...draft, storefront: { ...design, blocks } })} categories={previewCategories} products={previewProducts} onUploading={setUploading} />
+            <StorefrontBlockEditor designStyle={design.style} blocks={design.blocks ?? []} onChange={(blocks) => setDraft({ ...draft, storefront: { ...design, blocks } })} categories={previewCategories} products={previewProducts} banners={previewBanners} onUploading={setUploading} />
           </fieldset>
           {/* 樣板 */}
           <div>
@@ -259,7 +261,7 @@ export default function SiteThemeEditor({ initial, onSaved, categoryImageStyle =
           <button type="button" autoFocus onClick={() => setPreviewOpen(false)} aria-label="關閉預覽" title="關閉預覽" className="flex h-10 w-10 items-center justify-center rounded-full hover:bg-neutral-100"><X size={20} /></button>
         </div>
           <div className={`${previewStyles.preview} max-h-[calc(90dvh-65px)] overflow-y-auto overflow-x-hidden overscroll-contain bg-[var(--c-bg)] text-[var(--c-text)]`} data-card={draft.layout.card} data-radius={draft.layout.radius} data-heading={draft.layout.heading} onClickCapture={(event) => { if ((event.target as HTMLElement).closest('a')) event.preventDefault(); }} style={Object.fromEntries(COLOR_FIELDS.map((f) => [cssVar(f.key), draft.colors[f.key]])) as CSSProperties}>
-            {design.enabled ? <StorefrontBlocks designStyle={design.style} categoryImageStyle={categoryImageStyle} blocks={resolveBlocks(design.blocks) ?? []} products={previewProducts} categories={previewCategories} images={previewImages} onCategory={() => {}} preview renderProduct={(product) => <ProductCard product={product} favorited={false} favoritePending={false} favoritesLoaded onFavoriteChange={() => {}} onAdd={() => {}} />} /> : <StorePreview theme={draft} images={previewImages} />}
+            {design.enabled ? <StorefrontBlocks designStyle={design.style} categoryImageStyle={categoryImageStyle} blocks={resolveBlocks(design.blocks) ?? []} banners={previewBanners} products={previewProducts} categories={previewCategories} images={previewImages} onCategory={() => {}} preview renderProduct={(product) => <ProductCard product={product} favorited={false} favoritePending={false} favoritesLoaded onFavoriteChange={() => {}} onAdd={() => {}} />} /> : <StorePreview theme={draft} images={previewImages} />}
           </div>
       </dialog>
     </section>

@@ -518,6 +518,9 @@ export default function AdminDashboard({
   ]);
   const [cropFile, setCropFile] = useState<File | null>(null);
   const [editBannerId, setEditBannerId] = useState<string | null>(null);
+  // 輪播圖組:上傳目標組、還沒放圖片的新組
+  const [bannerGroup, setBannerGroup] = useState(1);
+  const [extraBannerGroups, setExtraBannerGroups] = useState<number[]>([]);
   const [newCat, setNewCat] = useState({ slug: '', name: '', en: '', parent_id: '' });
   const [newDiscount, setNewDiscount] = useState<DiscountDraft>(blankDiscountDraft());
   const [couponImgBusy, setCouponImgBusy] = useState(false);
@@ -1455,7 +1458,7 @@ export default function AdminDashboard({
         const res = await fetch('/api/banners', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ image: upData.image_url, title, sort_order: banners.length }),
+          body: JSON.stringify({ image: upData.image_url, title, group_no: bannerGroup, sort_order: banners.filter((b) => (b.group_no ?? 1) === bannerGroup).length }),
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error ?? '新增失敗');
@@ -1479,6 +1482,17 @@ export default function AdminDashboard({
     const data = await res.json();
     if (res.ok) setBanners((l) => l.map((b) => (b.id === id ? (data as Banner) : b)));
     else void uiAlert(data.error ?? '更新失敗');
+  }
+
+  function moveBanner(group: number, index: number, delta: number) {
+    const list = banners.filter((b) => (b.group_no ?? 1) === group);
+    const target = index + delta;
+    if (target < 0 || target >= list.length) return;
+    const next = [...list];
+    [next[index], next[target]] = [next[target], next[index]];
+    next.forEach((b, i) => { if (b.sort_order !== i) void updateBanner(b.id, { sort_order: i }); });
+    const order = new Map(next.map((b, i) => [b.id, i]));
+    setBanners((l) => l.map((b) => (order.has(b.id) ? { ...b, sort_order: order.get(b.id)! } : b)).sort((a, b) => a.sort_order - b.sort_order));
   }
 
   async function deleteBanner(id: string) {
@@ -2883,132 +2897,83 @@ export default function AdminDashboard({
                 ))}
               </div>
 
-              {settingsTab === 'banners' && (
-                <Card title="首頁輪播圖">
+              {settingsTab === 'banners' && (() => {
+                const groups = [...new Set([1, ...banners.map((b) => b.group_no ?? 1), ...extraBannerGroups])].sort((a, b) => a - b);
+                const pick = (group: number, id: string | null) => (e: React.ChangeEvent<HTMLInputElement>) => {
+                  const file = e.target.files?.[0];
+                  e.target.value = '';
+                  if (!file) return;
+                  setBannerGroup(group);
+                  setEditBannerId(id);
+                  setCropFile(file); // 先進裁切編輯器
+                };
+                return (
+                <Card title="輪播圖">
                   <p className="mb-4 text-sm text-[#8a7f72]">
-                    顯示在首頁最上方,可放多張。圖片尺寸統一 1080 × 1350 px(4:5):手機版完整顯示,電腦版同一張圖自動滿版、以中央裁切,不需另做電腦版圖片。第一張(排序小的)先顯示,前台每 4 秒自動切換,也可左右滑動。頁尾內文頁的背景圖也會使用第一張啟用輪播圖；要修改內文頁圖片,請在這裡替換或調整第一張啟用圖片。
+                    圖片尺寸 1080 × 1350 px(4:5),每 4 秒自動切換。輪播圖1 是首頁最上方的輪播(頁尾內文頁背景也用它的第一張);其他組可在「模板設定」新增「輪播圖」板塊後選用。
                   </p>
-                  <label className="mb-5 inline-flex cursor-pointer items-center rounded-full bg-[#1f1b19] px-5 py-2.5 text-sm font-semibold text-white">
-                    {uploadingBanner ? '處理中…' : '+ 新增輪播圖'}
-                    <input
-                      type="file"
-                      accept="image/png,image/jpeg,image/webp,image/gif"
-                      className="hidden"
-                      disabled={uploadingBanner}
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) {
-                          setEditBannerId(null);
-                          setCropFile(file); // 先進裁切編輯器
-                        }
-                        e.target.value = '';
-                      }}
-                    />
-                  </label>
-
-                  {banners.length === 0 ? (
-                    <p className="rounded-lg bg-[#f6f2ec] p-5 text-sm text-[#6b6156]">
-                      還沒有輪播圖,上傳一張開始吧。
-                    </p>
-                  ) : (
-                    <div className="space-y-3">
-                      {banners.map((banner, index) => (
-                        <div
-                          key={banner.id}
-                          className="flex flex-col gap-3 rounded-xl border border-[#e5ded4] p-3 sm:flex-row sm:items-center"
-                        >
-                          <label
-                            title="點圖編輯 / 換圖"
-                            className="group relative aspect-[4/5] w-32 shrink-0 cursor-pointer overflow-hidden rounded-lg border border-[#eee5da] bg-[#e9e1d6]"
-                          >
-                            <img src={banner.image} alt="" className="h-full w-full object-cover object-center" />
-                            <span className="absolute inset-0 flex items-center justify-center bg-black/0 text-xs font-semibold text-white opacity-0 transition group-hover:bg-black/40 group-hover:opacity-100">
-                              點圖編輯
-                            </span>
-                            <input
-                              type="file"
-                              accept="image/png,image/jpeg,image/webp,image/gif"
-                              className="hidden"
-                              disabled={uploadingBanner}
-                              onChange={(e) => {
-                                const file = e.target.files?.[0];
-                                e.target.value = '';
-                                if (!file) return;
-                                setEditBannerId(banner.id);
-                                setCropFile(file);
-                              }}
-                            />
-                          </label>
-                          <div className="flex-1">
-                            {banner.title && (
-                              <p className="mb-1 truncate text-xs text-[#8a7f72]">檔名：{banner.title}</p>
-                            )}
-                            <input
-                              className="w-full rounded-lg border border-[#e5ded4] px-3 py-2 text-sm"
-                              placeholder="點擊後前往的網址(可空)"
-                              defaultValue={banner.link}
-                              onBlur={(e) => {
-                                if (e.target.value !== banner.link) updateBanner(banner.id, { link: e.target.value });
-                              }}
-                            />
-                            <label className="mt-2 flex items-center gap-2 text-sm">
-                              <input
-                                type="checkbox"
-                                checked={banner.active}
-                                onChange={(e) => updateBanner(banner.id, { active: e.target.checked })}
-                              />
-                              <span>{banner.active ? '顯示中' : '已隱藏'}</span>
-                            </label>
+                  <div className="space-y-4">
+                    {groups.map((group) => {
+                      const list = banners.filter((b) => (b.group_no ?? 1) === group);
+                      return (
+                        <section key={group} className="rounded-xl border border-[#e5ded4] p-3">
+                          <div className="mb-3 flex items-center justify-between gap-2">
+                            <p className="text-sm font-semibold">輪播圖{group} <span className="font-normal text-[#a99e8f]">{list.length} 張</span></p>
+                            <div className="flex items-center gap-2">
+                              {list.length === 0 && group !== 1 ? (
+                                <button type="button" onClick={() => setExtraBannerGroups((g) => g.filter((x) => x !== group))} className="text-xs text-[#8a7f72] underline">移除</button>
+                              ) : null}
+                              <label className="cursor-pointer rounded-full bg-[#1f1b19] px-4 py-1.5 text-xs font-semibold text-white">
+                                {uploadingBanner && bannerGroup === group ? '處理中…' : '+ 新增圖片'}
+                                <input type="file" accept="image/png,image/jpeg,image/webp,image/gif" className="hidden" disabled={uploadingBanner} onChange={pick(group, null)} />
+                              </label>
+                            </div>
                           </div>
-                          <div className="flex items-center gap-2">
-                            <label className="cursor-pointer rounded-lg border border-[#d7c9bd] px-3 py-2 text-sm font-semibold">
-                              換圖/裁切
-                              <input
-                                type="file"
-                                accept="image/png,image/jpeg,image/webp,image/gif"
-                                className="hidden"
-                                disabled={uploadingBanner}
-                                onChange={(e) => {
-                                  const file = e.target.files?.[0];
-                                  e.target.value = '';
-                                  if (!file) return;
-                                  // 走裁切編輯器,裁好再更新這張輪播圖
-                                  setEditBannerId(banner.id);
-                                  setCropFile(file);
-                                }}
-                              />
-                            </label>
-                            <button
-                              onClick={() => {
-                                if (index === 0) return;
-                                const prev = banners[index - 1];
-                                updateBanner(banner.id, { sort_order: prev.sort_order });
-                                updateBanner(prev.id, { sort_order: banner.sort_order });
-                                setBanners((l) => {
-                                  const next = [...l];
-                                  [next[index - 1], next[index]] = [next[index], next[index - 1]];
-                                  return next;
-                                });
-                              }}
-                              disabled={index === 0}
-                              className="rounded-lg border border-[#d7c9bd] px-3 py-2 text-sm disabled:opacity-30"
-                              aria-label="上移"
-                            >
-                              ↑
-                            </button>
-                            <button
-                              onClick={() => deleteBanner(banner.id)}
-                              className="rounded-lg border border-[#e0b4b4] px-3 py-2 text-sm font-semibold text-[#c0392b]"
-                            >
-                              刪除
-                            </button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
+                          {list.length === 0 ? (
+                            <p className="rounded-lg bg-[#f6f2ec] p-4 text-center text-xs text-[#8a7f72]">還沒有圖片,按「+ 新增圖片」上傳。</p>
+                          ) : (
+                            <div className="-mx-1 flex snap-x gap-3 overflow-x-auto px-1 pb-2">
+                              {list.map((banner, index) => (
+                                <div key={banner.id} className={`w-32 shrink-0 snap-start ${banner.active ? '' : 'opacity-50'}`}>
+                                  <label title="點圖換圖 / 裁切" className="group relative block aspect-[4/5] cursor-pointer overflow-hidden rounded-lg border border-[#eee5da] bg-[#e9e1d6]">
+                                    <img src={banner.image} alt="" className="h-full w-full object-cover" />
+                                    <span className="absolute left-1.5 top-1.5 rounded-full bg-black/55 px-1.5 text-[10px] text-white">{index + 1}</span>
+                                    <span className="absolute inset-0 flex items-center justify-center bg-black/0 text-xs font-semibold text-white opacity-0 transition group-hover:bg-black/40 group-hover:opacity-100">換圖</span>
+                                    <input type="file" accept="image/png,image/jpeg,image/webp,image/gif" className="hidden" disabled={uploadingBanner} onChange={pick(group, banner.id)} />
+                                  </label>
+                                  <input
+                                    className="mt-1.5 w-full rounded-md border border-[#e5ded4] px-2 py-1 text-[11px]"
+                                    placeholder="連結(可空)"
+                                    defaultValue={banner.link}
+                                    onBlur={(e) => {
+                                      if (e.target.value !== banner.link) updateBanner(banner.id, { link: e.target.value });
+                                    }}
+                                  />
+                                  <div className="mt-1 flex items-center justify-between text-[#6b6156]">
+                                    <label className="flex items-center gap-1 text-[11px]">
+                                      <input type="checkbox" checked={banner.active} onChange={(e) => updateBanner(banner.id, { active: e.target.checked })} />
+                                      顯示
+                                    </label>
+                                    <span className="flex">
+                                      <button type="button" aria-label="往前" disabled={index === 0} onClick={() => moveBanner(group, index, -1)} className="h-7 w-6 rounded text-sm hover:bg-[#f6f2ec] disabled:opacity-25">‹</button>
+                                      <button type="button" aria-label="往後" disabled={index === list.length - 1} onClick={() => moveBanner(group, index, 1)} className="h-7 w-6 rounded text-sm hover:bg-[#f6f2ec] disabled:opacity-25">›</button>
+                                      <button type="button" aria-label="刪除" onClick={() => deleteBanner(banner.id)} className="h-7 w-6 rounded text-sm text-[#c0392b] hover:bg-[#fdecea]">✕</button>
+                                    </span>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </section>
+                      );
+                    })}
+                  </div>
+                  {groups.length < 9 ? (
+                    <button type="button" onClick={() => setExtraBannerGroups((g) => [...g, Math.max(...groups) + 1])} className="mt-4 rounded-full border border-[#d7c9bd] px-4 py-2 text-sm font-semibold">+ 新增輪播圖{Math.max(...groups) + 1}</button>
+                  ) : null}
                 </Card>
-              )}
+                );
+              })()}
 
               <div hidden={settingsTab !== 'templates'}><SiteThemeEditor initial={siteTheme} onSaved={setSiteTheme} categoryImageStyle={categoryImageStyle} onCategoryImageStyle={(style) => void saveCategoryImageStyle(style)} /></div>
 

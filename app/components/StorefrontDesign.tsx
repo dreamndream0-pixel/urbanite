@@ -19,7 +19,7 @@ export function StorefrontDesignHero({ design, image, categories, onCategory, on
           {design.action && <button type="button" onClick={onBrowse}>{design.action}<ArrowRight size={18} /></button>}
         </div>
       </section>
-      {(design.style === 'gallery' || design.style === 'category') && categories.length > 0 && (
+      {design.style === 'gallery' && categories.length > 0 && (
         <nav className={styles.categories} aria-label="精選商品分類">
           {categories.slice(0, 6).map((category) => (
             <button type="button" key={category.slug} onClick={() => onCategory(category.slug)}>

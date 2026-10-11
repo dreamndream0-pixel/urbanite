@@ -11,7 +11,7 @@ import { setShopHome } from '@/lib/shop-home';
 import { campaignHomeHref } from '@/lib/campaign';
 import FavoriteFoldButton from '@/app/components/FavoriteFoldButton';
 import CategoryNavigation from '@/app/components/CategoryNavigation';
-import { useLoopCarousel } from '@/app/components/useLoopCarousel';
+import HeroCarousel from '@/app/components/HeroCarousel';
 import { isProductSoldOut, isVisibleInStore } from '@/lib/product-status';
 import { POLICY_SECTION_TITLE } from '@/lib/footer-policies';
 import { HIDDEN_FOOTER_SECTION_TITLES } from '@/lib/checkout-line';
@@ -282,7 +282,7 @@ export default function Storefront({ campaign = null, preview = false }: { campa
     ? campaign.hero_image
       ? [{ id: campaign.id, image: campaign.hero_image, link: '', title: campaign.title || campaign.name, active: true, sort_order: 0 }]
       : []
-    : banners.filter((b) => b.active);
+    : banners.filter((b) => b.active && (b.group_no ?? 1) === 1); // 原本首頁只用輪播圖1
 
   const visibleProducts = useMemo(() => {
     let list = liveProducts;
@@ -490,7 +490,7 @@ export default function Storefront({ campaign = null, preview = false }: { campa
         onCart={() => setCartOpen(true)}
       />
 
-      {showBlocks ? <StorefrontBlocks designStyle={design.style} categoryImageStyle={settings?.category_image_style} onBrowseAll={browseAllProducts} blocks={design.blocks!} products={products} categories={categoryTabs.filter((c) => c.slug !== 'all')} images={[...heroBanners.map((b) => b.image), ...liveProducts.map((p) => p.image)].filter(Boolean)} onCategory={browseCategory} loading={loading} renderProduct={(product) => <ProductCard product={product} favorited={favorites.has(product.id)} favoritePending={favoritePending.has(product.id)} favoritesLoaded={favoritesLoaded} onFavoriteChange={(next) => setFavoriteSaved(product.id, next)} onAdd={() => setQuickAdd(product)} />} /> : <>
+      {showBlocks ? <StorefrontBlocks designStyle={design.style} categoryImageStyle={settings?.category_image_style} onBrowseAll={browseAllProducts} blocks={design.blocks!} banners={banners.filter((b) => b.active)} products={products} categories={categoryTabs.filter((c) => c.slug !== 'all')} images={[...heroBanners.map((b) => b.image), ...liveProducts.map((p) => p.image)].filter(Boolean)} onCategory={browseCategory} loading={loading} renderProduct={(product) => <ProductCard product={product} favorited={favorites.has(product.id)} favoritePending={favoritePending.has(product.id)} favoritesLoaded={favoritesLoaded} onFavoriteChange={(next) => setFavoriteSaved(product.id, next)} onAdd={() => setQuickAdd(product)} />} /> : <>
       {customDesign && !modularDesign ? <StorefrontDesignHero design={design} image={heroBanners[0]?.image || products.find(isVisibleInStore)?.image} categories={categoryTabs.filter((c) => c.slug !== 'all')} onCategory={browseCategory} onBrowse={browseProducts} /> : !modularDesign ? <HeroCarousel banners={heroBanners} /> : null}
       <CategoryNavigation categories={categoryTabs} value={category} onSelect={setCategory} imageStyle={settings?.category_image_style ?? 'circle'} />
 
@@ -508,7 +508,7 @@ export default function Storefront({ campaign = null, preview = false }: { campa
             <p className="py-20 text-center text-[var(--c-muted)]">這個分類目前沒有商品。</p>
           ) : (
             <>
-              <div className={customDesign && design.style === 'editorial' ? 'grid grid-cols-2 gap-5 md:grid-cols-3' : customDesign && design.style === 'minimal' ? 'grid grid-cols-2 gap-6 md:gap-10' : 'store-grid grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4'}>
+              <div className={customDesign && design.style === 'editorial' ? 'grid grid-cols-2 gap-5 md:grid-cols-3' : 'store-grid grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4'}>
                 {shown.map((product) => (
                   <ProductCard
                     key={product.id}
@@ -1435,91 +1435,6 @@ function Row({ label, value, strong = false }: { label: string; value: string; s
       <span>{label}</span>
       <span>{value}</span>
     </div>
-  );
-}
-
-function HeroCarousel({ banners }: { banners: Banner[] }) {
-  const { slides, realIndex, realOf, step, go, trackProps } = useLoopCarousel(banners, { autoplayMs: 4000 });
-  const count = banners.length;
-  if (count === 0) return null;
-
-  return (
-    <section aria-label="首頁輪播" className="group relative w-full select-none overflow-hidden bg-[var(--c-border)]">
-      <div {...trackProps}>
-        {slides.map((banner, i) => {
-          // 副本與真實張共用同一個「真實序號」,換回真實張時樣式不會閃動
-          const active = realOf(i) === realIndex;
-          const img = (
-            <img
-              src={banner.image}
-              alt={banner.title || '輪播圖'}
-              draggable={false}
-              // 固定框架,圖片放大縮小填滿整個輪播框(適配版面大小)
-              className={`pointer-events-none h-full w-full object-cover object-center transition-[opacity,transform,filter] duration-700 ease-out ${
-                active ? 'scale-100 opacity-100 blur-0' : 'scale-[1.035] opacity-75 blur-[1px]'
-              }`}
-            />
-          );
-          return (
-            <div
-              key={`${banner.id}-${i}`}
-              className="relative aspect-[4/5] w-full shrink-0 bg-[var(--c-border)] sm:aspect-[16/7] lg:aspect-[16/5]"
-            >
-              {banner.link ? (
-                <a href={banner.link} target="_blank" rel="noreferrer" className="block h-full w-full">
-                  {img}
-                </a>
-              ) : (
-                img
-              )}
-            </div>
-          );
-        })}
-      </div>
-
-      {count > 1 && (
-        <>
-          <button
-            onClick={() => step(-1)}
-            aria-label="上一張"
-            className="absolute left-2 top-1/2 hidden -translate-y-1/2 items-center justify-center rounded-full bg-black/30 p-2 text-white opacity-0 transition group-hover:opacity-100 sm:flex"
-          >
-            <IconChevron dir="left" />
-          </button>
-          <button
-            onClick={() => step(1)}
-            aria-label="下一張"
-            className="absolute right-2 top-1/2 hidden -translate-y-1/2 items-center justify-center rounded-full bg-black/30 p-2 text-white opacity-0 transition group-hover:opacity-100 sm:flex"
-          >
-            <IconChevron dir="right" />
-          </button>
-          <div className="absolute inset-x-0 bottom-6 flex items-center justify-center gap-2">
-            {banners.map((banner, i) => (
-              <button
-                key={banner.id}
-                onClick={() => go(i)}
-                aria-label={`第 ${i + 1} 張`}
-                className={`h-2 rounded-full border border-white/80 transition-all ${
-                  i === realIndex ? 'w-2 bg-[var(--c-surface)]' : 'w-2 bg-transparent hover:bg-[var(--c-surface)]/60'
-                }`}
-              />
-            ))}
-          </div>
-        </>
-      )}
-    </section>
-  );
-}
-
-function IconChevron({ dir }: { dir: 'left' | 'right' }) {
-  return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <path
-        d={dir === 'left' ? 'M15 6l-6 6 6 6' : 'M9 6l6 6-6 6'}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
   );
 }
 

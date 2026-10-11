@@ -18,7 +18,7 @@ export default async function FooterContentPage({ params }: { params: Promise<{ 
   const supabase = (await shopAdminClient());
   const [{ data: settingsData }, { data: bannerData }] = await Promise.all([
     supabase.from('site_settings').select('footer_sections,logo_url').single(),
-    supabase.from('banners').select('image,title').eq('active', true).order('sort_order', { ascending: true }).limit(1).maybeSingle(),
+    supabase.from('banners').select('image,title').eq('active', true).eq('group_no', 1).order('sort_order', { ascending: true }).limit(1).maybeSingle(),
   ]);
   const settings = settingsData as Pick<SiteSettings, 'footer_sections' | 'logo_url'> | null;
   const banner = bannerData as Pick<Banner, 'image' | 'title'> | null;

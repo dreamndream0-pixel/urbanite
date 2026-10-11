@@ -192,6 +192,7 @@ export type Banner = {
   title: string;
   active: boolean;
   sort_order: number;
+  group_no?: number; // 輪播圖組:1 = 輪播圖1(原本的首頁輪播),2 = 輪播圖2…
   created_at?: string;
 };
 

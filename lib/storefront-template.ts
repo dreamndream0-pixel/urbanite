@@ -4,9 +4,7 @@ export const STOREFRONT_TEMPLATES = [
   { key: 'classic', name: '經典商城型', en: 'Classic Shop', note: '最常見的電商版型,商品分類清楚,適合各種產業' },
   { key: 'editorial', name: '品牌雜誌型', en: 'Editorial', note: '大圖形象+精選商品,強調品牌氛圍,適合服飾、美妝、香氛' },
   { key: 'gallery', name: '視覺圖冊型', en: 'Gallery', note: '以大圖拼貼展示,點擊即可進入商品,適合設計品牌、選物店' },
-  { key: 'category', name: '分類導購型', en: 'Category First', note: '先以大分類引導,再進入精選商品,適合商品眾多的店家' },
   { key: 'campaign', name: '主題活動型', en: 'Campaign', note: '活動主視覺+精選商品+倒數,適合節慶、聯名、新品活動' },
-  { key: 'minimal', name: '極簡精品型', en: 'Minimal Boutique', note: '大量留白、乾淨高質感,少量商品呈現,適合高單價品牌' },
 ] as const;
 export type StorefrontTemplate = typeof STOREFRONT_TEMPLATES[number]['key'];
 export const STOREFRONT_TEXT_FIELDS = [

@@ -148,3 +148,7 @@
   .tile:last-child:nth-child(4n + 2) { grid-row: span 2; }
   .tile:last-child:nth-child(4n + 3) { grid-row: span 1; }
 }
+/* 輪播圖板塊:沿用原本首頁輪播,寬度對齊內容區 */
+.carousel { max-width: 1152px; margin: auto; }
+.editorial .carousel, .gallery .carousel, .campaign .carousel { padding-inline: var(--tpl-inset); }
+.editorial .carousel > section, .gallery .carousel > section, .campaign .carousel > section { border-radius: var(--tpl-radius); }

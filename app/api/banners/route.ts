@@ -17,6 +17,12 @@ export async function GET() {
   });
 }
 
+// 輪播圖組編號 1~9
+function bannerGroup(value: unknown) {
+  const n = Math.round(Number(value));
+  return Number.isFinite(n) ? Math.min(9, Math.max(1, n)) : 1;
+}
+
 // POST /api/banners — 新增輪播圖(限管理員)
 export async function POST(request: Request) {
   const admin = await getAdminUser();
@@ -35,6 +41,7 @@ export async function POST(request: Request) {
       title: body.title ?? '',
       active: body.active ?? true,
       sort_order: body.sort_order ?? 0,
+      ...(bannerGroup(body.group_no) > 1 ? { group_no: bannerGroup(body.group_no) } : {}),
     })
     .select()
     .single();

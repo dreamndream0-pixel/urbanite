@@ -3,7 +3,7 @@
 import { useRef, useState, type ReactNode } from 'react';
 import { ArrowDown, ArrowUp, ChevronDown, Copy, Eye, EyeOff, GripVertical, ImagePlus, Plus, Trash2, X } from 'lucide-react';
 import { BLOCK_TYPES, MAX_BLOCKS, createBlock, moveBlock, safeBlockUrl, type BlockType, type StorefrontBlock } from '@/lib/storefront-blocks';
-import type { Product } from '@/lib/types';
+import type { Banner, Product } from '@/lib/types';
 import type { DesignCategory } from '@/app/components/StorefrontDesign';
 import NumberInput from './NumberInput';
 import { uiAlert, uiConfirm } from '@/lib/ui-dialog';
@@ -12,9 +12,9 @@ const input = 'mt-1 block w-full min-w-0 rounded-lg border border-[#e5ded4] bg-w
 const typeLabel = (type: BlockType) => BLOCK_TYPES.find((t) => t.key === type)?.label ?? type;
 
 // 後台 模板設定 → 首頁內容:一個板塊一列,點開只顯示該類型需要的欄位,進階設定收起來
-export default function StorefrontBlockEditor({ blocks, onChange, categories, products, onUploading }: {
+export default function StorefrontBlockEditor({ blocks, onChange, categories, products, banners = [], onUploading }: {
   blocks: StorefrontBlock[]; onChange: (blocks: StorefrontBlock[]) => void;
-  categories: DesignCategory[]; products: Product[]; onUploading: (busy: boolean) => void;
+  categories: DesignCategory[]; products: Product[]; banners?: Banner[]; onUploading: (busy: boolean) => void;
   designStyle?: string;
 }) {
   const [type, setType] = useState<BlockType>('imageText');
@@ -49,7 +49,7 @@ export default function StorefrontBlockEditor({ blocks, onChange, categories, pr
             <button type="button" draggable={!uploading} aria-label={`拖曳板塊 ${index + 1}`} title="拖曳排序" onDragStart={(e) => { e.dataTransfer.setData('text/plain', block.id); e.dataTransfer.effectAllowed = 'move'; setDragged(block.id); }} onDragEnd={() => { setDragged(null); setTarget(null); }} className="hidden h-9 w-7 shrink-0 cursor-grab items-center justify-center text-[#b8ad9f] sm:flex"><GripVertical size={18} /></button>
             <button type="button" onClick={() => setActive(open ? null : block.id)} aria-expanded={open} className="flex min-w-0 flex-1 items-center gap-2 py-1.5 text-left">
               <span className="shrink-0 rounded-full bg-[#efe8dd] px-2 py-0.5 text-[11px] text-[#6b6156]">{typeLabel(block.type)}</span>
-              <span className="min-w-0 truncate text-sm font-medium">{block.title.split('\n').join(' ') || <span className="text-[#a99e8f]">(未命名)</span>}</span>
+              <span className="min-w-0 truncate text-sm font-medium">{block.type === 'carousel' ? `輪播圖${block.group}` : block.title.split('\n').join(' ') || <span className="text-[#a99e8f]">(未命名)</span>}</span>
               <ChevronDown size={16} className={`ml-auto shrink-0 text-[#a99e8f] transition ${open ? 'rotate-180' : ''}`} />
             </button>
             <IconButton label={block.visible ? `隱藏板塊 ${index + 1}` : `顯示板塊 ${index + 1}`} onClick={() => patch(block.id, { visible: !block.visible })}>{block.visible ? <Eye size={16} /> : <EyeOff size={16} />}</IconButton>
@@ -57,7 +57,7 @@ export default function StorefrontBlockEditor({ blocks, onChange, categories, pr
             <IconButton label={`下移板塊 ${index + 1}`} disabled={index === blocks.length - 1} onClick={() => onChange(moveBlock(blocks, index, index + 1))}><ArrowDown size={16} /></IconButton>
           </div>
           {open && <div className="space-y-3 border-t border-[#efe8dd] px-3 pb-3 pt-3">
-            <BlockFields block={block} patch={(value) => patch(block.id, value)} categories={categories} products={products} uploading={uploading} onUpload={(file) => void upload(block.id, file)} />
+            <BlockFields block={block} patch={(value) => patch(block.id, value)} categories={categories} products={products} banners={banners} uploading={uploading} onUpload={(file) => void upload(block.id, file)} />
             <details className="rounded-lg bg-[#faf8f5] px-3 py-2 text-sm">
               <summary className="cursor-pointer text-xs text-[#8a7f72]">進階設定(比例、間距、背景色)</summary>
               <div className="mt-3 grid gap-3 sm:grid-cols-2">
@@ -77,14 +77,14 @@ export default function StorefrontBlockEditor({ blocks, onChange, categories, pr
     </ol>
     <div className="flex flex-wrap items-center gap-2">
       <select aria-label="新增板塊類型" value={type} onChange={(e) => setType(e.target.value as BlockType)} className="rounded-lg border border-[#e5ded4] bg-white px-3 py-2 text-sm">{BLOCK_TYPES.map((option) => <option key={option.key} value={option.key}>{option.label}</option>)}</select>
-      <button type="button" disabled={blocks.length >= MAX_BLOCKS} onClick={() => { const next = createBlock(type, crypto.randomUUID()); if (type === 'products' || type === 'imageText') next.href = '#store-products'; onChange([...blocks, next]); setActive(next.id); }} className="flex items-center gap-1.5 rounded-lg bg-[#1f1b19] px-3 py-2 text-sm text-white disabled:opacity-40"><Plus size={16} />新增板塊</button>
+      <button type="button" disabled={blocks.length >= MAX_BLOCKS} onClick={() => { const next = createBlock(type, crypto.randomUUID()); if (type === 'products' || type === 'imageText') next.href = '#store-products'; if (type === 'carousel') { next.title = ''; next.spacing = 0; } onChange([...blocks, next]); setActive(next.id); }} className="flex items-center gap-1.5 rounded-lg bg-[#1f1b19] px-3 py-2 text-sm text-white disabled:opacity-40"><Plus size={16} />新增板塊</button>
       <span className="text-xs text-[#a99e8f]">{blocks.length} / {MAX_BLOCKS}</span>
     </div>
   </fieldset>;
 }
 
-function BlockFields({ block, patch, categories, products, uploading, onUpload }: {
-  block: StorefrontBlock; patch: (value: Partial<StorefrontBlock>) => void; categories: DesignCategory[]; products: Product[];
+function BlockFields({ block, patch, categories, products, banners, uploading, onUpload }: {
+  block: StorefrontBlock; patch: (value: Partial<StorefrontBlock>) => void; categories: DesignCategory[]; products: Product[]; banners: Banner[];
   uploading: boolean; onUpload: (file?: File) => void;
 }) {
   const title = (label: string, rows = 1) => rows > 1
@@ -119,6 +119,13 @@ function BlockFields({ block, patch, categories, products, uploading, onUpload }
       {title('標題')}<TextField label="按鈕文字(選填)" value={block.action} max={40} onChange={(v) => patch({ action: v })} />
       <div className="sm:col-span-2">{text('內容', 3)}</div>{block.action && link}
     </div>;
+    case 'carousel': {
+      const groups = [...new Set([1, ...banners.map((b) => b.group_no ?? 1), block.group])].sort((a, b) => a - b);
+      return <div className="space-y-2">
+        <label className="block text-sm">顯示哪一組輪播圖<select value={block.group} onChange={(e) => patch({ group: Number(e.target.value) })} className={input}>{groups.map((g) => <option key={g} value={g}>輪播圖{g}({banners.filter((b) => (b.group_no ?? 1) === g && b.active).length} 張)</option>)}</select></label>
+        <p className="text-xs text-[#a99e8f]">輪播圖的圖片在「系統設定 → 輪播圖」上傳和排序。</p>
+      </div>;
+    }
     case 'video': return <div className="grid gap-3 sm:grid-cols-2">
       <div className="space-y-3">{title('標題')}<TextField label="影片網址(MP4 / WebM)" value={block.video} max={2048} onChange={(v) => patch({ video: v })} url />{text('說明(選填)')}</div>
       {image('影片封面')}

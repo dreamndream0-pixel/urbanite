@@ -20,6 +20,7 @@ export async function PATCH(
   if (typeof body.title === 'string') update.title = body.title;
   if (typeof body.active === 'boolean') update.active = body.active;
   if (typeof body.sort_order === 'number') update.sort_order = body.sort_order;
+  if (typeof body.group_no === 'number' && Number.isFinite(body.group_no)) update.group_no = Math.min(9, Math.max(1, Math.round(body.group_no)));
   if (Object.keys(update).length === 0) {
     return NextResponse.json({ error: '沒有可更新的欄位' }, { status: 400 });
   }
