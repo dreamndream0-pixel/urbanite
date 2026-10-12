@@ -14,7 +14,7 @@ import CategoryNavigation from '@/app/components/CategoryNavigation';
 import HeroCarousel from '@/app/components/HeroCarousel';
 import { isProductSoldOut, isVisibleInStore } from '@/lib/product-status';
 import { POLICY_SECTION_TITLE } from '@/lib/footer-policies';
-import { HIDDEN_FOOTER_SECTION_TITLES } from '@/lib/checkout-line';
+import { getNewsletter, HIDDEN_FOOTER_SECTION_TITLES } from '@/lib/checkout-line';
 import StoreHeader from '@/app/components/StoreHeader';
 import { resolveSiteTheme } from '@/lib/site-theme';
 import { resolveStorefront } from '@/lib/storefront-template';
@@ -742,21 +742,22 @@ function Footer({ settings, logoUrl, homeHref }: { settings: SiteSettings | null
   const followSection = {
     title: '尋找我們 FOLLOW US',
     items: [
-      settings?.footer_service_hours ? `服務時間：${settings.footer_service_hours}` : '',
-      settings?.footer_email ? `E-MAIL：${settings.footer_email}` : '',
-      settings?.footer_instagram_url ? 'Instagram' : '',
-      settings?.footer_line_url ? 'LINE 官方帳號' : '',
-      settings?.footer_company_name ? `公司名稱：${settings.footer_company_name}` : '',
-      settings?.footer_tax_id ? `統一編號：${settings.footer_tax_id}` : '',
+      settings?.footer_service_hours ? { subtitle: `服務時間：${settings.footer_service_hours}`, url: '' } : null,
+      settings?.footer_email ? { subtitle: `E-MAIL：${settings.footer_email}`, url: `mailto:${settings.footer_email}` } : null,
+      settings?.footer_instagram_url ? { subtitle: 'Instagram', url: normalizeFooterHref(settings.footer_instagram_url) } : null,
+      settings?.footer_line_url ? { subtitle: 'LINE 官方帳號', url: normalizeFooterHref(settings.footer_line_url) } : null,
+      settings?.footer_company_name ? { subtitle: `公司名稱：${settings.footer_company_name}`, url: '' } : null,
+      settings?.footer_tax_id ? { subtitle: `統一編號：${settings.footer_tax_id}`, url: '' } : null,
     ]
-      .filter(Boolean)
-      .map((subtitle) => ({ subtitle, content: '', url: '' })),
+      .filter((item): item is { subtitle: string; url: string } => Boolean(item))
+      .map((item) => ({ ...item, content: '' })),
   };
+  const newsletter = getNewsletter(settings);
   const hasFollowSection = displaySections.some((section) => /尋找我們|追蹤我們|follow us/i.test(section.title));
   const mobileSections = [
     ...displaySections,
     ...(hasFollowSection ? [] : [followSection]),
-    { title: '訂閱最新消息', items: [{ subtitle: '訂閱收到新品、優惠與穿搭靈感。', content: '', url: '' }] },
+    ...(newsletter.show ? [{ title: newsletter.title || '訂閱最新消息', items: newsletter.text ? [{ subtitle: newsletter.text, content: '', url: '' }] : [] }] : []),
   ];
 
   return (
@@ -813,11 +814,9 @@ function Footer({ settings, logoUrl, homeHref }: { settings: SiteSettings | null
           )}
         </div>
 
-        <section className="text-center lg:text-left">
-          <h2 className="text-sm font-bold tracking-wide">訂閱最新消息</h2>
-          <p className="mt-4 text-sm leading-7 text-[var(--c-text2)]">
-            訂閱收到新品、優惠與穿搭靈感。
-          </p>
+        {newsletter.show ? <section className="text-center lg:text-left">
+          <h2 className="text-sm font-bold tracking-wide">{newsletter.title || '訂閱最新消息'}</h2>
+          {newsletter.text ? <p className="mt-4 whitespace-pre-line text-sm leading-7 text-[var(--c-text2)]">{newsletter.text}</p> : null}
           <form className="mt-5 space-y-3">
             <input
               type="email"
@@ -831,7 +830,7 @@ function Footer({ settings, logoUrl, homeHref }: { settings: SiteSettings | null
               訂閱
             </button>
           </form>
-        </section>
+        </section> : <span />}
       </div>
       <div className="mx-auto max-w-3xl px-8 py-10 lg:hidden">
         <div className="divide-y divide-[var(--c-border)] border-y border-[var(--c-border)]">

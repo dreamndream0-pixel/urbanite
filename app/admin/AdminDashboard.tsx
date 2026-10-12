@@ -47,7 +47,7 @@ import SiteThemeEditor from './SiteThemeEditor';
 import LineBotManager from './line-bot/LineBotManager';
 import { isCollectOnDelivery } from '@/lib/payment';
 import { buildReturnSteps, historyKind, isReturnOrder } from '@/lib/return-progress';
-import { getCheckoutLine, HIDDEN_FOOTER_SECTION_TITLES, lineAddFriendUrl, withCheckoutLine } from '@/lib/checkout-line';
+import { getCheckoutLine, getNewsletter, HIDDEN_FOOTER_SECTION_TITLES, lineAddFriendUrl, withCheckoutLine, withNewsletter } from '@/lib/checkout-line';
 import { ADMIN_PRODUCT_TABS, adminProductTab, UNLISTED_STATUS, type AdminProductTab } from '@/lib/product-status';
 
 const formatter = new Intl.NumberFormat('zh-TW', {
@@ -561,6 +561,9 @@ export default function AdminDashboard({
     taxId: initialSettings?.footer_tax_id ?? '',
     instagramUrl: initialSettings?.footer_instagram_url ?? '',
     lineUrl: initialSettings?.footer_line_url ?? '',
+    newsletterShow: getNewsletter(initialSettings).show,
+    newsletterTitle: getNewsletter(initialSettings).title,
+    newsletterText: getNewsletter(initialSettings).text,
     checkoutLineId: getCheckoutLine(initialSettings).id,
     checkoutLineUrl: getCheckoutLine(initialSettings).url,
     socialLinks: JSON.stringify(
@@ -1530,7 +1533,10 @@ export default function AdminDashboard({
           footer_tax_id: footerDraft.taxId.trim(),
           footer_instagram_url: footerDraft.instagramUrl.trim(),
           footer_line_url: footerDraft.lineUrl.trim(),
-          footer_sections: withCheckoutLine(footerSections, { id: footerDraft.checkoutLineId, url: footerDraft.checkoutLineUrl }),
+          footer_sections: withNewsletter(
+            withCheckoutLine(footerSections, { id: footerDraft.checkoutLineId, url: footerDraft.checkoutLineUrl }),
+            { show: footerDraft.newsletterShow, title: footerDraft.newsletterTitle, text: footerDraft.newsletterText },
+          ),
           // 金流/物流各自在「金流設定」「物流設定」儲存,頁尾不要覆蓋
         }),
       });
@@ -3115,6 +3121,59 @@ export default function AdminDashboard({
                           />
                         </label>
                       ))}
+                    </div>
+                  </div>
+                </div>
+                {/* 頁尾「尋找我們」與「訂閱最新消息」 */}
+                <div className="mt-6 grid gap-4 lg:grid-cols-2">
+                  <div className="rounded-lg border border-[#e5ded4] p-4">
+                    <h3 className="text-lg font-bold">尋找我們 FOLLOW US</h3>
+                    <p className="mt-1 text-xs leading-5 text-[#8a7f72]">空白的欄位不會顯示。若在上方頁尾分頁自己建了「尋找我們」分頁,會改用那個分頁的內容。</p>
+                    <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                      <label className="block text-sm">
+                        <span className="mb-1 block font-semibold text-[#6b6156]">服務時間</span>
+                        <input value={footerDraft.serviceHours} onChange={(e) => setFooterDraft({ ...footerDraft, serviceHours: e.target.value })} placeholder="例如 上班日 11:00 - 18:00" className="w-full rounded-lg border border-[#e5ded4] bg-white px-3 py-2" />
+                      </label>
+                      <label className="block text-sm">
+                        <span className="mb-1 block font-semibold text-[#6b6156]">E-mail</span>
+                        <input value={footerDraft.email} onChange={(e) => setFooterDraft({ ...footerDraft, email: e.target.value })} placeholder="例如 service@example.com" className="w-full rounded-lg border border-[#e5ded4] bg-white px-3 py-2" />
+                      </label>
+                      <label className="block text-sm">
+                        <span className="mb-1 block font-semibold text-[#6b6156]">Instagram 網址</span>
+                        <input value={footerDraft.instagramUrl} onChange={(e) => setFooterDraft({ ...footerDraft, instagramUrl: e.target.value })} placeholder="https://instagram.com/..." className="w-full rounded-lg border border-[#e5ded4] bg-white px-3 py-2" />
+                      </label>
+                      <label className="block text-sm">
+                        <span className="mb-1 block font-semibold text-[#6b6156]">LINE 官方帳號網址</span>
+                        <input value={footerDraft.lineUrl} onChange={(e) => setFooterDraft({ ...footerDraft, lineUrl: e.target.value })} placeholder="https://lin.ee/..." className="w-full rounded-lg border border-[#e5ded4] bg-white px-3 py-2" />
+                      </label>
+                      <label className="block text-sm">
+                        <span className="mb-1 block font-semibold text-[#6b6156]">公司名稱</span>
+                        <input value={footerDraft.companyName} onChange={(e) => setFooterDraft({ ...footerDraft, companyName: e.target.value })} placeholder="" className="w-full rounded-lg border border-[#e5ded4] bg-white px-3 py-2" />
+                      </label>
+                      <label className="block text-sm">
+                        <span className="mb-1 block font-semibold text-[#6b6156]">統一編號</span>
+                        <input value={footerDraft.taxId} onChange={(e) => setFooterDraft({ ...footerDraft, taxId: e.target.value })} placeholder="" className="w-full rounded-lg border border-[#e5ded4] bg-white px-3 py-2" />
+                      </label>
+                    </div>
+                  </div>
+                  <div className="rounded-lg border border-[#e5ded4] p-4">
+                    <div className="flex items-center justify-between gap-2">
+                      <h3 className="text-lg font-bold">訂閱最新消息</h3>
+                      <label className="flex items-center gap-2 text-sm">
+                        <input type="checkbox" checked={footerDraft.newsletterShow} onChange={(e) => setFooterDraft({ ...footerDraft, newsletterShow: e.target.checked })} />
+                        顯示
+                      </label>
+                    </div>
+                    <p className="mt-1 text-xs leading-5 text-[#8a7f72]">頁尾的 Email 訂閱區塊。不需要可以取消「顯示」。</p>
+                    <div className="mt-3 space-y-3">
+                      <label className="block text-sm">
+                        <span className="mb-1 block font-semibold text-[#6b6156]">標題</span>
+                        <input value={footerDraft.newsletterTitle} onChange={(e) => setFooterDraft({ ...footerDraft, newsletterTitle: e.target.value })} placeholder="訂閱最新消息" className="w-full rounded-lg border border-[#e5ded4] bg-white px-3 py-2" />
+                      </label>
+                      <label className="block text-sm">
+                        <span className="mb-1 block font-semibold text-[#6b6156]">說明文字</span>
+                        <textarea value={footerDraft.newsletterText} onChange={(e) => setFooterDraft({ ...footerDraft, newsletterText: e.target.value })} rows={3} className="w-full rounded-lg border border-[#e5ded4] bg-white px-3 py-2" />
+                      </label>
                     </div>
                   </div>
                 </div>
