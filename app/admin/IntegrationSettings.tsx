@@ -26,6 +26,39 @@ export default function IntegrationSettings() {
   const [password, setPassword] = useState('');
   const [unlocking, setUnlocking] = useState(false);
   const [unlockError, setUnlockError] = useState('');
+  // 忘記密碼:寄驗證碼到管理員信箱後設定新密碼
+  const [reset, setReset] = useState<'' | 'start' | 'sent'>('');
+  const [resetTo, setResetTo] = useState('');
+  const [resetCode, setResetCode] = useState('');
+  const [resetNext, setResetNext] = useState('');
+  const [resetBusy, setResetBusy] = useState(false);
+  const [resetError, setResetError] = useState('');
+
+  async function sendResetCode() {
+    setResetBusy(true); setResetError('');
+    try {
+      const res = await fetch('/api/admin/integrations/reset', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'send' }) });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? '寄送失敗');
+      setResetTo(data.to ?? ''); setReset('sent');
+    } catch (error) { setResetError(error instanceof Error ? error.message : '寄送失敗'); }
+    finally { setResetBusy(false); }
+  }
+
+  async function confirmReset() {
+    if (resetNext.length < 12) { setResetError('新密碼至少 12 碼'); return; }
+    setResetBusy(true); setResetError('');
+    try {
+      const res = await fetch('/api/admin/integrations/reset', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'confirm', code: resetCode, next: resetNext }) });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? '重設失敗');
+      setReset(''); setResetCode(''); setResetNext('');
+      setUnlocked(true); setDefaultPassword(false);
+      await loadSettings();
+      void uiAlert('密碼已重設,串接設定已解鎖。');
+    } catch (error) { setResetError(error instanceof Error ? error.message : '重設失敗'); }
+    finally { setResetBusy(false); }
+  }
 
   function apply(list: Status[]) {
     setStatus(Object.fromEntries(list.map((item) => [item.key, item])));
@@ -151,6 +184,29 @@ export default function IntegrationSettings() {
             {unlocking ? '驗證中…' : '解鎖'}
           </button>
         </form>
+        {reset === '' ? (
+          <button type="button" onClick={() => { setReset('start'); setResetError(''); }} className="mt-4 text-sm text-[#8a7f72] underline underline-offset-2">忘記密碼?</button>
+        ) : (
+          <div className="mt-6 space-y-3 rounded-xl border border-[#e5ded4] bg-[#faf7f2] p-4 text-left text-sm">
+            <p className="font-semibold">重設串接設定密碼</p>
+            {reset === 'start' ? (
+              <>
+                <p className="text-xs leading-5 text-[#8a7f72]">會寄 6 位數驗證碼到你目前登入的管理員信箱,10 分鐘內有效。</p>
+                <button type="button" disabled={resetBusy} onClick={() => void sendResetCode()} className="w-full rounded-full bg-[#1f1b19] py-2.5 text-sm font-semibold text-white disabled:opacity-40">{resetBusy ? '寄送中…' : '寄送驗證碼'}</button>
+              </>
+            ) : (
+              <form onSubmit={(e) => { e.preventDefault(); void confirmReset(); }} className="space-y-3">
+                <p className="text-xs leading-5 text-[#8a7f72]">驗證碼已寄到 {resetTo}。</p>
+                <input value={resetCode} onChange={(e) => setResetCode(e.target.value.replace(/D/g, '').slice(0, 6))} inputMode="numeric" autoComplete="one-time-code" placeholder="6 位數驗證碼" className="w-full rounded-lg border border-[#e5ded4] bg-white px-4 py-2.5 text-center tracking-[0.4em]" />
+                <input type="password" autoComplete="new-password" value={resetNext} onChange={(e) => setResetNext(e.target.value)} placeholder="新密碼(至少 12 碼)" className="w-full rounded-lg border border-[#e5ded4] bg-white px-4 py-2.5" />
+                <button type="submit" disabled={resetBusy || resetCode.length !== 6 || !resetNext} className="w-full rounded-full bg-[#1f1b19] py-2.5 text-sm font-semibold text-white disabled:opacity-40">{resetBusy ? '處理中…' : '設定新密碼並解鎖'}</button>
+                <button type="button" disabled={resetBusy} onClick={() => void sendResetCode()} className="w-full text-xs text-[#8a7f72] underline">重新寄送驗證碼</button>
+              </form>
+            )}
+            {resetError && <p className="text-sm text-[#c0392b]">{resetError}</p>}
+            <button type="button" onClick={() => setReset('')} className="text-xs text-[#a99e8f]">取消</button>
+          </div>
+        )}
       </div>
     );
   }

@@ -192,3 +192,38 @@ export function verifyUnlockToken(token: string | undefined, email: string) {
   const expected = signUnlock(email, exp);
   return expected.length === signature.length && crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(signature));
 }
+
+// ---------- 忘記串接設定密碼:Email 驗證碼重設 ----------
+// 6 位數驗證碼寄到登入中的平台管理員信箱,10 分鐘內有效、最多試 5 次;雜湊後加密存在同一張表
+const PANEL_RESET_KEY = '__PANEL_RESET__';
+const RESET_MS = 10 * 60 * 1000;
+type PanelReset = { email: string; code: string; exp: number; tries: number };
+
+async function writeReset(value: PanelReset | null) {
+  const supabase = createAdminClient();
+  const { error } = value
+    ? await supabase.from('integration_settings').upsert({ key: PANEL_RESET_KEY, value: encrypt(JSON.stringify(value)), updated_at: new Date().toISOString() }, { onConflict: 'key' })
+    : await supabase.from('integration_settings').delete().eq('key', PANEL_RESET_KEY);
+  if (error) throw new Error(error.message);
+  cache = null;
+}
+
+export async function createPanelResetCode(email: string) {
+  const code = String(crypto.randomInt(0, 1_000_000)).padStart(6, '0');
+  await writeReset({ email: email.toLowerCase(), code: hashPassword(code), exp: Date.now() + RESET_MS, tries: 0 });
+  return code;
+}
+
+// 驗證碼正確才回傳 true(並作廢);錯誤累計次數,超過 5 次作廢
+export async function consumePanelResetCode(email: string, code: string) {
+  const { data } = await createAdminClient().from('integration_settings').select('value').eq('key', PANEL_RESET_KEY).maybeSingle();
+  if (!data) return false;
+  let reset: PanelReset;
+  try { reset = JSON.parse(decrypt(String(data.value ?? ''))) as PanelReset; } catch { return false; }
+  if (reset.email !== email.toLowerCase() || reset.exp < Date.now() || reset.tries >= 5) { await writeReset(null); return false; }
+  const [salt, expected] = reset.code.split(':');
+  const actual = hashPassword(code.trim(), salt).split(':')[1];
+  const ok = /^\d{6}$/.test(code.trim()) && crypto.timingSafeEqual(Buffer.from(actual, 'hex'), Buffer.from(expected, 'hex'));
+  await writeReset(ok ? null : { ...reset, tries: reset.tries + 1 });
+  return ok;
+}
