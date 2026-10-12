@@ -9,7 +9,7 @@ import type { Customer, Discount, Order, OrderStatusHistory, Product, Recipient,
 import { TW_CITIES, TW_REGIONS } from '@/lib/tw-regions';
 import { awaitingPayment, isOnlinePayment, paymentDeadline } from '@/lib/payment';
 import { buildReturnSteps, historyKind, isReturnOrder } from '@/lib/return-progress';
-import { orderNeedsAttention } from '@/app/components/OrderStatusBadge';
+import { isPaymentReported, orderNeedsAttention } from '@/app/components/OrderStatusBadge';
 import ShopHeader from '@/app/components/ShopHeader';
 import { couponImageStyle, couponScript } from '@/lib/coupon-presets';
 import { uiAlert } from '@/lib/ui-dialog';
@@ -1468,7 +1468,7 @@ function OrderModal({
           ) : null}
 
           {/* 操作 */}
-          {canPayNow(order) && awaitingPayment(order) && order.created_at ? (
+          {canPayNow(order) && awaitingPayment(order) && !isPaymentReported(order) && order.created_at ? (
             <p className="mb-2 text-sm text-[#c0392b]">
               請於 {paymentDeadline(order.created_at).toLocaleString('zh-TW', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })} 前完成付款,逾期將自動取消訂單。
             </p>
@@ -1482,6 +1482,14 @@ function OrderModal({
                 >
                   立即付款
                 </a>
+              ) : isPaymentReported(order) ? (
+                // 已回報匯款:等賣家對帳,點了仍可查看或修改回報內容
+                <button
+                  onClick={() => onPay(order)}
+                  className="inline-flex h-9 items-center gap-1.5 rounded-full border border-[var(--c-border-strong)] bg-[var(--c-soft)] px-4 text-sm font-semibold text-[var(--c-text2)] transition hover:bg-[var(--c-soft)]"
+                >
+                  ✓ 已通知付款
+                </button>
               ) : (
                 <button
                   onClick={() => onPay(order)}
