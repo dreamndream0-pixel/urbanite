@@ -4893,9 +4893,10 @@ ${order.note ? `<div class="sec"><h2>備註</h2><p class="muted">${escapeHtml(or
               {row('姓名', order.customer_name)}
               {row('電話', order.phone)}
               {row('Email', order.email)}
-              {row('地址', order.address)}
+              {/* 超商取貨:地址欄就是門市資料,改由下方取貨門市/門市地址顯示,避免重複 */}
+              {order.store_name || order.store_id ? null : row('地址', order.address)}
               {row('送貨方式', order.shipping_method)}
-              {row('取貨門市', order.store_name ? `${order.store_name}（${order.store_id ?? ''}）` : order.store_id)}
+              {row('取貨門市', order.store_name ? (order.store_id && order.store_id !== 'MANUAL' ? `${order.store_name}（${order.store_id}）` : order.store_name) : order.store_id)}
               {row('門市地址', order.store_address)}
               {row('門市電話', order.store_phone)}
               {row('付款方式', order.payment_method)}
