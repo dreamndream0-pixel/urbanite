@@ -800,6 +800,10 @@ export default function AdminDashboard({
         ? sizeDim.options
         : editing.sizes.split(',').map((s) => s.trim()).filter(Boolean),
     };
+    // 勾滿店家目前所有方式 = 不限制(存空陣列),之後店家在系統設定新增的物流/金流才會自動出現在結帳頁
+    const coversAll = (list: string[], all: string[]) => all.length > 0 && all.every((m) => list.includes(m));
+    if (!payload.available_shipping_methods.includes('免運') && coversAll(payload.available_shipping_methods, enabledShippingMethods)) payload.available_shipping_methods = [];
+    if (coversAll(payload.available_payment_methods, enabledPaymentMethods)) payload.available_payment_methods = [];
     if (isNew) {
       if (!payload.id || !payload.name) return void uiAlert('請填寫商品代碼與名稱');
       const res = await fetch('/api/products', {
@@ -1527,10 +1531,7 @@ export default function AdminDashboard({
           footer_instagram_url: footerDraft.instagramUrl.trim(),
           footer_line_url: footerDraft.lineUrl.trim(),
           footer_sections: withCheckoutLine(footerSections, { id: footerDraft.checkoutLineId, url: footerDraft.checkoutLineUrl }),
-          payment_methods: toLines(footerDraft.payments),
-          shipping_methods: toLines(footerDraft.shippings),
-          enabled_payment_methods: toLines(footerDraft.payments),
-          enabled_shipping_methods: toLines(footerDraft.shippings),
+          // 金流/物流各自在「金流設定」「物流設定」儲存,頁尾不要覆蓋
         }),
       });
       const data = await res.json();
@@ -1581,6 +1582,9 @@ export default function AdminDashboard({
   ) {
     const targets = scope === 'category' ? products.filter((p) => p.category === category) : products;
     if (targets.length === 0) { void uiAlert('沒有符合的商品。'); return; }
+    // 套用全部方式 = 不限制,之後新增的方式也會自動可用
+    const all = field === 'available_payment_methods' ? enabledPaymentMethods : enabledShippingMethods;
+    if (!methods.includes('免運') && all.length > 0 && all.every((m) => methods.includes(m))) methods = [];
     const kindLabel = field === 'available_payment_methods' ? '付款' : '物流';
     const scopeLabel = scope === 'category'
       ? `分類「${categories.find((c) => c.slug === category)?.name ?? category}」`

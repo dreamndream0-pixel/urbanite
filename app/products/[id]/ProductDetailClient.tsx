@@ -49,7 +49,7 @@ export default function ProductDetailClient({ product, homeHref = '/' }: { produ
     return inStock ? [...inStock.options] : first;
   });
   const [quantity, setQuantity] = useState(1);
-  const [tab, setTab] = useState<'description' | 'shipping'>('shipping');
+  const [tab, setTab] = useState<'description' | 'shipping'>('description');
   // 畫面置中的提示(深灰 80% 半透明,3 秒後消失)
   const [toast, setToast] = useState('');
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
