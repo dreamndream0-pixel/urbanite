@@ -39,6 +39,7 @@ type PickupStore = {
 const SHIPPING_METHODS = ['全家取貨付款', '全家取貨不付款', '7-11取貨付款', '7-11取貨不付款', '宅配到府'];
 const PAYMENT_METHODS = ['信用卡付款', 'Apple Pay', '轉帳匯款'];
 const PICKUP_STORE_KEY = 'newebpay-pickup-store';
+const CHECKOUT_DRAFT_KEY = 'checkout-draft';
 
 function isStorePickupMethod(method = '') {
   return /超商|取貨|7-?11|7-ELEVEN|全家|family|萊爾富|hi-?life|ok/i.test(method);
@@ -125,16 +126,30 @@ export default function CheckoutPage() {
       } catch {
         /* 略過 */
       }
+      // 從門市地圖回來:帶回換頁前填好的資料
+      try {
+        const draft = JSON.parse(sessionStorage.getItem(CHECKOUT_DRAFT_KEY) || 'null') as Record<string, string> | null;
+        sessionStorage.removeItem(CHECKOUT_DRAFT_KEY);
+        if (draft) {
+          setName(draft.name ?? ''); setEmail(draft.email ?? ''); setPhone(draft.phone ?? '');
+          setAddress(draft.address ?? ''); setCity(draft.city ?? ''); setDistrict(draft.district ?? ''); setNote(draft.note ?? '');
+          if (draft.shippingMethod) setShippingMethod(draft.shippingMethod);
+          if (draft.paymentMethod) setPaymentMethod(draft.paymentMethod);
+        }
+      } catch {
+        /* 略過 */
+      }
       setLoaded(true);
     });
 
     fetch('/api/me')
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
-        if (data?.email) { setEmail(data.email); setIsMember(true); }
-        if (data?.name) setName(data.name);
-        if (data?.phone) setPhone(data.phone);
-        if (data?.address) setAddress(data.address);
+        // 只補空白欄位,不蓋掉買家已填(或從地圖回來帶回)的資料
+        if (data?.email) { setEmail((v) => v || data.email); setIsMember(true); }
+        if (data?.name) setName((v) => v || data.name);
+        if (data?.phone) setPhone((v) => v || data.phone);
+        if (data?.address) setAddress((v) => v || data.address);
         if (Array.isArray(data?.recipients)) setRecipients(data.recipients);
       })
       .catch(() => {});
@@ -270,7 +285,7 @@ export default function CheckoutPage() {
     };
   }, [cart, loaded, memberCoupons, shipping, subtotal]);
 
-  // 用彈出視窗開藍新電子地圖:選完由回傳頁 postMessage 帶回門市,結帳頁不換頁
+  // 開超商門市地圖:電腦用彈出視窗(選完由回傳頁 postMessage 帶回);手機或彈窗被擋時同頁開,回來再帶回已填資料
   function openStoreMap(shipType: string) {
     // 店家自寄:7-11 直接開 7-11 官方地圖(不經過藍新);URBANITE 走藍新物流地圖
     const mobile = window.matchMedia('(max-width: 768px)').matches;
@@ -282,12 +297,20 @@ export default function CheckoutPage() {
     const height = Math.min(820, window.screen.availHeight || 820);
     const left = Math.max(0, ((window.screen.availWidth || width) - width) / 2);
     const top = Math.max(0, ((window.screen.availHeight || height) - height) / 2);
+    // 同頁開地圖:先暫存已填資料,選完門市回到結帳頁會帶回
+    const samePage = () => {
+      try { sessionStorage.setItem(CHECKOUT_DRAFT_KEY, JSON.stringify({ name, email, phone, address, city, district, note, shippingMethod: selectedShippingMethod, paymentMethod })); } catch { /* 略過 */ }
+      window.location.href = url;
+    };
+    // 手機(含 LINE / IG 內建瀏覽器)彈出視窗常被擋又不回報,一律同頁開
+    if (mobile || window.matchMedia('(pointer: coarse)').matches) { samePage(); return; }
     const w = window.open(
       url,
       'newebpay-storemap',
       `width=${width},height=${height},left=${left},top=${top},scrollbars=yes,resizable=yes`,
     );
-    if (!w) { window.location.href = url; } // 彈窗被擋 → 退回同頁流程
+    if (!w || w.closed) { samePage(); return; } // 彈窗被擋 → 退回同頁流程
+    setTimeout(() => { if (w.closed) samePage(); }, 800); // 有些瀏覽器擋了仍回傳視窗,稍後確認
   }
 
   useEffect(() => {
