@@ -175,7 +175,7 @@ const MAIN_TABS: { key: MainTab; label: string; icon: ReactNode }[] = [
 
 // ---------- 方案(免費 / Pro) ----------
 const ADMIN_PLAN: CardPlanInfo = { tier: 'max', pro: true, isAdmin: true, expiresAt: null, limits: PRO_LIMITS };
-const PlanCtx = createContext<{ plan: CardPlanInfo; upgradeHref: string }>({ plan: ADMIN_PLAN, upgradeHref: '/mycard/upgrade' });
+const PlanCtx = createContext<{ plan: CardPlanInfo; upgradeHref: string; baseUrl?: string }>({ plan: ADMIN_PLAN, upgradeHref: '/mycard/upgrade' });
 const usePlan = () => useContext(PlanCtx);
 
 // 樣板分類:全部 / 免費 / U Plus / 其他(之後的專屬樣板)
@@ -391,7 +391,8 @@ async function askUpgrade(message: string, href: string) {
 }
 
 // 「個人名片」編輯器:後台(店家)與會員「我的名片」共用;最上方網址+複製;我的內容 / 外觀風格 / 數據分析 / 設定;即時預覽
-export default function ProfileCardManager({ products, lineUrl = '', upgradeHref = '/mycard/upgrade' }: { products: Product[]; lineUrl?: string; upgradeHref?: string }) {
+// baseUrl:名片網址的網域。店家官網後台(子網域)要傳主站網址,名片一律在主站 /@代稱
+export default function ProfileCardManager({ products, lineUrl = '', upgradeHref = '/mycard/upgrade', baseUrl = '' }: { products: Product[]; lineUrl?: string; upgradeHref?: string; baseUrl?: string }) {
   const [plan, setPlan] = useState<CardPlanInfo>(ADMIN_PLAN);
   const [card, setCard] = useState<ProfileCard | null>(null);
   const [draft, setDraft] = useState<ProfileCard | null>(null);
@@ -448,7 +449,7 @@ export default function ProfileCardManager({ products, lineUrl = '', upgradeHref
   }
 
   useEffect(() => {
-    Promise.resolve().then(() => setOrigin(window.location.origin));
+    Promise.resolve().then(() => setOrigin(baseUrl || window.location.origin));
     fetch('/api/profile-card', { cache: 'no-store' })
       .then(async (res) => {
         const data = await res.json();
@@ -561,7 +562,7 @@ export default function ProfileCardManager({ products, lineUrl = '', upgradeHref
   const preview = <ProfileCardView card={draft} blocks={blocks} products={productMap} lineUrl={lineUrl} preview />;
 
   return (
-    <PlanCtx.Provider value={{ plan, upgradeHref }}>
+    <PlanCtx.Provider value={{ plan, upgradeHref, baseUrl }}>
     <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start lg:gap-6">
       <div className="space-y-4 pb-20">
         {/* 網址 */}
@@ -2755,6 +2756,7 @@ function SettingsEditor({ draft, setDraft }: { draft: ProfileCard; setDraft: (c:
 
 // 推薦好友:每滿 5 位送 1 個月 U Plus
 function ReferralSection() {
+  const { baseUrl } = usePlan();
   const [data, setData] = useState<{ slug: string; count: number; rewards: number; progress: number; goal: number } | null>(null);
   const [copied, setCopied] = useState(false);
 
@@ -2766,7 +2768,7 @@ function ReferralSection() {
   }, []);
 
   if (!data) return null;
-  const url = `${window.location.origin}/card?ref=${data.slug}`;
+  const url = `${baseUrl || window.location.origin}/card?ref=${data.slug}`;
   const left = data.goal - data.progress;
 
   async function copy() {

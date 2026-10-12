@@ -7,7 +7,8 @@ import { requestSecurityError } from '@/lib/request-security';
 // 每次請求刷新使用者的登入 session(Supabase 官方建議做法)。
 // 尚未設定 Supabase 環境變數時直接放行,方便本機開發。
 // 名片服務、LINE 綁定屬於平台(主網站);在店家子網域打開時轉回主網站
-const PLATFORM_ONLY = /^\/(card|mycard|line|shop\/new|@|api\/profile-card|api\/card-import|api\/admin\/card|api\/admin\/line|api\/admin\/shops)/;
+// api/profile-card 店家官網後台也要用(編輯自己的名片),不轉回主站
+const PLATFORM_ONLY = /^\/(card|mycard|line|shop\/new|@|api\/card-import|api\/admin\/card|api\/admin\/line|api\/admin\/shops)/;
 
 export async function proxy(request: NextRequest) {
   const rejected = requestSecurityError(request);

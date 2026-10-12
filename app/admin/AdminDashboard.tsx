@@ -32,6 +32,7 @@ import {
 } from '@/lib/order-status';
 import { uiToast } from '@/lib/ui-toast';
 import NumberInput from './NumberInput';
+import { PRIMARY_SITE_URL } from '@/lib/site-url';
 import { defaultSelfShipCarrier, NO_TRACKING_CARRIERS, needsTracking } from '@/lib/self-ship';
 import { uiAlert, uiConfirm, uiPrompt } from '@/lib/ui-dialog';
 import { OrderCardBadges, orderNeedsAttention, AttentionDot, isPaymentReported } from '@/app/components/OrderStatusBadge';
@@ -107,7 +108,8 @@ const NAV = [
 ] as const;
 
 type SectionKey = (typeof NAV)[number]['key'];
-const PLATFORM_SECTIONS = new Set<string>(['profile-card', 'card-members', 'line-bot', 'shops']);
+// 個人名片:店家(U Pro 以上)也能在官網後台編輯自己的名片
+const PLATFORM_SECTIONS = new Set<string>(['card-members', 'line-bot', 'shops']);
 
 type Draft = {
   id: string;
@@ -456,7 +458,7 @@ export default function AdminDashboard({
   platform?: boolean; // 主網站(URBANITE)= 平台;店家子網域 = false
   shopName?: string;
 }) {
-  // 店家後台不顯示平台功能(名片服務、LINE 機器人、店家管理)
+  // 店家後台不顯示平台功能(名片會員、LINE 機器人、店家管理)
   const nav = platform ? NAV : NAV.filter((n) => !PLATFORM_SECTIONS.has(n.key));
   const router = useRouter();
   const [section, setSection] = useState<SectionKey>('overview');
@@ -2835,7 +2837,10 @@ export default function AdminDashboard({
           {section === 'line-bot' && <LineBotManager products={products} coupons={discounts} logoUrl={logoUrl} />}
           {section === 'card-members' && <CardMembersManager />}
           {section === 'shops' && platform && <ShopsManager />}
-          {section === 'profile-card' && <ProfileCardManager products={products} lineUrl={lineAddFriendUrl(getCheckoutLine(initialSettings))} />}
+          {section === 'profile-card' && (platform
+            ? <ProfileCardManager products={products} lineUrl={lineAddFriendUrl(getCheckoutLine(initialSettings))} />
+            // 店家:編輯登入者自己的名片;名片網址在主站,商品區塊只限主站商店
+            : <ProfileCardManager products={[]} baseUrl={PRIMARY_SITE_URL} upgradeHref={`${PRIMARY_SITE_URL}/mycard/upgrade`} />)}
 
           {section === 'campaign-pages' && (
             <CampaignManager
