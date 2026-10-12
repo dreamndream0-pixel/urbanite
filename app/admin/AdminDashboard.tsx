@@ -2899,7 +2899,7 @@ export default function AdminDashboard({
                   { key: 'payments', label: '金流設定' },
                   { key: 'shippings', label: '物流設定' },
                   { key: 'integrations', label: '串接設定' },
-                  { key: 'shopline', label: 'LINE 串接' },
+                  { key: 'shopline', label: '服務設定' },
                 ] as const).filter((t) => (platform ? t.key !== 'shopline' : t.key !== 'integrations')).map((t) => (
                   <button
                     key={t.key}

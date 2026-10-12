@@ -5,7 +5,7 @@ import { uiAlert, uiConfirm } from '@/lib/ui-dialog';
 
 type Status = { configured: boolean; valid: boolean; botName: string; basicId: string; webhookUrl: string };
 
-// 店家後台 系統設定 → LINE 串接:店家自己的 LINE 官方帳號(和 URBANITE 主站分開)
+// 店家後台 系統設定 → 服務設定:店家自己的 LINE 官方帳號(和 URBANITE 主站分開)
 export default function ShopLineSettings() {
   const [status, setStatus] = useState<Status | null>(null);
   const [secret, setSecret] = useState('');
@@ -32,7 +32,7 @@ export default function ShopLineSettings() {
   }
 
   async function clear() {
-    if (!(await uiConfirm('解除 LINE 串接?解除後不會再用 LINE 通知顧客,顧客也無法在 LINE 查詢訂單。'))) return;
+    if (!(await uiConfirm('解除 LINE 官方帳號連接?解除後不會再用 LINE 通知顧客,顧客也無法在 LINE 查詢訂單。'))) return;
     setBusy(true);
     try {
       const res = await fetch('/api/admin/shop-line', { method: 'DELETE' });
@@ -51,7 +51,7 @@ export default function ShopLineSettings() {
     <div className="space-y-5 rounded-xl border border-[#e5ded4] bg-white p-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-lg font-semibold">LINE 串接</h2>
+          <h2 className="text-lg font-semibold">LINE 官方帳號</h2>
           <p className="mt-1 text-sm text-[#8a7f72]">連接你自己的 LINE 官方帳號:顧客綁定會員後,訂單成立、出貨會用 LINE 通知,也能在 LINE 輸入「訂單查詢」。</p>
         </div>
         {status.configured ? (

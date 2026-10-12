@@ -53,7 +53,7 @@ type LineEvent = { type: string; replyToken?: string; source?: { type: string; u
 // 店家 LINE Webhook:加好友歡迎、輸入「綁定」取得綁定連結、「訂單查詢」;其他訊息不自動回覆(留給店家真人回覆)
 export async function handleShopWebhook(shop: Shop, raw: string, signature: string | null) {
   const cfg = await getShopLineConfig(shop.id);
-  if (!cfg) return { status: 503, body: { error: '這家店還沒設定 LINE 串接' } };
+  if (!cfg) return { status: 503, body: { error: '這家店還沒連接 LINE 官方帳號' } };
   if (!verifyLineSignature(raw, signature, cfg.channelSecret)) return { status: 401, body: { error: 'invalid signature' } };
   const events = ((JSON.parse(raw || '{}') as { events?: LineEvent[] }).events ?? []);
   await Promise.all(events.map(async (event) => {

@@ -5,7 +5,7 @@ import { fetchBotInfo, getShopLineConfig, saveShopLineConfig } from '@/lib/shop-
 
 export const dynamic = 'force-dynamic';
 
-// 店家後台「LINE 串接」:店家自己的 LINE 官方帳號金鑰(只寫不讀,前端只看到狀態)
+// 店家後台「服務設定」:店家自己的 LINE 官方帳號金鑰(只寫不讀,前端只看到狀態)
 async function context() {
   const admin = await getAdminUser();
   const shop = await getCurrentShop();

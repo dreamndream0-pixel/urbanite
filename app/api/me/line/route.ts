@@ -47,7 +47,7 @@ export async function POST(request: Request) {
     const shop = await getCurrentShop();
     if (shop && !isPlatformShop(shop)) {
       const cfg = await getShopLineConfig(shop.id);
-      if (!cfg) throw new Error('這家店還沒設定 LINE 串接');
+      if (!cfg) throw new Error('這家店還沒連接 LINE 官方帳號');
       const { lineUserId } = verifyBindToken(String(body.token ?? ''), cfg.channelSecret);
       const profile = await bindShopLine(shop, cfg, user.id, user.email ?? '', lineUserId);
       return NextResponse.json({ ok: true, displayName: profile?.displayName ?? '' });
