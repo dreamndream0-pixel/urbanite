@@ -1237,6 +1237,17 @@ function OrderRecordCard({
               >
                 前往付款 <span aria-hidden>→</span>
               </a>
+            ) : isPaymentReported(order) ? (
+              // 已回報匯款:等賣家對帳,點了仍可查看或修改回報
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onPay(order);
+                }}
+                className="inline-flex h-10 items-center gap-2 rounded-full border border-[#8d7568] bg-[#f6f2ec] px-6 text-sm font-semibold text-[#3d302a]"
+              >
+                ✓ 已通知付款
+              </button>
             ) : (
               <button
                 onClick={(e) => {
@@ -1282,7 +1293,9 @@ function OrderListStatusBadge({ order }: { order: Order }) {
   const tab = orderTabOf(order);
   const config =
     tab === 'unpaid'
-      ? { label: '尚未付款', className: 'bg-[#fbf1e6] text-[#9b6b25]', icon: 'clock' as const }
+      ? isPaymentReported(order)
+        ? { label: '已通知付款', className: 'bg-[#eaf1f7] text-[#38617d]', icon: 'clock' as const }
+        : { label: '尚未付款', className: 'bg-[#fbf1e6] text-[#9b6b25]', icon: 'clock' as const }
       : tab === 'to_ship'
         ? { label: '待出貨', className: 'bg-[#f4efe7] text-[var(--c-text2)]', icon: 'box' as const }
         : tab === 'shipping'
