@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { after, NextResponse } from 'next/server';
 import { getAdminUser, getSessionUser } from '@/lib/supabase/server';
 import { evaluateCoupon } from '@/lib/discount';
 import { isStorePickup, shipTypeFromMethod } from '@/lib/newebpay-logistics';
@@ -8,9 +8,11 @@ import { createOrderAccessToken, orderAccessCookieName, ORDER_ACCESS_MAX_AGE } f
 import { computeShipping, resolveMethodFee } from '@/lib/shipping';
 import { isCampaignLive } from '@/lib/campaign';
 import type { Campaign, Discount, Order, OrderItem, Product, Shipment } from '@/lib/types';
-import { getCurrentShop, isPlatformShop, shopAdminClient } from '@/lib/shop';
+import { getCurrentShop, isPlatformShop, shopAdminClient, shopUrl } from '@/lib/shop';
 import { isCollectOnDelivery, isOnlinePayment } from '@/lib/payment';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { sendOrderEmails } from '@/lib/order-email';
+import { getConfiguredSiteUrl } from '@/lib/site-url';
 
 // GET /api/orders — 取得所有訂單(限管理員)
 export async function GET() {
@@ -73,7 +75,8 @@ export async function POST(request: Request) {
   }
   // 其他店家(U Pro):只能用這家店開啟的付款 / 寄送方式;不能用線上金流與「取貨付款」(需要藍新代收,是 URBANITE 的帳號)
   // 「超商取貨不付款」可以:買家自己填門市,店家自己寄(例如賣貨便),手動填物流單號
-  const platformShop = isPlatformShop(await getCurrentShop());
+  const currentShop = await getCurrentShop();
+  const platformShop = isPlatformShop(currentShop);
   if (!platformShop) {
     const { data: shopSettings } = await (await shopAdminClient()).from('site_settings').select('enabled_payment_methods, enabled_shipping_methods').maybeSingle();
     const pays = ((shopSettings?.enabled_payment_methods as string[] | null) ?? ['轉帳匯款']).filter((m) => !isOnlinePayment(m));
@@ -400,6 +403,15 @@ export async function POST(request: Request) {
   } catch {
     /* 記錄失敗不影響下單 */
   }
+
+  // 回應送出後再寄訂單通知信(買家+賣家),寄信失敗不影響下單
+  after(() => sendOrderEmails({
+    order: order as Order,
+    shop: currentShop ? { id: currentShop.id, name: currentShop.name, slug: currentShop.slug } : null,
+    platform: platformShop,
+    siteUrl: platformShop || !currentShop ? getConfiguredSiteUrl().replace(/\/$/, '') : shopUrl(currentShop.slug, ''),
+    member: Boolean(user),
+  }).catch((error) => console.error('order email', error)));
 
   const response = NextResponse.json(order as Order, { status: 201, headers: { 'Cache-Control': 'private, no-store' } });
   if (guestAccess) response.cookies.set(orderAccessCookieName(orderNo), guestAccess, {

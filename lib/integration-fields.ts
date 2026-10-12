@@ -55,6 +55,15 @@ export const INTEGRATION_GROUPS: IntegrationGroup[] = [
     ],
   },
   {
+    title: 'Email 通知(Resend)',
+    description: '下單後寄訂單通知信給買家與賣家。到 resend.com 建立帳號、驗證寄件網域(例如 urbanite.com.tw)後,在 API Keys 建立金鑰貼上。沒填就不寄信,不影響下單。',
+    fields: [
+      { key: 'RESEND_API_KEY', label: 'API Key', secret: true, placeholder: 're_...' },
+      { key: 'EMAIL_FROM', label: '寄件信箱', placeholder: 'order@urbanite.com.tw', hint: '要在 Resend 驗證過的網域底下。寄件人名稱會自動帶入店名。' },
+      { key: 'ORDER_NOTIFY_EMAILS', label: '主站訂單通知收件人', placeholder: 'a@example.com, b@example.com', hint: 'URBANITE 主站新訂單寄給誰,多個以逗號分隔;空白則寄給管理員 Email。各店家的訂單會寄給該店的店主。' },
+    ],
+  },
+  {
     title: '網站',
     fields: [
       {
