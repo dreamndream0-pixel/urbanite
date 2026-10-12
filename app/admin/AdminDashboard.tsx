@@ -32,6 +32,7 @@ import {
 } from '@/lib/order-status';
 import { uiToast } from '@/lib/ui-toast';
 import NumberInput from './NumberInput';
+import ShopLineSettings from './ShopLineSettings';
 import { PRIMARY_SITE_URL } from '@/lib/site-url';
 import { defaultSelfShipCarrier, NO_TRACKING_CARRIERS, needsTracking } from '@/lib/self-ship';
 import { uiAlert, uiConfirm, uiPrompt } from '@/lib/ui-dialog';
@@ -493,7 +494,7 @@ export default function AdminDashboard({
   const [customers] = useState<Customer[]>(initialCustomers);
   const [banners, setBanners] = useState<Banner[]>(initialBanners);
   const [uploadingBanner, setUploadingBanner] = useState(false);
-  const [settingsTab, setSettingsTab] = useState<'general' | 'templates' | 'banners' | 'footer' | 'payments' | 'shippings' | 'integrations'>('general');
+  const [settingsTab, setSettingsTab] = useState<'general' | 'templates' | 'banners' | 'footer' | 'payments' | 'shippings' | 'integrations' | 'shopline'>('general');
   const [orderFilter, setOrderFilter] = useState<string>('全部');
   const [orderSearch, setOrderSearch] = useState('');
   const [orderPaidFilter, setOrderPaidFilter] = useState<'全部' | '已付款' | '未付款'>('全部');
@@ -2898,7 +2899,8 @@ export default function AdminDashboard({
                   { key: 'payments', label: '金流設定' },
                   { key: 'shippings', label: '物流設定' },
                   { key: 'integrations', label: '串接設定' },
-                ] as const).filter((t) => platform || t.key !== 'integrations').map((t) => (
+                  { key: 'shopline', label: 'LINE 串接' },
+                ] as const).filter((t) => (platform ? t.key !== 'shopline' : t.key !== 'integrations')).map((t) => (
                   <button
                     key={t.key}
                     onClick={() => setSettingsTab(t.key)}
@@ -3246,6 +3248,7 @@ export default function AdminDashboard({
               )}
 
               {settingsTab === 'integrations' && <IntegrationSettings />}
+              {settingsTab === 'shopline' && !platform && <ShopLineSettings />}
               {settingsTab === 'shippings' && (
               <Card
                 title="物流設定"

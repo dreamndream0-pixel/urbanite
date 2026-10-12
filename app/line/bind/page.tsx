@@ -3,7 +3,8 @@ import { redirect } from 'next/navigation';
 import { getSessionUser } from '@/lib/supabase/server';
 import { fetchBotProfile, getMessagingConfig, verifyBindToken } from '@/lib/line-messaging';
 import BindClient from './BindClient';
-import { scopedClient, URBANITE_SHOP_ID } from '@/lib/shop';
+import { getCurrentShop, isPlatformShop, scopedClient, URBANITE_SHOP_ID } from '@/lib/shop';
+import { getShopLineConfig } from '@/lib/shop-line';
 
 export const dynamic = 'force-dynamic';
 export const metadata: Metadata = { title: '綁定 LINE', robots: { index: false } };
@@ -11,7 +12,11 @@ export const metadata: Metadata = { title: '綁定 LINE', robots: { index: false
 // LINE 官方帳號傳來的綁定連結:登入(任何方式)後確認綁定
 export default async function LineBindPage({ searchParams }: { searchParams: Promise<{ t?: string }> }) {
   const { t = '' } = await searchParams;
-  const { channelSecret, accessToken } = await getMessagingConfig();
+  // 店家網站用店家自己的 LINE 官方帳號
+  const shop = await getCurrentShop();
+  const shopSite = Boolean(shop && !isPlatformShop(shop));
+  const shopCfg = shopSite ? await getShopLineConfig(shop!.id) : null;
+  const { channelSecret, accessToken } = shopSite ? { channelSecret: shopCfg?.channelSecret ?? '', accessToken: shopCfg?.accessToken ?? '' } : await getMessagingConfig();
 
   let lineUserId = '';
   let error = '';
@@ -28,7 +33,7 @@ export default async function LineBindPage({ searchParams }: { searchParams: Pro
   let alreadyMine = false;
   let boundElsewhere = false;
   if (user && lineUserId) {
-    const supabase = scopedClient(URBANITE_SHOP_ID);
+    const supabase = scopedClient(shopSite ? shop!.id : URBANITE_SHOP_ID);
     const { data } = await supabase.from('customers').select('user_id').eq('line_user_id', lineUserId).maybeSingle();
     alreadyMine = data?.user_id === user.id;
     boundElsewhere = Boolean(data?.user_id && data.user_id !== user.id);

@@ -1,5 +1,6 @@
-import { NextResponse } from 'next/server';
+import { after, NextResponse } from 'next/server';
 import { needsTracking } from '@/lib/self-ship';
+import { notifyShopOrder } from '@/lib/shop-line';
 import { buildItemDesc } from '@/lib/newebpay';
 import {
   getShipmentNoWithRetry,
@@ -92,6 +93,9 @@ export async function POST(
       note,
       created_by: admin.email || '後台管理員',
     });
+    // 店家:用店家自己的 LINE 通知買家已出貨
+    const shop = await getCurrentShop();
+    if (shop && !isPlatformShop(shop)) after(() => notifyShopOrder(shop, id, 'shipped', trackingNumber ? `${provider} 單號 ${trackingNumber}` : provider).catch((e) => console.error('shop LINE notify', e)));
     return NextResponse.json(shipment as Shipment, { status: 201 });
   }
   if (useNewebpay) {

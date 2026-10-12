@@ -4,7 +4,8 @@ import { getCheckoutLine, lineAddFriendUrl } from '@/lib/checkout-line';
 import { bindLineToUser, fetchBotProfile, getMessagingConfig, verifyBindToken } from '@/lib/line-messaging';
 import { createLinkToken, getLineLoginConfig } from '@/lib/line-login';
 import { syncMemberMenu } from '@/lib/line-bot';
-import { scopedClient, URBANITE_SHOP_ID } from '@/lib/shop';
+import { getCurrentShop, isPlatformShop, scopedClient, URBANITE_SHOP_ID } from '@/lib/shop';
+import { bindShopLine, getShopLineConfig } from '@/lib/shop-line';
 
 export const dynamic = 'force-dynamic';
 
@@ -42,6 +43,15 @@ export async function POST(request: Request) {
   if (!user) return NextResponse.json({ error: '請先登入' }, { status: 401 });
   const body = (await request.json().catch(() => ({}))) as { token?: string };
   try {
+    // 店家網站:綁到店家自己的 LINE 官方帳號
+    const shop = await getCurrentShop();
+    if (shop && !isPlatformShop(shop)) {
+      const cfg = await getShopLineConfig(shop.id);
+      if (!cfg) throw new Error('這家店還沒設定 LINE 串接');
+      const { lineUserId } = verifyBindToken(String(body.token ?? ''), cfg.channelSecret);
+      const profile = await bindShopLine(shop, cfg, user.id, user.email ?? '', lineUserId);
+      return NextResponse.json({ ok: true, displayName: profile?.displayName ?? '' });
+    }
     const { channelSecret, accessToken } = await getMessagingConfig();
     const { lineUserId } = verifyBindToken(String(body.token ?? ''), channelSecret);
     const profile = accessToken ? await fetchBotProfile(lineUserId, accessToken) : null;

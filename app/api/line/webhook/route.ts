@@ -14,6 +14,8 @@ import {
 } from '@/lib/line-messaging';
 import { fillVars, keywordMatches, loadBotConfig, loadRules, logEvent, ruleActiveNow, toLineMessages } from '@/lib/line-bot';
 import type { BuiltinKey, MessageSet } from '@/lib/line-bot-types';
+import { getCurrentShop, isPlatformShop } from '@/lib/shop';
+import { handleShopWebhook } from '@/lib/shop-line';
 
 export const dynamic = 'force-dynamic';
 
@@ -104,6 +106,12 @@ async function handleEvent(event: LineEvent, accessToken: string) {
 // POST /api/line/webhook — LINE 官方帳號 Webhook
 export async function POST(request: Request) {
   const raw = await request.text();
+  // 店家子網域:店家自己的 LINE 官方帳號(與主站分開)
+  const shop = await getCurrentShop();
+  if (shop && !isPlatformShop(shop)) {
+    const result = await handleShopWebhook(shop, raw, request.headers.get('x-line-signature'));
+    return NextResponse.json(result.body, { status: result.status });
+  }
   const { channelSecret, accessToken } = await getMessagingConfig();
   if (!channelSecret || !accessToken) return NextResponse.json({ error: 'LINE 官方帳號尚未設定' }, { status: 503 });
   if (!verifyLineSignature(raw, request.headers.get('x-line-signature'), channelSecret)) {

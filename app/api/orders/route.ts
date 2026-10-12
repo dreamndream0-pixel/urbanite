@@ -12,6 +12,7 @@ import { getCurrentShop, isPlatformShop, shopAdminClient, shopUrl } from '@/lib/
 import { isCollectOnDelivery, isOnlinePayment } from '@/lib/payment';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { sendOrderEmails } from '@/lib/order-email';
+import { notifyShopOrder } from '@/lib/shop-line';
 import { getConfiguredSiteUrl } from '@/lib/site-url';
 
 // GET /api/orders — 取得所有訂單(限管理員)
@@ -412,6 +413,8 @@ export async function POST(request: Request) {
     siteUrl: platformShop || !currentShop ? getConfiguredSiteUrl().replace(/\/$/, '') : shopUrl(currentShop.slug, ''),
     member: Boolean(user),
   }).catch((error) => console.error('order email', error)));
+  // 店家:用店家自己的 LINE 通知買家訂單成立
+  if (currentShop && !platformShop) after(() => notifyShopOrder(currentShop, (order as Order).id, 'created').catch((error) => console.error('shop LINE notify', error)));
 
   const response = NextResponse.json(order as Order, { status: 201, headers: { 'Cache-Control': 'private, no-store' } });
   if (guestAccess) response.cookies.set(orderAccessCookieName(orderNo), guestAccess, {

@@ -8,7 +8,8 @@ import { requestSecurityError } from '@/lib/request-security';
 // 尚未設定 Supabase 環境變數時直接放行,方便本機開發。
 // 名片服務、LINE 綁定屬於平台(主網站);在店家子網域打開時轉回主網站
 // api/profile-card 店家官網後台也要用(編輯自己的名片),不轉回主站
-const PLATFORM_ONLY = /^\/(card|mycard|line|shop\/new|@|api\/card-import|api\/admin\/card|api\/admin\/line|api\/admin\/shops)/;
+// /line/bind 店家也要用(綁定店家自己的 LINE 官方帳號)
+const PLATFORM_ONLY = /^\/(card|mycard|line(?!\/bind)|shop\/new|@|api\/card-import|api\/admin\/card|api\/admin\/line|api\/admin\/shops)/;
 
 export async function proxy(request: NextRequest) {
   const rejected = requestSecurityError(request);
