@@ -72,6 +72,7 @@ export default function AccountClient({
   favoriteIds,
   coupons,
   customer,
+  platform = true,
 }: {
   userName: string;
   userEmail: string;
@@ -83,6 +84,7 @@ export default function AccountClient({
   favoriteIds: string[];
   coupons: Discount[];
   customer: Customer | null;
+  platform?: boolean; // 店家網站不顯示 LINE 綁定(綁定的是 URBANITE 的官方帳號)
 }) {
   const router = useRouter();
   const [tab, setTab] = useState<TabKey>('profile');
@@ -234,6 +236,7 @@ export default function AccountClient({
       <section className="mx-auto max-w-4xl px-4 py-8 sm:px-6">
         {tab === 'profile' && (
           <ProfileTab
+            platform={platform}
             customer={customer}
             fallbackName={userName}
             email={userEmail}
@@ -245,7 +248,7 @@ export default function AccountClient({
           />
         )}
 
-        {tab === 'coupons' && <CouponsTab coupons={coupons} heroImage={couponHero} />}
+        {tab === 'coupons' && <CouponsTab coupons={coupons} heroImage={couponHero} platform={platform} />}
 
         {tab === 'orders' && (
           <OrdersTab
@@ -305,6 +308,7 @@ const DEFAULT_STAMP_IMAGE =
   'https://mffhznxcqjlwquqyrgth.supabase.co/storage/v1/object/public/assets/member/stamp-1788777088885-ai152h.png';
 
 function ProfileTab({
+  platform,
   customer,
   fallbackName,
   email,
@@ -322,6 +326,7 @@ function ProfileTab({
   provider: string;
   stampImage?: string | null;
   onSaved: () => void;
+  platform: boolean;
 }) {
   const [stampReady, setStampReady] = useState(false);
   const [name, setName] = useState(customer?.name || fallbackName || '');
@@ -629,7 +634,7 @@ function ProfileTab({
             <span className={labelText}>登入方式</span>
             <div className={field + ' flex items-center bg-[#f0ece6] text-[var(--c-muted)]'}>{PROVIDER_LABEL[provider.toLowerCase()] ?? provider} 帳號登入</div>
           </div>
-          <LineBindingRow />
+          {platform ? <LineBindingRow /> : null}
           <div className="col-span-2 min-w-0">
             <span className={labelText}>個人名片</span>
             <a href="/mycard" className="flex min-h-10 w-full items-center gap-3 rounded-lg border border-[var(--c-border)] bg-[var(--c-surface)] px-3 py-2 text-sm transition hover:bg-[var(--c-soft)] sm:min-h-11">
@@ -772,7 +777,7 @@ function PreferenceIcon({ type }: { type?: 'mail' | 'chat' | 'star' | 'eye' }) {
 }
 
 /* ---------- 優惠券及購物金 ---------- */
-function CouponsTab({ coupons, heroImage = '' }: { coupons: Discount[]; heroImage?: string }) {
+function CouponsTab({ coupons, heroImage = '', platform }: { coupons: Discount[]; heroImage?: string; platform: boolean }) {
   const [owned, setOwned] = useState<UserCoupon[]>([]);
   const [claimable, setClaimable] = useState<Discount[]>(coupons);
   const [ready, setReady] = useState(true);
@@ -855,7 +860,7 @@ function CouponsTab({ coupons, heroImage = '' }: { coupons: Discount[]; heroImag
         </div>
       </section>
 
-      <LineCouponBanner />
+      {platform ? <LineCouponBanner /> : null}
 
       {/* 我的優惠券 */}
       <section>

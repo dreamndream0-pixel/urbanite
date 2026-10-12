@@ -3,7 +3,7 @@ import { getSessionUser } from '@/lib/supabase/server';
 import { expireOverdueOrders } from '@/lib/order-expiry';
 import AccountClient from './AccountClient';
 import type { Customer, Discount, Order, Product } from '@/lib/types';
-import { shopAdminClient } from '@/lib/shop';
+import { getCurrentShop, isPlatformShop, shopAdminClient } from '@/lib/shop';
 
 export const dynamic = 'force-dynamic';
 
@@ -58,6 +58,7 @@ export default async function AccountPage() {
       products={(products ?? []) as Product[]}
       favoriteIds={favoriteIds}
       coupons={(coupons ?? []) as Discount[]}
+      platform={isPlatformShop(await getCurrentShop())}
     />
   );
 }

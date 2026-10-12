@@ -20,13 +20,16 @@ export default function LineContactCard({ settings }: { settings?: SiteSettings 
       .catch(() => {});
   }, [settings]);
 
-  const line = getCheckoutLine(settings === undefined ? fetched : settings);
+  const current = settings === undefined ? fetched : settings;
+  const line = getCheckoutLine(current);
+  // 店家網站:LINE 綁定/通知是 URBANITE 官方帳號的功能,只顯示店家自己的「加入官方 LINE」
+  const shopSite = current?.platform === false;
   const href = lineAddFriendUrl(line);
   const lineId = formatLineId(line.id);
   if (!href) return null;
 
-  const linkMember = member.loggedIn && !member.bound && member.linkUrl;
-  if (member.loggedIn && member.bound) {
+  const linkMember = !shopSite && member.loggedIn && !member.bound && member.linkUrl;
+  if (!shopSite && member.loggedIn && member.bound) {
     return (
       <div className="mx-auto mt-6 max-w-sm rounded-xl border border-[#cfe9d6] bg-[#f3fbf5] p-4 text-center">
         <p className="text-sm font-semibold text-[#1f5a33]">✓ 已綁定官方 LINE</p>
