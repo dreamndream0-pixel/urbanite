@@ -11,19 +11,51 @@ export default function ShopLineSettings() {
   const [secret, setSecret] = useState('');
   const [token, setToken] = useState('');
   const [busy, setBusy] = useState(false);
+  // 和主站「串接設定」共用密碼,解鎖 30 分鐘
+  const [locked, setLocked] = useState<boolean | null>(null);
+  const [password, setPassword] = useState('');
+  const [unlockError, setUnlockError] = useState('');
 
+  async function load() {
+    const res = await fetch('/api/admin/shop-line', { cache: 'no-store' });
+    if (res.status === 423) { setLocked(true); return; }
+    setLocked(false);
+    setStatus(res.ok ? await res.json() : null);
+  }
   useEffect(() => {
     fetch('/api/admin/shop-line', { cache: 'no-store' })
-      .then((res) => (res.ok ? res.json() : null))
-      .then(setStatus)
-      .catch(() => {});
+      .then(async (res) => {
+        if (res.status === 423) return setLocked(true);
+        setLocked(false);
+        setStatus(res.ok ? await res.json() : null);
+      })
+      .catch(() => setLocked(true));
   }, []);
+
+  async function unlock() {
+    if (!password || busy) return;
+    setBusy(true); setUnlockError('');
+    try {
+      const res = await fetch('/api/admin/shop-line/unlock', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password }) });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? '密碼錯誤');
+      setPassword('');
+      await load();
+    } catch (error) { setUnlockError(error instanceof Error ? error.message : '密碼錯誤'); }
+    finally { setBusy(false); }
+  }
+
+  async function lock() {
+    await fetch('/api/admin/shop-line/unlock', { method: 'DELETE' }).catch(() => {});
+    setStatus(null); setLocked(true);
+  }
 
   async function save() {
     setBusy(true);
     try {
       const res = await fetch('/api/admin/shop-line', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ channelSecret: secret, accessToken: token }) });
       const data = await res.json();
+      if (res.status === 423) { setLocked(true); throw new Error('已逾時自動上鎖,請重新輸入密碼'); }
       if (!res.ok) throw new Error(data.error ?? '儲存失敗');
       setStatus(data); setSecret(''); setToken('');
       void uiAlert(`已連接 LINE 官方帳號「${data.botName || '已驗證'}」。別忘了把 Webhook 網址貼到 LINE Developers。`);
@@ -44,7 +76,18 @@ export default function ShopLineSettings() {
     try { await navigator.clipboard.writeText(text); void uiAlert('已複製 Webhook 網址'); } catch { void uiAlert('無法複製,請長按網址手動複製'); }
   }
 
-  if (!status) return <p className="py-10 text-center text-sm text-[#8a7f72]">載入中…</p>;
+  if (locked === null) return <p className="py-10 text-center text-sm text-[#8a7f72]">載入中…</p>;
+  if (locked) {
+    return (
+      <form className="mx-auto max-w-sm space-y-3 py-8 text-center" onSubmit={(e) => { e.preventDefault(); void unlock(); }}>
+        <p className="text-sm font-semibold text-[#6b6156]">服務設定需要密碼才能開啟</p>
+        <input type="password" autoComplete="off" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="請輸入服務設定密碼" className="w-full rounded-lg border border-[#e5ded4] bg-white px-4 py-2.5 text-center tracking-[0.3em]" />
+        {unlockError && <p className="text-sm text-[#c0392b]">{unlockError}</p>}
+        <button type="submit" disabled={!password || busy} className="w-full rounded-full bg-[#1f1b19] py-2.5 text-sm font-semibold text-white disabled:opacity-40">{busy ? '驗證中…' : '解鎖'}</button>
+      </form>
+    );
+  }
+  if (!status) return <p className="py-10 text-center text-sm text-[#8a7f72]">讀取失敗,請重新整理</p>;
 
   const input = 'mt-1 w-full rounded-lg border border-[#e5ded4] bg-white px-3 py-2 font-mono text-sm';
   return (
@@ -59,6 +102,7 @@ export default function ShopLineSettings() {
             {status.valid ? `已連接:${status.botName}${status.basicId ? `(${status.basicId})` : ''}` : '金鑰失效,請重新設定'}
           </span>
         ) : <span className="rounded-full bg-[#f6f2ec] px-3 py-1 text-xs font-semibold text-[#a99e8f]">尚未連接</span>}
+        <button type="button" onClick={() => void lock()} className="rounded-full border border-[#d9b98a] px-3 py-1 text-xs font-semibold text-[#9a5b13]">上鎖</button>
       </div>
 
       <ol className="list-decimal space-y-1.5 rounded-lg bg-[#faf7f2] py-3 pl-8 pr-4 text-sm leading-6 text-[#6b6156]">

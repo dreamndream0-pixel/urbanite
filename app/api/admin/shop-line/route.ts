@@ -1,4 +1,5 @@
-import { NextResponse } from 'next/server';
+import { NextResponse, type NextRequest } from 'next/server';
+import { PANEL_UNLOCK_COOKIE, verifyUnlockToken } from '@/lib/integrations';
 import { getAdminUser } from '@/lib/supabase/server';
 import { getCurrentShop, isPlatformShop, shopUrl } from '@/lib/shop';
 import { fetchBotInfo, getShopLineConfig, saveShopLineConfig } from '@/lib/shop-line';
@@ -6,10 +7,12 @@ import { fetchBotInfo, getShopLineConfig, saveShopLineConfig } from '@/lib/shop-
 export const dynamic = 'force-dynamic';
 
 // 店家後台「服務設定」:店家自己的 LINE 官方帳號金鑰(只寫不讀,前端只看到狀態)
-async function context() {
+// 需先用主站串接設定密碼解鎖(/api/admin/shop-line/unlock)
+async function context(request: NextRequest) {
   const admin = await getAdminUser();
   const shop = await getCurrentShop();
-  if (!admin || !shop) return null;
+  if (!admin?.email || !shop) return null;
+  if (!verifyUnlockToken(request.cookies.get(PANEL_UNLOCK_COOKIE)?.value, admin.email)) return 'locked' as const;
   if (isPlatformShop(shop)) return 'platform' as const;
   return shop;
 }
@@ -26,17 +29,21 @@ async function status(shop: { id: string; slug: string }) {
   };
 }
 
-export async function GET() {
-  const shop = await context();
+const locked = () => NextResponse.json({ error: '請先輸入服務設定密碼', locked: true }, { status: 423 });
+
+export async function GET(request: NextRequest) {
+  const shop = await context(request);
   if (!shop) return NextResponse.json({ error: '未授權' }, { status: 401 });
+  if (shop === 'locked') return locked();
   if (shop === 'platform') return NextResponse.json({ error: '主站的 LINE 在「串接設定」設定' }, { status: 400 });
   return NextResponse.json(await status(shop), { headers: { 'Cache-Control': 'no-store' } });
 }
 
 // PUT { channelSecret, accessToken } — 先向 LINE 驗證 token,正確才儲存
-export async function PUT(request: Request) {
-  const shop = await context();
+export async function PUT(request: NextRequest) {
+  const shop = await context(request);
   if (!shop) return NextResponse.json({ error: '未授權' }, { status: 401 });
+  if (shop === 'locked') return locked();
   if (shop === 'platform') return NextResponse.json({ error: '主站的 LINE 在「串接設定」設定' }, { status: 400 });
   const body = await request.json().catch(() => ({}));
   const channelSecret = String(body?.channelSecret ?? '').trim();
@@ -49,9 +56,10 @@ export async function PUT(request: Request) {
   return NextResponse.json(await status(shop));
 }
 
-export async function DELETE() {
-  const shop = await context();
+export async function DELETE(request: NextRequest) {
+  const shop = await context(request);
   if (!shop) return NextResponse.json({ error: '未授權' }, { status: 401 });
+  if (shop === 'locked') return locked();
   if (shop === 'platform') return NextResponse.json({ error: '主站的 LINE 在「串接設定」設定' }, { status: 400 });
   await saveShopLineConfig(shop.id, null);
   return NextResponse.json(await status(shop));
