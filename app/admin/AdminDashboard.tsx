@@ -4660,7 +4660,7 @@ ${order.note ? `<div class="sec"><h2>備註</h2><p class="muted">${escapeHtml(or
                 }}
                 className={`inline-flex h-10 items-center rounded-full px-6 text-sm font-semibold text-white ${canShipHome ? 'bg-[#1f7a44] hover:bg-[#186437]' : 'bg-[#b8c9bd]'}`}
               >
-                {isManualStore ? '超商寄件' : '宅配出貨'}
+                準備出貨
               </button>
             ) : null}
             <button onClick={printShippingDocument} className="inline-flex h-10 items-center rounded-full bg-[#1f1b19] px-6 text-sm font-semibold text-white hover:bg-black">列印出貨單</button>
