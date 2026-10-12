@@ -32,6 +32,7 @@ import {
 } from '@/lib/order-status';
 import { uiToast } from '@/lib/ui-toast';
 import NumberInput from './NumberInput';
+import { defaultSelfShipCarrier, NO_TRACKING_CARRIERS, needsTracking } from '@/lib/self-ship';
 import { uiAlert, uiConfirm, uiPrompt } from '@/lib/ui-dialog';
 import { OrderCardBadges, orderNeedsAttention, AttentionDot, isPaymentReported } from '@/app/components/OrderStatusBadge';
 import { COUPON_PRESETS } from '@/lib/coupon-presets';
@@ -4941,7 +4942,7 @@ ${order.note ? `<div class="sec"><h2>備註</h2><p class="muted">${escapeHtml(or
 
         </div>
       </div>
-      {homeShipOpen ? <HomeShipModal busy={busy} onClose={() => setHomeShipOpen(false)} onSubmit={shipHome} /> : null}
+      {homeShipOpen ? <HomeShipModal busy={busy} store={isManualStore} shippingMethod={order.shipping_method ?? ''} onClose={() => setHomeShipOpen(false)} onSubmit={shipHome} /> : null}
       <div
         role="status"
         aria-live="polite"
@@ -4955,9 +4956,10 @@ ${order.note ? `<div class="sec"><h2>備註</h2><p class="muted">${escapeHtml(or
 
 const HOME_CARRIERS = ['黑貓宅急便', '新竹物流', '中華郵政', '宅配通', '嘉里大榮', '7-11 賣貨便', '全家好賣+', '萊爾富', 'OK 超商'];
 
-// 宅配出貨:輸入物流公司與物流單號
-function HomeShipModal({ busy, onClose, onSubmit }: { busy: boolean; onClose: () => void; onSubmit: (carrier: string, tracking: string) => void }) {
-  const [carrier, setCarrier] = useState(HOME_CARRIERS[0]);
+// 宅配 / 超商自行寄件:選寄送方式,需要時填物流單號(7-11 交貨便、全家店到店不必填)
+function HomeShipModal({ busy, store = false, shippingMethod = '', onClose, onSubmit }: { busy: boolean; store?: boolean; shippingMethod?: string; onClose: () => void; onSubmit: (carrier: string, tracking: string) => void }) {
+  const carriers = store ? [...NO_TRACKING_CARRIERS, ...HOME_CARRIERS] : [...HOME_CARRIERS, ...NO_TRACKING_CARRIERS];
+  const [carrier, setCarrier] = useState((store && defaultSelfShipCarrier(shippingMethod)) || carriers[0]);
   const [other, setOther] = useState('');
   const [tracking, setTracking] = useState('');
   const name = carrier === '其他' ? other.trim() : carrier;
@@ -4968,23 +4970,24 @@ function HomeShipModal({ busy, onClose, onSubmit }: { busy: boolean; onClose: ()
         onClick={(e) => e.stopPropagation()}
         onSubmit={(e) => {
           e.preventDefault();
-          if (!name || !tracking.trim()) { void uiAlert('請填寫物流公司與物流單號'); return; }
+          if (!name) { void uiAlert('請選擇寄送方式'); return; }
+          if (!tracking.trim() && needsTracking(name)) { void uiAlert('請填寫物流單號'); return; }
           onSubmit(name, tracking.trim());
         }}
       >
-        <h3 className="text-lg font-semibold">宅配出貨</h3>
+        <h3 className="text-lg font-semibold">{store ? '超商寄件' : '宅配出貨'}</h3>
         <p className="mt-1 text-xs text-[#8a7f72]">填寫後訂單會標記為已出貨,並記錄在訂單歷程。</p>
         <label className="mt-4 block text-sm">
-          <span className="mb-1 block font-semibold text-[#6b6156]">物流公司</span>
+          <span className="mb-1 block font-semibold text-[#6b6156]">寄送方式</span>
           <select value={carrier} onChange={(e) => setCarrier(e.target.value)} className="w-full rounded-lg border border-[#e5ded4] bg-white px-3 py-2">
-            {[...HOME_CARRIERS, '其他'].map((c) => <option key={c} value={c}>{c}</option>)}
+            {[...carriers, '其他'].map((c) => <option key={c} value={c}>{c}</option>)}
           </select>
         </label>
         {carrier === '其他' ? (
           <input value={other} onChange={(e) => setOther(e.target.value)} placeholder="物流公司名稱" className="mt-2 w-full rounded-lg border border-[#e5ded4] px-3 py-2 text-sm" />
         ) : null}
         <label className="mt-3 block text-sm">
-          <span className="mb-1 block font-semibold text-[#6b6156]">物流單號</span>
+          <span className="mb-1 block font-semibold text-[#6b6156]">物流單號{needsTracking(name) ? '' : '(選填)'}</span>
           <input value={tracking} onChange={(e) => setTracking(e.target.value)} inputMode="numeric" placeholder="例如 123456789012" className="w-full rounded-lg border border-[#e5ded4] px-3 py-2" />
         </label>
         <div className="mt-5 flex justify-end gap-2">

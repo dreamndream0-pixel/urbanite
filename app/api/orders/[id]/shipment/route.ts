@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { needsTracking } from '@/lib/self-ship';
 import { buildItemDesc } from '@/lib/newebpay';
 import {
   getShipmentNoWithRetry,
@@ -60,11 +61,12 @@ export async function POST(
 
   const nowIso = new Date().toISOString();
   if (homeDelivery) {
-    if (!provider || !trackingNumber) return NextResponse.json({ error: '請填寫物流公司與物流單號' }, { status: 400 });
+    if (!provider) return NextResponse.json({ error: '請選擇寄送方式' }, { status: 400 });
+    if (!trackingNumber && needsTracking(provider)) return NextResponse.json({ error: '請填寫物流單號' }, { status: 400 });
     if (!order.paid && !isCollectOnDelivery(order.shipping_method ?? '', order.payment_method ?? '')) {
       return NextResponse.json({ error: '此訂單尚未收款,請先確認已收款再出貨' }, { status: 409 });
     }
-    const note = `宅配出貨:${provider},物流單號 ${trackingNumber}`;
+    const note = trackingNumber ? `寄件出貨:${provider},物流單號 ${trackingNumber}` : `寄件出貨:${provider}`;
     const { data: shipment, error } = await supabase
       .from('shipments')
       .insert({
