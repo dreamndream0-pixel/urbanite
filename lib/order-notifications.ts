@@ -123,3 +123,28 @@ export async function processOrderNotificationQueue() {
   }
   return result;
 }
+
+// 不經佇列、直接發送(資料庫 trigger 不涵蓋的事件,例如退貨申請)。依店家通知設定決定收件對象與管道。
+export async function sendOrderNoticeNow(shopId: string, orderId: string, event: OrderNoticeEvent) {
+  const config = await getOrderNotificationConfig(shopId);
+  const cfg = await getIntegrations(['RESEND_API_KEY', 'EMAIL_FROM', 'ORDER_NOTIFY_EMAILS'] as const);
+  const lineToken = (shopId === URBANITE_SHOP_ID ? await getMessagingConfig() : await getShopLineConfig(shopId))?.accessToken;
+  const tasks = (['buyer', 'seller'] as const).flatMap(audience => (['email', 'line'] as const).map(async channel => {
+    if (config && !noticeEnabled(config.settings, event, audience, channel)) return;
+    const token = channel === 'email' ? cfg.RESEND_API_KEY : lineToken;
+    if (!token || (channel === 'email' && !emails([cfg.EMAIL_FROM]).length)) return;
+    const job = { id: crypto.randomUUID(), shop_id: shopId, order_id: orderId, event, audience, channel, attempts: 0, lease_token: '', first_send_at: null, created_at: new Date().toISOString(), payload: null };
+    try {
+      const payload = await prepare(job, cfg.EMAIL_FROM, cfg.ORDER_NOTIFY_EMAILS);
+      const response = await fetch(payload.endpoint === 'email' ? 'https://api.resend.com/emails' : `https://api.line.me/v2/bot/message/${payload.endpoint}`, {
+        method: 'POST', signal: AbortSignal.timeout(8000),
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload.body),
+      });
+      if (!response.ok) console.error('order notice failed', event, audience, channel, response.status);
+    } catch (error) {
+      if (!(error instanceof NoticeError && error.skip)) console.error('order notice failed', event, audience, channel, error instanceof Error ? error.message : error);
+    }
+  }));
+  await Promise.allSettled(tasks);
+}
