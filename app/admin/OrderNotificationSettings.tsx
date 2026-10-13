@@ -1,11 +1,20 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Bell, Save, RefreshCw } from 'lucide-react';
-import { ORDER_NOTICE_EVENTS, resolveOrderNotificationSettings, type OrderNotificationSettings, type NoticeAudience, type NoticeChannel } from '@/lib/order-notification-settings';
+import { ORDER_NOTICE_EVENTS, resolveOrderNotificationSettings, type OrderNotificationSettings, type OrderNoticeEvent, type NoticeAudience, type NoticeChannel } from '@/lib/order-notification-settings';
 
 type Recent = { id: string; event: string; audience: string; channel: string; status: string; attempts: number; last_error: string | null; created_at: string };
 const labels: Record<string, string> = { pending: '待發送', processing: '發送中', sent: '已送出', skipped: '未發送', failed: '發送失敗' };
+const channels: NoticeChannel[] = ['email', 'line'];
+const events = ORDER_NOTICE_EVENTS.map(event => event.key);
+function SelectionCheckbox({ values, label, disabled, onChange }: { values: boolean[]; label: string; disabled?: boolean; onChange: (checked: boolean) => void }) {
+  const ref = useRef<HTMLInputElement>(null);
+  const checked = values.length > 0 && values.every(Boolean);
+  const mixed = !checked && values.some(Boolean);
+  useEffect(() => { if (ref.current) ref.current.indeterminate = mixed; }, [mixed]);
+  return <input ref={ref} type="checkbox" aria-label={label} disabled={disabled || values.length === 0} checked={checked} onChange={e => onChange(e.target.checked)} className="h-5 w-5 shrink-0 accent-emerald-800 disabled:opacity-30" />;
+}
 export default function OrderNotificationSettingsPanel() {
   const [settings, setSettings] = useState<OrderNotificationSettings>(resolveOrderNotificationSettings(null));
   const [ready, setReady] = useState(false);
@@ -37,10 +46,16 @@ export default function OrderNotificationSettingsPanel() {
     } catch (e) { setMessage(e instanceof Error ? e.message : '連線失敗'); }
     finally { setBusy(false); }
   }
-  const columns: { audience: NoticeAudience; channel: NoticeChannel; label: string }[] = [
-    { audience: 'buyer', channel: 'email', label: '買家 Email' }, { audience: 'buyer', channel: 'line', label: '買家 LINE' },
-    { audience: 'seller', channel: 'email', label: '賣家 Email' }, { audience: 'seller', channel: 'line', label: '賣家 LINE' },
-  ];
+  const activeChannels = channels.filter(channel => settings.enabled[channel]);
+  function select(audience: NoticeAudience, selectedEvents: OrderNoticeEvent[], selectedChannels: NoticeChannel[], checked: boolean) {
+    setSettings(current => {
+      const next = resolveOrderNotificationSettings(current);
+      for (const event of selectedEvents) for (const channel of selectedChannels) {
+        if (current.enabled[channel]) next.rules[event][audience][channel] = checked;
+      }
+      return next;
+    });
+  }
   return <section className="min-w-0 space-y-5" aria-label="通知設定">
     <div className="flex flex-wrap items-center justify-between gap-3"><h2 className="flex items-center gap-2 text-lg font-semibold"><Bell size={20} />通知</h2>
       <div className="flex gap-2"><button type="button" title="重新整理通知設定" aria-label="重新整理通知設定" disabled={loading || busy} onClick={() => { setLoading(true); setMessage(''); setReload(n => n + 1); }} className="rounded-md border p-2 disabled:opacity-40"><RefreshCw size={18} /></button>
@@ -52,15 +67,42 @@ export default function OrderNotificationSettingsPanel() {
       <fieldset disabled={!ready || busy} className="space-y-4">
         <legend className="mb-2 font-medium">通知管道</legend>
         <div className="flex flex-wrap gap-6">{(['email', 'line'] as const).map(channel => <label key={channel} className="flex items-center gap-2"><input type="checkbox" checked={settings.enabled[channel]} onChange={e => setSettings(s => ({ ...s, enabled: { ...s.enabled, [channel]: e.target.checked } }))} className="h-5 w-5 accent-emerald-800" />{channel === 'email' ? '信件通知' : 'LINE 通知'}</label>)}</div>
-        <div className="divide-y border-y border-[#e5ded4]">
-          <div className="hidden grid-cols-[minmax(100px,1fr)_repeat(4,minmax(72px,1fr))] gap-2 bg-[#faf7f2] p-3 text-center text-sm sm:grid"><span className="text-left">訂單事件</span>{columns.map(c => <span key={c.label}>{c.label}</span>)}</div>
-          {ORDER_NOTICE_EVENTS.map(event => <div key={event.key} className="grid grid-cols-2 gap-3 py-3 sm:grid-cols-[minmax(100px,1fr)_repeat(4,minmax(72px,1fr))] sm:items-center sm:gap-2 sm:px-3">
-            <span className="col-span-2 text-sm font-medium sm:col-span-1">{event.label}</span>
-            {columns.map(c => <label key={c.label} className="flex items-center justify-between gap-2 text-sm sm:justify-center"><span className="sm:sr-only">{c.label}</span>
-              <input type="checkbox" aria-label={`${event.label} ${c.label}`} disabled={!settings.enabled[c.channel]} checked={settings.rules[event.key][c.audience][c.channel]} onChange={e => setSettings(s => ({ ...s, rules: { ...s.rules, [event.key]: { ...s.rules[event.key], [c.audience]: { ...s.rules[event.key][c.audience], [c.channel]: e.target.checked } } } }))} className="h-5 w-5 accent-emerald-800 disabled:opacity-30" />
-            </label>)}
-          </div>)}
-        </div>
+        {(['buyer', 'seller'] as const).map(audience => {
+          const name = audience === 'buyer' ? '買家' : '賣家';
+          return <section key={audience} aria-label={`${name}通知`} className="min-w-0 border-t border-[#e5ded4] pt-5">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+              <h3 className="font-semibold">{name}通知</h3>
+              <label className="flex min-h-10 items-center gap-2 text-sm">
+                <SelectionCheckbox label={`${name}全部通知全選`} values={events.flatMap(event => activeChannels.map(channel => settings.rules[event][audience][channel]))} onChange={checked => select(audience, events, activeChannels, checked)} />全選
+              </label>
+            </div>
+            <table className="w-full table-fixed text-sm">
+              <colgroup><col /><col className="w-14 sm:w-24" /><col className="w-14 sm:w-24" /><col className="w-14 sm:w-24" /></colgroup>
+              <thead className="bg-[#faf7f2]">
+                <tr><th scope="col" className="p-2 text-left font-medium">訂單事件</th>
+                  {channels.map(channel => <th key={channel} scope="col" className="py-2 font-medium">
+                    <label className="flex flex-col items-center gap-2 py-1">
+                      {channel === 'email' ? 'Email' : 'LINE'}
+                      <SelectionCheckbox label={`${name} ${channel === 'email' ? 'Email' : 'LINE'} 全選`} disabled={!settings.enabled[channel]} values={events.map(event => settings.rules[event][audience][channel])} onChange={checked => select(audience, events, [channel], checked)} />
+                    </label>
+                  </th>)}
+                  <th scope="col" className="py-2 font-medium">整排<br />全選</th>
+                </tr>
+              </thead>
+              <tbody>{ORDER_NOTICE_EVENTS.map(event => <tr key={event.key} className="border-b border-[#e5ded4]">
+                <th scope="row" className="break-words px-2 py-4 text-left font-medium">{event.label}</th>
+                {channels.map(channel => <td key={channel} className="text-center">
+                  <label className="flex min-h-12 items-center justify-center">
+                    <SelectionCheckbox label={`${event.label} ${name} ${channel === 'email' ? 'Email' : 'LINE'}`} disabled={!settings.enabled[channel]} values={[settings.rules[event.key][audience][channel]]} onChange={checked => select(audience, [event.key], [channel], checked)} />
+                  </label>
+                </td>)}
+                <td className="text-center"><label className="flex min-h-12 items-center justify-center">
+                  <SelectionCheckbox label={`${name} ${event.label} 整排全選`} values={activeChannels.map(channel => settings.rules[event.key][audience][channel])} onChange={checked => select(audience, [event.key], activeChannels, checked)} />
+                </label></td>
+              </tr>)}</tbody>
+            </table>
+          </section>;
+        })}
       </fieldset>
       <p className="text-sm text-[#6b6156]">Email 需完成信件串接。LINE 收件人需綁定本商店官方帳號；賣家為店主帳號，主站使用通知信箱對應的會員。通知由排程發送。</p>
       <h3 className="font-medium">最近通知紀錄</h3>
