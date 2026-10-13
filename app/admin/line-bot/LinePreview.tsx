@@ -3,7 +3,7 @@
 import type { BotCard, MessageSet } from '@/lib/line-bot-types';
 import type { Discount, Product } from '@/lib/types';
 import FlexView from './FlexView';
-import { couponCard, memberCard, productCard } from './templateSamples';
+import { couponCard, memberCard, productCard, sellable } from './templateSamples';
 
 const formatter = new Intl.NumberFormat('zh-TW', { style: 'currency', currency: 'TWD', maximumFractionDigits: 0 });
 
@@ -64,7 +64,7 @@ export default function LinePreview({
                 m.productIds.length ? (
                   <FlexView scale={0.62} contents={{ type: 'carousel', contents: m.productIds.map((id) => productCard(m.style!, products.find((x) => x.id === id))) }} />
                 ) : (
-                  <FlexView scale={0.62} contents={productCard(m.style)} />
+                  <FlexView scale={0.62} contents={productCard(m.style, sellable(products)[0])} />
                 )
               ) : m.type === 'products' ? (
                 m.productIds.length ? (

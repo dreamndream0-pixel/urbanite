@@ -16,6 +16,9 @@ import type { Discount, Product } from '@/lib/types';
 
 const abs = (u: string) => (u && u.startsWith('/') && typeof window !== 'undefined' ? `${window.location.origin}${u}` : u);
 
+// 可上架顯示的商品(有圖、未下架),新增商品卡時預設帶入
+export const sellable = (products: Product[]) => products.filter((p) => p.status !== '已下架' && (p.image || p.images?.length));
+
 export function productData(p?: Product): ProductData {
   if (!p) return { ...SAMPLE_PRODUCT, image: '' };
   return { name: p.name, subtitle: p.tagline || '', price: p.price, originalPrice: p.original_price, image: abs(p.image || p.images?.[0] || ''), url: '#' };

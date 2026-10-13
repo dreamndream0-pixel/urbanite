@@ -16,7 +16,7 @@ import LinePreview from './LinePreview';
 import ShopLineSettings from '../ShopLineSettings';
 import TemplatePicker from './TemplatePicker';
 import FlexView from './FlexView';
-import { couponCard, memberCard, productCard } from './templateSamples';
+import { couponCard, memberCard, productCard, sellable } from './templateSamples';
 import { COUPON_STYLES, MEMBER_STYLES, ORDER_KINDS, PRODUCT_STYLES, SAMPLE_ORDER, orderBubble, orderKindOf } from '@/lib/line-flex-templates';
 import MessageSetEditor from './MessageSetEditor';
 import RulesPanel from './RulesPanel';
@@ -258,10 +258,12 @@ const ORDER_SAMPLES: Record<string, { title: string; subtitle: string; event?: s
 };
 
 function TemplatesPanel({ shopName, products, coupons }: { shopName?: string; products: Product[]; coupons: Discount[] }) {
-  const sampleProduct = products.find((p) => p.status !== '已下架' && (p.image || p.images?.length));
+  const list = sellable(products);
+  const [productId, setProductId] = useState(list[0]?.id ?? '');
+  const sampleProduct = list.find((p) => p.id === productId) ?? list[0];
   const sampleCoupon = coupons.find((c) => c.active !== false);
-  const row = (title: string, desc: string, cards: { key: string; label: string; contents: Record<string, unknown> }[]) => (
-    <Card title={title} desc={desc}>
+  const row = (title: string, desc: string, cards: { key: string; label: string; contents: Record<string, unknown> }[], action?: React.ReactNode) => (
+    <Card title={title} desc={desc} action={action}>
       <div className="flex gap-3 overflow-x-auto pb-2 [scrollbar-width:thin]">
         {cards.map((c, i) => (
           <div key={c.key} className="shrink-0">
@@ -275,7 +277,11 @@ function TemplatesPanel({ shopName, products, coupons }: { shopName?: string; pr
   return (
     <div className="space-y-4">
       {row('會員卡片', '在歡迎訊息、自動回覆或推播「新增訊息 → 會員卡」選用;內建查詢「會員資料」也會用會員卡回覆(在「內建查詢與設定」選款式)。', MEMBER_STYLES.map((s) => ({ key: s.key, label: s.label, contents: memberCard(s.key, shopName) })))}
-      {row('商品卡片', '「新增訊息 → 商品」選擇商品後,在「卡片樣式」選用。商品圖、名稱、價格會自動帶入。', PRODUCT_STYLES.map((s) => ({ key: s.key, label: s.label, contents: productCard(s.key, sampleProduct) })))}
+      {row('商品卡片', '「新增訊息 → 商品」選擇商品後,在「卡片樣式」選用。商品圖、名稱、價格會自動帶入。', PRODUCT_STYLES.map((s) => ({ key: s.key, label: s.label, contents: productCard(s.key, sampleProduct) })), list.length ? (
+        <select value={sampleProduct?.id ?? ''} onChange={(e) => setProductId(e.target.value)} aria-label="預覽商品" className="max-w-[12rem] rounded-lg border border-[#e5ded4] bg-white px-2 py-1.5 text-xs">
+          {list.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+        </select>
+      ) : <span className="text-xs text-[#a99e8f]">尚無上架商品</span>)}
       {row('訂單卡片', '自動套用:訂單通知(系統設定 → 通知)與訂單查詢會依訂單狀態使用對應的卡片,不需要設定。', ORDER_KINDS.map((s) => {
         const o = ORDER_SAMPLES[s.key];
         const { step } = orderKindOf(o.event);

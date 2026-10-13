@@ -19,7 +19,7 @@ import type { Discount, Product } from '@/lib/types';
 import { uiAlert } from '@/lib/ui-dialog';
 import { Field, inputClass, smallBtn, Svg, TagInput, uploadBotImage } from './ui';
 import TemplatePicker from './TemplatePicker';
-import { couponCard, memberCard, productCard } from './templateSamples';
+import { couponCard, memberCard, productCard, sellable } from './templateSamples';
 import { COUPON_STYLES, MEMBER_STYLES, PRODUCT_STYLES } from '@/lib/line-flex-templates';
 
 const formatter = new Intl.NumberFormat('zh-TW', { style: 'currency', currency: 'TWD', maximumFractionDigits: 0 });
@@ -80,7 +80,10 @@ export default function MessageSetEditor({
                   key={t.type}
                   type="button"
                   onClick={() => {
-                    setMessages([...value.messages, blankMessage(t.type)]);
+                    const next = blankMessage(t.type);
+                    // 商品卡:預設帶入前 3 個上架中的商品,可再增減
+                    if (next.type === 'products') next.productIds = sellable(products).slice(0, 3).map((p) => p.id);
+                    setMessages([...value.messages, next]);
                     setAdding(false);
                   }}
                   className="rounded-lg border border-[#efe8dd] px-2.5 py-2 text-left transition hover:border-[#1f1b19]/30 hover:bg-[#faf7f2]"
@@ -152,7 +155,7 @@ function MessageBody({
     );
   }
   if (m.type === 'products') {
-    const first = products.find((p) => p.id === m.productIds[0]);
+    const first = products.find((p) => p.id === m.productIds[0]) ?? sellable(products)[0];
     return (
       <div className="space-y-3">
         <Field label="卡片樣式" hint="點選套用,右側預覽會即時更新">
