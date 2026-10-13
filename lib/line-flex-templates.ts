@@ -380,7 +380,8 @@ export function orderBubble(kind: OrderKind | string, d: OrderCardData, color?: 
     body.push(...extra);
     if (k === 'shipping') body.push(steps(['訂單處理', '已出貨', '配送中', '已送達'], d.step ?? 1, c));
     if (k === 'return' && !cancelled) body.push(steps(['申請成立', '商品退回', '審核中', '退款完成'], d.step ?? 0, c));
-    if (k === 'created' || k === 'delivered' || k === 'return') {
+    // 所有貨態卡片都附第一件商品縮圖(多件顯示件數)
+    {
       body.push(box('horizontal', [
         thumb(first?.image),
         box('vertical', [
