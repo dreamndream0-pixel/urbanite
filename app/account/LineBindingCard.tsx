@@ -79,7 +79,7 @@ export default function LineBindingRow() {
           </button>
         </div>
       ) : (
-        <div className={box}>
+        <div className={`${box} flex-wrap`}>
           <span className="min-w-0 flex-1 text-xs leading-5 text-[var(--c-text2)]">{status.available === false ? '商店尚未開放 LINE 通知' : status.bindingMode === 'chat' ? '加入官方 LINE 後，傳送「綁定」完成會員連結' : '綁定官方 LINE，接收訂單與出貨通知'}</span>
           {status.available !== false && status.linkUrl ? <a
             href={status.linkUrl}
@@ -88,6 +88,7 @@ export default function LineBindingRow() {
             <LineMark />
             訂閱 LINE 通知
           </a> : <button type="button" disabled className="shrink-0 rounded-full bg-[#06C755] px-3.5 py-1.5 text-xs font-semibold text-white opacity-40">訂閱 LINE 通知</button>}
+          <p className="w-full text-right text-xs leading-5 text-[var(--c-text2)]">訂閱LINE通知查詢訂單狀態</p>
         </div>
       )}
       {notice && notice.text ? <p className={`mt-1.5 text-xs ${notice.ok ? 'text-[#1f7a44]' : 'text-[#c0392b]'}`}>{notice.text}</p> : null}
