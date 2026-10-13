@@ -5,6 +5,7 @@ import type { Order, OrderItem, ReturnItem, ReturnRequest } from '@/lib/types';
 import { shopAdminClient } from '@/lib/shop';
 import { createAdminClient } from '@/lib/supabase/admin';
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { kickOrderNotifications } from '@/lib/order-notification-kick';
 
 // 退貨 / 退款單號全站唯一:跨所有店家計數
 async function genNo(_supabase: SupabaseClient, table: string, prefix: string) {
@@ -41,6 +42,7 @@ export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  kickOrderNotifications();
   const user = await getSessionUser();
   if (!user) return NextResponse.json({ error: '請先登入' }, { status: 401 });
 
@@ -102,6 +104,7 @@ export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  kickOrderNotifications();
   const { id } = await params;
   const body = await request.json().catch(() => ({}));
   const returnId = String(body?.return_id ?? '').trim();

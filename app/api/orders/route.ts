@@ -14,6 +14,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { sendOrderEmails } from '@/lib/order-email';
 import { notifyShopOrder } from '@/lib/shop-line';
 import { getConfiguredSiteUrl } from '@/lib/site-url';
+import { kickOrderNotifications } from '@/lib/order-notification-kick';
 
 // GET /api/orders — 取得所有訂單(限管理員)
 export async function GET() {
@@ -49,6 +50,7 @@ export async function GET() {
 // 前端只送 { customer_name, email, items:[{ productId, variant, quantity }] }
 // 價格與金額全部由後端依資料庫重新計算,避免竄改。
 export async function POST(request: Request) {
+  kickOrderNotifications();
   const body = await request.json();
   const { customer_name, email, items } = body ?? {};
   const shippingMethod = String(body?.shipping_method ?? '').trim();

@@ -4,6 +4,7 @@ import { deriveStatuses } from '@/lib/order-status';
 import { restoreOrderStock } from '@/lib/inventory';
 import type { Order, Payment, Shipment, ShipmentEvent, OrderStatusHistory, ReturnRequest, Refund } from '@/lib/types';
 import { shopAdminClient } from '@/lib/shop';
+import { kickOrderNotifications } from '@/lib/order-notification-kick';
 
 // GET /api/orders/[id] — 取得訂單完整資訊(主檔 + 付款 + 物流 + 歷程),限管理員
 export async function GET(
@@ -59,6 +60,7 @@ export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  kickOrderNotifications();
   const admin = await getAdminUser();
   if (!admin) return NextResponse.json({ error: '未授權' }, { status: 401 });
 

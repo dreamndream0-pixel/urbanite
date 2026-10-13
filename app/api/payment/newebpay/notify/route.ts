@@ -1,9 +1,11 @@
 import { getNewebpayConfig, aesDecrypt, verifyTradeSha } from '@/lib/newebpay';
 import { settleNewebpayPayment } from '@/lib/newebpay-settle';
+import { kickOrderNotifications } from '@/lib/order-notification-kick';
 
 // POST /api/payment/newebpay/notify — 藍新 NotifyURL 背景付款通知
 // 驗證 TradeSha → AES 解密 TradeInfo → 確認成功與金額 → 更新訂單(冪等)。
 export async function POST(request: Request) {
+  kickOrderNotifications();
   let form: FormData;
   try { form = await request.formData(); }
   catch { return new Response('INVALID FORM', { status: 400 }); }

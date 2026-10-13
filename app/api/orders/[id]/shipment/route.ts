@@ -18,6 +18,7 @@ import { isCollectOnDelivery } from '@/lib/payment';
 import { getAdminUser } from '@/lib/supabase/server';
 import type { Shipment } from '@/lib/types';
 import { getCurrentShop, isPlatformShop, shopAdminClient } from '@/lib/shop';
+import { kickOrderNotifications } from '@/lib/order-notification-kick';
 
 function firstSuccessRow(payload: Record<string, unknown> | null): Record<string, unknown> {
   const success = payload?.SUCCESS;
@@ -37,6 +38,7 @@ export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  kickOrderNotifications();
   const admin = await getAdminUser();
   if (!admin) return NextResponse.json({ error: '未授權' }, { status: 401 });
 
@@ -236,6 +238,7 @@ export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  kickOrderNotifications();
   const admin = await getAdminUser();
   if (!admin) return NextResponse.json({ error: '未授權' }, { status: 401 });
 

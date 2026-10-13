@@ -41,7 +41,7 @@ async function main() {
     'next/server': { NextResponse: { json: (data, init) => Response.json(data, init) } },
     '@/lib/supabase/server': { getSessionUser: async () => user, getAdminUser: async () => admin },
     '@/lib/shop': { getCurrentShop: async () => ({ id: 'shop', status: 'active' }) },
-    '@/lib/supabase/admin': { createAdminClient: () => db }, '@/lib/manual-order': manual,
+    '@/lib/supabase/admin': { createAdminClient: () => db }, '@/lib/manual-order': manual, '@/lib/order-notification-kick': { kickOrderNotifications: () => {} },
   });
   const request = action => new Request('https://example.test/api', { method: 'POST', body: JSON.stringify({ action }) });
   const context = { params: Promise.resolve({ id }) };

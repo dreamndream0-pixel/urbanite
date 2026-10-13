@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { loadBotConfig, processOrderNotifications, sendBroadcast } from '@/lib/line-bot';
+import { processOrderNotificationQueue } from '@/lib/order-notifications';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -31,6 +32,8 @@ export async function GET(request: Request) {
   // 訂單通知
   try {
     result.notifications = (await processOrderNotifications()).sent;
+    // 新版訂單通知佇列(店家可設定的通知),沒即時送出的在這裡補送
+    result.notifications += (await processOrderNotificationQueue()).sent;
   } catch (e) {
     result.errors.push(e instanceof Error ? e.message : 'notify failed');
   }

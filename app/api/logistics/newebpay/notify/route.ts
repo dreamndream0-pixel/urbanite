@@ -2,8 +2,10 @@ import { NextResponse } from 'next/server';
 import { decodeNewebpayLogisticsResponse, retToFulfillmentStatus } from '@/lib/newebpay-logistics';
 import { finalizePickedUp } from '@/lib/pickup-complete';
 import { scopedClient, URBANITE_SHOP_ID } from '@/lib/shop';
+import { kickOrderNotifications } from '@/lib/order-notification-kick';
 
 export async function POST(request: Request) {
+  kickOrderNotifications();
   try {
     const formData = await request.formData();
     const payload = await decodeNewebpayLogisticsResponse(Object.fromEntries(formData.entries()));

@@ -6,6 +6,7 @@ import { shopAdminClient } from '@/lib/shop';
 import { sanitizeImage } from '@/lib/safe-image';
 import { limitedFormData } from '@/lib/limited-form';
 import { PAYMENT_PROOF_BUCKET, PRIVATE_PROOF_PREFIX, paymentProofPath, legacyPaymentProofPath } from '@/lib/payment-proof';
+import { kickOrderNotifications } from '@/lib/order-notification-kick';
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const headers = { 'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff', 'Content-Security-Policy': "default-src 'none'; frame-ancestors 'none'" };
@@ -39,6 +40,7 @@ export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  kickOrderNotifications();
   const user = await getSessionUser();
   if (!user) return NextResponse.json({ error: '請先登入' }, { status: 401 });
 
