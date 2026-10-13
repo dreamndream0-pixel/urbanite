@@ -13,7 +13,7 @@ const TONE: Record<Tone, string> = {
 };
 
 // 由訂單狀態 + 物流狀態 + 付款推導出「顯示狀態」(標籤 / 色調 / 圖示)
-export function orderDisplayStatus(order: Pick<Order, 'status' | 'fulfillment_status' | 'paid'>): {
+export function orderDisplayStatus(order: Pick<Order, 'status' | 'fulfillment_status' | 'paid'> & { order_status?: string }): {
   label: string; tone: Tone; icon: IconName;
 } {
   const f = order.fulfillment_status ?? '';
@@ -21,7 +21,8 @@ export function orderDisplayStatus(order: Pick<Order, 'status' | 'fulfillment_st
   if (order.status === '退貨' || f === 'RETURNING') return { label: '退貨中', tone: 'red', icon: 'undo' };
   if (f === 'RETURNED') return { label: '已退貨', tone: 'red', icon: 'undo' };
   if (f === 'PICKED_UP') return { label: '已取貨完成', tone: 'green', icon: 'check' };
-  if (order.status === '已完成' || f === 'DELIVERED') return { label: '已完成', tone: 'green', icon: 'check' };
+  if (order.status === '已完成' || order.order_status === 'COMPLETED') return { label: '已完成', tone: 'green', icon: 'check' };
+  if (f === 'DELIVERED') return { label: '已到貨', tone: 'blue', icon: 'box' };
   if (f === 'AT_STORE') return { label: '待取貨', tone: 'blue', icon: 'store' };
   if (f === 'IN_TRANSIT') return { label: '配送中', tone: 'blue', icon: 'truck' };
   if (f === 'SHIPPED' || order.status === '已出貨') return { label: '已出貨', tone: 'blue', icon: 'truck' };
@@ -52,7 +53,7 @@ function Pill({ label, tone, icon, className = '' }: { label: string; tone: Tone
 }
 
 // 狀態徽章(圖示 + 顏色)
-export function OrderStatusBadge({ order, className = '' }: { order: Pick<Order, 'status' | 'fulfillment_status' | 'paid'>; className?: string }) {
+export function OrderStatusBadge({ order, className = '' }: { order: Pick<Order, 'status' | 'fulfillment_status' | 'paid'> & { order_status?: string }; className?: string }) {
   const s = orderDisplayStatus(order);
   return <Pill label={s.label} tone={s.tone} icon={s.icon} className={className} />;
 }
@@ -76,7 +77,7 @@ export function OrderCardBadges({ order, className = '' }: {
   else if (f === 'RETURNED') fb = { label: '已退貨', tone: 'red', icon: 'undo' };
   else if (f === 'RETURNING' || order.status === '退貨') fb = { label: '退貨中', tone: 'red', icon: 'undo' };
   else if (f === 'PICKED_UP') fb = { label: '已取貨', tone: 'green', icon: 'store' };
-  else if (f === 'DELIVERED') fb = { label: '已送達', tone: 'green', icon: 'truck' };
+  else if (f === 'DELIVERED') fb = { label: order.status === '已完成' ? '已送達' : '已到貨', tone: order.status === '已完成' ? 'green' : 'blue', icon: 'box' };
   else if (f === 'IN_TRANSIT') fb = { label: '配送中', tone: 'blue', icon: 'truck' };
   else if (f === 'AT_STORE') fb = { label: '待取貨', tone: 'blue', icon: 'store' };
   else if (f === 'SHIPPED' || order.status === '已出貨') fb = { label: '已出貨', tone: 'blue', icon: 'truck' };

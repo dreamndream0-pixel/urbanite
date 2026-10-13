@@ -1295,7 +1295,7 @@ function OrderListStatusBadge({ order }: { order: Order }) {
       : tab === 'to_ship'
         ? { label: '待出貨', className: 'bg-[#f4efe7] text-[var(--c-text2)]', icon: 'box' as const }
         : tab === 'shipping'
-          ? { label: '配送中', className: 'bg-[#eaf1f7] text-[#38617d]', icon: 'truck' as const }
+          ? { label: order.fulfillment_status === 'DELIVERED' ? '已到貨' : order.fulfillment_status === 'AT_STORE' ? '已到店' : '配送中', className: 'bg-[#eaf1f7] text-[#38617d]', icon: order.fulfillment_status === 'DELIVERED' || order.fulfillment_status === 'AT_STORE' ? 'box' as const : 'truck' as const }
           : tab === 'done'
             ? { label: '已完成', className: 'bg-[#e8f6ed] text-[#247447]', icon: 'check' as const }
             : tab === 'returning'

@@ -128,6 +128,7 @@ type TabOrder = {
   status: string;
   paid: boolean;
   fulfillment_status?: string;
+  order_status?: string;
   cancel_status?: string;
   shipping_method?: string;
   payment_method?: string;
@@ -137,8 +138,9 @@ export function orderTabOf(order: TabOrder): Exclude<OrderTab, 'all'> {
   const f = order.fulfillment_status ?? '';
   if (f === 'RETURNING') return 'returning';                 // 退貨處理中
   if (order.status === '取消' || order.status === '退貨' || order.cancel_status === 'APPROVED' || f === 'RETURNED') return 'cancelled';
-  if (order.status === '已完成' || f === 'DELIVERED' || f === 'PICKED_UP') return 'done';
-  if (['SHIPPED', 'IN_TRANSIT', 'AT_STORE'].includes(f) || order.status === '已出貨') return 'shipping';
+  // 已到貨(DELIVERED)還要等買家確認收貨,仍歸在「配送中」;超商已取貨或訂單完成才算「已完成」
+  if (order.status === '已完成' || order.order_status === 'COMPLETED' || f === 'PICKED_UP') return 'done';
+  if (['SHIPPED', 'IN_TRANSIT', 'AT_STORE', 'DELIVERED'].includes(f) || order.status === '已出貨') return 'shipping';
   if (isCollectOnDelivery(order.shipping_method ?? '', order.payment_method ?? '')) return 'to_ship';
   if (!order.paid) return 'unpaid';
   return 'to_ship';
