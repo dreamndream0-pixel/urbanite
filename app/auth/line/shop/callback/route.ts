@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { getSessionUser } from '@/lib/supabase/server';
+import { createServerSupabase, getSessionUser } from '@/lib/supabase/server';
 import { getCurrentShop, isPlatformShop, scopedClient, shopUrl } from '@/lib/shop';
 import { bindShopLine, getShopLineConfig } from '@/lib/shop-line';
 import { exchangeLineCode, fetchLineProfile } from '@/lib/line-login';
@@ -39,6 +39,16 @@ export async function GET(request: NextRequest) {
     if (friendFlag !== true) console.warn('shop LINE friendFlag mismatch; check Linked LINE Official Account', { shop: shop.slug, friendFlag });
     await bindShopLine(shop, cfg, userId, member.user.email ?? '', profile.userId);
     target.searchParams.set('ok', '1');
+    // LINE 授權後常回到另一個瀏覽器(沒有原本的登入狀態):用剛綁定的會員直接登入,返回商店不用重登
+    if (!session && member.user.email) {
+      try {
+        const { data: link } = await db.auth.admin.generateLink({ type: 'magiclink', email: member.user.email });
+        const tokenHash = link?.properties?.hashed_token;
+        if (tokenHash) await (await createServerSupabase()).auth.verifyOtp({ type: 'magiclink', token_hash: tokenHash });
+      } catch (loginError) {
+        console.error('shop LINE auto login failed', loginError instanceof Error ? loginError.message : loginError);
+      }
+    }
   } catch (error) {
     // Do not expose provider token-exchange responses or credentials to the URL.
     const message = error instanceof Error && /^(授權驗證|會員授權|登入已失效|商店尚未|尚未完成|請在 LINE|無法確認|這個 LINE)/.test(error.message)
