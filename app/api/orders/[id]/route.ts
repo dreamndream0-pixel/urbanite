@@ -91,10 +91,19 @@ export async function PATCH(
     return NextResponse.json({ error: '沒有可更新的欄位' }, { status: 400 });
   }
 
-  const derived = deriveStatuses(nextStatus, nextPaid);
-  update.order_status = derived.order_status;
-  update.payment_status = derived.payment_status;
-  update.fulfillment_status = derived.fulfillment_status;
+  const statusChanged = nextStatus !== current.status;
+  const paymentChanged = nextPaid !== current.paid;
+  const calculated = deriveStatuses(nextStatus, nextPaid);
+  const derived = {
+    order_status: statusChanged ? calculated.order_status : current.order_status,
+    payment_status: paymentChanged ? calculated.payment_status : current.payment_status,
+    fulfillment_status: statusChanged ? calculated.fulfillment_status : current.fulfillment_status,
+  };
+  if (statusChanged) {
+    update.order_status = derived.order_status;
+    update.fulfillment_status = derived.fulfillment_status;
+  }
+  if (paymentChanged) update.payment_status = derived.payment_status;
 
   // 手動標記退款:改寫付款狀態與淨額
   let refundValue = 0;

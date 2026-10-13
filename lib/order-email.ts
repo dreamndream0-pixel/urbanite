@@ -4,6 +4,7 @@ import { getAdminEmails, getIntegrations } from '@/lib/integrations';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { isOnlinePayment } from '@/lib/payment';
 import type { Order } from '@/lib/types';
+import { getOrderNotificationConfig } from '@/lib/order-notification-config';
 
 type Shop = { id: string; name: string; slug: string } | null;
 type Ctx = { order: Order; shop: Shop; platform: boolean; siteUrl: string; member: boolean };
@@ -24,14 +25,15 @@ async function send(key: string, from: string, to: string[], subject: string, ht
 }
 
 // 賣家收件人:主站 → 後台設定的通知信箱(沒填用管理員);店家 → 店主的帳號信箱
-async function sellerRecipients(shop: Shop, platform: boolean, notify: string): Promise<string[]> {
+export async function sellerRecipients(shop: Shop, platform: boolean, notify: string): Promise<string[]> {
   if (platform) {
     const list = notify.split(',').map((s) => s.trim()).filter(Boolean);
     return list.length ? list : await getAdminEmails().catch(() => []);
   }
   if (!shop) return [];
   const admin = createAdminClient();
-  const { data } = await admin.from('shop_members').select('user_id').eq('shop_id', shop.id).eq('role', 'owner');
+  const { data, error } = await admin.from('shop_members').select('user_id').eq('shop_id', shop.id).eq('role', 'owner');
+  if (error) throw new Error('Unable to resolve shop owner');
   const emails: string[] = [];
   for (const row of data ?? []) {
     const { data: u } = await admin.auth.admin.getUserById(String(row.user_id));
@@ -64,6 +66,7 @@ const frame = (shopName: string, body: string) => `<div style="background:#f6f2e
   <p style="margin:0 0 16px;font-size:18px;font-weight:700;letter-spacing:.08em">${esc(shopName)}</p>${body}</div></div>`;
 
 export async function sendOrderEmails({ order, shop, platform, siteUrl, member }: Ctx) {
+  if (shop && await getOrderNotificationConfig(shop.id)) return;
   const cfg = await getIntegrations(['RESEND_API_KEY', 'EMAIL_FROM', 'ORDER_NOTIFY_EMAILS'] as const);
   if (!cfg.RESEND_API_KEY || !isEmail(cfg.EMAIL_FROM)) return;
   const shopName = shop?.name || 'URBANITE';

@@ -33,6 +33,8 @@ import {
 import { uiToast } from '@/lib/ui-toast';
 import NumberInput from './NumberInput';
 import ShopLineSettings from './ShopLineSettings';
+import OrderNotificationSettingsPanel from './OrderNotificationSettings';
+import ManualFulfillmentAction from '@/app/components/ManualFulfillmentAction';
 import { PRIMARY_SITE_URL } from '@/lib/site-url';
 import { defaultSelfShipCarrier, NO_TRACKING_CARRIERS, needsTracking } from '@/lib/self-ship';
 import { uiAlert, uiConfirm, uiPrompt } from '@/lib/ui-dialog';
@@ -494,7 +496,7 @@ export default function AdminDashboard({
   const [customers] = useState<Customer[]>(initialCustomers);
   const [banners, setBanners] = useState<Banner[]>(initialBanners);
   const [uploadingBanner, setUploadingBanner] = useState(false);
-  const [settingsTab, setSettingsTab] = useState<'general' | 'templates' | 'banners' | 'footer' | 'payments' | 'shippings' | 'integrations' | 'shopline'>('general');
+  const [settingsTab, setSettingsTab] = useState<'general' | 'templates' | 'banners' | 'footer' | 'payments' | 'shippings' | 'integrations' | 'shopline' | 'notifications'>('general');
   const [orderFilter, setOrderFilter] = useState<string>('全部');
   const [orderSearch, setOrderSearch] = useState('');
   const [orderPaidFilter, setOrderPaidFilter] = useState<'全部' | '已付款' | '未付款'>('全部');
@@ -2899,6 +2901,7 @@ export default function AdminDashboard({
                   { key: 'payments', label: '金流設定' },
                   { key: 'shippings', label: '物流設定' },
                   { key: 'integrations', label: '串接設定' },
+                  { key: 'notifications', label: '通知' },
                   { key: 'shopline', label: '服務設定' },
                 ] as const).filter((t) => (platform ? t.key !== 'shopline' : t.key !== 'integrations')).map((t) => (
                   <button
@@ -3248,6 +3251,7 @@ export default function AdminDashboard({
               )}
 
               {settingsTab === 'integrations' && <IntegrationSettings />}
+              {settingsTab === 'notifications' && <OrderNotificationSettingsPanel />}
               {settingsTab === 'shopline' && !platform && <ShopLineSettings />}
               {settingsTab === 'shippings' && (
               <Card
@@ -4660,6 +4664,7 @@ ${order.note ? `<div class="sec"><h2>備註</h2><p class="muted">${escapeHtml(or
         <div className="flex-1 space-y-5 overflow-y-auto overscroll-contain p-5">
           {/* 主要操作固定在內容最上方 */}
           <div className="flex flex-wrap gap-2">
+            <ManualFulfillmentAction order={order} action="arrived" onUpdated={(updated) => { onOrderChange?.(updated); void loadDetail(); }} />
             {isHomeDelivery && !hasShipment && order.status !== '取消' && order.status !== '退貨' ? (
               <button
                 onClick={() => {

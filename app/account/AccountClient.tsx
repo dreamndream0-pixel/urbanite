@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import LineBindingRow from './LineBindingCard';
+import ManualFulfillmentAction from '@/app/components/ManualFulfillmentAction';
 import LineCouponBanner from './LineCouponBanner';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -1384,7 +1385,7 @@ function OrderModal({
       .then((res) => (res.ok ? res.json() : []))
       .then((data: OrderStatusHistory[]) => setHistory(Array.isArray(data) ? data : []))
       .catch(() => {});
-  }, [order.id]);
+  }, [order.id, order.order_status, order.fulfillment_status]);
 
   const loadReturns = useCallback(() => {
     fetch(`/api/orders/${order.id}/returns`)
@@ -1486,6 +1487,7 @@ function OrderModal({
           ) : null}
 
           {/* 操作 */}
+          <ManualFulfillmentAction order={order} action="complete" onUpdated={onOrderChange} />
           {canPayNow(order) && awaitingPayment(order) && !isPaymentReported(order) && order.created_at ? (
             <p className="mb-2 text-sm text-[#c0392b]">
               請於 {paymentDeadline(order.created_at).toLocaleString('zh-TW', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })} 前完成付款,逾期將自動取消訂單。

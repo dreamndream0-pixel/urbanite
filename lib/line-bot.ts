@@ -1,4 +1,5 @@
 import crypto from 'crypto';
+import { getOrderNotificationConfig } from '@/lib/order-notification-config';
 import { getConfiguredSiteUrl } from '@/lib/site-url';
 import { bindUrl, createBindToken, getMessagingConfig, type LineMessage } from '@/lib/line-messaging';
 import {
@@ -393,6 +394,7 @@ function notifyKeyOf(r: HistoryRow): NotifyKey | null {
 }
 
 export async function processOrderNotifications() {
+  if (await getOrderNotificationConfig(URBANITE_SHOP_ID)) return { sent: 0 };
   const supabase = scopedClient(URBANITE_SHOP_ID);
   const { config, raw } = await loadBotConfig();
   const cursor = typeof raw.notifyCursor === 'string' ? raw.notifyCursor : '';

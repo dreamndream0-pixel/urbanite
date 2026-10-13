@@ -4,6 +4,7 @@ import { getShopSecret, setShopSecret } from '@/lib/integrations';
 import { scopedClient, shopUrl, type Shop } from '@/lib/shop';
 import { createBindToken, fetchBotProfile, replyMessage, verifyLineSignature, type LineMessage } from '@/lib/line-messaging';
 import type { Order } from '@/lib/types';
+import { getOrderNotificationConfig } from '@/lib/order-notification-config';
 
 export type ShopLineConfig = { channelSecret: string; accessToken: string };
 const KIND = 'LINE';
@@ -103,6 +104,7 @@ export async function bindShopLine(shop: Shop, cfg: ShopLineConfig, userId: stri
 
 // 訂單通知:成立 / 出貨。沒設定 LINE 或買家沒綁定就略過
 export async function notifyShopOrder(shop: Shop, orderId: string, kind: 'created' | 'shipped', detail = '') {
+  if (await getOrderNotificationConfig(shop.id)) return;
   const cfg = await getShopLineConfig(shop.id);
   if (!cfg) return;
   const supabase = scopedClient(shop.id);

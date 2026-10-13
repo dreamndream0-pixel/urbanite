@@ -195,10 +195,14 @@ export function verifyUnlockToken(token: string | undefined, email: string) {
 
 // ---------- 店家專屬金鑰(例如店家自己的 LINE 官方帳號) ----------
 // 存在同一張表,key = SHOP_<類別>:<shopId>,值為加密後的 JSON;只在伺服器端讀取,不回傳給前端
-export async function getShopSecret<T>(kind: string, shopId: string): Promise<T | null> {
-  const { data } = await createAdminClient().from('integration_settings').select('value').eq('key', `SHOP_${kind}:${shopId}`).maybeSingle();
+export async function getShopSecret<T>(kind: string, shopId: string, strict = false): Promise<T | null> {
+  const { data, error } = await createAdminClient().from('integration_settings').select('value').eq('key', `SHOP_${kind}:${shopId}`).maybeSingle();
+  if (error && strict) throw new Error('Unable to read shop configuration');
   if (!data) return null;
-  try { return JSON.parse(decrypt(String(data.value ?? ''))) as T; } catch { return null; }
+  try { return JSON.parse(decrypt(String(data.value ?? ''))) as T; } catch {
+    if (strict) throw new Error('Unable to decrypt shop configuration');
+    return null;
+  }
 }
 
 export async function setShopSecret(kind: string, shopId: string, value: unknown | null) {
