@@ -17,7 +17,7 @@ export default function TemplatePicker({
   extra?: { key: string; label: string; hint: string };
 }) {
   return (
-    <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:thin]">
+    <div className="flex w-full max-w-full min-w-0 gap-2 overflow-x-auto pb-1 [scrollbar-width:thin]">
       {extra ? (
         <button
           type="button"

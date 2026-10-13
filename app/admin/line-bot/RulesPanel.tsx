@@ -158,7 +158,7 @@ function RuleEditor({
       <EditorWithPreview
         editor={
           <div className="space-y-4">
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <Field label="規則名稱(只有你看得到)">
                 <input value={draft.name} maxLength={60} onChange={(e) => setDraft({ ...draft, name: e.target.value })} placeholder="例如:運費說明" className={inputClass} />
               </Field>
