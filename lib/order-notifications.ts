@@ -14,9 +14,11 @@ const BUYER_TEXT: Partial<Record<OrderNoticeEvent, string>> = {
   created: '感謝您的訂購,我們已收到訂單。', ready: '商品正在準備出貨。', shipped: '商品已出貨,請留意配送進度。',
   paid: '已確認收到您的款項。', arrived: '商品已送達,請記得取貨。', picked_up: '已完成取貨,感謝您的購買。',
   completed: '訂單已完成,期待再次為您服務。', cancelled: '您的訂單已取消。', refunded: '退款已處理。', return_requested: '已收到您的退貨申請,我們會盡快處理。',
+  payment_reported: '已收到您的付款通知,我們確認款項後會盡快出貨。',
 };
 const SELLER_TEXT: Partial<Record<OrderNoticeEvent, string>> = {
   created: '有一筆新訂單,請盡快處理。', paid: '買家已付款。', return_requested: '買家提出退貨申請,請到後台處理。', cancelled: '訂單已取消。',
+  payment_reported: '買家已通知付款,請核對款項後標記已付款。',
 };
 
 
@@ -48,7 +50,11 @@ async function prepare(job: Job, sender: string, notify: string): Promise<Payloa
   if (job.channel === 'email') {
     const to = job.audience === 'buyer' ? emails([order.email]) : sellerEmails;
     if (!to.length) throw new NoticeError('未設定有效的收件信箱', false, true);
-    let html = `<p>${esc(subject)}</p><p>訂單金額：NT$${Number(order.total).toLocaleString('en-US')}</p><p><a href="${esc(link)}">查看訂單</a></p>`;
+    // 已通知付款:附上買家回報的帳號後五碼與備註
+    const reported = job.event === 'payment_reported'
+      ? `${order.payment_ref ? `<p>帳號後五碼:${esc(String(order.payment_ref))}</p>` : ''}${order.payment_proof_note ? `<p>備註:${esc(String(order.payment_proof_note))}</p>` : ''}${order.payment_proof_url ? '<p>已附付款截圖(請到後台查看)</p>' : ''}`
+      : '';
+    let html = `<p>${esc(subject)}</p><p>訂單金額：NT${Number(order.total).toLocaleString('en-US')}</p>${reported}<p><a href="${esc(link)}">查看訂單</a></p>`;
     if (job.event === 'created') {
       let transfer = '';
       if (/轉帳|匯款/.test(order.payment_method ?? '')) {
@@ -86,6 +92,10 @@ async function prepare(job: Job, sender: string, notify: string): Promise<Payloa
   if (!ids.length) throw new NoticeError('收件人尚未綁定本商店 LINE', false, true);
   if (ids.length > 500) throw new NoticeError('LINE 收件人超過上限');
   const extra: [string, string][] = [];
+  if (job.event === 'payment_reported') {
+    if (order.payment_ref) extra.push(['帳號後五碼', String(order.payment_ref)]);
+    if (order.payment_proof_url) extra.push(['付款截圖', '已附上']);
+  }
   if (['shipped', 'arrived', 'ready'].includes(job.event)) {
     const { data: ship } = await db.from('shipments').select('carrier,tracking_number').eq('order_id', order.id).order('created_at', { ascending: false }).limit(1).maybeSingle();
     if (ship?.carrier) extra.push(['物流', String(ship.carrier)]);
@@ -94,7 +104,7 @@ async function prepare(job: Job, sender: string, notify: string): Promise<Payloa
   const seller = job.audience === 'seller';
   const messages = [orderFlexMessage({
     shopName: shop.name,
-    title: seller && job.event === 'created' ? '新訂單' : label,
+    title: seller && job.event === 'created' ? '新訂單' : seller && job.event === 'payment_reported' ? '買家已通知付款' : label,
     subtitle: (seller ? SELLER_TEXT : BUYER_TEXT)[job.event],
     order, link, extra,
     buttonLabel: seller ? '到後台處理' : '查看訂單',

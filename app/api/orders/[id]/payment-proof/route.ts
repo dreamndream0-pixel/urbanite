@@ -1,4 +1,5 @@
-import { NextResponse } from 'next/server';
+import { after, NextResponse } from 'next/server';
+import { sendOrderNoticeNow } from '@/lib/order-notifications';
 import { getAdminUser, getSessionUser } from '@/lib/supabase/server';
 import { randomUUID } from 'node:crypto';
 import type { Order } from '@/lib/types';
@@ -97,6 +98,8 @@ export async function POST(
     note: `買家回報付款${last5 ? `(後五碼 ${last5})` : ''}${update.payment_proof_url ? '(附截圖)' : ''}`,
     created_by: '客人',
   });
+  // 通知買家(已收到付款通知)與賣家(請核對款項),依店家通知設定
+  if (order.shop_id) after(() => sendOrderNoticeNow(order.shop_id, id, 'payment_reported').catch(() => {}));
 
   return NextResponse.json(data as Order);
 }

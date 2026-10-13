@@ -405,7 +405,7 @@ export function orderBubble(kind: OrderKind | string, d: OrderCardData, color?: 
 // 訂單事件 → 卡片種類與進度
 export function orderKindOf(event?: string): { kind: OrderKind; step?: number } {
   switch (event) {
-    case 'created': case 'paid': return { kind: 'created' };
+    case 'created': case 'paid': case 'payment_reported': return { kind: 'created' };
     case 'ready': return { kind: 'shipping', step: 0 };
     case 'shipped': return { kind: 'shipping', step: 1 };
     case 'arrived': case 'at_store': return { kind: 'shipping', step: 2 };
