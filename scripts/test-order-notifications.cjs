@@ -71,7 +71,7 @@ async function main() {
       '@/lib/order-notification-settings': settings,
       '@/lib/line-messaging': { getMessagingConfig: async () => ({ accessToken: 'fake' }) },
       '@/lib/shop-line': { getShopLineConfig: async () => ({ accessToken: 'fake' }) },
-      '@/lib/order-email': {}, '@/lib/order-flex': load('lib/order-flex.ts', { '@/lib/line-flex-templates': load('lib/line-flex-templates.ts', { '@/lib/line-icons': { lineIconUrl: (n) => 'https://x.test/' + n } }) }), '@/lib/shop': { URBANITE_SHOP_ID: 'shop' },
+      '@/lib/order-email': {}, '@/lib/order-flex': load('lib/order-flex.ts', { '@/lib/order-status': { FULFILLMENT_STATUS_LABEL: {} }, '@/lib/line-flex-templates': load('lib/line-flex-templates.ts', { '@/lib/line-icons': { lineIconUrl: (n) => 'https://x.test/' + n } }) }), '@/lib/shop': { URBANITE_SHOP_ID: 'shop' },
     });
     global.fetch = async (url, options) => { calls.push({ url, options }); return response; };
     const run = async (overrides = {}, res = new Response('{}', { status: 200 })) => {
