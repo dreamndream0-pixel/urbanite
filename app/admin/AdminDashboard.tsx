@@ -4689,6 +4689,44 @@ ${order.note ? `<div class="sec"><h2>備註</h2><p class="muted">${escapeHtml(or
             ) : null}
           </div>
 
+          {/* 退貨 / 退款(待處理的申請放在上方,方便核准) */}
+          {detail && (detail.returns.length > 0 || detail.refunds.length > 0) ? (
+            <div className="rounded-xl border border-[#f0d9b5] bg-[#fffaf2] p-4">
+              <h3 className="mb-3 font-semibold">退貨 / 退款</h3>
+              <div className="space-y-3">
+                {detail.returns.map((r) => (
+                  <div key={r.id} className="rounded-xl border border-[#e5ded4] bg-white p-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium">{r.return_no}</span>
+                      <span className="rounded-full bg-[#fbe9e7] px-2.5 py-1 text-xs font-semibold text-[#c0392b]">{RETURN_STATUS_LABEL[r.status] ?? r.status}</span>
+                    </div>
+                    <p className="mt-1 text-xs text-[#6b6156]">{r.items.map((it) => `${it.name}${it.variant ? `(${it.variant})` : ''}×${it.quantity}`).join('、')}</p>
+                    <p className="mt-0.5 text-xs text-[#8a7f72]">原因：{r.reason || '—'}｜退款 {formatter.format(r.refund_amount)}</p>
+                    {r.response ? <p className="mt-0.5 text-xs text-[#8a7f72]">回覆：{r.response}</p> : null}
+                    {r.return_tracking || r.return_carrier ? (
+                      <p className="mt-0.5 text-xs text-[#1f7a44]">買家已寄回：{r.return_carrier} {r.return_tracking}</p>
+                    ) : null}
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      {r.status === 'REQUESTED' ? (
+                        <>
+                          <button onClick={() => reviewReturn(r.id, 'approve')} disabled={busy} className="rounded-full bg-[#1f7a44] px-3 py-1 text-xs font-semibold text-white disabled:opacity-50">核准退貨</button>
+                          <button onClick={async () => { const resp = await uiPrompt('婉拒退貨,回覆客人(選填):'); if (resp !== null) reviewReturn(r.id, 'reject', resp); }} disabled={busy} className="rounded-full border border-[#e0b4b4] px-3 py-1 text-xs font-semibold text-[#c0392b] disabled:opacity-50">婉拒</button>
+                        </>
+                      ) : r.status !== 'REJECTED' && r.status !== 'REFUNDED' && r.status !== 'COMPLETED' ? (
+                        <ReturnStatusControl r={r} busy={busy} onAction={(action) => reviewReturn(r.id, action)} />
+                      ) : null}
+                    </div>
+                  </div>
+                ))}
+                {detail.refunds.map((rf) => (
+                  <div key={rf.id} className="rounded-lg bg-[#faf7f2] p-3 text-xs text-[#6b6156]">
+                    退款單 {rf.refund_no}｜{formatter.format(rf.amount)}｜{new Date(rf.created_at ?? '').toLocaleString('zh-TW')}
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
+
           {/* 寄件單號(取代原本重複的物流資訊) */}
           {detail?.shipments.map((sh) => {
             const code = sh.store_print_no || sh.tracking_number;
@@ -4915,44 +4953,6 @@ ${order.note ? `<div class="sec"><h2>備註</h2><p class="muted">${escapeHtml(or
               {row('付款方式', order.payment_method)}
             </div>
           </div>
-
-          {/* 退貨 / 退款 */}
-          {detail && (detail.returns.length > 0 || detail.refunds.length > 0) ? (
-            <div className="border-t border-[#efe8dd] pt-4">
-              <h3 className="mb-3 font-semibold">退貨 / 退款</h3>
-              <div className="space-y-3">
-                {detail.returns.map((r) => (
-                  <div key={r.id} className="rounded-xl border border-[#e5ded4] p-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium">{r.return_no}</span>
-                      <span className="rounded-full bg-[#fbe9e7] px-2.5 py-1 text-xs font-semibold text-[#c0392b]">{RETURN_STATUS_LABEL[r.status] ?? r.status}</span>
-                    </div>
-                    <p className="mt-1 text-xs text-[#6b6156]">{r.items.map((it) => `${it.name}${it.variant ? `(${it.variant})` : ''}×${it.quantity}`).join('、')}</p>
-                    <p className="mt-0.5 text-xs text-[#8a7f72]">原因：{r.reason || '—'}｜退款 {formatter.format(r.refund_amount)}</p>
-                    {r.response ? <p className="mt-0.5 text-xs text-[#8a7f72]">回覆：{r.response}</p> : null}
-                    {r.return_tracking || r.return_carrier ? (
-                      <p className="mt-0.5 text-xs text-[#1f7a44]">買家已寄回：{r.return_carrier} {r.return_tracking}</p>
-                    ) : null}
-                    <div className="mt-2 flex flex-wrap items-center gap-2">
-                      {r.status === 'REQUESTED' ? (
-                        <>
-                          <button onClick={() => reviewReturn(r.id, 'approve')} disabled={busy} className="rounded-full bg-[#1f7a44] px-3 py-1 text-xs font-semibold text-white disabled:opacity-50">核准退貨</button>
-                          <button onClick={async () => { const resp = await uiPrompt('婉拒退貨,回覆客人(選填):'); if (resp !== null) reviewReturn(r.id, 'reject', resp); }} disabled={busy} className="rounded-full border border-[#e0b4b4] px-3 py-1 text-xs font-semibold text-[#c0392b] disabled:opacity-50">婉拒</button>
-                        </>
-                      ) : r.status !== 'REJECTED' && r.status !== 'REFUNDED' && r.status !== 'COMPLETED' ? (
-                        <ReturnStatusControl r={r} busy={busy} onAction={(action) => reviewReturn(r.id, action)} />
-                      ) : null}
-                    </div>
-                  </div>
-                ))}
-                {detail.refunds.map((rf) => (
-                  <div key={rf.id} className="rounded-lg bg-[#faf7f2] p-3 text-xs text-[#6b6156]">
-                    退款單 {rf.refund_no}｜{formatter.format(rf.amount)}｜{new Date(rf.created_at ?? '').toLocaleString('zh-TW')}
-                  </div>
-                ))}
-              </div>
-            </div>
-          ) : null}
 
         </div>
       </div>
