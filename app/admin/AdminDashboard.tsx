@@ -2837,7 +2837,7 @@ export default function AdminDashboard({
           )}
 
           {/* ===== 報表及分析 ===== */}
-          {section === 'line-bot' && <LineBotManager products={products} coupons={discounts} logoUrl={logoUrl} platform={platform} />}
+          {section === 'line-bot' && <LineBotManager products={products} coupons={discounts} logoUrl={logoUrl} platform={platform} campaigns={initialCampaigns} />}
           {section === 'card-members' && <CardMembersManager />}
           {section === 'shops' && platform && <ShopsManager />}
           {section === 'profile-card' && (platform

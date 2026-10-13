@@ -10,7 +10,8 @@ import {
   type BuiltinKey,
   type RichMenu,
 } from '@/lib/line-bot-types';
-import type { Discount, Product } from '@/lib/types';
+import type { Campaign, Discount, Product } from '@/lib/types';
+import { CampaignsContext } from './campaignContext';
 import { uiAlert } from '@/lib/ui-dialog';
 import LinePreview from './LinePreview';
 import ShopLineSettings from '../ShopLineSettings';
@@ -52,7 +53,7 @@ const TABS: { key: Tab; label: string }[] = [
 
 // 後台「LINE 機器人」:主站與店家共用(資料依網域分店家)。店家多一個「連線設定」分頁(自己的 LINE 金鑰)
 // 訂單通知統一在「系統設定 → 通知」設定
-export default function LineBotManager({ products, coupons, logoUrl, platform = true }: { products: Product[]; coupons: Discount[]; logoUrl: string; platform?: boolean }) {
+export default function LineBotManager({ products, coupons, logoUrl, platform = true, campaigns = [] }: { products: Product[]; coupons: Discount[]; logoUrl: string; platform?: boolean; campaigns?: Campaign[] }) {
   const [data, setData] = useState<BotData | null>(null);
   const [draft, setDraft] = useState<BotConfig | null>(null);
   const [tab, setTab] = useState<Tab>(platform ? 'welcome' : 'connect');
@@ -97,6 +98,7 @@ export default function LineBotManager({ products, coupons, logoUrl, platform = 
   const shared = { products, coupons, logoUrl, brand: draft.brandColor };
 
   return (
+    <CampaignsContext.Provider value={campaigns}>
     <div className="space-y-4 pb-20">
       {!data.ready && tab !== 'connect' ? (
         <p className="rounded-xl border border-[#f0d9b5] bg-[#fff8ec] px-4 py-3 text-sm text-[#8a5a1c]">
@@ -136,6 +138,7 @@ export default function LineBotManager({ products, coupons, logoUrl, platform = 
         </div>
       ) : null}
     </div>
+    </CampaignsContext.Provider>
   );
 }
 
