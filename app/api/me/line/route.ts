@@ -4,8 +4,8 @@ import { getCheckoutLine, lineAddFriendUrl } from '@/lib/checkout-line';
 import { bindLineToUser, fetchBotProfile, getMessagingConfig, verifyBindToken } from '@/lib/line-messaging';
 import { createLinkToken, getLineLoginConfig } from '@/lib/line-login';
 import { syncMemberMenu } from '@/lib/line-bot';
-import { getCurrentShop, isPlatformShop, scopedClient, URBANITE_SHOP_ID } from '@/lib/shop';
-import { bindShopLine, getShopLineConfig } from '@/lib/shop-line';
+import { getCurrentShop, isPlatformShop, scopedClient } from '@/lib/shop';
+import { bindShopLine, fetchBotInfo, getShopLineConfig } from '@/lib/shop-line';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,12 +15,26 @@ export async function GET(request: Request) {
   const nextParam = new URL(request.url).searchParams.get('next') ?? '/account';
   const next = nextParam.startsWith('/') && !nextParam.startsWith('//') ? nextParam : '/account';
   if (!user) return NextResponse.json({ error: '請先登入' }, { status: 401 });
-  const supabase = scopedClient(URBANITE_SHOP_ID);
-  const [{ data: customer }, { data: settings }] = await Promise.all([
+  const shop = await getCurrentShop();
+  if (!shop || shop.status === 'suspended') return NextResponse.json({ error: '找不到商店' }, { status: 404 });
+  const supabase = scopedClient(shop.id);
+  const [{ data: customer, error: customerError }, { data: settings, error: settingsError }] = await Promise.all([
     supabase.from('customers').select('line_user_id, line_display_name, line_picture_url, line_bound_at').eq('user_id', user.id).maybeSingle(),
-    supabase.from('site_settings').select('footer_sections').eq('id', 1).maybeSingle(),
+    supabase.from('site_settings').select('footer_sections').maybeSingle(),
   ]);
+  if (customerError || settingsError) return NextResponse.json({ error: '無法讀取 LINE 設定' }, { status: 503 });
   const line = getCheckoutLine(settings);
+  if (!isPlatformShop(shop)) {
+    const cfg = await getShopLineConfig(shop.id);
+    let addFriendUrl = lineAddFriendUrl(line);
+    if (!addFriendUrl && cfg?.accessToken) {
+      const bot = await fetchBotInfo(cfg.accessToken).catch(() => null);
+      if (bot?.basicId) addFriendUrl = lineAddFriendUrl({ id: bot.basicId, url: '' });
+    }
+    return NextResponse.json({ bound: Boolean(customer?.line_user_id), displayName: customer?.line_display_name ?? '',
+      linkUrl: cfg?.accessToken ? addFriendUrl : '', addFriendUrl, bindingMode: 'chat', available: !!cfg?.accessToken && !!addFriendUrl },
+    { headers: { 'Cache-Control': 'private, no-store' } });
+  }
   // 「加入 LINE」專屬連結:LINE 授權途中切換到 LINE App / 內建瀏覽器也能完成綁定
   const { channelSecret: loginSecret } = await getLineLoginConfig();
   const linkUrl = loginSecret
@@ -34,7 +48,9 @@ export async function GET(request: Request) {
     boundAt: customer?.line_bound_at ?? null,
     addFriendUrl: lineAddFriendUrl(line),
     lineId: line.id,
-  });
+    bindingMode: 'login',
+    available: Boolean(loginSecret),
+  }, { headers: { 'Cache-Control': 'private, no-store' } });
 }
 
 // POST /api/me/line { token } — 用 LINE 傳來的綁定連結完成綁定
@@ -66,7 +82,9 @@ export async function POST(request: Request) {
 export async function DELETE() {
   const user = await getSessionUser();
   if (!user) return NextResponse.json({ error: '請先登入' }, { status: 401 });
-  const supabase = scopedClient(URBANITE_SHOP_ID);
+  const shop = await getCurrentShop();
+  if (!shop || shop.status === 'suspended') return NextResponse.json({ error: '找不到商店' }, { status: 404 });
+  const supabase = scopedClient(shop.id);
   const { data: before } = await supabase.from('customers').select('line_user_id').eq('user_id', user.id).maybeSingle();
   const { error } = await supabase
     .from('customers')
@@ -74,6 +92,6 @@ export async function DELETE() {
     .eq('user_id', user.id);
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
   // 換回非會員圖文選單
-  if (before?.line_user_id) await syncMemberMenu(before.line_user_id, false);
+  if (isPlatformShop(shop) && before?.line_user_id) await syncMemberMenu(before.line_user_id, false);
   return NextResponse.json({ ok: true });
 }

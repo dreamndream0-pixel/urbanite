@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { uiAlert, uiConfirm } from '@/lib/ui-dialog';
 
-type Status = { bound: boolean; displayName: string; linkUrl?: string };
+type Status = { bound: boolean; displayName: string; linkUrl?: string; available?: boolean; bindingMode?: 'chat' | 'login' };
 
 const LineMark = ({ size = 14 }: { size?: number }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -16,6 +16,7 @@ const LineMark = ({ size = 14 }: { size?: number }) => (
 export default function LineBindingRow() {
   const [status, setStatus] = useState<Status | null>(null);
   const [busy, setBusy] = useState(false);
+  const [failed, setFailed] = useState(false);
   const [notice, setNotice] = useState<{ ok: boolean; text: string } | null>(null);
 
   useEffect(() => {
@@ -29,12 +30,12 @@ export default function LineBindingRow() {
       window.history.replaceState(null, '', url);
     }
     fetch('/api/me/line', { cache: 'no-store' })
-      .then((r) => (r.ok ? r.json() : null))
+      .then((r) => { if (!r.ok) throw new Error('讀取失敗'); return r.json(); })
       .then((d) => {
         setStatus(d);
         if (linked || error) setNotice(linked ? { ok: true, text: 'LINE 綁定完成,可在官方 LINE 查詢訂單與優惠券' } : { ok: false, text: error ?? '' });
       })
-      .catch(() => setStatus(null));
+      .catch(() => setFailed(true));
   }, []);
 
   async function unbind() {
@@ -43,7 +44,7 @@ export default function LineBindingRow() {
     try {
       const res = await fetch('/api/me/line', { method: 'DELETE' });
       if (!res.ok) throw new Error((await res.json()).error ?? '解除失敗');
-      setStatus((s) => ({ bound: false, displayName: '', linkUrl: s?.linkUrl }));
+      setStatus((s) => s ? { ...s, bound: false, displayName: '' } : null);
       setNotice({ ok: true, text: '已解除 LINE 綁定' });
     } catch (e) {
       void uiAlert(e instanceof Error ? e.message : '解除失敗');
@@ -56,8 +57,8 @@ export default function LineBindingRow() {
 
   return (
     <div className="col-span-2 min-w-0">
-      <span className="mb-1.5 block text-xs font-medium text-[var(--c-text2)]">LINE 綁定</span>
-      {!status ? (
+      <span className="mb-1.5 block text-xs font-medium text-[var(--c-text2)]">LINE 訂單通知</span>
+      {failed ? <p role="alert" className={`${box} text-sm text-[var(--c-muted)]`}>暫時無法讀取 LINE 設定，請重新整理頁面。</p> : !status ? (
         <div className={`${box} text-sm text-[var(--c-muted)]`}>讀取中…</div>
       ) : status.bound ? (
         <div className={box}>
@@ -79,14 +80,14 @@ export default function LineBindingRow() {
         </div>
       ) : (
         <div className={box}>
-          <span className="min-w-0 flex-1 text-xs leading-5 text-[var(--c-text2)]">加入 LINE 好友查詢訂單更方便,領取優惠券</span>
-          <a
-            href={status.linkUrl || '/auth/line/start?mode=link&next=/account'}
+          <span className="min-w-0 flex-1 text-xs leading-5 text-[var(--c-text2)]">{status.available === false ? '商店尚未開放 LINE 通知' : status.bindingMode === 'chat' ? '加入官方 LINE 後，傳送「綁定」完成會員連結' : '綁定官方 LINE，接收訂單與出貨通知'}</span>
+          {status.available !== false && status.linkUrl ? <a
+            href={status.linkUrl}
             className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-[#06C755] px-3.5 py-1.5 text-xs font-semibold text-white"
           >
             <LineMark />
-            加入 LINE
-          </a>
+            訂閱 LINE 通知
+          </a> : <button type="button" disabled className="shrink-0 rounded-full bg-[#06C755] px-3.5 py-1.5 text-xs font-semibold text-white opacity-40">訂閱 LINE 通知</button>}
         </div>
       )}
       {notice && notice.text ? <p className={`mt-1.5 text-xs ${notice.ok ? 'text-[#1f7a44]' : 'text-[#c0392b]'}`}>{notice.text}</p> : null}

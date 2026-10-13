@@ -85,7 +85,7 @@ export default function AccountClient({
   favoriteIds: string[];
   coupons: Discount[];
   customer: Customer | null;
-  platform?: boolean; // 店家網站不顯示 LINE 綁定(綁定的是 URBANITE 的官方帳號)
+  platform?: boolean;
 }) {
   const router = useRouter();
   const [tab, setTab] = useState<TabKey>('profile');
@@ -237,7 +237,6 @@ export default function AccountClient({
       <section className="mx-auto max-w-4xl px-4 py-8 sm:px-6">
         {tab === 'profile' && (
           <ProfileTab
-            platform={platform}
             customer={customer}
             fallbackName={userName}
             email={userEmail}
@@ -309,7 +308,6 @@ const DEFAULT_STAMP_IMAGE =
   'https://mffhznxcqjlwquqyrgth.supabase.co/storage/v1/object/public/assets/member/stamp-1788777088885-ai152h.png';
 
 function ProfileTab({
-  platform,
   customer,
   fallbackName,
   email,
@@ -327,7 +325,6 @@ function ProfileTab({
   provider: string;
   stampImage?: string | null;
   onSaved: () => void;
-  platform: boolean;
 }) {
   const [stampReady, setStampReady] = useState(false);
   const [name, setName] = useState(customer?.name || fallbackName || '');
@@ -635,7 +632,7 @@ function ProfileTab({
             <span className={labelText}>登入方式</span>
             <div className={field + ' flex items-center bg-[#f0ece6] text-[var(--c-muted)]'}>{PROVIDER_LABEL[provider.toLowerCase()] ?? provider} 帳號登入</div>
           </div>
-          {platform ? <LineBindingRow /> : null}
+          <LineBindingRow />
         </div>
       </section>
 
