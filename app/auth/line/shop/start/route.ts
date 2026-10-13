@@ -22,6 +22,8 @@ export async function GET(request: Request) {
   const url = new URL('https://access.line.me/oauth2/v2.1/authorize');
   url.search = new URLSearchParams({ response_type: 'code', client_id: cfg.loginChannelId,
     redirect_uri: shopUrl(shop.slug, '/auth/line/shop/callback'), state, scope: 'profile', bot_prompt: 'aggressive',
+    // 每次都顯示授權畫面,才會一併出現「加入官方帳號好友」(授權過的人 LINE 會自動略過)
+    prompt: 'consent',
     code_challenge: challenge, code_challenge_method: 'S256' }).toString();
   const response = NextResponse.redirect(url);
   response.headers.set('Cache-Control', 'private, no-store');
