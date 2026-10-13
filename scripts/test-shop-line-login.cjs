@@ -91,7 +91,8 @@ const request = (state, cookie = state, extra = '') => ({ nextUrl: new URL(`http
   equal(bound[0][2], 'buyer'); equal(new URL(result.headers.get('location')).searchParams.get('ok'), '1');
   bound = []; exchanges = 0;
   await callback.GET(request(state, state, '&error=access_denied')); equal(exchanges, 0);
-  friend = false; await callback.GET(request(state)); equal(bound.length, 0);
+  friend = false; await callback.GET(request(state)); equal(bound.length, 1); bound = [];
+  botId = null; await callback.GET(request(state)); equal(bound.length, 0); botId = 'line-buyer';
   friend = true; botId = 'other-provider'; await callback.GET(request(state)); equal(bound.length, 0);
   botId = null; await callback.GET(request(state)); equal(bound.length, 0);
   user = { id: 'other' }; await callback.GET(request(state)); equal(bound.length, 0);

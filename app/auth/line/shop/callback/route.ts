@@ -4,7 +4,7 @@ import { getCurrentShop, isPlatformShop, scopedClient, shopUrl } from '@/lib/sho
 import { bindShopLine, getShopLineConfig } from '@/lib/shop-line';
 import { exchangeLineCode, fetchLineProfile } from '@/lib/line-login';
 import { fetchBotProfile } from '@/lib/line-messaging';
-import { requireLineFriend, SHOP_LINE_COOKIE, shopLinePkce, verifyShopLineState } from '@/lib/shop-line-login';
+import { LINE_FRIEND_ERROR, lineFriendFlag, SHOP_LINE_COOKIE, shopLinePkce, verifyShopLineState } from '@/lib/shop-line-login';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,11 +27,15 @@ export async function GET(request: NextRequest) {
     if (customerError || (customer?.line_bound_at && new Date(customer.line_bound_at).getTime() >= since)) throw new Error('會員授權已失效，請重新訂閱');
     const { verifier } = shopLinePkce(state, shop.id, cfg.loginChannelSecret);
     const token = await exchangeLineCode({ code, redirectUri: shopUrl(shop.slug, '/auth/line/shop/callback'), channelId: cfg.loginChannelId, channelSecret: cfg.loginChannelSecret, codeVerifier: verifier });
-    await requireLineFriend(token);
+    const friendFlag = await lineFriendFlag(token);
     const profile = await fetchLineProfile(token);
     // Messaging API must recognize this exact Login identity: providers/bots must match.
     const botProfile = await fetchBotProfile(profile.userId, cfg.accessToken).catch(() => null);
-    if (!botProfile || botProfile.userId !== profile.userId) throw new Error('無法確認官方帳號好友，請確認已加入此商店的 LINE，或聯絡商店檢查 LINE 設定');
+    if (!botProfile || botProfile.userId !== profile.userId) {
+      console.error('shop LINE bind not friend', { shop: shop.slug, friendFlag });
+      throw new Error(friendFlag ? '無法確認官方帳號好友，請確認已加入此商店的 LINE，或聯絡商店檢查 LINE 設定' : LINE_FRIEND_ERROR);
+    }
+    if (friendFlag !== true) console.warn('shop LINE friendFlag mismatch; check Linked LINE Official Account', { shop: shop.slug, friendFlag });
     await bindShopLine(shop, cfg, userId, member.user.email ?? '', profile.userId);
     target.searchParams.set('ok', '1');
   } catch (error) {
