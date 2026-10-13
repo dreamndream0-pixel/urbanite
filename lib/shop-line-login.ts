@@ -34,7 +34,7 @@ export async function lineFriendFlag(accessToken: string) {
     headers: { Authorization: `Bearer ${accessToken}` }, cache: 'no-store',
   }).catch(() => null);
   if (!response?.ok) {
-    console.error('shop LINE friendship status failed', response?.status ?? 'network');
+    console.error('shop LINE friendship status failed', response?.status ?? 'network', (await response?.text().catch(() => '') ?? '').slice(0, 200));
     return null;
   }
   return (await response.json().catch(() => ({}))).friendFlag === true;

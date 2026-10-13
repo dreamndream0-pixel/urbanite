@@ -32,7 +32,8 @@ export async function GET(request: NextRequest) {
     // Messaging API must recognize this exact Login identity: providers/bots must match.
     const botProfile = await fetchBotProfile(profile.userId, cfg.accessToken).catch(() => null);
     if (!botProfile || botProfile.userId !== profile.userId) {
-      console.error('shop LINE bind not friend', { shop: shop.slug, friendFlag });
+      const probe = await fetch(`https://api.line.me/v2/bot/profile/${encodeURIComponent(profile.userId)}`, { headers: { Authorization: `Bearer ${cfg.accessToken}` } }).catch(() => null);
+      console.error('shop LINE bind not friend', { shop: shop.slug, friendFlag, botProfileStatus: probe?.status ?? 'network', botProfileError: (await probe?.text().catch(() => '') ?? '').slice(0, 200) });
       throw new Error(friendFlag ? '無法確認官方帳號好友，請確認已加入此商店的 LINE，或聯絡商店檢查 LINE 設定' : LINE_FRIEND_ERROR);
     }
     if (friendFlag !== true) console.warn('shop LINE friendFlag mismatch; check Linked LINE Official Account', { shop: shop.slug, friendFlag });
