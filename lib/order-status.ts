@@ -56,6 +56,7 @@ export function buildProgress(order: {
   status: string;
   paid: boolean;
   fulfillment_status?: string;
+  order_status?: string;
   shipping_method?: string;
   payment_method?: string;
   created_at?: string;
@@ -67,28 +68,32 @@ export function buildProgress(order: {
   const cod = isCollectOnDelivery(sm, order.payment_method ?? '');
   const shipped = ['SHIPPED', 'IN_TRANSIT', 'AT_STORE', 'PICKED_UP', 'DELIVERED'].includes(f) || order.status === '已出貨' || order.status === '已完成';
   const inTransit = ['IN_TRANSIT', 'AT_STORE', 'PICKED_UP', 'DELIVERED'].includes(f) || order.status === '已完成';
-  const completed = order.status === '已完成' || f === 'DELIVERED' || f === 'PICKED_UP';
+  // 已到貨/已到店:賣家按「通知已到貨」或物流回報送達;訂單完成要買家確認收貨(或超商已取貨)
+  const arrived = ['AT_STORE', 'PICKED_UP', 'DELIVERED'].includes(f) || order.status === '已完成';
+  const completed = order.status === '已完成' || order.order_status === 'COMPLETED' || f === 'PICKED_UP';
 
   // 取貨付款/貨到付款:錢在取貨/到貨時才付,進度不放「付款完成」,
   // 訂單成立後直接「待出貨」;最後一節為「已取貨/送達(付款)」。
   const flags = cod
-    ? [true, true, shipped, inTransit, completed]
-    : [true, order.paid, order.paid || shipped, shipped, inTransit, completed];
+    ? [true, true, shipped, inTransit, arrived, completed]
+    : [true, order.paid, order.paid || shipped, shipped, inTransit, arrived, completed];
   const labels = cod
     ? [
         { key: 'created', label: '訂單成立' },
         { key: 'confirmed', label: '待出貨' },
         { key: 'shipped', label: '商品出貨' },
-        { key: 'transit', label: isPickup ? '待取貨' : '配送中' },
-        { key: 'done', label: isPickup ? '已取貨完成' : '已送達' },
+        { key: 'transit', label: '配送中' },
+        { key: 'arrived', label: isPickup ? '已到店' : '已到貨' },
+        { key: 'done', label: isPickup ? '已取貨' : '訂單完成' },
       ]
     : [
         { key: 'created', label: '訂單成立' },
         { key: 'paid', label: order.paid ? '已付款' : '尚未付款' },
         { key: 'confirmed', label: '待出貨' },
         { key: 'shipped', label: '商品出貨' },
-        { key: 'transit', label: isPickup ? '待取貨' : '配送中' },
-        { key: 'done', label: isPickup ? '已取貨完成' : '訂單完成' },
+        { key: 'transit', label: '配送中' },
+        { key: 'arrived', label: isPickup ? '已到店' : '已到貨' },
+        { key: 'done', label: isPickup ? '已取貨' : '訂單完成' },
       ];
   if (cancelled) {
     return [

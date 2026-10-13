@@ -4387,6 +4387,7 @@ function AdminOrderProgress({ order, createdAt, paidAt }: { order: Order; create
     if (key === 'created') return (<svg {...p}><path d="M7 3h7l4 4v14H7z" /><path d="M14 3v4h4M9 12h7M9 16h7" /></svg>);
     if (key === 'paid') return (<svg {...p}><rect x="3" y="6" width="18" height="12" rx="2" /><path d="M3 10h18" /></svg>);
     if (key === 'shipped' || key === 'transit') return (<svg {...p}><path d="M3 7h11v9H3zM14 10h4l3 3v3h-7z" /><circle cx="7" cy="18" r="1.5" /><circle cx="17.5" cy="18" r="1.5" /></svg>);
+    if (key === 'arrived') return (<svg {...p}><path d="M3 7l9-4 9 4v10l-9 4-9-4z" /><path d="M8.5 12.5l2.5 2.5 4.5-5" /></svg>);
     if (key === 'done') return (<svg {...p}><path d="M5 13l4 4L19 7" strokeWidth={2.2} /></svg>);
     return (<svg {...p}><path d="M3 7l9-4 9 4-9 4-9-4zM3 7v10l9 4 9-4V7" /></svg>);
   };
