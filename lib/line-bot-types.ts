@@ -74,7 +74,7 @@ export type BuiltinKey = 'orders' | 'coupons' | 'credit' | 'member' | 'bind';
 export type Builtin = { enabled: boolean; keywords: string[]; intro: string };
 
 export const BUILTIN_LABELS: Record<BuiltinKey, { label: string; hint: string }> = {
-  orders: { label: '訂單查詢', hint: '回覆最近 5 筆訂單與狀態' },
+  orders: { label: '訂單查詢', hint: '回覆處理中的訂單與出貨狀態(最多 5 筆)' },
   coupons: { label: '優惠券', hint: '回覆可使用的優惠券' },
   credit: { label: '購物金', hint: '回覆購物金餘額' },
   member: { label: '會員資料', hint: '回覆會員資料(手機、Email 遮蔽)' },

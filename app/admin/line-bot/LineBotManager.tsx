@@ -205,7 +205,7 @@ function SettingsPanel({ draft, setDraft, ready, platform, ...shared }: { draft:
                 {b.enabled && k === 'orders' ? (
                   <div className="flex flex-wrap items-start gap-3 rounded-lg bg-[#faf7f2] p-3">
                     <div className="rounded-xl bg-[#8fa6c3] p-1.5"><FlexView contents={orderBubble('detail', { ...SAMPLE_ORDER, title: '已出貨', ship: { step: 1, last: '已送達', rows: [['出貨狀態', '已出貨'], ['物流', '黑貓宅急便'], ['物流單號', '8123456789']] } })} scale={0.42} /></div>
-                    <p className="min-w-0 flex-1 text-[11px] leading-5 text-[#6b6156]">已綁定的會員傳出觸發關鍵字時,自動回覆最近 5 筆訂單,一筆一張「訂單明細卡」左右滑動:出貨進度(訂單處理→已出貨→配送中→送達/取貨)、物流、物流單號、出貨日期、商品與合計,以及「查看訂單」按鈕。卡片不需另外設定;「開頭文字」會先以一則文字送出。</p>
+                    <p className="min-w-0 flex-1 text-[11px] leading-5 text-[#6b6156]">已綁定的會員傳出觸發關鍵字時,自動回覆最近 5 筆處理中的訂單(已完成、已取消、已退貨不顯示),一筆一張「訂單明細卡」左右滑動:出貨進度(訂單處理→已出貨→配送中→送達/取貨)、物流、物流單號、出貨日期、商品與合計,以及「查看訂單」按鈕。卡片不需另外設定;「開頭文字」會先以一則文字送出。</p>
                   </div>
                 ) : null}
                 {b.enabled && k === 'member' ? (

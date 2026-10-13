@@ -64,16 +64,20 @@ export function orderFlexMessage({ shopName, title, subtitle, order, link, butto
   return { type: 'flex' as const, altText: `【${shopName}】${title} ${order.order_no}`.slice(0, 300), contents };
 }
 
-// 訂單查詢(LINE):最近 5 筆訂單的明細卡輪播,含出貨進度、物流與單號。db 需已限定店家(scopedClient)
+// 訂單查詢(LINE):最近 5 筆「處理中」的訂單明細卡輪播,含出貨進度、物流與單號。
+// 已完成、已取消、已退貨的不顯示;沒有處理中的訂單時回文字訊息。db 需已限定店家(scopedClient)
 export async function orderQueryMessage(db: SupabaseClient, userId: string, shopName: string, link: string): Promise<Record<string, unknown> | null> {
   const { data } = await db
     .from('orders')
     .select('id, order_no, status, fulfillment_status, total, created_at, items, payment_method, shipping_method, store_name')
     .eq('user_id', userId)
+    .or('order_status.is.null,order_status.not.in.(COMPLETED,CANCELLED,CLOSED)')
+    .or('fulfillment_status.is.null,fulfillment_status.not.in.(RETURNED)')
+    .not('status', 'in', '(取消,已取消,已完成,已退貨)')
     .order('created_at', { ascending: false })
     .limit(5);
   const orders = (data ?? []) as (Order & { fulfillment_status?: string })[];
-  if (!orders.length) return null;
+  if (!orders.length) return { type: 'text', text: `目前沒有處理中的訂單。\n\n查看全部訂單:${link}` };
   const { data: ships } = await db.from('shipments').select('order_id, provider, shipping_method, tracking_number, shipped_at, created_at').in('order_id', orders.map((o) => o.id)).order('created_at', { ascending: false });
   const latest = (id: string) => (ships ?? []).find((x) => x.order_id === id) ?? null;
   const bubbles = orders.map((o) => {
@@ -86,5 +90,5 @@ export async function orderQueryMessage(db: SupabaseClient, userId: string, shop
       buttonLabel: '查看訂單',
     }).contents;
   });
-  return { type: 'flex', altText: `最近 ${orders.length} 筆訂單與出貨狀態`, contents: { type: 'carousel', contents: bubbles } };
+  return { type: 'flex', altText: `處理中的訂單 ${orders.length} 筆`, contents: { type: 'carousel', contents: bubbles } };
 }
