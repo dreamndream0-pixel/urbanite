@@ -26,13 +26,18 @@ LINE requires the user's consent; adding a friend cannot be forced. Until Login
 credentials are configured, the subscription button is disabled. Saving the keys
 does not prove the external Login channel, callback, and Provider are configured.
 
-The callback requires the initiating browser's short-lived HttpOnly state cookie
-and the same signed-in member. Browser/session changes fail closed and ask the
-buyer to retry in the original browser. OAuth codes are single-use, state expires
-after ten minutes, and the cookie is cleared after the callback. Cross-shop and
-cross-member state is rejected. Redirects use the canonical shop URL.
+The authenticated start route issues signed, shop/member-bound state valid for ten
+minutes. PKCE S256 binds the code to that exact request; the verifier is derived
+server-side using a separate HMAC purpose and is never sent to the browser.
+The callback can finish without browser cookies when LINE opens a different
+webview. It verifies the signed initiating member against Auth, rejects a different
+active member or a newer binding, and never creates a login session. Older pre-PKCE
+state is rejected. OAuth codes are single-use. Cross-shop state is rejected.
+Redirects use the canonical shop URL and a public result page rather than the
+login-protected account page. Refresh the original account page to see the binding.
 
 Reference: https://developers.line.biz/en/docs/line-login/link-a-bot/
+PKCE: https://developers.line.biz/en/docs/line-login/integrate-pkce/
 
 Local checks:
 

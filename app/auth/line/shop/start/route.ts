@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { getSessionUser } from '@/lib/supabase/server';
 import { getCurrentShop, isPlatformShop, shopUrl } from '@/lib/shop';
 import { getShopLineConfig } from '@/lib/shop-line';
-import { createShopLineState, SHOP_LINE_COOKIE } from '@/lib/shop-line-login';
+import { createShopLineState, shopLinePkce } from '@/lib/shop-line-login';
 
 export const dynamic = 'force-dynamic';
 
@@ -18,11 +18,13 @@ export async function GET(request: Request) {
     return NextResponse.redirect(shopUrl(shop.slug, `/account?line_error=${encodeURIComponent('商店尚未設定 LINE 自動綁定')}`));
   }
   const state = createShopLineState(shop.id, user.id, cfg.loginChannelSecret);
+  const { challenge } = shopLinePkce(state, shop.id, cfg.loginChannelSecret);
   const url = new URL('https://access.line.me/oauth2/v2.1/authorize');
   url.search = new URLSearchParams({ response_type: 'code', client_id: cfg.loginChannelId,
-    redirect_uri: shopUrl(shop.slug, '/auth/line/shop/callback'), state, scope: 'profile', bot_prompt: 'aggressive' }).toString();
+    redirect_uri: shopUrl(shop.slug, '/auth/line/shop/callback'), state, scope: 'profile', bot_prompt: 'aggressive',
+    code_challenge: challenge, code_challenge_method: 'S256' }).toString();
   const response = NextResponse.redirect(url);
   response.headers.set('Cache-Control', 'private, no-store');
-  response.cookies.set(SHOP_LINE_COOKIE, state, { httpOnly: true, secure: true, sameSite: 'lax', path: '/auth/line/shop', maxAge: 600 });
+  response.headers.set('Referrer-Policy', 'no-referrer');
   return response;
 }

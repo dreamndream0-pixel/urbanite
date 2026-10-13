@@ -109,11 +109,13 @@ export async function exchangeLineCode({
   redirectUri,
   channelId,
   channelSecret,
+  codeVerifier,
 }: {
   code: string;
   redirectUri: string;
   channelId: string;
   channelSecret: string;
+  codeVerifier?: string;
 }) {
   const response = await fetch('https://api.line.me/oauth2/v2.1/token', {
     method: 'POST',
@@ -124,6 +126,7 @@ export async function exchangeLineCode({
       redirect_uri: redirectUri,
       client_id: channelId,
       client_secret: channelSecret,
+      ...(codeVerifier ? { code_verifier: codeVerifier } : {}),
     }),
   });
   const data = await response.json().catch(() => ({}));
