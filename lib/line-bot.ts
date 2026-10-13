@@ -1,13 +1,14 @@
 import crypto from 'crypto';
 import { getOrderNotificationConfig } from '@/lib/order-notification-config';
-import { getConfiguredSiteUrl } from '@/lib/site-url';
-import { bindUrl, createBindToken, getMessagingConfig, type LineMessage } from '@/lib/line-messaging';
+import { bindUrl, createBindToken, type LineMessage } from '@/lib/line-messaging';
+import { botChannel, botIsPlatform, botShop, botShopId, botSiteUrl, lineBotDb } from '@/lib/line-channel';
 import {
   MENU_LAYOUTS,
   MENU_SIZE,
   NOTIFY_LABELS,
   PAGE_OPTIONS,
   resolveBotConfig,
+  SHOP_DEFAULT_BOT_CONFIG,
   type BotAction,
   type BotCard,
   type BotConfig,
@@ -27,22 +28,26 @@ const formatter = new Intl.NumberFormat('zh-TW', { style: 'currency', currency: 
 
 // ---------- 設定 ----------
 export async function loadBotConfig(): Promise<{ config: BotConfig; raw: Record<string, unknown> }> {
-  const { data } = await scopedClient(URBANITE_SHOP_ID).from('line_bot_config').select('data').eq('id', 1).maybeSingle();
+  const db = await lineBotDb();
+  const { data } = await db.from('line_bot_config').select('data').order('id').limit(1).maybeSingle();
   const raw = (data?.data ?? {}) as Record<string, unknown>;
-  return { config: resolveBotConfig(raw), raw };
+  return { config: resolveBotConfig(raw, botIsPlatform() ? undefined : SHOP_DEFAULT_BOT_CONFIG), raw };
 }
 
 export async function saveBotConfig(patch: Record<string, unknown>) {
-  const supabase = scopedClient(URBANITE_SHOP_ID);
+  const db = await lineBotDb();
   const { raw } = await loadBotConfig();
   const next = { ...raw, ...patch };
-  const { error } = await supabase.from('line_bot_config').upsert({ id: 1, data: next, updated_at: new Date().toISOString() });
+  const row = { data: next, updated_at: new Date().toISOString() };
+  // 已有設定列就更新;沒有就新增(主站的舊資料列 id=1)
+  const { data: existing } = await db.from('line_bot_config').select('id').order('id').limit(1).maybeSingle();
+  const { error } = existing ? await db.from('line_bot_config').update(row).eq('id', existing.id) : await db.from('line_bot_config').insert(row);
   if (error) throw new Error(error.message);
   return next;
 }
 
 export async function loadRules(onlyEnabled = false): Promise<BotRule[]> {
-  let q = scopedClient(URBANITE_SHOP_ID).from('line_bot_rules').select('*').order('sort_order').order('created_at');
+  let q = (await lineBotDb()).from('line_bot_rules').select('*').order('sort_order').order('created_at');
   if (onlyEnabled) q = q.eq('enabled', true);
   const { data } = await q;
   return (data ?? []) as BotRule[];
@@ -51,7 +56,7 @@ export async function loadRules(onlyEnabled = false): Promise<BotRule[]> {
 // ---------- 事件紀錄 ----------
 export async function logEvent(type: string, lineUserId: string | null, key = '') {
   try {
-    await scopedClient(URBANITE_SHOP_ID).from('line_events').insert({ type, line_user_id: lineUserId, key: key.slice(0, 200) });
+    await (await lineBotDb()).from('line_events').insert({ type, line_user_id: lineUserId, key: key.slice(0, 200) });
   } catch {
     /* 紀錄失敗不影響回覆 */
   }
@@ -63,11 +68,11 @@ function sign(value: string, secret: string) {
 }
 
 export function trackedUrl(url: string, key: string, secret: string) {
-  const target = url.startsWith('/') ? `${getConfiguredSiteUrl()}${url}` : url;
+  const target = url.startsWith('/') ? `${botSiteUrl()}${url}` : url;
   if (!secret) return target;
   const params = new URLSearchParams({ u: target, k: key.slice(0, 60) });
   params.set('s', sign(`${target}|${params.get('k')}`, secret));
-  return `${getConfiguredSiteUrl()}/api/line/r?${params.toString()}`;
+  return `${botSiteUrl()}/api/line/r?${params.toString()}`;
 }
 
 export function verifyTracked(u: string, k: string, s: string, secret: string) {
@@ -106,7 +111,7 @@ export function fillVars(text: string, vars: Record<string, string>) {
   return text.replace(/\{([^{}]+)\}/g, (m, name) => (name in vars ? vars[name] : m));
 }
 
-const abs = (url: string) => (url.startsWith('/') ? `${getConfiguredSiteUrl()}${url}` : url);
+const abs = (url: string) => (url.startsWith('/') ? `${botSiteUrl()}${url}` : url);
 const label = (t: string) => (t.trim() || '查看').slice(0, 20);
 
 function lineAction(action: BotAction, text: string, ctx: SendContext, secret: string, index: number) {
@@ -189,8 +194,8 @@ function quickReply(items: string[]) {
 }
 
 export async function toLineMessages(set: MessageSet, ctx: SendContext, brand: string): Promise<LineMessage[]> {
-  const { channelSecret } = await getMessagingConfig();
-  const supabase = scopedClient(URBANITE_SHOP_ID);
+  const { channelSecret } = await botChannel();
+  const supabase = scopedClient(botShopId());
   const out: LineMessage[] = [];
   for (const m of set.messages.slice(0, 5)) {
     if (m.type === 'text') {
@@ -241,7 +246,10 @@ export async function toLineMessages(set: MessageSet, ctx: SendContext, brand: s
       const { data: c } = await supabase.from('discounts').select('*').eq('id', m.couponId).maybeSingle();
       if (c) out.push({ type: 'flex', altText: `優惠券:${c.name || c.code}`.slice(0, 300), contents: couponBubble(c as Discount, brand, ctx, channelSecret) });
     } else if (m.type === 'bind') {
-      const bindLink = ctx.lineUserId ? bindUrl(createBindToken(ctx.lineUserId, channelSecret)) : `${getConfiguredSiteUrl()}/account`;
+      const site = botSiteUrl();
+      const bindLink = ctx.lineUserId ? bindUrl(createBindToken(ctx.lineUserId, channelSecret), site) : `${site}/account`;
+      // 主站:新會員可用 LINE 一鍵加入;店家:登入(或註冊)店家官網後綁定
+      const platform = botIsPlatform();
       out.push({
         type: 'flex',
         altText: '加入會員 / 綁定帳號',
@@ -254,7 +262,7 @@ export async function toLineMessages(set: MessageSet, ctx: SendContext, brand: s
             paddingAll: '18px',
             contents: [
               { type: 'text', text: '綁定官網會員', weight: 'bold', size: 'md', color: '#1f1b19' },
-              { type: 'text', text: '第一次來選「新會員」。已經用 Google 或 Email 註冊過的,選「已有官網帳號」。', size: 'sm', wrap: true, color: '#6b6156' },
+              { type: 'text', text: platform ? '第一次來選「新會員」。已經用 Google 或 Email 註冊過的,選「已有官網帳號」。' : `登入 ${botShop().name} 官網會員,就會完成 LINE 綁定,之後訂單通知都會傳到這裡。`, size: 'sm', wrap: true, color: '#6b6156' },
             ],
           },
           footer: {
@@ -262,10 +270,12 @@ export async function toLineMessages(set: MessageSet, ctx: SendContext, brand: s
             layout: 'vertical',
             spacing: 'xs',
             paddingAll: '12px',
-            contents: [
-              { type: 'button', style: 'primary', height: 'sm', color: '#06C755', action: { type: 'uri', label: '新會員 LINE 一鍵加入', uri: `${getConfiguredSiteUrl()}/auth/line/start?next=/account` } },
-              { type: 'button', style: 'link', height: 'sm', color: '#6b6156', action: { type: 'uri', label: '已有官網帳號,綁定', uri: bindLink } },
-            ],
+            contents: platform
+              ? [
+                  { type: 'button', style: 'primary', height: 'sm', color: '#06C755', action: { type: 'uri', label: '新會員 LINE 一鍵加入', uri: `${site}/auth/line/start?next=/account` } },
+                  { type: 'button', style: 'link', height: 'sm', color: '#6b6156', action: { type: 'uri', label: '已有官網帳號,綁定', uri: bindLink } },
+                ]
+              : [{ type: 'button', style: 'primary', height: 'sm', color: '#06C755', action: { type: 'uri', label: '登入官網完成綁定', uri: bindLink } }],
           },
         },
       });
@@ -278,8 +288,8 @@ export async function toLineMessages(set: MessageSet, ctx: SendContext, brand: s
 
 // ---------- LINE API ----------
 async function lineFetch(path: string, init: RequestInit & { data?: boolean } = {}) {
-  const { accessToken } = await getMessagingConfig();
-  if (!accessToken) throw new Error('LINE 官方帳號尚未設定(串接設定)');
+  const { accessToken } = await botChannel();
+  if (!accessToken) throw new Error(botIsPlatform() ? 'LINE 官方帳號尚未設定(串接設定)' : 'LINE 官方帳號尚未設定(LINE 機器人 → 連線設定)');
   const res = await fetch(`${init.data ? DATA_API : API}${path}`, {
     ...init,
     headers: { Authorization: `Bearer ${accessToken}`, ...(init.body && typeof init.body === 'string' ? { 'Content-Type': 'application/json' } : {}), ...(init.headers ?? {}) },
@@ -316,7 +326,7 @@ export async function getFollowerCount() {
 
 // ---------- 推播對象 ----------
 export async function audienceUserIds(audience: BroadcastAudience): Promise<string[]> {
-  const supabase = scopedClient(URBANITE_SHOP_ID);
+  const supabase = scopedClient(botShopId());
   const { data: members } = await supabase.from('customers').select('user_id, line_user_id, birthday').not('line_user_id', 'is', null);
   const list = (members ?? []) as { user_id: string; line_user_id: string; birthday: string | null }[];
   if (audience === 'members' || audience === 'all') return list.map((m) => m.line_user_id);
@@ -351,7 +361,7 @@ export async function audienceUserIds(audience: BroadcastAudience): Promise<stri
 const BROADCAST_VARS = { LINE名稱: '你', 會員姓名: '你' };
 
 export async function sendBroadcast(id: string) {
-  const supabase = scopedClient(URBANITE_SHOP_ID);
+  const supabase = await lineBotDb();
   const { data: b } = await supabase.from('line_broadcasts').select('*').eq('id', id).maybeSingle();
   if (!b) throw new Error('找不到推播');
   if (b.status === 'sent' || b.status === 'sending') throw new Error('這則推播已經送出');
@@ -432,7 +442,7 @@ export async function processOrderNotifications() {
       退款金額: formatter.format(order.refund_amount ?? order.total ?? 0),
     };
     const body = fillVars(rule.text, vars);
-    const { channelSecret } = await getMessagingConfig();
+    const { channelSecret } = await botChannel();
     // 與店家相同的訂單卡片;後台設定的通知文字放在標題下方
     const { data: full } = await supabase.from('orders').select('order_no, total, items, payment_method, shipping_method, store_name').eq('id', order.id).maybeSingle();
     const message = orderFlexMessage({
@@ -464,8 +474,8 @@ function menuAction(action: BotAction, labelText: string, secret: string, key: s
 }
 
 export async function publishRichMenu(menu: RichMenu) {
-  const supabase = scopedClient(URBANITE_SHOP_ID);
-  const { channelSecret } = await getMessagingConfig();
+  const supabase = await lineBotDb();
+  const { channelSecret } = await botChannel();
   const layout = MENU_LAYOUTS.find((l) => l.key === menu.layout);
   if (!layout) throw new Error('格局設定錯誤');
   if (!menu.image_url) throw new Error('請先產生或上傳選單圖片');
@@ -512,7 +522,7 @@ export async function publishRichMenu(menu: RichMenu) {
 }
 
 export async function unpublishRichMenu(menu: RichMenu) {
-  const supabase = scopedClient(URBANITE_SHOP_ID);
+  const supabase = await lineBotDb();
   if (menu.line_rich_menu_id) {
     if (menu.audience === 'guest') await lineFetch('/user/all/richmenu', { method: 'DELETE' }).catch(() => {});
     else {
@@ -527,7 +537,7 @@ export async function unpublishRichMenu(menu: RichMenu) {
 // 綁定 / 解除綁定時切換會員選單
 export async function syncMemberMenu(lineUserId: string, bound: boolean) {
   try {
-    const { data } = await scopedClient(URBANITE_SHOP_ID).from('line_rich_menus').select('line_rich_menu_id').eq('audience', 'member').not('line_rich_menu_id', 'is', null).maybeSingle();
+    const { data } = await (await lineBotDb()).from('line_rich_menus').select('line_rich_menu_id').eq('audience', 'member').not('line_rich_menu_id', 'is', null).maybeSingle();
     if (bound && data?.line_rich_menu_id) await lineFetch(`/user/${lineUserId}/richmenu/${data.line_rich_menu_id}`, { method: 'POST' });
     if (!bound) await lineFetch(`/user/${lineUserId}/richmenu`, { method: 'DELETE' });
   } catch {

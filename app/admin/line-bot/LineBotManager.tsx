@@ -3,19 +3,17 @@
 import { useEffect, useState } from 'react';
 import {
   BUILTIN_LABELS,
-  NOTIFY_LABELS,
-  ORDER_VARIABLES,
   VARIABLES,
   type BotConfig,
   type BotRule,
   type Broadcast,
   type BuiltinKey,
-  type NotifyKey,
   type RichMenu,
 } from '@/lib/line-bot-types';
 import type { Discount, Product } from '@/lib/types';
 import { uiAlert } from '@/lib/ui-dialog';
-import LinePreview, { fill } from './LinePreview';
+import LinePreview from './LinePreview';
+import ShopLineSettings from '../ShopLineSettings';
 import MessageSetEditor from './MessageSetEditor';
 import RulesPanel from './RulesPanel';
 import MenuPanel from './MenuPanel';
@@ -34,22 +32,24 @@ export type BotData = {
   notifyStarted: boolean;
 };
 
-type Tab = 'welcome' | 'rules' | 'menu' | 'broadcast' | 'notify' | 'stats' | 'settings';
+type Tab = 'connect' | 'welcome' | 'rules' | 'menu' | 'broadcast' | 'stats' | 'settings';
 const TABS: { key: Tab; label: string }[] = [
+  { key: 'connect', label: '連線設定' },
   { key: 'welcome', label: '歡迎訊息' },
   { key: 'rules', label: '自動回覆' },
   { key: 'menu', label: '圖文選單' },
   { key: 'broadcast', label: '推播' },
-  { key: 'notify', label: '訂單通知' },
   { key: 'stats', label: '數據' },
-  { key: 'settings', label: '設定' },
+  { key: 'settings', label: '內建查詢與設定' },
 ];
 
-// 後台「LINE 機器人」
-export default function LineBotManager({ products, coupons, logoUrl }: { products: Product[]; coupons: Discount[]; logoUrl: string }) {
+// 後台「LINE 機器人」:主站與店家共用(資料依網域分店家)。店家多一個「連線設定」分頁(自己的 LINE 金鑰)
+// 訂單通知統一在「系統設定 → 通知」設定
+export default function LineBotManager({ products, coupons, logoUrl, platform = true }: { products: Product[]; coupons: Discount[]; logoUrl: string; platform?: boolean }) {
   const [data, setData] = useState<BotData | null>(null);
   const [draft, setDraft] = useState<BotConfig | null>(null);
-  const [tab, setTab] = useState<Tab>('welcome');
+  const [tab, setTab] = useState<Tab>(platform ? 'welcome' : 'connect');
+  const tabs = TABS.filter((t) => platform ? t.key !== 'connect' : true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
@@ -64,11 +64,13 @@ export default function LineBotManager({ products, coupons, logoUrl }: { product
       .catch((e) => setError(e instanceof Error ? e.message : '讀取失敗'));
   }, []);
 
+  // 店家:讀不到機器人資料時(例如資料庫尚未更新)仍可以先做連線設定
+  if (error && !platform) return <div className="space-y-4"><p className="rounded-xl border border-[#f0d9b5] bg-[#fff8ec] px-4 py-3 text-sm text-[#8a5a1c]">{error}</p><ShopLineSettings /></div>;
   if (error) return <p className="rounded-xl border border-[#e5ded4] bg-white p-6 text-sm text-[#c0392b]">{error}</p>;
   if (!data || !draft) return <p className="rounded-xl border border-[#e5ded4] bg-white p-6 text-sm text-[#8a7f72]">讀取中…</p>;
 
   const dirty = JSON.stringify(draft) !== JSON.stringify(data.config);
-  const configTab = tab === 'welcome' || tab === 'notify' || tab === 'settings';
+  const configTab = tab === 'welcome' || tab === 'settings';
 
   async function saveConfig() {
     setSaving(true);
@@ -76,7 +78,7 @@ export default function LineBotManager({ products, coupons, logoUrl }: { product
       const res = await fetch('/api/admin/line-bot', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ config: draft }) });
       const d = await res.json();
       if (!res.ok) throw new Error(d.error ?? '儲存失敗');
-      setData((x) => (x ? { ...x, config: d.config, notifyStarted: x.notifyStarted || Object.values((d.config as BotConfig).notify).some((n) => n.enabled) } : x));
+      setData((x) => (x ? { ...x, config: d.config } : x));
       setDraft(d.config);
     } catch (e) {
       void uiAlert(e instanceof Error ? e.message : '儲存失敗');
@@ -89,14 +91,14 @@ export default function LineBotManager({ products, coupons, logoUrl }: { product
 
   return (
     <div className="space-y-4 pb-20">
-      {!data.ready ? (
+      {!data.ready && tab !== 'connect' ? (
         <p className="rounded-xl border border-[#f0d9b5] bg-[#fff8ec] px-4 py-3 text-sm text-[#8a5a1c]">
-          LINE 官方帳號還沒串接。請到「系統設定 → 串接設定」填入 Messaging API 的 Channel secret 與 Channel access token。
+          {platform ? 'LINE 官方帳號還沒串接。請到「系統設定 → 串接設定」填入 Messaging API 的 Channel secret 與 Channel access token。' : 'LINE 官方帳號還沒串接。請先到「連線設定」填入你的官方帳號金鑰。'}
         </p>
       ) : null}
 
       <div className="flex gap-1 overflow-x-auto overflow-y-hidden rounded-xl border border-[#e5ded4] bg-white p-1 [scrollbar-width:none]">
-        {TABS.map((t) => (
+        {tabs.map((t) => (
           <button
             key={t.key}
             type="button"
@@ -108,15 +110,15 @@ export default function LineBotManager({ products, coupons, logoUrl }: { product
         ))}
       </div>
 
+      {tab === 'connect' ? <ShopLineSettings /> : null}
       {tab === 'welcome' ? <WelcomePanel draft={draft} setDraft={setDraft} {...shared} /> : null}
       {tab === 'rules' ? <RulesPanel rules={data.rules} onChange={(rules) => setData({ ...data, rules })} {...shared} /> : null}
       {tab === 'menu' ? <MenuPanel menus={data.menus} onChange={(menus) => setData({ ...data, menus })} /> : null}
       {tab === 'broadcast' ? (
         <BroadcastPanel broadcasts={data.broadcasts} quota={data.quota} followers={data.followers} onChange={(broadcasts) => setData({ ...data, broadcasts })} {...shared} />
       ) : null}
-      {tab === 'notify' ? <NotifyPanel draft={draft} setDraft={setDraft} started={data.notifyStarted} quota={data.quota} /> : null}
       {tab === 'stats' ? <StatsPanel /> : null}
-      {tab === 'settings' ? <SettingsPanel draft={draft} setDraft={setDraft} ready={data.ready} {...shared} /> : null}
+      {tab === 'settings' ? <SettingsPanel draft={draft} setDraft={setDraft} ready={data.ready} platform={platform} {...shared} /> : null}
 
       {configTab ? (
         <div className="sticky bottom-3 z-10 flex justify-center pt-2">
@@ -152,65 +154,16 @@ function WelcomePanel({ draft, setDraft, ...shared }: { draft: BotConfig; setDra
   );
 }
 
-function NotifyPanel({ draft, setDraft, started, quota }: { draft: BotConfig; setDraft: (c: BotConfig) => void; started: boolean; quota: BotData['quota'] }) {
-  const keys = Object.keys(NOTIFY_LABELS) as NotifyKey[];
-  const setRule = (k: NotifyKey, patch: Partial<BotConfig['notify'][NotifyKey]>) => setDraft({ ...draft, notify: { ...draft.notify, [k]: { ...draft.notify[k], ...patch } } });
-  return (
-    <div className="space-y-4">
-      <Card title="訂單通知" desc="訂單狀態改變時,自動傳 LINE 給已綁定的會員(每 5 分鐘檢查一次)。主動傳送的訊息會用到 LINE 方案的訊息額度。">
-        <div className="flex flex-wrap items-center gap-x-6 gap-y-1 rounded-lg bg-[#faf7f2] px-3.5 py-2.5 text-xs text-[#6b6156]">
-          <span>本月已用 {quota.used} 則{quota.limit !== null ? ` / ${quota.limit} 則` : ''}</span>
-          <span>{started ? '通知已啟動,只會通知開啟之後的狀態變更' : '開啟任一通知並儲存後開始運作'}</span>
-        </div>
-      </Card>
-      {keys.map((k) => {
-        const rule = draft.notify[k];
-        return (
-          <section key={k} className="rounded-xl border border-[#e5ded4] bg-white p-5">
-            <div className="flex items-center gap-3">
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold text-[#1f1b19]">{NOTIFY_LABELS[k].label}</p>
-                <p className="text-[11px] text-[#a99e8f]">{NOTIFY_LABELS[k].hint}</p>
-              </div>
-              <Toggle on={rule.enabled} onChange={(v) => setRule(k, { enabled: v })} label={NOTIFY_LABELS[k].label} />
-            </div>
-            {rule.enabled ? (
-              <div className="mt-4 grid gap-4 sm:grid-cols-[minmax(0,1fr)_240px]">
-                <div className="space-y-2">
-                  <textarea value={rule.text} rows={3} maxLength={1000} onChange={(e) => setRule(k, { text: e.target.value })} className={`${inputClass} resize-y leading-6`} />
-                  <div className="flex flex-wrap gap-1.5">
-                    {ORDER_VARIABLES.map((v) => (
-                      <button key={v} type="button" onClick={() => setRule(k, { text: rule.text + v })} className="rounded-md bg-[#f3eee7] px-2 py-0.5 text-[11px] text-[#6b6156] hover:bg-[#ebe3d7]">{v}</button>
-                    ))}
-                  </div>
-                  <label className="flex items-center gap-2 pt-1 text-xs text-[#6b6156]">
-                    <Toggle on={rule.button} onChange={(v) => setRule(k, { button: v })} label="附查看訂單按鈕" />
-                    附「查看訂單」按鈕
-                  </label>
-                </div>
-                <div className="rounded-2xl bg-[#8fa6c3] p-2.5">
-                  <div className="overflow-hidden rounded-xl bg-white">
-                    <p className="whitespace-pre-line px-3 py-2.5 text-[12px] leading-5 text-[#1f1b19]">{fill(rule.text)}</p>
-                    {rule.button ? (
-                      <div className="px-2.5 pb-2.5"><span className="block rounded-md py-1.5 text-center text-[12px] font-semibold text-white" style={{ background: draft.brandColor }}>查看訂單</span></div>
-                    ) : null}
-                  </div>
-                </div>
-              </div>
-            ) : null}
-          </section>
-        );
-      })}
-    </div>
-  );
-}
-
-function SettingsPanel({ draft, setDraft, ready, ...shared }: { draft: BotConfig; setDraft: (c: BotConfig) => void; ready: boolean } & Shared) {
+function SettingsPanel({ draft, setDraft, ready, platform, ...shared }: { draft: BotConfig; setDraft: (c: BotConfig) => void; ready: boolean; platform: boolean } & Shared) {
   const setBuiltin = (k: BuiltinKey, patch: Partial<BotConfig['builtins'][BuiltinKey]>) => setDraft({ ...draft, builtins: { ...draft.builtins, [k]: { ...draft.builtins[k], ...patch } } });
   const webhook = 'https://www.urbanite.com.tw/api/line/webhook';
   return (
     <div className="space-y-4">
-      <Card title="串接狀態">
+      <Card title="訂單通知" desc="訂單成立、出貨、到貨等 LINE 與 Email 通知,統一在「系統設定 → 通知」設定,通知會以訂單卡片傳送。">
+        <p className="text-xs text-[#a99e8f]">下方「按鈕顏色」也會套用到訂單查詢的卡片。</p>
+      </Card>
+
+      {platform ? <Card title="串接狀態">
         <div className="space-y-2 text-sm">
           <p className="flex items-center gap-2">
             <span className={`h-2 w-2 rounded-full ${ready ? 'bg-[#2fb36b]' : 'bg-[#d9a04a]'}`} />
@@ -223,7 +176,7 @@ function SettingsPanel({ draft, setDraft, ready, ...shared }: { draft: BotConfig
           </div>
           <p className="text-[11px] leading-5 text-[#a99e8f]">貼到 LINE Developers → Messaging API → Webhook URL,並開啟 Use webhook;LINE Official Account Manager 的「自動回應訊息」請關閉,避免重複回覆。</p>
         </div>
-      </Card>
+      </Card> : null}
 
       <Card title="內建查詢" desc="會員綁定後可直接在 LINE 查詢自己的資料。關鍵字只要「包含」就會觸發(會員綁定需完全符合)。">
         <div className="divide-y divide-[#f3eee7]">

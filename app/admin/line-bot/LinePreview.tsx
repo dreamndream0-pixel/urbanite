@@ -5,7 +5,7 @@ import type { Discount, Product } from '@/lib/types';
 
 const formatter = new Intl.NumberFormat('zh-TW', { style: 'currency', currency: 'TWD', maximumFractionDigits: 0 });
 
-const SAMPLE_VARS: Record<string, string> = { LINE名稱: '小宇', 會員姓名: '黃小宇', 訂單編號: 'UB20261005001', 訂單金額: 'NT$1,280', 取貨門市: '全家 信義店', 物流單號: '8123456789', 退款金額: 'NT$1,280' };
+const SAMPLE_VARS: Record<string, string> = { 商店名稱: '你的商店', LINE名稱: '小宇', 會員姓名: '黃小宇', 訂單編號: 'UB20261005001', 訂單金額: 'NT$1,280', 取貨門市: '全家 信義店', 物流單號: '8123456789', 退款金額: 'NT$1,280' };
 export const fill = (t: string, vars = SAMPLE_VARS) => t.replace(/\{([^{}]+)\}/g, (m, k) => vars[k] ?? m);
 
 // 手機 LINE 聊天畫面預覽(後台編輯時即時顯示)

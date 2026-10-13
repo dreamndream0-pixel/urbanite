@@ -6,6 +6,7 @@ import { createBindToken, fetchBotProfile, replyMessage, verifyLineSignature, ty
 import type { Order } from '@/lib/types';
 import { getOrderNotificationConfig } from '@/lib/order-notification-config';
 import { orderFlexMessage } from '@/lib/order-flex';
+import { runAsShop } from '@/lib/line-channel';
 
 export type ShopLineConfig = { channelSecret: string; accessToken: string; loginChannelId?: string; loginChannelSecret?: string };
 const KIND = 'LINE';
@@ -111,6 +112,8 @@ export async function bindShopLine(shop: Shop, cfg: ShopLineConfig, userId: stri
   }).eq('user_id', userId).select('user_id').single();
   if (error) throw new Error(error.message);
   if (!updated) throw new Error('會員綁定未完成，請重新訂閱');
+  // 有上線中的會員圖文選單時,換成會員選單(失敗不影響綁定)
+  await runAsShop(shop, async () => (await import('@/lib/line-bot')).syncMemberMenu(lineUserId, true)).catch(() => {});
   await push(cfg, lineUserId, [text(`綁定完成!之後在 ${shop.name} 的訂單成立、出貨都會在這裡通知你。`)]).catch(() => console.error('shop LINE binding confirmation unavailable'));
   return profile;
 }

@@ -2,7 +2,8 @@ import crypto from 'crypto';
 import { getIntegrations } from '@/lib/integrations';
 import { getConfiguredSiteUrl } from '@/lib/site-url';
 import type { Discount, Order } from '@/lib/types';
-import { scopedClient, URBANITE_SHOP_ID } from '@/lib/shop';
+import { scopedClient } from '@/lib/shop';
+import { botShop, botShopId, botSiteUrl } from '@/lib/line-channel';
 
 // LINE 官方帳號(Messaging API):會員綁定 LINE userId,綁定後可在 LINE 查詢自己的資料
 
@@ -42,9 +43,9 @@ export function verifyBindToken(token: string, channelSecret: string): { lineUse
   return { lineUserId: data.u };
 }
 
-export function bindUrl(token: string) {
+export function bindUrl(token: string, base = getConfiguredSiteUrl()) {
   // openExternalBrowser:在手機預設瀏覽器開啟(通常已登入官網),避免 LINE 內建瀏覽器沒有登入狀態
-  return `${getConfiguredSiteUrl()}/line/bind?t=${encodeURIComponent(token)}&openExternalBrowser=1`;
+  return `${base}/line/bind?t=${encodeURIComponent(token)}&openExternalBrowser=1`;
 }
 
 // ---------- LINE API ----------
@@ -81,7 +82,7 @@ type BoundCustomer = { user_id: string; email: string | null; name: string | nul
 
 // 找出綁定這個 LINE 的會員(只看已綁定的;LINE 登入時會自動綁定)
 export async function findCustomerByLine(lineUserId: string): Promise<BoundCustomer | null> {
-  const supabase = scopedClient(URBANITE_SHOP_ID);
+  const supabase = scopedClient(botShopId());
   const { data } = await supabase.from('customers').select('user_id, email, name, phone, line_display_name').eq('line_user_id', lineUserId).maybeSingle();
   return data?.user_id ? (data as BoundCustomer) : null;
 }
@@ -94,7 +95,7 @@ export async function bindLineToUser(
   profile: { displayName?: string; pictureUrl?: string } | null,
   { transfer = false }: { transfer?: boolean } = {},
 ) {
-  const supabase = scopedClient(URBANITE_SHOP_ID);
+  const supabase = scopedClient(botShopId());
   // 舊帳號可能還沒有會員資料列,先補建
   const { data: mine } = await supabase.from('customers').select('user_id').eq('user_id', userId).maybeSingle();
   if (!mine) await supabase.from('customers').insert({ user_id: userId, email, name: '', phone: '' });
@@ -125,7 +126,7 @@ const dateText = (iso?: string | null) => (iso ? new Date(iso).toLocaleDateStrin
 
 // intro:後台「內建查詢」設定的開頭文字(空白時用預設)
 export async function ordersText(userId: string, intro = '') {
-  const supabase = scopedClient(URBANITE_SHOP_ID);
+  const supabase = scopedClient(botShopId());
   const { data } = await supabase
     .from('orders')
     .select('order_no, status, total, created_at, items')
@@ -138,12 +139,12 @@ export async function ordersText(userId: string, intro = '') {
     const count = Array.isArray(o.items) ? o.items.reduce((n, i) => n + (Number(i.quantity) || 0), 0) : 0;
     return `${o.order_no}\n${dateText(o.created_at)}・${count} 件・${formatter.format(o.total)}\n狀態:${o.status}`;
   });
-  return `${intro || `最近 ${orders.length} 筆訂單`}\n\n${lines.join('\n\n')}\n\n完整明細:${getConfiguredSiteUrl()}/account?tab=orders`;
+  return `${intro || `最近 ${orders.length} 筆訂單`}\n\n${lines.join('\n\n')}\n\n完整明細:${botSiteUrl()}/account?tab=orders`;
 }
 
 // 訂單查詢(卡片版):最近 5 筆訂單的 Flex 輪播,沒有訂單時回 null(由呼叫端回文字)
 export async function ordersFlex(userId: string, quickReply?: unknown): Promise<LineMessage | null> {
-  const { data } = await scopedClient(URBANITE_SHOP_ID)
+  const { data } = await scopedClient(botShopId())
     .from('orders')
     .select('order_no, status, total, created_at, items, payment_method, shipping_method, store_name')
     .eq('user_id', userId)
@@ -152,8 +153,8 @@ export async function ordersFlex(userId: string, quickReply?: unknown): Promise<
   const orders = (data ?? []) as Order[];
   if (!orders.length) return null;
   const { orderFlexMessage } = await import('@/lib/order-flex');
-  const link = `${getConfiguredSiteUrl()}/account?tab=orders`;
-  const bubbles = orders.map((o) => orderFlexMessage({ shopName: 'URBANITE', order: o, link, title: o.status || '訂單', subtitle: `下單日期 ${dateText(o.created_at)}` }).contents);
+  const link = `${botSiteUrl()}/account?tab=orders`;
+  const bubbles = orders.map((o) => orderFlexMessage({ shopName: botShop().name, order: o, link, title: o.status || '訂單', subtitle: `下單日期 ${dateText(o.created_at)}` }).contents);
   return { type: 'flex', altText: `最近 ${orders.length} 筆訂單`, contents: { type: 'carousel', contents: bubbles }, ...(quickReply ? { quickReply } : {}) };
 }
 
@@ -164,7 +165,7 @@ function couponValue(c: Discount) {
 }
 
 export async function couponsText(userId: string, intro = '') {
-  const supabase = scopedClient(URBANITE_SHOP_ID);
+  const supabase = scopedClient(botShopId());
   const { data } = await supabase
     .from('user_coupons')
     .select('status, expired_at, coupon:discounts(name, code, type, value, min_spend, end_at)')
@@ -176,7 +177,7 @@ export async function couponsText(userId: string, intro = '') {
     const end = r.coupon?.end_at ?? r.expired_at;
     return r.coupon && (!end || new Date(end).getTime() > now);
   });
-  if (!rows.length) return `目前沒有可使用的優惠券。\n\n領取優惠券:${getConfiguredSiteUrl()}/account?tab=coupons`;
+  if (!rows.length) return `目前沒有可使用的優惠券。\n\n領取優惠券:${botSiteUrl()}/account?tab=coupons`;
   const lines = rows.slice(0, 8).map(({ coupon: c, expired_at }) => {
     const end = c!.end_at ?? expired_at;
     const min = c!.min_spend ? `滿 ${formatter.format(c!.min_spend)}` : '無門檻';
@@ -198,7 +199,7 @@ const maskEmail = (e: string) => {
 };
 
 export async function memberText(customer: BoundCustomer, intro = '') {
-  const supabase = scopedClient(URBANITE_SHOP_ID);
+  const supabase = scopedClient(botShopId());
   const [{ count: orderCount }, { count: couponCount }] = await Promise.all([
     supabase.from('orders').select('id', { count: 'exact', head: true }).eq('user_id', customer.user_id),
     supabase.from('user_coupons').select('id', { count: 'exact', head: true }).eq('user_id', customer.user_id).eq('status', 'available'),
@@ -213,7 +214,7 @@ export async function memberText(customer: BoundCustomer, intro = '') {
     `可用優惠券:${couponCount ?? 0} 張`,
     `購物金:${formatter.format(0)}`,
     '',
-    `會員中心:${getConfiguredSiteUrl()}/account`,
+    `會員中心:${botSiteUrl()}/account`,
   ]
     .filter((l, i, arr) => l || (i > 0 && arr[i - 1]))
     .join('\n');

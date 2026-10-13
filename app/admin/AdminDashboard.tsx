@@ -32,7 +32,6 @@ import {
 } from '@/lib/order-status';
 import { uiToast } from '@/lib/ui-toast';
 import NumberInput from './NumberInput';
-import ShopLineSettings from './ShopLineSettings';
 import OrderNotificationSettingsPanel from './OrderNotificationSettings';
 import ManualFulfillmentAction from '@/app/components/ManualFulfillmentAction';
 import { PRIMARY_SITE_URL } from '@/lib/site-url';
@@ -112,7 +111,8 @@ const NAV = [
 
 type SectionKey = (typeof NAV)[number]['key'];
 // 個人名片:店家(U Pro 以上)也能在官網後台編輯自己的名片
-const PLATFORM_SECTIONS = new Set<string>(['card-members', 'line-bot', 'shops']);
+// LINE 機器人:主站與店家共用(店家用自己的官方帳號)
+const PLATFORM_SECTIONS = new Set<string>(['card-members', 'shops']);
 
 type Draft = {
   id: string;
@@ -2837,7 +2837,7 @@ export default function AdminDashboard({
           )}
 
           {/* ===== 報表及分析 ===== */}
-          {section === 'line-bot' && <LineBotManager products={products} coupons={discounts} logoUrl={logoUrl} />}
+          {section === 'line-bot' && <LineBotManager products={products} coupons={discounts} logoUrl={logoUrl} platform={platform} />}
           {section === 'card-members' && <CardMembersManager />}
           {section === 'shops' && platform && <ShopsManager />}
           {section === 'profile-card' && (platform
@@ -2902,8 +2902,7 @@ export default function AdminDashboard({
                   { key: 'shippings', label: '物流設定' },
                   { key: 'integrations', label: '串接設定' },
                   { key: 'notifications', label: '通知' },
-                  { key: 'shopline', label: '服務設定' },
-                ] as const).filter((t) => (platform ? t.key !== 'shopline' : t.key !== 'integrations')).map((t) => (
+                ] as const).filter((t) => platform || t.key !== 'integrations').map((t) => (
                   <button
                     key={t.key}
                     onClick={() => setSettingsTab(t.key)}
@@ -3252,7 +3251,6 @@ export default function AdminDashboard({
 
               {settingsTab === 'integrations' && <IntegrationSettings />}
               {settingsTab === 'notifications' && <OrderNotificationSettingsPanel />}
-              {settingsTab === 'shopline' && !platform && <ShopLineSettings />}
               {settingsTab === 'shippings' && (
               <Card
                 title="物流設定"

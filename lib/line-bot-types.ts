@@ -40,7 +40,7 @@ export const MESSAGE_TYPES: { type: BotMessage['type']; label: string; hint: str
   { type: 'bind', label: '會員綁定', hint: '加入會員/綁定' },
 ];
 
-export const VARIABLES = ['{LINE名稱}', '{會員姓名}'];
+export const VARIABLES = ['{LINE名稱}', '{會員姓名}', '{商店名稱}'];
 export const ORDER_VARIABLES = ['{會員姓名}', '{訂單編號}', '{訂單金額}', '{取貨門市}', '{物流單號}', '{退款金額}'];
 
 const uid = () => Math.random().toString(36).slice(2, 10);
@@ -126,8 +126,29 @@ export const DEFAULT_BOT_CONFIG: BotConfig = {
   brandColor: '#1f1b19',
 };
 
-// 合併預設值(舊資料缺的欄位補上)
-export function resolveBotConfig(raw: unknown): BotConfig {
+// 店家官網的預設機器人(和店家 LINE 原本的行為一致):歡迎+綁定、訂單查詢;優惠券、購物金、會員資料預設關閉
+export const SHOP_DEFAULT_BOT_CONFIG: BotConfig = {
+  welcomeGuest: set([
+    text('嗨 {LINE名稱},謝謝你加入 {商店名稱}!\n\n綁定官網會員後,訂單成立、出貨都會在這裡通知你。'),
+    { id: uid(), type: 'bind' },
+  ]),
+  welcomeMember: set([text('{會員姓名},歡迎回來 {商店名稱}!訂單成立、出貨都會在這裡通知你,輸入「訂單查詢」可以查看最近的訂單。')], ['訂單查詢']),
+  defaultReply: { enabled: false, ...set([text('收到你的訊息了,我們會盡快回覆你。')]) },
+  alreadyMember: '{會員姓名},你已經綁定 {商店名稱} 官網會員了。',
+  builtins: {
+    orders: { enabled: true, keywords: ['訂單'], intro: '' },
+    coupons: { enabled: false, keywords: ['優惠', '折價', '折扣'], intro: '' },
+    credit: { enabled: false, keywords: ['購物金'], intro: '' },
+    member: { enabled: false, keywords: ['會員資料', '我的資料'], intro: '' },
+    bind: { enabled: true, keywords: ['綁定'], intro: '點下面的按鈕登入官網,就會完成 LINE 綁定。' },
+  },
+  notify: DEFAULT_BOT_CONFIG.notify,
+  brandColor: '#1f1b19',
+};
+
+// 合併預設值(舊資料缺的欄位補上);defaults:主站或店家的預設
+export function resolveBotConfig(raw: unknown, defaults: BotConfig = DEFAULT_BOT_CONFIG): BotConfig {
+  const DEFAULT_BOT_CONFIG = defaults;
   const d = (raw && typeof raw === 'object' ? raw : {}) as Partial<BotConfig>;
   const pickSet = (v: unknown, fallback: MessageSet): MessageSet => {
     const s = v as Partial<MessageSet> | undefined;

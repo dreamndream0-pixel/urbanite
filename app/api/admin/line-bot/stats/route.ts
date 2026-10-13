@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server';
-import { getPlatformAdmin } from '@/lib/supabase/server';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { getFollowerCount } from '@/lib/line-bot';
+import { withLineBotAdmin } from '@/lib/line-bot-admin';
 import { BUILTIN_LABELS, type BuiltinKey } from '@/lib/line-bot-types';
-import { scopedClient, URBANITE_SHOP_ID } from '@/lib/shop';
+import { scopedClient } from '@/lib/shop';
 
 export const dynamic = 'force-dynamic';
 
@@ -20,15 +21,18 @@ function clickLabel(key: string, rules: Map<string, string>) {
   return key;
 }
 
-// GET /api/admin/line-bot/stats?days=30
-export async function GET(request: Request) {
-  if (!(await getPlatformAdmin())) return NextResponse.json({ error: '未授權' }, { status: 401 });
+// GET /api/admin/line-bot/stats?days=30(只算目前這家店)
+export function GET(request: Request) {
+  return withLineBotAdmin(({ db, shop }) => stats(request, db, shop.id));
+}
+
+async function stats(request: Request, db: SupabaseClient, shopId: string) {
   const days = Math.min(90, Math.max(7, Number(new URL(request.url).searchParams.get('days')) || 30));
   const since = new Date(Date.now() - days * 24 * 3600 * 1000).toISOString();
-  const supabase = scopedClient(URBANITE_SHOP_ID);
+  const supabase = scopedClient(shopId);
   const [{ data: events }, { data: rules }, { count: bound }, { count: members }, followers] = await Promise.all([
-    supabase.from('line_events').select('type, key, created_at').gte('created_at', since).order('created_at').limit(50000),
-    supabase.from('line_bot_rules').select('id, name, keywords, hits'),
+    db.from('line_events').select('type, key, created_at').gte('created_at', since).order('created_at').limit(50000),
+    db.from('line_bot_rules').select('id, name, keywords, hits'),
     supabase.from('customers').select('id', { count: 'exact', head: true }).not('line_user_id', 'is', null),
     supabase.from('customers').select('id', { count: 'exact', head: true }),
     getFollowerCount(),
