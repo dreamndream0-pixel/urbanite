@@ -5,6 +5,7 @@ import { bindUrl, createBindToken, getMessagingConfig, type LineMessage } from '
 import {
   MENU_LAYOUTS,
   MENU_SIZE,
+  NOTIFY_LABELS,
   PAGE_OPTIONS,
   resolveBotConfig,
   type BotAction,
@@ -18,6 +19,7 @@ import {
 } from '@/lib/line-bot-types';
 import type { Discount } from '@/lib/types';
 import { scopedClient, URBANITE_SHOP_ID } from '@/lib/shop';
+import { orderFlexMessage } from '@/lib/order-flex';
 
 const API = 'https://api.line.me/v2/bot';
 const DATA_API = 'https://api-data.line.me/v2/bot';
@@ -431,22 +433,17 @@ export async function processOrderNotifications() {
     };
     const body = fillVars(rule.text, vars);
     const { channelSecret } = await getMessagingConfig();
-    const message: LineMessage = rule.button
-      ? {
-          type: 'flex',
-          altText: body.slice(0, 300),
-          contents: {
-            type: 'bubble',
-            body: { type: 'box', layout: 'vertical', paddingAll: '18px', contents: [{ type: 'text', text: body.slice(0, 1000), wrap: true, size: 'sm', color: '#1f1b19' }] },
-            footer: {
-              type: 'box',
-              layout: 'vertical',
-              paddingAll: '12px',
-              contents: [{ type: 'button', style: 'primary', height: 'sm', color: config.brandColor, action: { type: 'uri', label: '查看訂單', uri: trackedUrl('/account?tab=orders', `notify:${key}`, channelSecret) } }],
-            },
-          },
-        }
-      : { type: 'text', text: body.slice(0, 5000) };
+    // 與店家相同的訂單卡片;後台設定的通知文字放在標題下方
+    const { data: full } = await supabase.from('orders').select('order_no, total, items, payment_method, shipping_method, store_name').eq('id', order.id).maybeSingle();
+    const message = orderFlexMessage({
+      shopName: 'URBANITE',
+      title: NOTIFY_LABELS[key].label,
+      subtitle: body.slice(0, 120),
+      order: full ?? order,
+      link: trackedUrl('/account?tab=orders', `notify:${key}`, channelSecret),
+      extra: key === 'shipped' && ship?.tracking_number ? [['物流單號', String(ship.tracking_number)]] : [],
+      color: config.brandColor,
+    }) as LineMessage;
     try {
       await pushMessages(customer.line_user_id, [message]);
       await logEvent('notify', customer.line_user_id, dedupe);

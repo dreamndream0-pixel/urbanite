@@ -141,6 +141,22 @@ export async function ordersText(userId: string, intro = '') {
   return `${intro || `最近 ${orders.length} 筆訂單`}\n\n${lines.join('\n\n')}\n\n完整明細:${getConfiguredSiteUrl()}/account?tab=orders`;
 }
 
+// 訂單查詢(卡片版):最近 5 筆訂單的 Flex 輪播,沒有訂單時回 null(由呼叫端回文字)
+export async function ordersFlex(userId: string, quickReply?: unknown): Promise<LineMessage | null> {
+  const { data } = await scopedClient(URBANITE_SHOP_ID)
+    .from('orders')
+    .select('order_no, status, total, created_at, items, payment_method, shipping_method, store_name')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+    .limit(5);
+  const orders = (data ?? []) as Order[];
+  if (!orders.length) return null;
+  const { orderFlexMessage } = await import('@/lib/order-flex');
+  const link = `${getConfiguredSiteUrl()}/account?tab=orders`;
+  const bubbles = orders.map((o) => orderFlexMessage({ shopName: 'URBANITE', order: o, link, title: o.status || '訂單', subtitle: `下單日期 ${dateText(o.created_at)}` }).contents);
+  return { type: 'flex', altText: `最近 ${orders.length} 筆訂單`, contents: { type: 'carousel', contents: bubbles }, ...(quickReply ? { quickReply } : {}) };
+}
+
 function couponValue(c: Discount) {
   if (c.type === 'percent') return `${c.value}% 折扣`;
   if (c.type === 'free_shipping') return '免運';

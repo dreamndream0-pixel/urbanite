@@ -7,6 +7,7 @@ import {
   findCustomerByLine,
   getMessagingConfig,
   memberText,
+  ordersFlex,
   ordersText,
   replyMessage,
   verifyLineSignature,
@@ -84,6 +85,14 @@ async function handleEvent(event: LineEvent, accessToken: string) {
         { messages: [{ id: 'g0', type: 'text', text: '查詢會員資料前,要先綁定官網會員。' }, { id: 'g1', type: 'bind' }], quickReplies: [] },
         'bind',
       );
+    }
+    if (key === 'orders') {
+      const quick = memberQuick.length ? { items: memberQuick.slice(0, 13).map((t) => ({ type: 'action', action: { type: 'message', label: t.slice(0, 20), text: t } })) } : undefined;
+      const card = await ordersFlex(customer.user_id, quick).catch(() => null);
+      if (card) {
+        const intro = (b.intro || '').trim();
+        return replyMessage(event.replyToken!, intro ? [{ type: 'text', text: intro.slice(0, 4900) }, card] : [card], accessToken);
+      }
     }
     const text =
       key === 'orders' ? await ordersText(customer.user_id, b.intro)
