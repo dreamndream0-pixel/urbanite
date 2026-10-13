@@ -40,6 +40,6 @@ export function orderFlexMessage({ shopName, title, subtitle, order, link, butto
     link,
     homeLink,
     buttonLabel,
-  }, event === 'cancelled' ? '#8a7f72' : undefined);
+  }, event === 'cancelled' ? '#8a7f72' : undefined, event);
   return { type: 'flex' as const, altText: `【${shopName}】${title} ${order.order_no}`.slice(0, 300), contents };
 }

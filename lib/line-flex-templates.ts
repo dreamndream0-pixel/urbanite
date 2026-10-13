@@ -1,3 +1,4 @@
+import { lineIconUrl } from '@/lib/line-icons';
 // LINE Flex 卡片模板庫:會員卡、商品卡、訂單卡、優惠券卡(各 5 款)。
 // 純函式:輸入資料與連結,輸出 LINE Flex bubble。前台預覽(app/admin/line-bot/FlexView)與伺服器傳送共用。
 
@@ -42,6 +43,14 @@ export type Flex = Record<string, unknown>;
 const money = (n: number) => `NT$${Math.round(Number(n) || 0).toLocaleString('en-US')}`;
 const clip = (v: unknown, max: number) => String(v ?? '').trim().slice(0, max);
 const safe = (v: unknown, max: number, fallback = '-') => clip(v, max) || fallback;
+// 商品簡介可能是後台編輯器的 HTML:去掉標籤與實體字元
+export const plainText = (v: unknown) => String(v ?? '')
+  .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+  .replace(/<[^>]*>/g, ' ')
+  .replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'")
+  .replace(/&[a-z#0-9]+;/gi, ' ')
+  .replace(/\s+/g, ' ')
+  .trim();
 const https = (u?: string | null) => (u && /^https:\/\//.test(u) ? u : '');
 
 type TextOpts = { size?: string; weight?: 'bold' | 'regular'; color?: string; align?: 'start' | 'center' | 'end'; wrap?: boolean; flex?: number; margin?: string; decoration?: string; maxLines?: number; gravity?: string };
@@ -61,12 +70,15 @@ function pill(label: string, uri: string, o: { bg?: string; fg: string; border?:
     flex: o.flex ?? 1,
   });
 }
+// SVG 線條圖示(轉成 PNG 的網址,見 lib/line-icons)
+const icon = (name: string, color: string, size = '20px'): Flex => ({ type: 'image', url: lineIconUrl(name, color), size, aspectRatio: '1:1', aspectMode: 'fit', flex: 0 });
+
 const pills = (a: Flex, b?: Flex): Flex => box('horizontal', b ? [a, b] : [a], { spacing: 'sm' });
 
 // 圖示格(圖示 + 文字),整格可點
-function cell(icon: string, label: string, uri: string, o: { fg: string; iconBg?: string; iconFg?: string }): Flex {
+function cell(name: string, label: string, uri: string, o: { fg: string; iconBg?: string; iconFg?: string }): Flex {
   return box('vertical', [
-    box('vertical', [txt(icon, { size: 'md', align: 'center', color: o.iconFg ?? o.fg })], { width: '36px', height: '36px', cornerRadius: '18px', backgroundColor: o.iconBg ?? '#00000010', justifyContent: 'center', alignItems: 'center' }),
+    box('vertical', [icon(name, o.iconFg ?? o.fg)], { width: '36px', height: '36px', cornerRadius: '18px', backgroundColor: o.iconBg ?? '#00000010', justifyContent: 'center', alignItems: 'center' }),
     txt(label, { size: 'xxs', color: o.fg, align: 'center', margin: 'sm' }),
   ], { flex: 1, alignItems: 'center', action: { type: 'uri', label: clip(label, 20), uri } });
 }
@@ -79,8 +91,8 @@ function bar(ratio: number, fg: string, bg = '#00000014'): Flex {
 
 // 步驟進度(訂單出貨、退貨)
 function steps(labels: string[], active: number, color: string): Flex {
-  const dot = (i: number) => box('vertical', [txt(i <= active ? '✓' : ' ', { size: 'xxs', color: '#ffffff', align: 'center' })], {
-    width: '18px', height: '18px', cornerRadius: '9px', backgroundColor: i <= active ? color : '#dddddd', justifyContent: 'center',
+  const dot = (i: number) => box('vertical', i <= active ? [icon('check', '#ffffff', '12px')] : [], {
+    width: '18px', height: '18px', cornerRadius: '9px', backgroundColor: i <= active ? color : '#dddddd', justifyContent: 'center', alignItems: 'center',
   });
   const line = (i: number) => box('vertical', [], { flex: 1, height: '2px', backgroundColor: i < active ? color : '#dddddd' });
   const row: Flex[] = [];
@@ -132,9 +144,9 @@ export function memberBubble(style: MemberStyle | string, d: MemberData, l: Memb
         txt(no, { size: 'xxs', color: '#999999', margin: 'xs' }),
         sep('#eee6d8', 'lg'),
         box('horizontal', [
-          cell('🎁', '專屬優惠', l.coupons, { fg: '#555555', iconBg: '#f1ebe0' }),
-          cell('📦', '我的訂單', l.orders, { fg: '#555555', iconBg: '#f1ebe0' }),
-          cell('👤', '會員中心', l.account, { fg: '#555555', iconBg: '#f1ebe0' }),
+          cell('gift', '專屬優惠', l.coupons, { fg: '#555555', iconBg: '#f1ebe0' }),
+          cell('package', '我的訂單', l.orders, { fg: '#555555', iconBg: '#f1ebe0' }),
+          cell('user', '會員中心', l.account, { fg: '#555555', iconBg: '#f1ebe0' }),
         ], { margin: 'lg' }),
         box('vertical', [pill('查看會員權益 →', l.account, { bg: green, fg: '#ffffff', radius: '20px' })], { margin: 'lg' }),
       ], { backgroundColor: '#fbf8f2', paddingAll: '18px' }),
@@ -154,30 +166,30 @@ export function memberBubble(style: MemberStyle | string, d: MemberData, l: Memb
         txt(`${money(d.spent)} / ${money(next)}`, { size: 'xxs', color: '#aaaaaa', align: 'end', margin: 'sm' }),
       ], { backgroundColor: '#ffffff', cornerRadius: '14px', paddingAll: '16px', margin: 'lg' }),
       box('horizontal', [
-        cell('🎁', '會員優惠', l.coupons, { fg: '#555555', iconBg: '#ffffff', iconFg: pink }),
-        cell('📦', '我的訂單', l.orders, { fg: '#555555', iconBg: '#ffffff', iconFg: pink }),
-        cell('👤', '個人資料', l.account, { fg: '#555555', iconBg: '#ffffff', iconFg: pink }),
+        cell('gift', '會員優惠', l.coupons, { fg: '#555555', iconBg: '#ffffff', iconFg: pink }),
+        cell('package', '我的訂單', l.orders, { fg: '#555555', iconBg: '#ffffff', iconFg: pink }),
+        cell('user', '個人資料', l.account, { fg: '#555555', iconBg: '#ffffff', iconFg: pink }),
       ], { margin: 'lg' }),
     ], { background: { type: 'linearGradient', angle: '160deg', startColor: '#fde7ea', endColor: '#f7d2d9' }, paddingAll: '20px' }));
   }
 
   if (style === 'diamond') {
     const gold = '#d8b878';
-    const dark = (icon: string, label: string, uri: string) => cell(icon, label, uri, { fg: '#d9d9d9', iconBg: '#2b2b2b', iconFg: gold });
+    const dark = (name: string, label: string, uri: string) => cell(name, label, uri, { fg: '#d9d9d9', iconBg: '#2b2b2b', iconFg: gold });
     return bubble(box('vertical', [
       txt(shop, { size: 'xxs', color: '#a8a8a8', align: 'center', weight: 'bold' }),
       txt('DIAMOND MEMBER', { size: 'md', color: gold, align: 'center', weight: 'bold', margin: 'sm' }),
-      txt('◆', { size: '3xl', color: '#e8e8e8', align: 'center', margin: 'md' }),
+      box('horizontal', [space(), icon('gem', '#e8e8e8', '48px'), space()], { margin: 'md' }),
       txt(name, { size: 'md', color: '#ffffff', align: 'center', weight: 'bold', margin: 'md' }),
       txt(no, { size: 'xxs', color: '#9a9a9a', align: 'center', margin: 'xs' }),
-      box('horizontal', [dark('💬', '專屬客服', l.account), dark('🎁', '我的優惠', l.coupons), dark('📦', '我的訂單', l.orders), dark('👤', '會員中心', l.account)], { margin: 'xl', paddingAll: '10px', backgroundColor: '#1d1d1d', cornerRadius: '12px' }),
+      box('horizontal', [dark('message', '專屬客服', l.account), dark('gift', '我的優惠', l.coupons), dark('package', '我的訂單', l.orders), dark('user', '會員中心', l.account)], { margin: 'xl', paddingAll: '10px', backgroundColor: '#1d1d1d', cornerRadius: '12px' }),
       box('vertical', [pill('探索會員禮遇 →', l.home, { fg: gold, border: gold, radius: '20px' })], { margin: 'lg' }),
     ], { backgroundColor: '#0f0f0f', paddingAll: '20px' }));
   }
 
   if (style === 'fresh') {
     const sage = '#5c7350';
-    const wcell = (icon: string, label: string, uri: string) => cell(icon, label, uri, { fg: '#555555', iconBg: '#eef2ea', iconFg: sage });
+    const wcell = (name: string, label: string, uri: string) => cell(name, label, uri, { fg: '#555555', iconBg: '#eef2ea', iconFg: sage });
     return bubble(box('vertical', [
       txt(shop, { size: 'sm', color: '#eef2ea', weight: 'bold' }),
       txt('會員中心', { size: 'lg', color: '#ffffff', weight: 'bold' }),
@@ -185,9 +197,9 @@ export function memberBubble(style: MemberStyle | string, d: MemberData, l: Memb
       txt('您的日常更美好', { size: 'xs', color: '#dfe7d8' }),
       box('horizontal', [
         box('vertical', [txt('可用優惠券', { size: 'xs', color: '#888888' }), txt(`${d.couponCount} 張`, { size: 'xl', weight: 'bold', color: '#222222' })], { flex: 1 }),
-        txt('›', { size: 'xl', color: '#999999', flex: 0, gravity: 'center' }),
+        box('vertical', [icon('chevron', '#999999', '20px')], { flex: 0, justifyContent: 'center' }),
       ], { backgroundColor: '#ffffff', cornerRadius: '12px', paddingAll: '14px', margin: 'lg', action: { type: 'uri', label: '可用優惠券', uri: l.coupons } }),
-      box('horizontal', [wcell('🏷', '最新優惠', l.coupons), wcell('📦', '我的訂單', l.orders), wcell('⚙', '會員設定', l.account)], { backgroundColor: '#ffffff', cornerRadius: '12px', paddingAll: '12px', margin: 'md' }),
+      box('horizontal', [wcell('tag', '最新優惠', l.coupons), wcell('package', '我的訂單', l.orders), wcell('settings', '會員設定', l.account)], { backgroundColor: '#ffffff', cornerRadius: '12px', paddingAll: '12px', margin: 'md' }),
     ], { background: { type: 'linearGradient', angle: '160deg', startColor: '#6d8660', endColor: '#4c6143' }, paddingAll: '20px' }));
   }
 
@@ -195,7 +207,7 @@ export function memberBubble(style: MemberStyle | string, d: MemberData, l: Memb
   const gold = '#a8802f';
   return bubble(box('vertical', [
     txt(shop, { size: 'xxs', color: '#6b5a3c', align: 'center', weight: 'bold' }),
-    txt('♛', { size: 'xl', color: gold, align: 'center', margin: 'md' }),
+    box('horizontal', [space(), icon('crown', gold, '32px'), space()], { margin: 'md' }),
     txt('GOLD MEMBER', { size: 'md', color: gold, align: 'center', weight: 'bold' }),
     sep('#e2d4b8', 'lg'),
     txt(`${name} 會員`, { size: 'md', color: '#222222', align: 'center', weight: 'bold', margin: 'lg' }),
@@ -233,7 +245,7 @@ export function productBubble(style: ProductStyle | string, p: ProductData): Fle
     ...(hero ? { hero } : {}),
     body: box('vertical', [
       txt(safe(p.name, 60, '商品'), { size: 'md', weight: 'bold', color: t.fg, wrap: true, maxLines: 2 }),
-      ...(p.subtitle ? [txt(clip(p.subtitle, 60), { size: 'xs', color: t.sub, wrap: true, maxLines: 1 })] : []),
+      ...(plainText(p.subtitle) ? [txt(clip(plainText(p.subtitle), 60), { size: 'xs', color: t.sub, wrap: true, maxLines: 1 })] : []),
       box('baseline', [
         txt(money(p.price), { size: 'md', weight: 'bold', color: t.fg, flex: 0 }),
         ...(onSale ? [txt(money(p.originalPrice!), { size: 'xs', color: t.sub, decoration: 'line-through', margin: 'md', flex: 0 })] : []),
@@ -264,11 +276,11 @@ export function couponBubble(style: CouponStyle | string, c: CouponData): Flex {
   const recolor = (b: Flex, color: string): Flex => ({ ...b, contents: (b.contents as Flex[]).map((x) => ({ ...x, color })) });
   type T = { bg: Flex; label: string; labelColor: string; valueColor: string; subColor: string; deco: string; primary: { bg: string; fg: string }; second: { bg?: string; fg: string; border?: string }; badge?: { text: string; bg: string } };
   const themes: Record<CouponStyle, T> = {
-    discount: { bg: { background: { type: 'linearGradient', angle: '135deg', startColor: '#fff1f1', endColor: '#fbdcdc' } }, label: '全館折扣券', labelColor: '#c8323c', valueColor: '#c8323c', subColor: '#8a5a5a', deco: '', primary: { bg: '#c8323c', fg: '#ffffff' }, second: { bg: '#ffffff', fg: '#c8323c', border: '#e8b4b4' } },
-    freeship: { bg: { background: { type: 'linearGradient', angle: '135deg', startColor: '#f7f3e8', endColor: '#e9e1cc' } }, label: '🚚 免運券', labelColor: '#3f5a3a', valueColor: '#2f4a2b', subColor: '#6b6a55', deco: '', primary: { bg: '#3f5a3a', fg: '#ffffff' }, second: { bg: '#ffffff', fg: '#3f5a3a', border: '#c9cdb6' } },
-    limited: { bg: { backgroundColor: '#141414' }, label: '期間限定', labelColor: '#ffffff', valueColor: '#e7c27a', subColor: '#bdbdbd', deco: '⏳', primary: { bg: '#d4a44c', fg: '#1a1a1a' }, second: { bg: '#3a3a3a', fg: '#eeeeee' }, badge: { text: '期間限定', bg: '#c8323c' } },
-    birthday: { bg: { background: { type: 'linearGradient', angle: '135deg', startColor: '#fff0f4', endColor: '#fbd5e0' } }, label: '生日專屬禮', labelColor: '#c23b5e', valueColor: '#c23b5e', subColor: '#8a5a6a', deco: '🎁', primary: { bg: '#c23b5e', fg: '#ffffff' }, second: { bg: '#ffffff', fg: '#c23b5e', border: '#efb7c6' } },
-    vip: { bg: { background: { type: 'linearGradient', angle: '135deg', startColor: '#1f3a2b', endColor: '#13261b' } }, label: '會員專屬券', labelColor: '#e9dcc3', valueColor: '#e7c27a', subColor: '#c9d3c5', deco: '👑', primary: { bg: '#d4a44c', fg: '#1a1a1a' }, second: { bg: '#ffffff', fg: '#1f3a2b' } },
+    discount: { bg: { background: { type: 'linearGradient', angle: '135deg', startColor: '#fff1f1', endColor: '#fbdcdc' } }, label: '全館折扣券', labelColor: '#c8323c', valueColor: '#c8323c', subColor: '#8a5a5a', deco: 'ticket', primary: { bg: '#c8323c', fg: '#ffffff' }, second: { bg: '#ffffff', fg: '#c8323c', border: '#e8b4b4' } },
+    freeship: { bg: { background: { type: 'linearGradient', angle: '135deg', startColor: '#f7f3e8', endColor: '#e9e1cc' } }, label: '免運券', labelColor: '#3f5a3a', valueColor: '#2f4a2b', subColor: '#6b6a55', deco: 'truck', primary: { bg: '#3f5a3a', fg: '#ffffff' }, second: { bg: '#ffffff', fg: '#3f5a3a', border: '#c9cdb6' } },
+    limited: { bg: { backgroundColor: '#141414' }, label: '期間限定', labelColor: '#ffffff', valueColor: '#e7c27a', subColor: '#bdbdbd', deco: 'hourglass', primary: { bg: '#d4a44c', fg: '#1a1a1a' }, second: { bg: '#3a3a3a', fg: '#eeeeee' }, badge: { text: '期間限定', bg: '#c8323c' } },
+    birthday: { bg: { background: { type: 'linearGradient', angle: '135deg', startColor: '#fff0f4', endColor: '#fbd5e0' } }, label: '生日專屬禮', labelColor: '#c23b5e', valueColor: '#c23b5e', subColor: '#8a5a6a', deco: 'gift', primary: { bg: '#c23b5e', fg: '#ffffff' }, second: { bg: '#ffffff', fg: '#c23b5e', border: '#efb7c6' } },
+    vip: { bg: { background: { type: 'linearGradient', angle: '135deg', startColor: '#1f3a2b', endColor: '#13261b' } }, label: '會員專屬券', labelColor: '#e9dcc3', valueColor: '#e7c27a', subColor: '#c9d3c5', deco: 'crown', primary: { bg: '#d4a44c', fg: '#1a1a1a' }, second: { bg: '#ffffff', fg: '#1f3a2b' } },
   };
   const key = (style in themes ? style : 'discount') as CouponStyle;
   const t = themes[key];
@@ -282,7 +294,7 @@ export function couponBubble(style: CouponStyle | string, c: CouponData): Flex {
         txt(safe(c.name, 40, t.label), { size: 'sm', color: key === 'limited' || key === 'vip' ? '#ffffff' : '#333333', weight: 'bold', wrap: true }),
         txt(safe(c.condition, 60, '無消費門檻'), { size: 'xs', color: t.subColor, wrap: true }),
       ], { flex: 7 }),
-      ...(t.deco ? [txt(t.deco, { size: '4xl', align: 'end', gravity: 'center', flex: 3 })] : []),
+      ...(t.deco ? [box('vertical', [icon(t.deco, t.valueColor, '56px')], { flex: 3, alignItems: 'flex-end', justifyContent: 'center' })] : []),
     ], { margin: 'md' }),
     recolor(meta, t.subColor),
   ];
@@ -314,19 +326,19 @@ export type OrderCardData = {
 };
 
 const ORDER_THEME: Record<OrderKind, { color: string; icon: string; second: string }> = {
-  created: { color: '#2e9e5b', icon: '✓', second: '繼續購物' },
-  shipping: { color: '#2f6fe0', icon: '🚚', second: '逛逛商品' },
-  delivered: { color: '#2e9e5b', icon: '✓', second: '再次購買' },
-  detail: { color: '#2e9e5b', icon: '≡', second: '逛逛商品' },
-  return: { color: '#e8732e', icon: '↺', second: '逛逛商品' },
+  created: { color: '#2e9e5b', icon: 'check', second: '繼續購物' },
+  shipping: { color: '#2f6fe0', icon: 'truck', second: '逛逛商品' },
+  delivered: { color: '#2e9e5b', icon: 'check', second: '再次購買' },
+  detail: { color: '#2e9e5b', icon: 'receipt', second: '逛逛商品' },
+  return: { color: '#e8732e', icon: 'undo', second: '逛逛商品' },
 };
 
-export function orderBubble(kind: OrderKind | string, d: OrderCardData, color?: string): Flex {
+export function orderBubble(kind: OrderKind | string, d: OrderCardData, color?: string, event?: string): Flex {
   const k = (kind in ORDER_THEME ? kind : 'created') as OrderKind;
   const th = ORDER_THEME[k];
   const c = color ?? th.color;
   const head = box('horizontal', [
-    box('vertical', [txt(th.icon, { size: 'md', color: '#ffffff', align: 'center', weight: 'bold' })], { width: '36px', height: '36px', cornerRadius: '18px', backgroundColor: c, justifyContent: 'center', flex: 0 }),
+    box('vertical', [icon(event === 'cancelled' ? 'x' : th.icon, '#ffffff', '20px')], { width: '36px', height: '36px', cornerRadius: '18px', backgroundColor: c, justifyContent: 'center', alignItems: 'center', flex: 0 }),
     box('vertical', [
       txt(safe(d.title, 30, '訂單通知'), { size: 'lg', weight: 'bold', color: c }),
       ...(d.subtitle ? [txt(clip(d.subtitle, 80), { size: 'xs', color: '#666666', wrap: true })] : []),
@@ -335,14 +347,14 @@ export function orderBubble(kind: OrderKind | string, d: OrderCardData, color?: 
   const first = d.items[0];
   const thumb = (u?: string, size = '56px') => https(u)
     ? box('vertical', [{ type: 'image', url: https(u), size: 'full', aspectMode: 'cover', aspectRatio: '1:1' }], { width: size, height: size, cornerRadius: '8px', flex: 0 })
-    : box('vertical', [txt('📦', { size: 'lg', align: 'center' })], { width: size, height: size, cornerRadius: '8px', backgroundColor: '#f2f2f2', justifyContent: 'center', flex: 0 });
+    : box('vertical', [icon('package', '#aaaaaa', '24px')], { width: size, height: size, cornerRadius: '8px', backgroundColor: '#f2f2f2', justifyContent: 'center', alignItems: 'center', flex: 0 });
   const count = d.items.reduce((n, i) => n + (Number(i.quantity) || 0), 0);
   const extra = (d.rows ?? []).filter(([, v]) => v).map(([kk, v]) => kv(kk, v));
   const body: Flex[] = [head, sep('#eeeeee', 'lg'), kv('訂單編號', d.orderNo)];
 
   if (k === 'detail') {
     body.splice(0, 3,
-      box('horizontal', [txt('▤ 訂單明細', { size: 'md', weight: 'bold', color: '#222222', flex: 1 }), txt(clip(d.title, 20), { size: 'xs', color: c, weight: 'bold', align: 'end', flex: 0 })]),
+      box('horizontal', [icon('receipt', c, '18px'), txt('訂單明細', { size: 'md', weight: 'bold', color: '#222222', flex: 1, margin: 'sm' }), txt(clip(d.title, 20), { size: 'xs', color: c, weight: 'bold', align: 'end', flex: 0 })]),
       box('horizontal', [txt(`#${d.orderNo}`, { size: 'xxs', color: '#999999' }), txt(d.date ?? '', { size: 'xxs', color: '#999999', align: 'end' })], { margin: 'xs' }),
       sep('#eeeeee', 'md'),
     );

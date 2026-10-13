@@ -202,6 +202,12 @@ function SettingsPanel({ draft, setDraft, ready, platform, ...shared }: { draft:
                   </div>
                   <Toggle on={b.enabled} onChange={(v) => setBuiltin(k, { enabled: v })} label={BUILTIN_LABELS[k].label} />
                 </div>
+                {b.enabled && k === 'orders' ? (
+                  <div className="flex flex-wrap items-start gap-3 rounded-lg bg-[#faf7f2] p-3">
+                    <div className="rounded-xl bg-[#8fa6c3] p-1.5"><FlexView contents={orderBubble('detail', { ...SAMPLE_ORDER, title: '已出貨' })} scale={0.42} /></div>
+                    <p className="min-w-0 flex-1 text-[11px] leading-5 text-[#6b6156]">已綁定的會員傳出觸發關鍵字時,自動回覆最近 5 筆訂單,一筆一張「訂單明細卡」左右滑動:訂單狀態、商品圖、數量金額、合計與「查看訂單」按鈕。卡片不需另外設定;「開頭文字」會先以一則文字送出。</p>
+                  </div>
+                ) : null}
                 {b.enabled && k === 'member' ? (
                   <Field label="會員卡樣式" hint="傳「會員資料」時以這張會員卡回覆">
                     <TemplatePicker options={MEMBER_STYLES} value={draft.memberStyle} onChange={(memberStyle) => setDraft({ ...draft, memberStyle })} render={(key) => memberCard(key)} />
