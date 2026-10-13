@@ -9,7 +9,6 @@ import { orderFlexMessage } from '@/lib/order-flex';
 
 export type ShopLineConfig = { channelSecret: string; accessToken: string; loginChannelId?: string; loginChannelSecret?: string };
 const KIND = 'LINE';
-const money = (n: number) => `NT$${Math.round(Number(n) || 0).toLocaleString('en-US')}`;
 
 export const getShopLineConfig = (shopId: string) => getShopSecret<ShopLineConfig>(KIND, shopId);
 export const saveShopLineConfig = (shopId: string, cfg: ShopLineConfig | null) => setShopSecret(KIND, shopId, cfg);
@@ -43,12 +42,18 @@ function bindLink(shop: Shop, lineUserId: string, cfg: ShopLineConfig) {
   return shopUrl(shop.slug, `/line/bind?t=${encodeURIComponent(createBindToken(lineUserId, cfg.channelSecret))}&openExternalBrowser=1`);
 }
 
-async function ordersReply(shop: Shop, userId: string) {
-  const { data } = await scopedClient(shop.id).from('orders').select('order_no, status, total, created_at').eq('user_id', userId).order('created_at', { ascending: false }).limit(5);
-  const orders = (data ?? []) as Pick<Order, 'order_no' | 'status' | 'total' | 'created_at'>[];
-  if (!orders.length) return '目前沒有訂單紀錄。';
-  const lines = orders.map((o) => `${o.order_no}\n${new Date(o.created_at ?? '').toLocaleDateString('zh-TW', { timeZone: 'Asia/Taipei' })}・${money(o.total)}\n狀態:${o.status}`);
-  return `最近 ${orders.length} 筆訂單\n\n${lines.join('\n\n')}\n\n完整明細:${shopUrl(shop.slug, '/account?tab=orders')}`;
+// 訂單查詢:最近 5 筆訂單,以 Flex 卡片輪播呈現
+async function ordersReply(shop: Shop, userId: string): Promise<LineMessage> {
+  const { data } = await scopedClient(shop.id).from('orders').select('order_no, status, total, created_at, items, payment_method, shipping_method, store_name').eq('user_id', userId).order('created_at', { ascending: false }).limit(5);
+  const orders = (data ?? []) as Order[];
+  if (!orders.length) return text('目前沒有訂單紀錄。');
+  const link = shopUrl(shop.slug, '/account?tab=orders');
+  const bubbles = orders.map((o) => orderFlexMessage({
+    shopName: shop.name, order: o, link,
+    title: o.status || '訂單',
+    subtitle: `下單日期 ${new Date(o.created_at ?? '').toLocaleDateString('zh-TW', { timeZone: 'Asia/Taipei' })}`,
+  }).contents);
+  return { type: 'flex', altText: `最近 ${orders.length} 筆訂單`, contents: { type: 'carousel', contents: bubbles }, quickReply: QUICK } as unknown as LineMessage;
 }
 
 type LineEvent = { type: string; replyToken?: string; source?: { type: string; userId?: string }; message?: { type: string; text?: string } };
@@ -76,7 +81,8 @@ export async function handleShopWebhook(shop: Shop, raw: string, signature: stri
         return reply(userId ? '你已經綁定官網會員了。' : `點下面的連結登入官網,完成綁定(30 分鐘內有效):\n${bindLink(shop, lineUserId, cfg)}`);
       }
       if (/訂單/.test(input)) {
-        return reply(userId ? await ordersReply(shop, userId) : `查詢訂單前,要先綁定官網會員:\n${bindLink(shop, lineUserId, cfg)}`);
+        if (userId) return replyMessage(event.replyToken!, [await ordersReply(shop, userId)], cfg.accessToken);
+        return reply(`查詢訂單前,要先綁定官網會員:\n${bindLink(shop, lineUserId, cfg)}`);
       }
     } catch (error) {
       console.error('shop LINE event failed', error);
