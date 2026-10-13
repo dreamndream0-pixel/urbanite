@@ -64,7 +64,7 @@ export async function fetchBotProfile(lineUserId: string, accessToken: string) {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
   if (!res.ok) return null;
-  return (await res.json()) as { displayName?: string; pictureUrl?: string };
+  return (await res.json()) as { userId?: string; displayName?: string; pictureUrl?: string };
 }
 
 // 常用查詢的快速回覆按鈕

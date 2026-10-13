@@ -3,13 +3,15 @@
 import { useEffect, useState } from 'react';
 import { uiAlert, uiConfirm } from '@/lib/ui-dialog';
 
-type Status = { configured: boolean; valid: boolean; botName: string; basicId: string; webhookUrl: string };
+type Status = { configured: boolean; valid: boolean; botName: string; basicId: string; webhookUrl: string; loginConfigured: boolean; callbackUrl: string };
 
 // 店家後台 系統設定 → 服務設定:店家自己的 LINE 官方帳號(和 URBANITE 主站分開)
 export default function ShopLineSettings() {
   const [status, setStatus] = useState<Status | null>(null);
   const [secret, setSecret] = useState('');
   const [token, setToken] = useState('');
+  const [loginId, setLoginId] = useState('');
+  const [loginSecret, setLoginSecret] = useState('');
   const [busy, setBusy] = useState(false);
   // 和主站「串接設定」共用密碼,解鎖 30 分鐘
   const [locked, setLocked] = useState<boolean | null>(null);
@@ -53,11 +55,11 @@ export default function ShopLineSettings() {
   async function save() {
     setBusy(true);
     try {
-      const res = await fetch('/api/admin/shop-line', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ channelSecret: secret, accessToken: token }) });
+      const res = await fetch('/api/admin/shop-line', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ channelSecret: secret, accessToken: token, loginChannelId: loginId, loginChannelSecret: loginSecret }) });
       const data = await res.json();
       if (res.status === 423) { setLocked(true); throw new Error('已逾時自動上鎖,請重新輸入密碼'); }
       if (!res.ok) throw new Error(data.error ?? '儲存失敗');
-      setStatus(data); setSecret(''); setToken('');
+      setStatus(data); setSecret(''); setToken(''); setLoginId(''); setLoginSecret('');
       void uiAlert(`已連接 LINE 官方帳號「${data.botName || '已驗證'}」。別忘了把 Webhook 網址貼到 LINE Developers。`);
     } catch (error) { void uiAlert(error instanceof Error ? error.message : '儲存失敗'); }
     finally { setBusy(false); }
@@ -73,7 +75,7 @@ export default function ShopLineSettings() {
   }
 
   async function copy(text: string) {
-    try { await navigator.clipboard.writeText(text); void uiAlert('已複製 Webhook 網址'); } catch { void uiAlert('無法複製,請長按網址手動複製'); }
+    try { await navigator.clipboard.writeText(text); void uiAlert('已複製網址'); } catch { void uiAlert('無法複製,請長按網址手動複製'); }
   }
 
   if (locked === null) return <p className="py-10 text-center text-sm text-[#8a7f72]">載入中…</p>;
@@ -127,8 +129,23 @@ export default function ShopLineSettings() {
         <label className="block text-sm text-[#6b6156]">Channel access token
           <input type="password" autoComplete="off" value={token} onChange={(e) => setToken(e.target.value)} placeholder={status.configured ? '已設定(要更換再填)' : '長串英數字'} className={input} />
         </label>
+        <div className="border-t border-[#e5ded4] pt-4 sm:col-span-2">
+          <h3 className="font-semibold">訂閱自動綁定 · LINE Login</h3>
+          <p className="mt-1 text-sm text-[#6b6156]">{status.loginConfigured ? '金鑰已設定，請實際訂閱確認授權。' : '尚未設定，自動綁定暫不開放。'}</p>
+          <p className="mt-2 text-sm leading-6 text-[#6b6156]">請在同一個 Provider 建立 LINE Login 網頁應用程式，連結上方的官方帳號，將 Channel 設為 Published，並登錄下方 Callback URL。留白會保留既有金鑰；更換 Login Channel 時須同時填寫 ID 與 secret。</p>
+          <label className="mt-3 block text-sm text-[#6b6156]">Callback URL
+            <input readOnly value={status.callbackUrl} className={input} onFocus={(e) => e.currentTarget.select()} />
+          </label>
+          <button type="button" onClick={() => void copy(status.callbackUrl)} className="mt-2 rounded-lg border border-[#d7c9bd] px-3 py-2 text-sm">複製 Callback URL</button>
+        </div>
+        <label className="block text-sm text-[#6b6156]">LINE Login Channel ID
+          <input autoComplete="off" inputMode="numeric" value={loginId} onChange={(e) => setLoginId(e.target.value)} placeholder={status.loginConfigured ? '已設定(要更換再填)' : 'LINE Login Channel ID'} className={input} />
+        </label>
+        <label className="block text-sm text-[#6b6156]">LINE Login Channel secret
+          <input type="password" autoComplete="off" value={loginSecret} onChange={(e) => setLoginSecret(e.target.value)} placeholder={status.loginConfigured ? '已設定(要更換再填)' : '32 碼英數字'} className={input} />
+        </label>
         <div className="flex flex-wrap items-center gap-2 sm:col-span-2">
-          <button type="submit" disabled={busy || !secret.trim() || !token.trim()} className="rounded-full bg-[#1f1b19] px-5 py-2 text-sm font-semibold text-white disabled:opacity-40">{busy ? '驗證中…' : '驗證並儲存'}</button>
+          <button type="submit" disabled={busy || (!status.configured && (!secret.trim() || !token.trim())) || (!secret.trim() && !token.trim() && !loginId.trim() && !loginSecret.trim())} className="rounded-full bg-[#1f1b19] px-5 py-2 text-sm font-semibold text-white disabled:opacity-40">{busy ? '驗證中…' : '驗證並儲存'}</button>
           {status.configured ? <button type="button" disabled={busy} onClick={() => void clear()} className="rounded-full border border-[#e0b4b4] px-4 py-2 text-sm font-semibold text-[#c0392b]">解除串接</button> : null}
           <span className="text-xs text-[#a99e8f]">金鑰加密保存,儲存後不會再顯示。</span>
         </div>

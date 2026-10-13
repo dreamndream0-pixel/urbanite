@@ -32,7 +32,7 @@ export async function GET(request: Request) {
       if (bot?.basicId) addFriendUrl = lineAddFriendUrl({ id: bot.basicId, url: '' });
     }
     return NextResponse.json({ bound: Boolean(customer?.line_user_id), displayName: customer?.line_display_name ?? '',
-      linkUrl: cfg?.accessToken ? addFriendUrl : '', addFriendUrl, bindingMode: 'chat', available: !!cfg?.accessToken && !!addFriendUrl },
+      linkUrl: cfg?.accessToken && cfg.loginChannelId && cfg.loginChannelSecret ? '/auth/line/shop/start' : '', addFriendUrl, bindingMode: 'login', available: !!cfg?.accessToken && !!cfg.loginChannelId && !!cfg.loginChannelSecret },
     { headers: { 'Cache-Control': 'private, no-store' } });
   }
   // 「加入 LINE」專屬連結:LINE 授權途中切換到 LINE App / 內建瀏覽器也能完成綁定

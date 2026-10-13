@@ -33,7 +33,7 @@ export default function LineBindingRow() {
       .then((r) => { if (!r.ok) throw new Error('讀取失敗'); return r.json(); })
       .then((d) => {
         setStatus(d);
-        if (linked || error) setNotice(linked ? { ok: true, text: 'LINE 綁定完成,可在官方 LINE 查詢訂單與優惠券' } : { ok: false, text: error ?? '' });
+        if (linked || error) setNotice(linked ? { ok: true, text: 'LINE 綁定完成，可在官方 LINE 查詢訂單狀態' } : { ok: false, text: error ?? '' });
       })
       .catch(() => setFailed(true));
   }, []);
@@ -80,7 +80,7 @@ export default function LineBindingRow() {
         </div>
       ) : (
         <div className={`${box} flex-wrap`}>
-          <span className="min-w-0 flex-1 text-xs leading-5 text-[var(--c-text2)]">{status.available === false ? '商店尚未開放 LINE 通知' : status.bindingMode === 'chat' ? '加入官方 LINE 後，傳送「綁定」完成會員連結' : '綁定官方 LINE，接收訂單與出貨通知'}</span>
+          <span className="min-w-0 flex-1 text-xs leading-5 text-[var(--c-text2)]">{status.available === false ? '商店尚未開放 LINE 自動綁定' : '授權並加入官方 LINE，自動綁定訂單通知'}</span>
           {status.available !== false && status.linkUrl ? <a
             href={status.linkUrl}
             className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-[#06C755] px-3.5 py-1.5 text-xs font-semibold text-white"

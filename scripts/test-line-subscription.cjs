@@ -1,7 +1,7 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const ts = require('typescript');
-let shop = { id: 'tenant', status: 'active' }, user = { id: 'buyer' }, configured = true;
+let shop = { id: 'tenant', status: 'active' }, user = { id: 'buyer' }, configured = true, loginConfigured = true;
 let scopes = [], menuCalls = 0, checks = 0;
 const equal = (a, b) => { assert.deepEqual(a, b); checks++; };
 const mocks = {
@@ -11,7 +11,7 @@ const mocks = {
   '@/lib/line-messaging': {},
   '@/lib/line-login': { getLineLoginConfig: async () => ({ channelSecret: 'fake' }), createLinkToken: () => 'test-token' },
   '@/lib/line-bot': { syncMemberMenu: async () => { menuCalls++; } },
-  '@/lib/shop-line': { getShopLineConfig: async () => configured ? { accessToken: 'fake' } : null },
+  '@/lib/shop-line': { getShopLineConfig: async () => configured ? { accessToken: 'fake', ...(loginConfigured ? { loginChannelId: '123456', loginChannelSecret: 'secret' } : {}) } : null },
   '@/lib/shop': {
     getCurrentShop: async () => shop, isPlatformShop: s => s.id === 'platform',
     scopedClient: id => { scopes.push(id); return { from: table => {
@@ -26,8 +26,9 @@ new Function('require', 'module', 'exports', js)(key => { if (!(key in mocks)) t
 (async () => {
   const req = new Request('https://tenant.example.test/api/me/line');
   let data = await (await mod.exports.GET(req)).json();
-  equal(scopes, ['tenant']); equal(data.bindingMode, 'chat'); equal(data.available, true); equal(data.linkUrl, 'https://line.me/@tenant');
+  equal(scopes, ['tenant']); equal(data.bindingMode, 'login'); equal(data.available, true); equal(data.linkUrl, '/auth/line/shop/start');
   equal((await mod.exports.DELETE()).status, 200); equal(menuCalls, 0); equal(scopes.at(-1), 'tenant');
+  loginConfigured = false; data = await (await mod.exports.GET(req)).json(); equal(data.available, false); equal(data.linkUrl, '');
   configured = false; data = await (await mod.exports.GET(req)).json(); equal(data.available, false); equal(data.linkUrl, '');
   shop = { id: 'platform', status: 'active' };
   data = await (await mod.exports.GET(req)).json(); equal(data.bindingMode, 'login'); equal(data.linkUrl.startsWith('/auth/line/start?mode=link'), true);

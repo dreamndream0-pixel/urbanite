@@ -6,7 +6,7 @@ import { createBindToken, fetchBotProfile, replyMessage, verifyLineSignature, ty
 import type { Order } from '@/lib/types';
 import { getOrderNotificationConfig } from '@/lib/order-notification-config';
 
-export type ShopLineConfig = { channelSecret: string; accessToken: string };
+export type ShopLineConfig = { channelSecret: string; accessToken: string; loginChannelId?: string; loginChannelSecret?: string };
 const KIND = 'LINE';
 const money = (n: number) => `NT$${Math.round(Number(n) || 0).toLocaleString('en-US')}`;
 
@@ -33,7 +33,8 @@ const QUICK = { items: ['訂單查詢', '綁定'].map((label) => ({ type: 'actio
 const text = (t: string): LineMessage => ({ type: 'text', text: t.slice(0, 4900), quickReply: QUICK });
 
 async function boundUserId(shop: Shop, lineUserId: string) {
-  const { data } = await scopedClient(shop.id).from('customers').select('user_id').eq('line_user_id', lineUserId).maybeSingle();
+  const { data, error } = await scopedClient(shop.id).from('customers').select('user_id').eq('line_user_id', lineUserId).maybeSingle();
+  if (error) throw new Error('無法讀取 LINE 綁定狀態');
   return (data?.user_id as string | undefined) ?? null;
 }
 
@@ -86,19 +87,24 @@ export async function handleShopWebhook(shop: Shop, raw: string, signature: stri
 // 綁定:把 LINE userId 綁到這家店的會員資料(customers 依店家分開)
 export async function bindShopLine(shop: Shop, cfg: ShopLineConfig, userId: string, email: string, lineUserId: string) {
   const supabase = scopedClient(shop.id);
-  const { data: mine } = await supabase.from('customers').select('user_id').eq('user_id', userId).maybeSingle();
-  if (!mine) await supabase.from('customers').insert({ user_id: userId, email, name: '', phone: '' });
+  const { data: mine, error: lookupError } = await supabase.from('customers').select('user_id').eq('user_id', userId).maybeSingle();
+  if (lookupError) throw new Error('無法讀取會員資料');
+  if (!mine) {
+    const { error: insertError } = await supabase.from('customers').insert({ user_id: userId, email, name: '', phone: '' });
+    if (insertError) throw new Error('無法建立會員資料，請重新訂閱');
+  }
   const owner = await boundUserId(shop, lineUserId);
   if (owner && owner !== userId) throw new Error('這個 LINE 已綁定其他會員帳號,請先用該帳號解除綁定');
   const profile = await fetchBotProfile(lineUserId, cfg.accessToken).catch(() => null);
-  const { error } = await supabase.from('customers').update({
+  const { data: updated, error } = await supabase.from('customers').update({
     line_user_id: lineUserId,
     line_display_name: profile?.displayName ?? '',
     line_picture_url: profile?.pictureUrl ?? '',
     line_bound_at: new Date().toISOString(),
-  }).eq('user_id', userId);
+  }).eq('user_id', userId).select('user_id').single();
   if (error) throw new Error(error.message);
-  await push(cfg, lineUserId, [text(`綁定完成!之後在 ${shop.name} 的訂單成立、出貨都會在這裡通知你。`)]);
+  if (!updated) throw new Error('會員綁定未完成，請重新訂閱');
+  await push(cfg, lineUserId, [text(`綁定完成!之後在 ${shop.name} 的訂單成立、出貨都會在這裡通知你。`)]).catch(() => console.error('shop LINE binding confirmation unavailable'));
   return profile;
 }
 

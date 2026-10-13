@@ -26,6 +26,8 @@ async function status(shop: { id: string; slug: string }) {
     botName: info?.displayName ?? '',
     basicId: info?.basicId ?? '',
     webhookUrl: shopUrl(shop.slug, '/api/line/webhook'),
+    loginConfigured: Boolean(cfg?.loginChannelId && cfg?.loginChannelSecret),
+    callbackUrl: shopUrl(shop.slug, '/auth/line/shop/callback'),
   };
 }
 
@@ -46,13 +48,20 @@ export async function PUT(request: NextRequest) {
   if (shop === 'locked') return locked();
   if (shop === 'platform') return NextResponse.json({ error: '主站的 LINE 在「串接設定」設定' }, { status: 400 });
   const body = await request.json().catch(() => ({}));
-  const channelSecret = String(body?.channelSecret ?? '').trim();
-  const accessToken = String(body?.accessToken ?? '').trim();
+  const previous = await getShopLineConfig(shop.id);
+  const channelSecret = String(body?.channelSecret ?? '').trim() || previous?.channelSecret || '';
+  const accessToken = String(body?.accessToken ?? '').trim() || previous?.accessToken || '';
+  const newLoginId = String(body?.loginChannelId ?? '').trim();
+  const newLoginSecret = String(body?.loginChannelSecret ?? '').trim();
+  if (Boolean(newLoginId) !== Boolean(newLoginSecret)) return NextResponse.json({ error: '更換 LINE Login 時請同時填寫 Channel ID 和 Channel secret' }, { status: 400 });
+  const loginChannelId = newLoginId || previous?.loginChannelId;
+  const loginChannelSecret = newLoginSecret || previous?.loginChannelSecret;
+  if (loginChannelId && (!/^\d{5,20}$/.test(loginChannelId) || !/^[a-f0-9]{32}$/i.test(loginChannelSecret ?? ''))) return NextResponse.json({ error: 'LINE Login Channel ID 或 secret 格式不正確' }, { status: 400 });
   if (!/^[a-f0-9]{32}$/i.test(channelSecret)) return NextResponse.json({ error: 'Channel secret 格式不對(應為 32 碼英數字)' }, { status: 400 });
   if (accessToken.length < 20 || accessToken.length > 400) return NextResponse.json({ error: 'Channel access token 格式不對' }, { status: 400 });
   const info = await fetchBotInfo(accessToken);
   if (!info) return NextResponse.json({ error: 'LINE 驗證失敗:Channel access token 無效,請到 LINE Developers 重新發行後再貼上' }, { status: 400 });
-  await saveShopLineConfig(shop.id, { channelSecret, accessToken });
+  await saveShopLineConfig(shop.id, { channelSecret, accessToken, loginChannelId, loginChannelSecret });
   return NextResponse.json(await status(shop));
 }
 
