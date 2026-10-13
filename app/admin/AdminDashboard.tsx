@@ -4491,7 +4491,8 @@ function AdminOrderModal({
   const paidAt = detail?.history?.find((h) => h.type === 'payment' && h.to_status === 'PAID')?.created_at
     ?? detail?.payments?.find((p) => p.status === 'PAID')?.paid_at
     ?? undefined;
-  const hasShipment = (detail?.shipments?.length ?? 0) > 0;
+  // 已出貨的狀態直接視為有出貨單,避免明細還沒載入時先閃出「準備出貨」
+  const hasShipment = ['SHIPPED', 'IN_TRANSIT', 'AT_STORE', 'DELIVERED', 'PICKED_UP'].includes(order.fulfillment_status ?? '') || (detail?.shipments?.length ?? 0) > 0;
   // 宅配到府(非超商取貨):收款後才能出貨(貨到付款除外)
   // 手動超商取貨(店家自己寄,例如賣貨便):和宅配一樣手動填物流單號出貨,不建藍新物流單
   const isManualStore = order.store_lgs_type === 'MANUAL';
@@ -4663,7 +4664,7 @@ ${order.note ? `<div class="sec"><h2>備註</h2><p class="muted">${escapeHtml(or
           {/* 主要操作固定在內容最上方 */}
           <div className="flex flex-wrap gap-2">
             <ManualFulfillmentAction order={order} action="arrived" onUpdated={(updated) => { onOrderChange?.(updated); void loadDetail(); }} />
-            {isHomeDelivery && !hasShipment && order.status !== '取消' && order.status !== '退貨' ? (
+            {detail && isHomeDelivery && !hasShipment && order.status !== '取消' && order.status !== '退貨' ? (
               <button
                 onClick={() => {
                   if (!canShipHome) { void uiAlert('此訂單尚未收款,請先確認已收款(標記已付款)後再宅配出貨。'); return; }
