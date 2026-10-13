@@ -3,9 +3,8 @@
 import { getShopSecret, setShopSecret } from '@/lib/integrations';
 import { scopedClient, shopUrl, type Shop } from '@/lib/shop';
 import { createBindToken, fetchBotProfile, replyMessage, verifyLineSignature, type LineMessage } from '@/lib/line-messaging';
-import type { Order } from '@/lib/types';
 import { getOrderNotificationConfig } from '@/lib/order-notification-config';
-import { orderFlexMessage } from '@/lib/order-flex';
+import { orderFlexMessage, orderQueryMessage } from '@/lib/order-flex';
 import { runAsShop } from '@/lib/line-channel';
 
 export type ShopLineConfig = { channelSecret: string; accessToken: string; loginChannelId?: string; loginChannelSecret?: string };
@@ -45,16 +44,8 @@ function bindLink(shop: Shop, lineUserId: string, cfg: ShopLineConfig) {
 
 // 訂單查詢:最近 5 筆訂單,以 Flex 卡片輪播呈現
 async function ordersReply(shop: Shop, userId: string): Promise<LineMessage> {
-  const { data } = await scopedClient(shop.id).from('orders').select('order_no, status, total, created_at, items, payment_method, shipping_method, store_name').eq('user_id', userId).order('created_at', { ascending: false }).limit(5);
-  const orders = (data ?? []) as Order[];
-  if (!orders.length) return text('目前沒有訂單紀錄。');
-  const link = shopUrl(shop.slug, '/account?tab=orders');
-  const bubbles = orders.map((o) => orderFlexMessage({
-    shopName: shop.name, order: o, link,
-    title: o.status || '訂單',
-    subtitle: `下單日期 ${new Date(o.created_at ?? '').toLocaleDateString('zh-TW', { timeZone: 'Asia/Taipei' })}`,
-  }).contents);
-  return { type: 'flex', altText: `最近 ${orders.length} 筆訂單`, contents: { type: 'carousel', contents: bubbles }, quickReply: QUICK } as unknown as LineMessage;
+  const card = await orderQueryMessage(scopedClient(shop.id), userId, shop.name, shopUrl(shop.slug, '/account?tab=orders'));
+  return card ? { ...card, quickReply: QUICK } : text('目前沒有訂單紀錄。');
 }
 
 type LineEvent = { type: string; replyToken?: string; source?: { type: string; userId?: string }; message?: { type: string; text?: string } };

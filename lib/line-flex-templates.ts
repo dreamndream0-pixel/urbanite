@@ -320,6 +320,7 @@ export type OrderCardData = {
   items: OrderCardItem[];
   rows?: [string, string][]; // 額外資訊(付款方式、門市、物流單號…)
   step?: number; // 出貨/退貨進度(0 起算)
+  ship?: { step: number; last: string; rows: [string, string][] } | null; // 訂單明細卡的出貨狀態(進度、物流、單號)
   link: string; // 查看訂單
   homeLink: string;
   buttonLabel?: string;
@@ -358,6 +359,12 @@ export function orderBubble(kind: OrderKind | string, d: OrderCardData, color?: 
       box('horizontal', [txt(`#${d.orderNo}`, { size: 'xxs', color: '#999999' }), txt(d.date ?? '', { size: 'xxs', color: '#999999', align: 'end' })], { margin: 'xs' }),
       sep('#eeeeee', 'md'),
     );
+    // 出貨狀態:進度條+物流資訊
+    if (d.ship) {
+      body.push(steps(['訂單處理', '已出貨', '配送中', d.ship.last], d.ship.step, c));
+      body.push(...d.ship.rows.filter(([, v]) => v).map(([kk, v]) => kv(kk, v)));
+      body.push(sep('#eeeeee', 'md'));
+    }
     d.items.slice(0, 4).forEach((i) => body.push(box('horizontal', [
       thumb(i.image, '44px'),
       box('vertical', [txt(safe(i.name, 40, '商品'), { size: 'xs', color: '#222222', wrap: true, maxLines: 2 }), ...(i.variant ? [txt(clip(i.variant, 30), { size: 'xxs', color: '#999999' })] : [])], { flex: 1, paddingStart: '10px' }),
