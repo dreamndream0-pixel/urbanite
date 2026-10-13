@@ -7,6 +7,18 @@ import { getShopLineConfig } from '@/lib/shop-line';
 import { orderEmailHtml, sellerRecipients, transferBlock } from '@/lib/order-email';
 import { shopUrl, URBANITE_SHOP_ID } from '@/lib/shop';
 import type { Order } from '@/lib/types';
+import { orderFlexMessage } from '@/lib/order-flex';
+
+// LINE 卡片上的說明文字與顏色
+const BUYER_TEXT: Partial<Record<OrderNoticeEvent, string>> = {
+  created: '感謝您的訂購,我們已收到訂單。', ready: '商品正在準備出貨。', shipped: '商品已出貨,請留意配送進度。',
+  paid: '已確認收到您的款項。', arrived: '商品已送達,請記得取貨。', picked_up: '已完成取貨,感謝您的購買。',
+  completed: '訂單已完成,期待再次為您服務。', cancelled: '您的訂單已取消。', refunded: '退款已處理。', return_requested: '已收到您的退貨申請,我們會盡快處理。',
+};
+const SELLER_TEXT: Partial<Record<OrderNoticeEvent, string>> = {
+  created: '有一筆新訂單,請盡快處理。', paid: '買家已付款。', return_requested: '買家提出退貨申請,請到後台處理。', cancelled: '訂單已取消。',
+};
+const EVENT_COLOR: Partial<Record<OrderNoticeEvent, string>> = { cancelled: '#8a7f72', refunded: '#8a7f72', return_requested: '#9a5b13', arrived: '#06C755', picked_up: '#06C755', completed: '#06C755' };
 
 type Payload = { body: Record<string, unknown>; endpoint: 'email' | 'push' | 'multicast' };
 type Job = {
@@ -73,7 +85,21 @@ async function prepare(job: Job, sender: string, notify: string): Promise<Payloa
   ids = [...new Set(ids)];
   if (!ids.length) throw new NoticeError('收件人尚未綁定本商店 LINE', false, true);
   if (ids.length > 500) throw new NoticeError('LINE 收件人超過上限');
-  const messages = [{ type: 'text', text: `${subject}\n訂單金額：NT$${Number(order.total).toLocaleString('en-US')}\n\n查看訂單：${link}`.slice(0, 4900) }];
+  const extra: [string, string][] = [];
+  if (['shipped', 'arrived', 'ready'].includes(job.event)) {
+    const { data: ship } = await db.from('shipments').select('carrier,tracking_number').eq('order_id', order.id).order('created_at', { ascending: false }).limit(1).maybeSingle();
+    if (ship?.carrier) extra.push(['物流', String(ship.carrier)]);
+    if (ship?.tracking_number) extra.push(['物流單號', String(ship.tracking_number)]);
+  }
+  const seller = job.audience === 'seller';
+  const messages = [orderFlexMessage({
+    shopName: shop.name,
+    title: seller && job.event === 'created' ? '新訂單' : label,
+    subtitle: (seller ? SELLER_TEXT : BUYER_TEXT)[job.event],
+    order, link, extra,
+    buttonLabel: seller ? '到後台處理' : '查看訂單',
+    color: EVENT_COLOR[job.event] ?? '#1f1b19',
+  })];
   return ids.length === 1 ? { endpoint: 'push', body: { to: ids[0], messages } } : { endpoint: 'multicast', body: { to: ids, messages } };
 }
 

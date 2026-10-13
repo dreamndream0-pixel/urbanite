@@ -71,7 +71,7 @@ async function main() {
       '@/lib/order-notification-settings': settings,
       '@/lib/line-messaging': { getMessagingConfig: async () => ({ accessToken: 'fake' }) },
       '@/lib/shop-line': { getShopLineConfig: async () => ({ accessToken: 'fake' }) },
-      '@/lib/order-email': {}, '@/lib/shop': { URBANITE_SHOP_ID: 'shop' },
+      '@/lib/order-email': {}, '@/lib/order-flex': load('lib/order-flex.ts'), '@/lib/shop': { URBANITE_SHOP_ID: 'shop' },
     });
     global.fetch = async (url, options) => { calls.push({ url, options }); return response; };
     const run = async (overrides = {}, res = new Response('{}', { status: 200 })) => {

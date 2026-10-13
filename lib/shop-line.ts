@@ -5,6 +5,7 @@ import { scopedClient, shopUrl, type Shop } from '@/lib/shop';
 import { createBindToken, fetchBotProfile, replyMessage, verifyLineSignature, type LineMessage } from '@/lib/line-messaging';
 import type { Order } from '@/lib/types';
 import { getOrderNotificationConfig } from '@/lib/order-notification-config';
+import { orderFlexMessage } from '@/lib/order-flex';
 
 export type ShopLineConfig = { channelSecret: string; accessToken: string; loginChannelId?: string; loginChannelSecret?: string };
 const KIND = 'LINE';
@@ -114,13 +115,16 @@ export async function notifyShopOrder(shop: Shop, orderId: string, kind: 'create
   const cfg = await getShopLineConfig(shop.id);
   if (!cfg) return;
   const supabase = scopedClient(shop.id);
-  const { data: order } = await supabase.from('orders').select('order_no, total, user_id, payment_method').eq('id', orderId).maybeSingle();
+  const { data: order } = await supabase.from('orders').select('order_no, total, user_id, payment_method, shipping_method, store_name, items').eq('id', orderId).maybeSingle();
   if (!order?.user_id) return;
   const { data: customer } = await supabase.from('customers').select('line_user_id').eq('user_id', order.user_id).maybeSingle();
   if (!customer?.line_user_id) return;
   const link = shopUrl(shop.slug, '/account?tab=orders');
-  const body = kind === 'created'
-    ? `訂單成立通知\n\n訂單編號:${order.order_no}\n金額:${money(order.total)}\n付款方式:${order.payment_method ?? ''}\n\n查看訂單:${link}`
-    : `出貨通知\n\n訂單編號:${order.order_no} 已出貨${detail ? `\n${detail}` : ''}\n\n查看訂單:${link}`;
-  await push(cfg, customer.line_user_id as string, [text(body)]);
+  const card = orderFlexMessage({
+    shopName: shop.name, order, link,
+    title: kind === 'created' ? '下單成立' : '已出貨',
+    subtitle: kind === 'created' ? '感謝您的訂購,我們已收到訂單。' : '商品已出貨,請留意配送進度。',
+    extra: kind === 'shipped' && detail ? [['出貨資訊', detail]] : [],
+  });
+  await push(cfg, customer.line_user_id as string, [card as unknown as LineMessage]);
 }
