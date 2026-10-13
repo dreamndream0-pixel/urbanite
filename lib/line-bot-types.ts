@@ -11,8 +11,9 @@ export type BotMessage =
   | { id: string; type: 'image'; url: string }
   | { id: string; type: 'card'; card: BotCard }
   | { id: string; type: 'carousel'; cards: BotCard[] }
-  | { id: string; type: 'products'; productIds: string[] }
-  | { id: string; type: 'coupon'; couponId: string }
+  | { id: string; type: 'products'; productIds: string[]; style?: string }
+  | { id: string; type: 'coupon'; couponId: string; style?: string }
+  | { id: string; type: 'member'; style: string }
   | { id: string; type: 'bind' };
 
 export type MessageSet = { messages: BotMessage[]; quickReplies: string[] };
@@ -35,8 +36,9 @@ export const MESSAGE_TYPES: { type: BotMessage['type']; label: string; hint: str
   { type: 'image', label: '圖片', hint: '單張圖片' },
   { type: 'card', label: '圖文卡片', hint: '圖片、標題、按鈕' },
   { type: 'carousel', label: '多頁卡片', hint: '左右滑動' },
-  { type: 'products', label: '商品', hint: '選網站商品' },
-  { type: 'coupon', label: '優惠券', hint: '附領取按鈕' },
+  { type: 'products', label: '商品', hint: '5 款商品卡模板' },
+  { type: 'coupon', label: '優惠券', hint: '5 款券面模板' },
+  { type: 'member', label: '會員卡', hint: '5 款會員卡模板' },
   { type: 'bind', label: '會員綁定', hint: '加入會員/綁定' },
 ];
 
@@ -53,8 +55,9 @@ export function blankMessage(type: BotMessage['type']): BotMessage {
     case 'image': return { id, type, url: '' };
     case 'card': return { id, type, card: blankCard() };
     case 'carousel': return { id, type, cards: [blankCard(), blankCard()] };
-    case 'products': return { id, type, productIds: [] };
-    case 'coupon': return { id, type, couponId: '' };
+    case 'products': return { id, type, productIds: [], style: 'fashion' };
+    case 'coupon': return { id, type, couponId: '', style: '' };
+    case 'member': return { id, type, style: 'classic' };
     default: return { id, type: 'bind' };
   }
 }
@@ -98,6 +101,7 @@ export type BotConfig = {
   builtins: Record<BuiltinKey, Builtin>;
   notify: Record<NotifyKey, NotifyRule>;
   brandColor: string;
+  memberStyle: string; // 內建「會員資料」回覆的會員卡模板
 };
 
 export const DEFAULT_BOT_CONFIG: BotConfig = {
@@ -124,6 +128,7 @@ export const DEFAULT_BOT_CONFIG: BotConfig = {
     cancelled: { enabled: false, button: false, text: '訂單 {訂單編號} 已取消,有任何問題都可以直接在這裡留言給我們。' },
   },
   brandColor: '#1f1b19',
+  memberStyle: 'classic',
 };
 
 // 店家官網的預設機器人(和店家 LINE 原本的行為一致):歡迎+綁定、訂單查詢;優惠券、購物金、會員資料預設關閉
@@ -144,6 +149,7 @@ export const SHOP_DEFAULT_BOT_CONFIG: BotConfig = {
   },
   notify: DEFAULT_BOT_CONFIG.notify,
   brandColor: '#1f1b19',
+  memberStyle: 'classic',
 };
 
 // 合併預設值(舊資料缺的欄位補上);defaults:主站或店家的預設
@@ -166,6 +172,7 @@ export function resolveBotConfig(raw: unknown, defaults: BotConfig = DEFAULT_BOT
     builtins,
     notify,
     brandColor: typeof d.brandColor === 'string' && /^#[0-9a-f]{6}$/i.test(d.brandColor) ? d.brandColor : DEFAULT_BOT_CONFIG.brandColor,
+    memberStyle: typeof d.memberStyle === 'string' && d.memberStyle ? d.memberStyle : DEFAULT_BOT_CONFIG.memberStyle,
   };
 }
 

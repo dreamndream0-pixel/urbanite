@@ -14,6 +14,10 @@ import type { Discount, Product } from '@/lib/types';
 import { uiAlert } from '@/lib/ui-dialog';
 import LinePreview from './LinePreview';
 import ShopLineSettings from '../ShopLineSettings';
+import TemplatePicker from './TemplatePicker';
+import FlexView from './FlexView';
+import { couponCard, memberCard, productCard } from './templateSamples';
+import { COUPON_STYLES, MEMBER_STYLES, ORDER_KINDS, PRODUCT_STYLES, SAMPLE_ORDER, orderBubble, orderKindOf } from '@/lib/line-flex-templates';
 import MessageSetEditor from './MessageSetEditor';
 import RulesPanel from './RulesPanel';
 import MenuPanel from './MenuPanel';
@@ -30,13 +34,16 @@ export type BotData = {
   followers: { followers: number; blocks: number } | null;
   ready: boolean;
   notifyStarted: boolean;
+  platform?: boolean;
+  shopName?: string;
 };
 
-type Tab = 'connect' | 'welcome' | 'rules' | 'menu' | 'broadcast' | 'stats' | 'settings';
+type Tab = 'connect' | 'welcome' | 'rules' | 'templates' | 'menu' | 'broadcast' | 'stats' | 'settings';
 const TABS: { key: Tab; label: string }[] = [
   { key: 'connect', label: '連線設定' },
   { key: 'welcome', label: '歡迎訊息' },
   { key: 'rules', label: '自動回覆' },
+  { key: 'templates', label: '卡片模板' },
   { key: 'menu', label: '圖文選單' },
   { key: 'broadcast', label: '推播' },
   { key: 'stats', label: '數據' },
@@ -113,6 +120,7 @@ export default function LineBotManager({ products, coupons, logoUrl, platform = 
       {tab === 'connect' ? <ShopLineSettings /> : null}
       {tab === 'welcome' ? <WelcomePanel draft={draft} setDraft={setDraft} {...shared} /> : null}
       {tab === 'rules' ? <RulesPanel rules={data.rules} onChange={(rules) => setData({ ...data, rules })} {...shared} /> : null}
+      {tab === 'templates' ? <TemplatesPanel shopName={data.shopName} products={products} coupons={coupons} /> : null}
       {tab === 'menu' ? <MenuPanel menus={data.menus} onChange={(menus) => setData({ ...data, menus })} /> : null}
       {tab === 'broadcast' ? (
         <BroadcastPanel broadcasts={data.broadcasts} quota={data.quota} followers={data.followers} onChange={(broadcasts) => setData({ ...data, broadcasts })} {...shared} />
@@ -191,6 +199,11 @@ function SettingsPanel({ draft, setDraft, ready, platform, ...shared }: { draft:
                   </div>
                   <Toggle on={b.enabled} onChange={(v) => setBuiltin(k, { enabled: v })} label={BUILTIN_LABELS[k].label} />
                 </div>
+                {b.enabled && k === 'member' ? (
+                  <Field label="會員卡樣式" hint="傳「會員資料」時以這張會員卡回覆">
+                    <TemplatePicker options={MEMBER_STYLES} value={draft.memberStyle} onChange={(memberStyle) => setDraft({ ...draft, memberStyle })} render={(key) => memberCard(key)} />
+                  </Field>
+                ) : null}
                 {b.enabled ? (
                   <div className="grid gap-2.5 sm:grid-cols-2">
                     <Field label="觸發關鍵字"><TagInput value={b.keywords} onChange={(keywords) => setBuiltin(k, { keywords })} placeholder="按 Enter 新增" /></Field>
@@ -231,6 +244,44 @@ function SettingsPanel({ draft, setDraft, ready, platform, ...shared }: { draft:
         </label>
       </Card>
       <p className="text-center text-[11px] text-[#a99e8f]">修改後記得按下方「儲存設定」</p>
+    </div>
+  );
+}
+
+// 卡片模板總覽:會員卡、商品卡、優惠券可在訊息中選用;訂單卡依事件自動套用在訂單通知與訂單查詢
+const ORDER_SAMPLES: Record<string, { title: string; subtitle: string; event?: string }> = {
+  created: { title: '訂單成立', subtitle: '感謝您的訂購!', event: 'created' },
+  shipping: { title: '訂單已出貨', subtitle: '您的商品正在配送中', event: 'shipped' },
+  delivered: { title: '已送達', subtitle: '您的商品已順利送達!', event: 'picked_up' },
+  detail: { title: '處理中', subtitle: '' },
+  return: { title: '退貨處理中', subtitle: '我們已收到您的退貨申請', event: 'return_requested' },
+};
+
+function TemplatesPanel({ shopName, products, coupons }: { shopName?: string; products: Product[]; coupons: Discount[] }) {
+  const sampleProduct = products.find((p) => p.status !== '已下架' && (p.image || p.images?.length));
+  const sampleCoupon = coupons.find((c) => c.active !== false);
+  const row = (title: string, desc: string, cards: { key: string; label: string; contents: Record<string, unknown> }[]) => (
+    <Card title={title} desc={desc}>
+      <div className="flex gap-3 overflow-x-auto pb-2 [scrollbar-width:thin]">
+        {cards.map((c, i) => (
+          <div key={c.key} className="shrink-0">
+            <div className="rounded-2xl bg-[#8fa6c3] p-2"><FlexView contents={c.contents} scale={0.58} /></div>
+            <p className="mt-1.5 text-center text-xs text-[#6b6156]">{i + 1}. {c.label}</p>
+          </div>
+        ))}
+      </div>
+    </Card>
+  );
+  return (
+    <div className="space-y-4">
+      {row('會員卡片', '在歡迎訊息、自動回覆或推播「新增訊息 → 會員卡」選用;內建查詢「會員資料」也會用會員卡回覆(在「內建查詢與設定」選款式)。', MEMBER_STYLES.map((s) => ({ key: s.key, label: s.label, contents: memberCard(s.key, shopName) })))}
+      {row('商品卡片', '「新增訊息 → 商品」選擇商品後,在「卡片樣式」選用。商品圖、名稱、價格會自動帶入。', PRODUCT_STYLES.map((s) => ({ key: s.key, label: s.label, contents: productCard(s.key, sampleProduct) })))}
+      {row('訂單卡片', '自動套用:訂單通知(系統設定 → 通知)與訂單查詢會依訂單狀態使用對應的卡片,不需要設定。', ORDER_KINDS.map((s) => {
+        const o = ORDER_SAMPLES[s.key];
+        const { step } = orderKindOf(o.event);
+        return { key: s.key, label: s.label, contents: orderBubble(s.key, { ...SAMPLE_ORDER, shopName: shopName || SAMPLE_ORDER.shopName, title: o.title, subtitle: o.subtitle, step, rows: s.key === 'shipping' ? [['物流單號', '8123456789']] : [] }) };
+      }))}
+      {row('優惠券卡片', '「新增訊息 → 優惠券」選擇優惠券後,在「券面樣式」選用。', COUPON_STYLES.map((s) => ({ key: s.key, label: s.label, contents: couponCard(s.key, sampleCoupon) })))}
     </div>
   );
 }

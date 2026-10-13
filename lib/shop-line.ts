@@ -134,6 +134,7 @@ export async function notifyShopOrder(shop: Shop, orderId: string, kind: 'create
     title: kind === 'created' ? '下單成立' : '已出貨',
     subtitle: kind === 'created' ? '感謝您的訂購,我們已收到訂單。' : '商品已出貨,請留意配送進度。',
     extra: kind === 'shipped' && detail ? [['出貨資訊', detail]] : [],
+    event: kind,
   });
   await push(cfg, customer.line_user_id as string, [card as unknown as LineMessage]);
 }

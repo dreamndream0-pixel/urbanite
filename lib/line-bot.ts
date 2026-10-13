@@ -21,6 +21,7 @@ import {
 import type { Discount } from '@/lib/types';
 import { scopedClient, URBANITE_SHOP_ID } from '@/lib/shop';
 import { orderFlexMessage } from '@/lib/order-flex';
+import { couponBubble as couponTemplate, couponValueText, defaultCouponStyle, memberBubble as memberTemplate, productBubble as productTemplate } from '@/lib/line-flex-templates';
 
 const API = 'https://api.line.me/v2/bot';
 const DATA_API = 'https://api-data.line.me/v2/bot';
@@ -160,32 +161,43 @@ function bubble(card: BotCard, brand: string, ctx: SendContext, secret: string, 
   };
 }
 
-function couponBubble(c: Discount, brand: string, ctx: SendContext, secret: string) {
-  const value = c.type === 'percent' ? `${c.value}% OFF` : c.type === 'free_shipping' ? '免運' : `折 ${formatter.format(c.value)}`;
-  const rule = [c.min_spend ? `滿 ${formatter.format(c.min_spend)} 可用` : '無消費門檻', c.end_at ? `${new Date(c.end_at).toLocaleDateString('zh-TW', { timeZone: 'Asia/Taipei' })} 前有效` : ''].filter(Boolean).join('・');
-  return {
-    type: 'bubble',
-    body: {
-      type: 'box',
-      layout: 'vertical',
-      paddingAll: '20px',
-      spacing: 'sm',
-      contents: [
-        { type: 'text', text: 'COUPON', size: 'xxs', color: '#a99e8f', weight: 'bold' },
-        { type: 'text', text: (c.name || c.code).slice(0, 60), size: 'md', weight: 'bold', color: '#1f1b19', wrap: true },
-        { type: 'text', text: value, size: 'xxl', weight: 'bold', color: brand, margin: 'md' },
-        { type: 'text', text: rule, size: 'xs', color: '#8a7f72', wrap: true },
-        { type: 'separator', margin: 'lg', color: '#eee6db' },
-        { type: 'text', text: `代碼 ${c.code}`, size: 'xs', color: '#6b6156', margin: 'md' },
-      ],
-    },
-    footer: {
-      type: 'box',
-      layout: 'vertical',
-      paddingAll: '12px',
-      contents: [{ type: 'button', style: 'primary', height: 'sm', color: brand, action: lineAction({ type: 'page', value: 'coupons' }, '領取優惠券', ctx, secret, 0) }],
-    },
-  };
+// 優惠券:套用券面模板(style 空白時依券種自動選:免運 → 免運券,其他 → 折扣券)
+function couponBubble(c: Discount, style: string | undefined, ctx: SendContext, secret: string) {
+  const site = botSiteUrl();
+  return couponTemplate(style || defaultCouponStyle(c.type), {
+    name: c.name || c.code,
+    valueText: couponValueText(c),
+    condition: c.min_spend ? `滿 ${formatter.format(c.min_spend)} 可用` : '無消費門檻',
+    code: c.code,
+    expiry: c.end_at ? new Date(c.end_at).toLocaleDateString('zh-TW', { timeZone: 'Asia/Taipei' }) : '',
+    claimUrl: trackedUrl('/account?tab=coupons', `${ctx.trackKey}:coupon`, secret),
+    shopUrl: trackedUrl('/', `${ctx.trackKey}:shop`, secret) || `${site}/`,
+  });
+}
+
+// 會員卡:依 LINE 使用者找出這家店的會員,帶入訂單數、累計消費、可用優惠券
+export async function memberCardMessage(lineUserId: string | undefined, style: string, trackKey: string): Promise<LineMessage | null> {
+  if (!lineUserId) return null;
+  const supabase = scopedClient(botShopId());
+  const { data: customer } = await supabase.from('customers').select('id, user_id, name, line_display_name, line_picture_url').eq('line_user_id', lineUserId).maybeSingle();
+  if (!customer?.user_id) return null;
+  const [{ data: orders }, { count: coupons }] = await Promise.all([
+    supabase.from('orders').select('total, status').eq('user_id', customer.user_id),
+    supabase.from('user_coupons').select('id', { count: 'exact', head: true }).eq('user_id', customer.user_id).eq('status', 'available'),
+  ]);
+  const valid = (orders ?? []).filter((o) => o.status !== '已取消');
+  const { channelSecret } = await botChannel();
+  const link = (path: string, key: string) => trackedUrl(path, `${trackKey}:${key}`, channelSecret);
+  const contents = memberTemplate(style, {
+    shopName: botShop().name,
+    name: customer.name || customer.line_display_name || '會員',
+    memberNo: String(customer.id ?? customer.user_id).replace(/-/g, '').slice(0, 10).toUpperCase(),
+    avatar: customer.line_picture_url || '',
+    orderCount: valid.length,
+    couponCount: coupons ?? 0,
+    spent: valid.reduce((n, o) => n + (Number(o.total) || 0), 0),
+  }, { account: link('/account', 'account'), orders: link('/account?tab=orders', 'orders'), coupons: link('/account?tab=coupons', 'coupons'), home: link('/', 'home') });
+  return { type: 'flex', altText: `${botShop().name} 會員卡`.slice(0, 300), contents };
 }
 
 function quickReply(items: string[]) {
@@ -216,35 +228,43 @@ export async function toLineMessages(set: MessageSet, ctx: SendContext, brand: s
       }
     } else if (m.type === 'products') {
       if (!m.productIds.length) continue;
-      const { data } = await supabase.from('products').select('id, name, price, original_price, image, images, status').in('id', m.productIds.slice(0, 10));
+      const { data } = await supabase.from('products').select('id, name, tagline, price, original_price, image, images, status').in('id', m.productIds.slice(0, 10));
       const rows = (data ?? []).filter((p) => p.status !== '已下架');
       const sorted = m.productIds.map((id) => rows.find((p) => p.id === id)).filter(Boolean) as typeof rows;
       if (!sorted.length) continue;
+      const productUrl = (id: string) => trackedUrl(`/products/${encodeURIComponent(id)}`, `${ctx.trackKey}:p:${id}`, channelSecret);
       out.push({
         type: 'flex',
         altText: `推薦商品:${sorted[0].name}`.slice(0, 300),
         contents: {
           type: 'carousel',
           contents: sorted.map((p) =>
-            bubble(
-              {
-                image: p.image || p.images?.[0] || '',
-                title: p.name,
-                body: p.original_price && p.original_price > p.price ? `${formatter.format(p.price)}  原價 ${formatter.format(p.original_price)}` : formatter.format(p.price),
-                buttons: [{ label: '查看商品', action: { type: 'url', value: `/products/${encodeURIComponent(p.id)}` } }],
-              },
-              brand,
-              { ...ctx, trackKey: `${ctx.trackKey}:p:${p.id}` },
-              channelSecret,
-              { aspect: '4:5' },
-            ),
+            m.style
+              ? productTemplate(m.style, { name: p.name, subtitle: p.tagline || '', price: p.price, originalPrice: p.original_price, image: abs(p.image || p.images?.[0] || ''), url: productUrl(p.id) })
+              : bubble(
+                  {
+                    image: p.image || p.images?.[0] || '',
+                    title: p.name,
+                    body: p.original_price && p.original_price > p.price ? `${formatter.format(p.price)}  原價 ${formatter.format(p.original_price)}` : formatter.format(p.price),
+                    buttons: [{ label: '查看商品', action: { type: 'url', value: `/products/${encodeURIComponent(p.id)}` } }],
+                  },
+                  brand,
+                  { ...ctx, trackKey: `${ctx.trackKey}:p:${p.id}` },
+                  channelSecret,
+                  { aspect: '4:5' },
+                ),
           ),
         },
       });
     } else if (m.type === 'coupon') {
       if (!m.couponId) continue;
       const { data: c } = await supabase.from('discounts').select('*').eq('id', m.couponId).maybeSingle();
-      if (c) out.push({ type: 'flex', altText: `優惠券:${c.name || c.code}`.slice(0, 300), contents: couponBubble(c as Discount, brand, ctx, channelSecret) });
+      if (c) out.push({ type: 'flex', altText: `優惠券:${c.name || c.code}`.slice(0, 300), contents: couponBubble(c as Discount, m.style, ctx, channelSecret) });
+    } else if (m.type === 'member') {
+      // 已綁定會員才有會員卡;還沒綁定的人改送綁定卡片
+      const card = await memberCardMessage(ctx.lineUserId, m.style, `${ctx.trackKey}:member`);
+      if (card) out.push(card);
+      else if (ctx.lineUserId) out.push(...(await toLineMessages({ messages: [{ id: 'bind', type: 'bind' }], quickReplies: [] }, ctx, brand)));
     } else if (m.type === 'bind') {
       const site = botSiteUrl();
       const bindLink = ctx.lineUserId ? bindUrl(createBindToken(ctx.lineUserId, channelSecret), site) : `${site}/account`;
@@ -452,7 +472,7 @@ export async function processOrderNotifications() {
       order: full ?? order,
       link: trackedUrl('/account?tab=orders', `notify:${key}`, channelSecret),
       extra: key === 'shipped' && ship?.tracking_number ? [['物流單號', String(ship.tracking_number)]] : [],
-      color: config.brandColor,
+      event: key,
     }) as LineMessage;
     try {
       await pushMessages(customer.line_user_id, [message]);

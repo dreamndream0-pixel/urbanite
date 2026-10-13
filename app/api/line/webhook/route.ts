@@ -11,7 +11,7 @@ import {
   verifyLineSignature,
   type LineMessage,
 } from '@/lib/line-messaging';
-import { fillVars, keywordMatches, loadBotConfig, loadRules, logEvent, ruleActiveNow, toLineMessages } from '@/lib/line-bot';
+import { fillVars, keywordMatches, loadBotConfig, loadRules, logEvent, memberCardMessage, ruleActiveNow, toLineMessages } from '@/lib/line-bot';
 import type { BuiltinKey, MessageSet } from '@/lib/line-bot-types';
 import { getCurrentShop, isPlatformShop } from '@/lib/shop';
 import { handleShopWebhook } from '@/lib/shop-line';
@@ -88,6 +88,14 @@ async function handleEvent(event: LineEvent, accessToken: string) {
     if (key === 'orders') {
       const quick = memberQuick.length ? { items: memberQuick.slice(0, 13).map((t) => ({ type: 'action', action: { type: 'message', label: t.slice(0, 20), text: t } })) } : undefined;
       const card = await ordersFlex(customer.user_id, quick).catch(() => null);
+      if (card) {
+        const intro = (b.intro || '').trim();
+        return replyMessage(event.replyToken!, intro ? [{ type: 'text', text: intro.slice(0, 4900) }, card] : [card], accessToken);
+      }
+    }
+    if (key === 'member') {
+      // 會員資料:以會員卡模板回覆(後台「內建查詢與設定」選擇款式)
+      const card = await memberCardMessage(lineUserId, config.memberStyle, 'builtin:member').catch(() => null);
       if (card) {
         const intro = (b.intro || '').trim();
         return replyMessage(event.replyToken!, intro ? [{ type: 'text', text: intro.slice(0, 4900) }, card] : [card], accessToken);

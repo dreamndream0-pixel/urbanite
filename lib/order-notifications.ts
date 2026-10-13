@@ -9,7 +9,7 @@ import { shopUrl, URBANITE_SHOP_ID } from '@/lib/shop';
 import type { Order } from '@/lib/types';
 import { orderFlexMessage } from '@/lib/order-flex';
 
-// LINE 卡片上的說明文字與顏色
+// LINE 卡片上的說明文字
 const BUYER_TEXT: Partial<Record<OrderNoticeEvent, string>> = {
   created: '感謝您的訂購,我們已收到訂單。', ready: '商品正在準備出貨。', shipped: '商品已出貨,請留意配送進度。',
   paid: '已確認收到您的款項。', arrived: '商品已送達,請記得取貨。', picked_up: '已完成取貨,感謝您的購買。',
@@ -18,7 +18,7 @@ const BUYER_TEXT: Partial<Record<OrderNoticeEvent, string>> = {
 const SELLER_TEXT: Partial<Record<OrderNoticeEvent, string>> = {
   created: '有一筆新訂單,請盡快處理。', paid: '買家已付款。', return_requested: '買家提出退貨申請,請到後台處理。', cancelled: '訂單已取消。',
 };
-const EVENT_COLOR: Partial<Record<OrderNoticeEvent, string>> = { cancelled: '#8a7f72', refunded: '#8a7f72', return_requested: '#9a5b13', arrived: '#06C755', picked_up: '#06C755', completed: '#06C755' };
+
 
 type Payload = { body: Record<string, unknown>; endpoint: 'email' | 'push' | 'multicast' };
 type Job = {
@@ -98,7 +98,7 @@ async function prepare(job: Job, sender: string, notify: string): Promise<Payloa
     subtitle: (seller ? SELLER_TEXT : BUYER_TEXT)[job.event],
     order, link, extra,
     buttonLabel: seller ? '到後台處理' : '查看訂單',
-    color: EVENT_COLOR[job.event] ?? '#1f1b19',
+    event: job.event,
   })];
   return ids.length === 1 ? { endpoint: 'push', body: { to: ids[0], messages } } : { endpoint: 'multicast', body: { to: ids, messages } };
 }

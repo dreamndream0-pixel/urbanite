@@ -18,6 +18,9 @@ import {
 import type { Discount, Product } from '@/lib/types';
 import { uiAlert } from '@/lib/ui-dialog';
 import { Field, inputClass, smallBtn, Svg, TagInput, uploadBotImage } from './ui';
+import TemplatePicker from './TemplatePicker';
+import { couponCard, memberCard, productCard } from './templateSamples';
+import { COUPON_STYLES, MEMBER_STYLES, PRODUCT_STYLES } from '@/lib/line-flex-templates';
 
 const formatter = new Intl.NumberFormat('zh-TW', { style: 'currency', currency: 'TWD', maximumFractionDigits: 0 });
 
@@ -148,11 +151,35 @@ function MessageBody({
       </div>
     );
   }
-  if (m.type === 'products') return <ProductPicker ids={m.productIds} onChange={(productIds) => onChange({ ...m, productIds })} products={products} />;
+  if (m.type === 'products') {
+    const first = products.find((p) => p.id === m.productIds[0]);
+    return (
+      <div className="space-y-3">
+        <Field label="卡片樣式" hint="點選套用,右側預覽會即時更新">
+          <TemplatePicker options={PRODUCT_STYLES} value={m.style ?? ''} onChange={(style) => onChange({ ...m, style: style || undefined })} render={(k) => productCard(k, first)} extra={{ key: '', label: '簡約卡片', hint: '原本的圖片+按鈕樣式' }} />
+        </Field>
+        <ProductPicker ids={m.productIds} onChange={(productIds) => onChange({ ...m, productIds })} products={products} />
+      </div>
+    );
+  }
+  if (m.type === 'member') {
+    return (
+      <div className="space-y-2">
+        <Field label="會員卡樣式">
+          <TemplatePicker options={MEMBER_STYLES} value={m.style} onChange={(style) => onChange({ ...m, style })} render={(k) => memberCard(k)} />
+        </Field>
+        <p className="text-[11px] leading-5 text-[#a99e8f]">傳送時自動帶入會員姓名、會員編號、累計訂單與消費、可用優惠券。還沒綁定的人會改收到綁定卡片。</p>
+      </div>
+    );
+  }
   if (m.type === 'coupon') {
     const active = coupons.filter((c) => c.active !== false);
     return (
-      <Field label="優惠券" hint="客人按「領取優惠券」會到會員中心領取">
+      <div className="space-y-3">
+      <Field label="券面樣式">
+        <TemplatePicker options={COUPON_STYLES} value={m.style ?? ''} onChange={(style) => onChange({ ...m, style })} render={(k) => couponCard(k, coupons.find((c) => c.id === m.couponId))} extra={{ key: '', label: '自動', hint: '免運券用免運款,其他用折扣券款' }} />
+      </Field>
+      <Field label="優惠券" hint="客人按「立即領取」會到會員中心領取">
         <select value={m.couponId} onChange={(e) => onChange({ ...m, couponId: e.target.value })} className={inputClass}>
           <option value="">選擇優惠券</option>
           {active.map((c) => (
@@ -162,6 +189,7 @@ function MessageBody({
           ))}
         </select>
       </Field>
+      </div>
     );
   }
   return <p className="text-xs leading-5 text-[#8a7f72]">顯示「新會員 LINE 一鍵加入」與「已有官網帳號,綁定」兩個按鈕。已經綁定的會員不會看到這則。</p>;
