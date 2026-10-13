@@ -373,12 +373,14 @@ export function orderBubble(kind: OrderKind | string, d: OrderCardData, color?: 
     if (d.items.length > 4) body.push(txt(`等 ${d.items.length - 4} 項商品`, { size: 'xxs', color: '#aaaaaa', margin: 'sm' }));
     body.push(sep('#eeeeee', 'md'), ...extra, kv('合計金額', money(d.total), { bold: true }));
   } else {
-    if (k === 'created' || k === 'return') body.push(kv(k === 'return' ? '退款金額' : '訂單金額', money(d.total), { bold: k === 'created' }));
-    if (d.date) body.push(kv(k === 'return' ? '申請日期' : k === 'delivered' ? '送達時間' : '日期', d.date));
+    // 取消:訂單金額+取消日期,不顯示退貨進度
+    const cancelled = event === 'cancelled';
+    if (k === 'created' || k === 'return') body.push(kv(k === 'return' && !cancelled ? '退款金額' : '訂單金額', money(d.total), { bold: k === 'created' }));
+    if (d.date) body.push(kv(cancelled ? '下單日期' : k === 'return' ? '申請日期' : k === 'delivered' ? '送達時間' : '日期', d.date));
     body.push(...extra);
     if (k === 'shipping') body.push(steps(['訂單處理', '已出貨', '配送中', '已送達'], d.step ?? 1, c));
-    if (k === 'return') body.push(steps(['申請成立', '商品退回', '審核中', '退款完成'], d.step ?? 0, c));
-    if (k === 'created' || k === 'delivered') {
+    if (k === 'return' && !cancelled) body.push(steps(['申請成立', '商品退回', '審核中', '退款完成'], d.step ?? 0, c));
+    if (k === 'created' || k === 'delivered' || k === 'return') {
       body.push(box('horizontal', [
         thumb(first?.image),
         box('vertical', [
@@ -393,7 +395,7 @@ export function orderBubble(kind: OrderKind | string, d: OrderCardData, color?: 
     type: 'bubble', size: 'mega',
     body: box('vertical', body, { paddingAll: '18px' }),
     footer: box('vertical', [pills(
-      pill(clip(d.buttonLabel, 20) || (k === 'return' ? '查看進度' : '查看訂單'), d.link, { bg: dark, fg: '#ffffff' }),
+      pill(clip(d.buttonLabel, 20) || (k === 'return' && event !== 'cancelled' ? '查看進度' : '查看訂單'), d.link, { bg: dark, fg: '#ffffff' }),
       pill(th.second, d.homeLink, { bg: '#ffffff', fg: '#333333', border: '#dddddd' }),
     )], { paddingAll: '14px', paddingTop: '0px' }),
     styles: { footer: { separator: false } },
