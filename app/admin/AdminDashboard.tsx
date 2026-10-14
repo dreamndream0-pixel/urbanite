@@ -2097,11 +2097,14 @@ export default function AdminDashboard({
                       key={product.id}
                       className="flex items-center gap-4 rounded-lg border border-[#e5ded4] p-3"
                     >
-                      {product.image ? (
-                        <img className="h-14 w-14 rounded-md object-cover" src={product.image} alt="" />
-                      ) : (
-                        <div className="h-14 w-14 rounded-md bg-[#f1e3dc]" />
-                      )}
+                      {/* 點縮圖開啟前台商品頁 */}
+                      <a href={`/products/${encodeURIComponent(product.id)}`} target="_blank" rel="noopener noreferrer" title="查看商品頁" className="shrink-0">
+                        {product.image ? (
+                          <img className="h-14 w-14 rounded-md object-cover" src={product.image} alt="" />
+                        ) : (
+                          <div className="h-14 w-14 rounded-md bg-[#f1e3dc]" />
+                        )}
+                      </a>
                       <div className="min-w-0 flex-1">
                         <p className="truncate font-semibold">
                           {product.name}

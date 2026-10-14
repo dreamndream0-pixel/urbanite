@@ -49,6 +49,8 @@ html {
 @media (max-width: 767px), (hover: none) and (pointer: coarse) {
   html { scroll-padding-top: 80px; }
 }
+/* iPhone Chrome 等:在頂部時頁首回到一般排版,避免網址列伸縮後 sticky 位置錯誤蓋住內容(見 ScrollLockGuard) */
+html.ios-alt-browser.at-top .page-header { position: relative; }
 
 body {
   margin: 0;
