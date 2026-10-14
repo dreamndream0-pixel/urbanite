@@ -182,6 +182,7 @@ export type Category = {
   sort_order: number;
   parent_id?: string | null;
   image?: string; // 首頁分類導覽的圓形圖片
+  campaign_id?: string | null; // 促銷活動頁專屬分類;null = 主站分類
   created_at?: string;
 };
 

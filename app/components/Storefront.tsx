@@ -161,7 +161,7 @@ export default function Storefront({ campaign = null, preview = false }: { campa
       .catch(() => setProducts([]))
       .finally(() => setLoading(false));
 
-    fetch('/api/categories')
+    fetch(campaign ? `/api/categories?campaign=${encodeURIComponent(campaign.id)}` : '/api/categories')
       .then((res) => (res.ok ? res.json() : []))
       .then((data: Category[]) => {
         setDbCategories(data);

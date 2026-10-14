@@ -1,6 +1,7 @@
 'use client';
 
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { lockScroll } from '@/lib/scroll-lock';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createBrowserSupabase } from '@/lib/supabase/client';
@@ -102,7 +103,7 @@ const NAV = [
   { key: 'customers', label: '顧客管理', Icon: IconUsers },
   { key: 'loyalty', label: '會員回饋', Icon: IconGift },
   { key: 'promotions', label: '促銷管理', Icon: IconGift },
-  { key: 'campaign-pages', label: '一頁式促銷頁', Icon: IconGrid },
+  { key: 'campaign-pages', label: '促銷活動頁', Icon: IconGrid },
   { key: 'profile-card', label: '個人名片', Icon: IconIdCard },
   { key: 'card-members', label: '名片會員', Icon: IconUsers },
   { key: 'line-bot', label: 'LINE 機器人', Icon: IconChat },
@@ -493,7 +494,9 @@ export default function AdminDashboard({
   const [sidebarOpen, setSidebarOpen] = useState(true); // 桌機側邊選單預設常開
   const [products, setProducts] = useState<Product[]>(initialProducts);
   const [orders, setOrders] = useState<Order[]>(initialOrders);
-  const [categories, setCategories] = useState<Category[]>(initialCategories);
+  // 主站分類;促銷活動頁的專屬分類另外放(不出現在主站分類管理與首頁)
+  const [categories, setCategories] = useState<Category[]>(() => initialCategories.filter((c) => !c.campaign_id));
+  const [campaignCategories, setCampaignCategories] = useState<Category[]>(() => initialCategories.filter((c) => c.campaign_id));
   const [discounts, setDiscounts] = useState<Discount[]>(initialDiscounts);
   const [customers] = useState<Customer[]>(initialCustomers);
   const [banners, setBanners] = useState<Banner[]>(initialBanners);
@@ -2861,7 +2864,10 @@ export default function AdminDashboard({
                 setIsNew(false);
               }}
               onDeleteProduct={deleteProduct}
-              onCampaignDeleted={(campaignId) => setProducts((list) => list.filter((product) => product.campaign_id !== campaignId))}
+              onCampaignDeleted={(campaignId) => { setProducts((list) => list.filter((product) => product.campaign_id !== campaignId)); setCampaignCategories((list) => list.filter((c) => c.campaign_id !== campaignId)); }}
+              categories={campaignCategories}
+              onCategoriesChange={setCampaignCategories}
+              onReorder={(ordered) => setProducts((list) => list.map((p) => { const i = ordered.findIndex((o) => o.id === p.id); return i >= 0 ? { ...p, sort_order: i } : p; }))}
             />
           )}
 
@@ -3307,7 +3313,7 @@ export default function AdminDashboard({
         <ProductModal
           draft={editing}
           isNew={isNew}
-          categories={categories}
+          categories={editing.campaign_id ? campaignCategories.filter((c) => c.campaign_id === editing.campaign_id) : categories}
           paymentMethods={enabledPaymentMethods}
           shippingMethods={enabledShippingMethods}
           shippingFees={shippingFees}
@@ -3394,13 +3400,7 @@ function BannerCropModal({
 
   useEffect(() => () => URL.revokeObjectURL(url), [url]);
 
-  useEffect(() => {
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.body.style.overflow = prev;
-    };
-  }, []);
+  useEffect(() => lockScroll(), []);
 
   function clamp(next: CropRect) {
     const w = Math.min(1, Math.max(0.12, next.w));
@@ -6855,7 +6855,7 @@ function ProductModal({
 	            )}
 	          </div>
 	          <div className="grid gap-3 sm:grid-cols-2">
-	            <Field label="分類(首頁篩選用)">
+	            <Field label={draft.campaign_id ? "活動分類(活動頁篩選用)" : "分類(首頁篩選用)"}>
 	              <select
 	                className="w-full rounded-lg border border-[#e5ded4] px-3 py-2"
 	                value={draft.category}

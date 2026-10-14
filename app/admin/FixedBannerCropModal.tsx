@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { lockScroll } from '@/lib/scroll-lock';
 
 // 輪播圖統一輸出尺寸(4:5,手機版完整顯示;電腦版同一張圖以中央裁切滿版)
 const MAX_ZOOM = 4;
@@ -40,11 +41,7 @@ export default function FixedBannerCropModal({
   const pointers = useRef(new Map<number, Point>());
   const gesture = useRef<{ pan: Point; zoom: number; mid: Point; dist: number } | null>(null);
 
-  useEffect(() => {
-    const previous = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => { document.body.style.overflow = previous; };
-  }, []);
+  useEffect(() => lockScroll(), []);
   useEffect(() => {
     const el = frameRef.current;
     if (!el) return;

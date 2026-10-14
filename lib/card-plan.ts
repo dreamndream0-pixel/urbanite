@@ -90,7 +90,7 @@ export const TIER_FEATURES: { group: string; rows: { label: string; values: [str
       { label: '會員系統、會員中心', values: ['—', '—', '—', '✓'] },
       { label: '超商取貨、宅配物流串接', values: ['—', '—', '—', '✓'] },
       { label: 'LINE 機器人與推播', values: ['—', '—', '—', '✓'] },
-      { label: '一頁式促銷頁', values: ['—', '—', '—', '✓'] },
+      { label: '促銷活動頁', values: ['—', '—', '—', '✓'] },
       { label: '自訂網域', values: ['—', '—', '—', '✓'] },
       { label: '移除所有 URBANLINKS 標示', values: ['—', '—', '—', '✓'] },
     ],

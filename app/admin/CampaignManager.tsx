@@ -1,7 +1,9 @@
 'use client';
 
 import { type ReactNode, useMemo, useState } from 'react';
-import type { Campaign, Product } from '@/lib/types';
+import type { Campaign, Category, Product } from '@/lib/types';
+import { uiAlert } from '@/lib/ui-dialog';
+import { useLongPressReorder } from './useLongPressReorder';
 import { uiConfirm } from '@/lib/ui-dialog';
 import FixedBannerCropModal from './FixedBannerCropModal';
 
@@ -32,6 +34,9 @@ export default function CampaignManager({
   onEditProduct,
   onDeleteProduct,
   onCampaignDeleted,
+  categories = [],
+  onCategoriesChange,
+  onReorder,
 }: {
   initialCampaigns: Campaign[];
   products: Product[];
@@ -39,6 +44,9 @@ export default function CampaignManager({
   onEditProduct: (product: Product) => void;
   onDeleteProduct: (id: string) => void;
   onCampaignDeleted: (campaignId: string) => void;
+  categories?: Category[]; // 促銷活動頁專屬分類(所有活動)
+  onCategoriesChange?: (list: Category[]) => void;
+  onReorder?: (ordered: Product[]) => void;
 }) {
   const [campaigns, setCampaigns] = useState(initialCampaigns);
   const [selectedId, setSelectedId] = useState(initialCampaigns[0]?.id ?? '');
@@ -57,6 +65,38 @@ export default function CampaignManager({
       .filter((product) => !q || [product.name, product.id, product.category].join(' ').toLowerCase().includes(q))
       .sort((a, b) => a.sort_order - b.sort_order);
   }, [products, query, selectedId]);
+
+  // 活動專屬分類(和主站分類分開)
+  const campaignCats = categories.filter((c) => c.campaign_id === selectedId).sort((a, b) => a.sort_order - b.sort_order);
+  const catName = (slug: string) => campaignCats.find((c) => c.slug === slug)?.name ?? (slug || '未分類');
+  const [catInput, setCatInput] = useState('');
+  async function addCategory() {
+    const name = catInput.trim();
+    if (!name || !selected) return;
+    const slug = `cp-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`;
+    const res = await fetch('/api/categories', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ slug, name, en: '', campaign_id: selected.id, sort_order: campaignCats.length }) });
+    const data = await res.json().catch(() => null);
+    if (!res.ok) return void uiAlert(data?.error ?? '新增分類失敗');
+    onCategoriesChange?.([...categories, data as Category]);
+    setCatInput('');
+  }
+  async function removeCategory(cat: Category) {
+    if (!(await uiConfirm(`刪除分類「${cat.name}」?這個分類的商品會變成未分類。`, { danger: true }))) return;
+    const res = await fetch(`/api/categories/${cat.id}`, { method: 'DELETE' });
+    if (!res.ok) return void uiAlert('刪除分類失敗');
+    onCategoriesChange?.(categories.filter((c) => c.id !== cat.id));
+  }
+
+  // 商品排序:長按(手機)或按住把手拖曳;搜尋中不能排序
+  const sortable = !query.trim();
+  const reorder = useLongPressReorder(campaignProducts.map((p) => p.id), (ids) => {
+    const ordered = ids.map((id) => campaignProducts.find((p) => p.id === id)!).filter(Boolean);
+    onReorder?.(ordered);
+    void Promise.all(ordered.map((p, i) => (p.sort_order === i ? null : fetch(`/api/products/${encodeURIComponent(p.id)}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sort_order: i }),
+    })))).then((results) => { if (results.some((r) => r && !r.ok)) flash('排序儲存失敗,請重新整理後再試'); else flash('已更新商品排序'); });
+  });
+  const shownProducts = reorder.order.map((id) => campaignProducts.find((p) => p.id === id)!).filter(Boolean);
 
   async function copyLink(slug: string) {
     try {
@@ -133,7 +173,7 @@ export default function CampaignManager({
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <p className="text-xs font-semibold tracking-[.22em] text-[#9b3048]">CAMPAIGN PAGE</p>
-          <h2 className="mt-1 font-serif-tc text-[28px] font-bold">一頁式促銷專頁</h2>
+          <h2 className="mt-1 font-serif-tc text-[28px] font-bold">促銷活動頁</h2>
           <p className="mt-1 text-sm text-[#8a7f72]">活動商品與主站完全分開，搜尋與分類只顯示目前活動內容。</p>
         </div>
         <button type="button" onClick={() => setNewOpen(true)} className="rounded-md bg-[#1f1b19] px-5 py-2.5 text-sm font-semibold text-white">＋ 新增專頁</button>
@@ -176,15 +216,34 @@ export default function CampaignManager({
                 <div><h3 className="text-lg font-bold">活動商品</h3><p className="text-xs text-[#8a7f72]">欄位與主站商品相同；不會出現在主站商品列表或主站搜尋。</p></div>
                 <button type="button" onClick={() => onNewProduct(selected.id)} className="rounded-md bg-[#702838] px-4 py-2 text-sm font-semibold text-white">＋ 新增活動商品</button>
               </div>
+              <div className="mt-4 rounded-md bg-[#faf7f2] p-3">
+                <p className="text-sm font-semibold">活動分類</p>
+                <p className="text-xs text-[#8a7f72]">只用在這個活動頁,和主站分類分開。編輯活動商品時可選擇。</p>
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {campaignCats.map((c) => (
+                    <span key={c.id} className="inline-flex items-center gap-1 rounded-full border border-[#d8d0c6] bg-white px-3 py-1 text-xs">
+                      {c.name}
+                      <button type="button" onClick={() => void removeCategory(c)} aria-label={`刪除分類 ${c.name}`} className="text-[#b23a3a]">×</button>
+                    </span>
+                  ))}
+                  {!campaignCats.length ? <span className="text-xs text-[#a99e8f]">尚未建立分類</span> : null}
+                </div>
+                <div className="mt-2 flex gap-2">
+                  <input value={catInput} onChange={(e) => setCatInput(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); void addCategory(); } }} placeholder="新分類名稱,例如:上衣" className="h-10 min-w-0 flex-1 border border-[#d8d0c6] bg-white px-3 text-sm outline-none focus:border-[#702838]" />
+                  <button type="button" onClick={() => void addCategory()} className="h-10 shrink-0 border border-[#702838] px-4 text-sm font-semibold text-[#702838]">新增分類</button>
+                </div>
+              </div>
               <div className="mt-4 flex gap-2">
                 <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜尋此活動的商品、代碼或分類" className="h-11 flex-1 border border-[#d8d0c6] px-3 text-sm outline-none focus:border-[#702838]" />
                 <a href={`/promo/${selected.slug}?preview=1`} target="_blank" rel="noreferrer" className="inline-flex h-11 items-center border border-[#702838] px-4 text-sm font-semibold text-[#702838]">預覽頁面 ↗</a>
               </div>
-              <div className="mt-4 divide-y divide-[#eee7de] border-y border-[#eee7de]">
-                {campaignProducts.map((product) => (
-                  <div key={product.id} className="grid grid-cols-[64px_minmax(0,1fr)_auto] items-center gap-3 py-3">
+              <p className="mt-3 text-xs text-[#8a7f72]">{sortable ? '長按商品(或按住左側 ⋮⋮)上下拖曳排序,活動頁依這個順序顯示。' : '清除搜尋後可以拖曳排序。'}</p>
+              <div ref={reorder.listRef} className="mt-2 divide-y divide-[#eee7de] border-y border-[#eee7de]">
+                {shownProducts.map((product) => (
+                  <div key={product.id} data-sort-row onPointerDown={sortable ? (e) => reorder.start(e, product.id) : undefined} onContextMenu={(e) => e.preventDefault()} className={`grid grid-cols-[18px_64px_minmax(0,1fr)_auto] items-center gap-3 py-3 select-none [-webkit-touch-callout:none] ${reorder.sorting === product.id ? 'bg-[#faf3ea] shadow-md' : ''}`}>
+                    <span onPointerDown={sortable ? (e) => { e.stopPropagation(); reorder.start(e, product.id, true); } : undefined} className={`touch-none text-center text-[#b3a897] ${sortable ? 'cursor-grab' : 'opacity-30'}`} aria-hidden="true">⋮⋮</span>
                     <div className="h-16 bg-[#f5f1eb]">{product.image ? <img src={product.image} alt="" className="h-full w-full object-contain" /> : null}</div>
-                    <div className="min-w-0"><p className="truncate font-semibold">{product.name}</p><p className="mt-1 text-xs text-[#8a7f72]">{product.id} · {product.category || '未分類'} · NT$ {product.price.toLocaleString()} · 庫存 {product.inventory} · {product.status}</p></div>
+                    <div className="min-w-0"><p className="truncate font-semibold">{product.name}</p><p className="mt-1 text-xs text-[#8a7f72]">{product.id} · {catName(product.category)} · NT$ {product.price.toLocaleString()} · 庫存 {product.inventory} · {product.status}</p></div>
                     <div className="flex gap-2"><button type="button" onClick={() => onEditProduct(product)} className="border border-[#d8d0c6] px-3 py-1.5 text-xs font-semibold">編輯</button><button type="button" onClick={() => onDeleteProduct(product.id)} className="px-2 text-xs text-[#b23a3a]">刪除</button></div>
                   </div>
                 ))}
@@ -237,7 +296,7 @@ function CampaignSettings({ campaign, busy, onSave, onUpload, onDelete }: { camp
 }
 
 function CampaignCreateModal({ draft, busy, onChange, onClose, onCreate }: { draft: CampaignDraft; busy: boolean; onChange: (draft: CampaignDraft) => void; onClose: () => void; onCreate: () => void }) {
-  return <Modal title="新增一頁式促銷專頁" onClose={onClose}><div className="grid gap-4"><Field label="活動名稱"><input value={draft.name} onChange={(e) => onChange({ ...draft, name: e.target.value, title: draft.title || e.target.value })} placeholder="例如：秋季限定優惠" /></Field><Field label="網址代稱"><input value={draft.slug} onChange={(e) => onChange({ ...draft, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '') })} placeholder="autumn-sale" /></Field><p className="text-xs text-[#8a7f72]">建立後網址為 /promo/{draft.slug || '活動網址'}，商品將在下一步新增。</p><button type="button" disabled={busy} onClick={onCreate} className="h-11 bg-[#702838] font-semibold text-white disabled:opacity-50">建立並開始編輯</button></div></Modal>;
+  return <Modal title="新增促銷活動頁" onClose={onClose}><div className="grid gap-4"><Field label="活動名稱"><input value={draft.name} onChange={(e) => onChange({ ...draft, name: e.target.value, title: draft.title || e.target.value })} placeholder="例如：秋季限定優惠" /></Field><Field label="網址代稱"><input value={draft.slug} onChange={(e) => onChange({ ...draft, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '') })} placeholder="autumn-sale" /></Field><p className="text-xs text-[#8a7f72]">建立後網址為 /promo/{draft.slug || '活動網址'}，商品將在下一步新增。</p><button type="button" disabled={busy} onClick={onCreate} className="h-11 bg-[#702838] font-semibold text-white disabled:opacity-50">建立並開始編輯</button></div></Modal>;
 }
 
 function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {

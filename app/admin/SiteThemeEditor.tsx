@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { lockScroll } from '@/lib/scroll-lock';
 import { Eye, X, Monitor, Smartphone, Save, Send } from 'lucide-react';
 import { STOREFRONT_TEMPLATES, resolveStorefront } from '@/lib/storefront-template';
 import type { DesignCategory } from '@/app/components/StorefrontDesign';
@@ -41,12 +42,11 @@ export default function SiteThemeEditor({ initial, onSaved, categoryImageStyle =
   useEffect(() => {
     if (!previewOpen) return;
     const dialog = previewDialog.current;
-    const previousOverflow = document.body.style.overflow;
     dialog?.showModal();
-    document.body.style.overflow = 'hidden';
+    const unlock = lockScroll();
     return () => {
       dialog?.close();
-      document.body.style.overflow = previousOverflow;
+      unlock();
     };
   }, [previewOpen]);
   const [previewImages, setPreviewImages] = useState<string[]>([]);
