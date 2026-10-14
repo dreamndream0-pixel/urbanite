@@ -1520,7 +1520,8 @@ export default function AdminDashboard({
     else void uiAlert('刪除失敗');
   }
 
-  async function saveFooterSettings() {
+  async function saveFooterSettings(override?: typeof footerDraft) {
+    const d = override ?? footerDraft;
     setSavingSettings(true);
     try {
       const toLines = (value: string) =>
@@ -1529,24 +1530,24 @@ export default function AdminDashboard({
           .map((line) => line.trim())
           .filter(Boolean);
       const footerSections = withPolicies(
-        mergeFooterSocialLinksIntoSections(JSON.parse(footerDraft.sections || '[]'), JSON.parse(footerDraft.socialLinks || '[]')),
-        { privacy: footerDraft.privacy, terms: footerDraft.terms },
+        mergeFooterSocialLinksIntoSections(JSON.parse(d.sections || '[]'), JSON.parse(d.socialLinks || '[]')),
+        { privacy: d.privacy, terms: d.terms },
       );
       const res = await fetch('/api/settings', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          footer_about_links: toLines(footerDraft.about),
-          footer_service_links: toLines(footerDraft.service),
-          footer_service_hours: footerDraft.serviceHours.trim(),
-          footer_email: footerDraft.email.trim(),
-          footer_company_name: footerDraft.companyName.trim(),
-          footer_tax_id: footerDraft.taxId.trim(),
-          footer_instagram_url: footerDraft.instagramUrl.trim(),
-          footer_line_url: footerDraft.lineUrl.trim(),
+          footer_about_links: toLines(d.about),
+          footer_service_links: toLines(d.service),
+          footer_service_hours: d.serviceHours.trim(),
+          footer_email: d.email.trim(),
+          footer_company_name: d.companyName.trim(),
+          footer_tax_id: d.taxId.trim(),
+          footer_instagram_url: d.instagramUrl.trim(),
+          footer_line_url: d.lineUrl.trim(),
           footer_sections: withNewsletter(
-            withCheckoutLine(footerSections, { id: footerDraft.checkoutLineId, url: footerDraft.checkoutLineUrl }),
-            { show: footerDraft.newsletterShow, title: footerDraft.newsletterTitle, text: footerDraft.newsletterText },
+            withCheckoutLine(footerSections, { id: d.checkoutLineId, url: d.checkoutLineUrl }),
+            { show: d.newsletterShow, title: d.newsletterTitle, text: d.newsletterText },
           ),
           // 金流/物流各自在「金流設定」「物流設定」儲存,頁尾不要覆蓋
         }),
@@ -3107,7 +3108,7 @@ export default function AdminDashboard({
                 title="頁尾資訊"
                 action={
                   <button
-                    onClick={saveFooterSettings}
+                    onClick={() => void saveFooterSettings()}
                     disabled={savingSettings}
                     className="rounded-full bg-[#1f1b19] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
                   >
@@ -3123,6 +3124,7 @@ export default function AdminDashboard({
                   <FooterSocialLinksEditor
                     value={footerDraft.socialLinks}
                     onChange={(socialLinks) => setFooterDraft({ ...footerDraft, socialLinks })}
+                    onCommit={(socialLinks) => void saveFooterSettings({ ...footerDraft, socialLinks })}
                   />
                   {/* 頁尾最下方的兩個連結 */}
                   <div className="lg:col-span-2 rounded-lg border border-[#e5ded4] p-4">
@@ -3790,112 +3792,121 @@ function FooterPagesEditor({ value, onChange }: { value: string; onChange: (valu
   );
 }
 
-function FooterSocialLinksEditor({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+// 頁尾社群按鈕:清單只顯示圖示與名稱,點一下跳出視窗編輯(名稱、連結、上傳圖片),儲存後直接更新頁尾
+function FooterSocialLinksEditor({ value, onChange, onCommit }: { value: string; onChange: (value: string) => void; onCommit?: (value: string) => void }) {
   const [items, setItems] = useState<FooterSocialDraft[]>(() => parseFooterSocialLinks(value));
-  const [uploadingIndex, setUploadingIndex] = useState<number | null>(null);
+  const [editing, setEditing] = useState<{ index: number; item: FooterSocialDraft } | null>(null); // index -1 = 新增
+  const [uploading, setUploading] = useState(false);
 
-  function update(next: FooterSocialDraft[]) {
+  function commit(next: FooterSocialDraft[]) {
     const normalized = normalizeFooterSocialLinks(next);
+    const json = JSON.stringify(normalized, null, 2);
     setItems(normalized);
-    onChange(JSON.stringify(normalized, null, 2));
+    onChange(json);
+    onCommit?.(json);
   }
 
-  function updateItem(index: number, patch: Partial<FooterSocialDraft>) {
-    update(items.map((item, i) => (i === index ? { ...item, ...patch } : item)));
-  }
-
-  async function uploadSocialImage(index: number, file: File) {
-    setUploadingIndex(index);
+  async function uploadImage(file: File) {
+    if (!editing) return;
+    setUploading(true);
     try {
       const fd = new FormData();
       fd.append('file', file);
-      fd.append('productId', `footer-social-${index + 1}`);
+      fd.append('productId', `footer-social-${Date.now()}`);
       const res = await fetch('/api/products/image', { method: 'POST', body: fd });
       const data = await res.json();
       if (!res.ok || !data.image_url) throw new Error(data.error ?? '上傳失敗');
-      updateItem(index, { image: data.image_url });
+      setEditing((cur) => (cur ? { ...cur, item: { ...cur.item, image: data.image_url } } : cur));
     } catch (error) {
       void uiAlert(error instanceof Error ? error.message : '上傳發生問題');
     } finally {
-      setUploadingIndex(null);
+      setUploading(false);
     }
   }
 
+  function save() {
+    if (!editing) return;
+    const item = { ...editing.item, label: editing.item.label.trim(), url: editing.item.url.trim() };
+    if (!item.label) return void uiAlert('請填寫按鈕名稱');
+    commit(editing.index < 0 ? [...items, item] : items.map((x, i) => (i === editing.index ? item : x)));
+    setEditing(null);
+  }
+
+  async function remove(index: number) {
+    if (!(await uiConfirm(`刪除「${items[index]?.label || '這個按鈕'}」?`, { danger: true }))) return;
+    commit(items.filter((_, i) => i !== index));
+    setEditing(null);
+  }
+
+  const icon = (item: FooterSocialDraft, size: string) => (
+    <span className={`flex shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#1f1b19] text-[11px] font-bold text-white ${size}`}>
+      {item.image ? <img src={item.image} alt="" className="h-full w-full object-cover" /> : item.label.slice(0, 4) || '@'}
+    </span>
+  );
+
   return (
     <div className="lg:col-span-2 rounded-lg border border-[#e5ded4] p-4">
-      <div>
-        <div className="flex flex-wrap items-center gap-3">
-          <h3 className="text-lg font-bold">頁尾社群按鈕</h3>
-          <button
-            type="button"
-            onClick={() => update([...items, { label: '', image: '', url: '' }])}
-            disabled={items.length >= MAX_FOOTER_SOCIAL_LINKS}
-            className="ml-auto rounded-full border border-[#1f1b19] px-4 py-1.5 text-sm font-semibold disabled:opacity-40"
-          >
-            + 新增按鈕
-          </button>
-        </div>
-        <p className="mt-1 text-sm text-[#8a7f72]">頁尾的圓形社群按鈕(Instagram、LINE、Facebook…),可新增、刪除,最多 {MAX_FOOTER_SOCIAL_LINKS} 個;有填連結的才會顯示。</p>
+      <div className="flex flex-wrap items-center gap-3">
+        <h3 className="text-lg font-bold">頁尾社群按鈕</h3>
+        <button
+          type="button"
+          onClick={() => setEditing({ index: -1, item: { label: '', image: '', url: '' } })}
+          disabled={items.length >= MAX_FOOTER_SOCIAL_LINKS}
+          className="ml-auto rounded-full border border-[#1f1b19] px-4 py-1.5 text-sm font-semibold disabled:opacity-40"
+        >
+          + 新增按鈕
+        </button>
       </div>
-      {items.length === 0 ? <p className="mt-5 rounded-lg bg-[#faf7f2] py-6 text-center text-sm text-[#a99e8f]">目前沒有社群按鈕,頁尾不會顯示這一排。</p> : null}
-
-      <div className="mt-5 grid gap-4 md:grid-cols-3">
-        {items.map((item, index) => (
-          <div key={index} className="relative rounded-lg border border-[#e5ded4] bg-white p-4">
-            <button
-              type="button"
-              onClick={() => update(items.filter((_, i) => i !== index))}
-              aria-label="刪除這個按鈕"
-              className="absolute right-2 top-2 rounded-full px-2 py-0.5 text-xs text-[#a33a2b] hover:bg-[#fbeaea]"
-            >
-              刪除
+      <p className="mt-1 text-sm text-[#8a7f72]">頁尾的圓形社群按鈕,最多 {MAX_FOOTER_SOCIAL_LINKS} 個;點一下編輯,有填連結的才會顯示。</p>
+      {items.length === 0 ? <p className="mt-4 rounded-lg bg-[#faf7f2] py-6 text-center text-sm text-[#a99e8f]">目前沒有社群按鈕,頁尾不會顯示這一排。</p> : (
+        <div className="mt-4 divide-y divide-[#f0ebe2] overflow-hidden rounded-lg border border-[#e5ded4] bg-white">
+          {items.map((item, index) => (
+            <button key={index} type="button" onClick={() => setEditing({ index, item: { ...item } })} className="flex w-full items-center gap-3 px-3 py-2.5 text-left hover:bg-[#faf7f2]">
+              {icon(item, 'h-10 w-10')}
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-sm font-semibold">{item.label || '未命名'}</span>
+                <span className={`block truncate text-xs ${item.url ? 'text-[#8a7f72]' : 'text-[#c0392b]'}`}>{item.url || '尚未填連結(不會顯示)'}</span>
+              </span>
+              <span className="text-[#b3a897]">›</span>
             </button>
-            <div className="mx-auto flex h-16 w-16 items-center justify-center overflow-hidden rounded-full bg-[#1f1b19] text-xs font-bold text-white">
-              {item.image ? <img src={item.image} alt="" className="h-full w-full object-cover" /> : item.label.slice(0, 4) || '@'}
+          ))}
+        </div>
+      )}
+
+      {editing ? (
+        <div className="fixed inset-0 z-[70] flex items-end justify-center bg-black/50 sm:items-center sm:p-4" onClick={() => setEditing(null)}>
+          <div className="w-full max-w-md rounded-t-2xl bg-white p-5 sm:rounded-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <p className="text-lg font-bold">{editing.index < 0 ? '新增社群按鈕' : '編輯社群按鈕'}</p>
+              <button type="button" onClick={() => setEditing(null)} aria-label="關閉" className="rounded p-1 text-xl leading-none hover:bg-[#efe8dd]">×</button>
+            </div>
+            <div className="mt-4 flex items-center gap-4">
+              {icon(editing.item, 'h-16 w-16')}
+              <div className="flex flex-wrap gap-2">
+                <label className="cursor-pointer rounded-full bg-[#1f1b19] px-4 py-2 text-sm font-semibold text-white">
+                  {uploading ? '上傳中...' : editing.item.image ? '更換圖片' : '上傳圖片'}
+                  <input type="file" accept="image/png,image/jpeg,image/webp,image/gif" className="hidden" disabled={uploading}
+                    onChange={(e) => { const file = e.target.files?.[0]; e.target.value = ''; if (file) void uploadImage(file); }} />
+                </label>
+                {editing.item.image ? <button type="button" onClick={() => setEditing({ ...editing, item: { ...editing.item, image: '' } })} className="text-sm text-[#8a7f72]">移除圖片</button> : null}
+              </div>
             </div>
             <label className="mt-4 block text-sm text-[#8a7f72]">
               按鈕名稱
-              <input
-                value={item.label}
-                onChange={(e) => updateItem(index, { label: e.target.value })}
-                className="mt-2 w-full rounded-lg border border-[#e5ded4] px-3 py-2 text-[#1f1b19]"
-              />
+              <input value={editing.item.label} onChange={(e) => setEditing({ ...editing, item: { ...editing.item, label: e.target.value } })} placeholder="例如:Instagram" className="mt-1.5 w-full rounded-lg border border-[#e5ded4] px-3 py-2 text-[#1f1b19]" />
             </label>
             <label className="mt-3 block text-sm text-[#8a7f72]">
               連結網址
-              <input
-                value={item.url}
-                onChange={(e) => updateItem(index, { url: e.target.value })}
-                placeholder="https:// 或 mailto:"
-                className="mt-2 w-full rounded-lg border border-[#e5ded4] px-3 py-2 text-[#1f1b19]"
-              />
+              <input value={editing.item.url} onChange={(e) => setEditing({ ...editing, item: { ...editing.item, url: e.target.value } })} placeholder="https:// 或 mailto:" className="mt-1.5 w-full rounded-lg border border-[#e5ded4] px-3 py-2 text-[#1f1b19]" />
             </label>
-            <label className="mt-3 block text-sm text-[#8a7f72]">
-              圖片網址
-              <input
-                value={item.image}
-                onChange={(e) => updateItem(index, { image: e.target.value })}
-                placeholder="可貼圖片網址"
-                className="mt-2 w-full rounded-lg border border-[#e5ded4] px-3 py-2 text-[#1f1b19]"
-              />
-            </label>
-            <label className="mt-4 inline-block cursor-pointer rounded-full bg-[#1f1b19] px-4 py-2 text-sm font-semibold text-white">
-              {uploadingIndex === index ? '上傳中...' : '上傳圖片'}
-              <input
-                type="file"
-                accept="image/png,image/jpeg,image/webp,image/gif"
-                className="hidden"
-                disabled={uploadingIndex !== null}
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  e.target.value = '';
-                  if (file) uploadSocialImage(index, file);
-                }}
-              />
-            </label>
+            <div className="mt-5 flex items-center gap-2">
+              {editing.index >= 0 ? <button type="button" onClick={() => void remove(editing.index)} className="px-2 text-sm font-semibold text-[#c0392b]">刪除</button> : null}
+              <button type="button" onClick={() => setEditing(null)} className="ml-auto rounded-full border border-[#d7c9bd] px-4 py-2 text-sm">取消</button>
+              <button type="button" disabled={uploading} onClick={save} className="rounded-full bg-[#1f1b19] px-5 py-2 text-sm font-semibold text-white disabled:opacity-50">儲存</button>
+            </div>
           </div>
-        ))}
-      </div>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -6567,10 +6578,24 @@ function ProductModal({
     if (!url) return;
     runDescriptionCommand('createLink', url);
   }
+  // 商品描述插入圖片:選檔上傳後插入(不再貼網址)
+  const descriptionImageInput = useRef<HTMLInputElement>(null);
   function addDescriptionImage() {
-    const url = prompt('貼上圖片網址')?.trim();
-    if (!url) return;
-    runDescriptionCommand('insertImage', url);
+    descriptionImageInput.current?.click();
+  }
+  async function uploadDescriptionImage(file: File) {
+    try {
+      const prepared = await prepareProductImage(file, 0);
+      const fd = new FormData();
+      fd.append('file', prepared.blob, prepared.filename);
+      fd.append('productId', draft.id || 'description');
+      const res = await fetch('/api/products/image', { method: 'POST', body: fd });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.image_url) throw new Error(data?.error ?? '圖片上傳失敗');
+      runDescriptionCommand('insertImage', data.image_url);
+    } catch (error) {
+      void uiAlert(error instanceof Error ? error.message : '圖片上傳失敗');
+    }
   }
   function addDescriptionTable() {
     runDescriptionCommand(
@@ -6641,15 +6666,6 @@ function ProductModal({
     onChange({ ...draft, images: next });
   }
 
-  function addImageByUrl() {
-    const url = prompt('貼上圖片網址')?.trim();
-    if (!url) return;
-    if (draft.images.length >= MAX_PRODUCT_IMAGES) {
-      void uiAlert(`最多只能放 ${MAX_PRODUCT_IMAGES} 張圖片`);
-      return;
-    }
-    onChange({ ...draft, images: [...draft.images, url] });
-  }
 
 	  return (
 	    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
@@ -6721,6 +6737,7 @@ function ProductModal({
 	                <EditorButton label="分隔線" onClick={() => runDescriptionCommand('insertHorizontalRule')}>—</EditorButton>
 	                <EditorButton label="連結" onClick={addDescriptionLink}>Link</EditorButton>
 	                <EditorButton label="圖片" onClick={addDescriptionImage}>▧</EditorButton>
+	                <input ref={descriptionImageInput} type="file" accept="image/png,image/jpeg,image/webp,image/gif" className="hidden" onChange={(e) => { const file = e.target.files?.[0]; e.target.value = ''; if (file) void uploadDescriptionImage(file); }} />
 	                <EditorButton label="影片" onClick={addDescriptionVideo}>▻</EditorButton>
 	                <EditorButton label="表格" onClick={addDescriptionTable}>▦</EditorButton>
 	                <EditorButton label="清除格式" onClick={() => runDescriptionCommand('removeFormat')}>Tx</EditorButton>
@@ -7013,14 +7030,6 @@ function ProductModal({
                     }}
                   />
                 </label>
-                <button
-                  type="button"
-                  onClick={addImageByUrl}
-                  disabled={draft.images.length >= MAX_PRODUCT_IMAGES}
-                  className="rounded-full border border-[#d7c9bd] px-4 py-2 text-sm font-semibold disabled:opacity-40"
-                >
-                  貼上網址
-                </button>
               </div>
               {uploadProgress && (
                 <div>
