@@ -3105,7 +3105,7 @@ export default function AdminDashboard({
 
               {settingsTab === 'footer' && (
               <Card
-                title="頁尾資訊"
+                title=""
                 action={
                   <button
                     onClick={() => void saveFooterSettings()}
@@ -3687,30 +3687,26 @@ function FooterPagesEditor({ value, onChange }: { value: string; onChange: (valu
   const section = sections[active];
 
   return (
-    <div className="lg:col-span-2 rounded-lg border border-[#e5ded4] p-4">
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <h3 className="text-lg font-bold">頁尾頁面設定</h3>
-          <p className="mt-1 text-sm text-[#8a7f72]">大標題、小標題、內文與網址都可自行新增、刪除與編輯。</p>
-        </div>
-        <button type="button" onClick={addSection} className="rounded-lg border border-[#1f1b19] px-3 py-2 text-sm font-semibold">
-          + 新增大標題
-        </button>
-      </div>
-
-      <div className="mt-5 flex flex-wrap gap-2 border-b border-[#e5ded4] pb-3">
+    <div className="min-w-0 lg:col-span-2 rounded-lg border border-[#e5ded4] p-4">
+      {/* 大標題選單:左右滑動 */}
+      <div className="flex items-center gap-2 border-b border-[#e5ded4] pb-3">
+        <div className="flex min-w-0 flex-1 gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {sections.map((entry, index) => (
           <button
             key={`${entry.title}-${index}`}
             type="button"
             onClick={() => setActive(index)}
-            className={`rounded-lg px-4 py-2 text-sm font-semibold ${
+            className={`shrink-0 whitespace-nowrap rounded-lg px-4 py-2 text-sm font-semibold ${
               active === index ? 'bg-[#7da185] text-white' : 'border border-[#e5ded4] bg-white'
             }`}
           >
             {entry.title || '未命名大標題'}
           </button>
         ))}
+        </div>
+        <button type="button" onClick={addSection} className="shrink-0 whitespace-nowrap rounded-lg border border-[#1f1b19] px-3 py-2 text-sm font-semibold">
+          + 大標題
+        </button>
       </div>
 
       {section ? (

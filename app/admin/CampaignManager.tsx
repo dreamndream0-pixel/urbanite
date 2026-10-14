@@ -201,9 +201,9 @@ export default function CampaignManager({
 
         {selected ? (
           <div className="min-w-0 space-y-5">
-            <CampaignSettings key={selected.id} campaign={selected} busy={busy} onSave={updateCampaign} onUpload={async (file) => {
+            <CampaignSettings key={selected.id} campaign={selected} busy={busy} onSave={updateCampaign} onUpload={async (file, ratio) => {
               setBusy(true);
-              try { const url = await upload(file, 'campaigns'); await updateCampaign({ hero_image: url }); return url; }
+              try { const url = await upload(file, 'campaigns'); await updateCampaign({ hero_image: url, hero_ratio: ratio }); return url; }
               catch (error) { flash(error instanceof Error ? error.message : '上傳失敗'); }
               finally { setBusy(false); }
               return '';
@@ -282,7 +282,7 @@ export default function CampaignManager({
   );
 }
 
-function CampaignSettings({ campaign, busy, onSave, onUpload, onDelete }: { campaign: Campaign; busy: boolean; onSave: (patch: Partial<Campaign>) => void; onUpload: (file: File) => Promise<string>; onDelete: () => void }) {
+function CampaignSettings({ campaign, busy, onSave, onUpload, onDelete }: { campaign: Campaign; busy: boolean; onSave: (patch: Partial<Campaign>) => void; onUpload: (file: File, ratio: NonNullable<Campaign['hero_ratio']>) => Promise<string>; onDelete: () => void }) {
   const [draft, setDraft] = useState(campaign);
   const [cropFile, setCropFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -296,7 +296,7 @@ function CampaignSettings({ campaign, busy, onSave, onUpload, onDelete }: { camp
       <Field label="結束時間"><input type="datetime-local" value={dateInput(draft.end_at)} onChange={(e) => setDraft({ ...draft, end_at: e.target.value || null })} /></Field>
       <Field label="主色"><input type="color" value={draft.theme_color} onChange={(e) => setDraft({ ...draft, theme_color: e.target.value })} className="h-11" /></Field>
       <Field label="頁面說明" className="sm:col-span-2"><textarea rows={3} value={draft.description} onChange={(e) => setDraft({ ...draft, description: e.target.value })} /></Field>
-      <Field label="輪播圖尺寸" className="sm:col-span-2"><select value={draft.hero_ratio ?? 'portrait'} onChange={(e) => setDraft({ ...draft, hero_ratio: e.target.value as NonNullable<Campaign['hero_ratio']> })} className="h-11 w-full border border-[#d8d0c6] bg-white px-3 text-sm">{HERO_RATIOS.map((r) => <option key={r.key} value={r.key}>{r.label}</option>)}</select><p className="mt-1 text-xs text-[#8a7f72]">先選尺寸再上傳,裁切框會照這個比例;建議上傳 {heroRatio.w} × {heroRatio.h} px 以上。換尺寸後請重新上傳首圖。</p></Field>
+      <Field label="輪播圖尺寸" className="sm:col-span-2"><select value={draft.hero_ratio ?? 'portrait'} onChange={(e) => { const hero_ratio = e.target.value as NonNullable<Campaign['hero_ratio']>; setDraft({ ...draft, hero_ratio }); onSave({ hero_ratio }); }} className="h-11 w-full border border-[#d8d0c6] bg-white px-3 text-sm">{HERO_RATIOS.map((r) => <option key={r.key} value={r.key}>{r.label}</option>)}</select><p className="mt-1 text-xs text-[#8a7f72]">先選尺寸再上傳,裁切框會照這個比例;建議上傳 {heroRatio.w} × {heroRatio.h} px 以上。換尺寸會立即套用,請重新上傳符合比例的首圖。</p></Field>
       <Field label="首圖(輪播圖)" className="sm:col-span-2"><div className="flex items-center gap-3">{draft.hero_image ? <img src={draft.hero_image} alt="" className={`h-24 bg-[#f5f1eb] object-cover ${heroRatio.cls}`} /> : null}<label className="cursor-pointer border border-[#d8d0c6] px-4 py-2 text-sm font-semibold">上傳首圖<input type="file" accept="image/*" className="hidden" onChange={(e) => { const file = e.target.files?.[0]; e.target.value = ''; if (file) setCropFile(file); }} /></label></div></Field>
     </div>
     {cropFile ? (
@@ -311,7 +311,7 @@ function CampaignSettings({ campaign, busy, onSave, onUpload, onDelete }: { camp
         onConfirm={async (blob, filename) => {
           setUploading(true);
           try {
-            const url = await onUpload(new File([blob], filename, { type: 'image/jpeg' }));
+            const url = await onUpload(new File([blob], filename, { type: 'image/jpeg' }), draft.hero_ratio ?? 'portrait');
             if (url) setDraft((current) => ({ ...current, hero_image: url }));
             setCropFile(null);
           } finally {

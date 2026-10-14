@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useId, useRef, useState } from 'react';
+import { lockScroll } from '@/lib/scroll-lock';
 import { ArrowLeft, ArrowRight, Maximize2, X } from 'lucide-react';
 import type { CardTier } from '@/lib/card-plan';
 import TierTable from '../TierTable';
@@ -14,9 +15,7 @@ export default function ComparisonDialog({ promoTier }: { promoTier?: CardTier }
   const [open, setOpen] = useState(false);
   useEffect(() => {
     if (!open) return;
-    const previous = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => { document.body.style.overflow = previous; };
+    return lockScroll();
   }, [open]);
   const slide = (direction: number) => {
     content.current?.querySelector('[role="region"]')?.scrollBy({

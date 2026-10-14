@@ -50,11 +50,20 @@ export function useLongPressReorder(ids: string[], onDrop: (ids: string[]) => vo
     window.addEventListener('pointermove', move);
     window.addEventListener('pointerup', end);
     window.addEventListener('pointercancel', end);
+    // pointerup 漏接時(拖曳中列表重排、iOS 手勢中斷、切到背景)也要結束,否則整頁一直被擋住無法捲動
+    window.addEventListener('touchend', end);
+    window.addEventListener('touchcancel', end);
+    window.addEventListener('blur', end);
+    document.addEventListener('visibilitychange', end);
     return () => {
       document.removeEventListener('touchmove', blockScroll);
       window.removeEventListener('pointermove', move);
       window.removeEventListener('pointerup', end);
       window.removeEventListener('pointercancel', end);
+      window.removeEventListener('touchend', end);
+      window.removeEventListener('touchcancel', end);
+      window.removeEventListener('blur', end);
+      document.removeEventListener('visibilitychange', end);
     };
   }, []);
 

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { lockScroll } from '@/lib/scroll-lock';
 import { createPortal } from 'react-dom';
 import { ArrowRight, ArrowUp, LayoutTemplate, LoaderCircle, Share2, X } from 'lucide-react';
 import ProfileCardView from '@/app/components/ProfileCardView';
@@ -60,12 +61,11 @@ export default function HeroImportBubble({ loggedIn }: { loggedIn: boolean }) {
   // 預覽開著時鎖住背景捲動,Esc 關閉
   useEffect(() => {
     if (!data) return;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
+    const unlock = lockScroll();
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setData(null);
     document.addEventListener('keydown', onKey);
     return () => {
-      document.body.style.overflow = prev;
+      unlock();
       document.removeEventListener('keydown', onKey);
     };
   }, [data]);
