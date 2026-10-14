@@ -21,6 +21,7 @@ import { resolveStorefront } from '@/lib/storefront-template';
 import { StorefrontDesignHero, StorefrontDesignFeature } from './StorefrontDesign';
 import StorefrontBlocks from './StorefrontBlocks';
 import { useScrollLock } from './useScrollLock';
+import SocialBrandIcon, { detectSocialBrand } from './SocialBrandIcon';
 
 // 購物車存在瀏覽器本機的 key(結帳頁會讀同一份)
 const CART_KEY = 'cart';
@@ -1051,7 +1052,16 @@ function getFooterLinkHref(item: FooterLinkItem, sectionTitle: string) {
 
 function SocialLink({ href, label, image, children }: { href?: string; label: string; image?: string; children: ReactNode }) {
   const active = href && href.trim();
-  const content = image ? <img src={image} alt="" className="h-full w-full rounded-full object-cover" /> : children;
+  // 沒上傳圖片時,認得出的品牌用彩色 logo
+  const brand = image ? null : detectSocialBrand(label, href);
+  const content = image ? <img src={image} alt="" className="h-full w-full rounded-full object-cover" /> : brand ? <SocialBrandIcon brand={brand} /> : children;
+  if (brand && active) {
+    return (
+      <a href={href} aria-label={label} target={href.startsWith('http') ? '_blank' : undefined} rel={href.startsWith('http') ? 'noreferrer' : undefined} className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full transition hover:opacity-80">
+        {content}
+      </a>
+    );
+  }
   if (!active) {
     return (
       <span className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full border border-[#d8cdc1] text-xs font-bold text-[#b8aea3]">

@@ -57,6 +57,7 @@ import { isCollectOnDelivery } from '@/lib/payment';
 import { buildReturnSteps, historyKind, isReturnOrder } from '@/lib/return-progress';
 import { getCheckoutLine, getNewsletter, HIDDEN_FOOTER_SECTION_TITLES, lineAddFriendUrl, withCheckoutLine, withNewsletter } from '@/lib/checkout-line';
 import { ADMIN_PRODUCT_TABS, adminProductTab, UNLISTED_STATUS, type AdminProductTab } from '@/lib/product-status';
+import SocialBrandIcon, { detectSocialBrand } from '@/app/components/SocialBrandIcon';
 
 const formatter = new Intl.NumberFormat('zh-TW', {
   style: 'currency',
@@ -3113,18 +3114,7 @@ export default function AdminDashboard({
               )}
 
               {settingsTab === 'footer' && (
-              <Card
-                title=""
-                action={
-                  <button
-                    onClick={() => void saveFooterSettings()}
-                    disabled={savingSettings}
-                    className="rounded-full bg-[#1f1b19] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
-                  >
-                    {savingSettings ? '儲存中...' : '儲存頁尾'}
-                  </button>
-                }
-              >
+              <Card title="頁尾設定">
                 <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                   <FooterPagesEditor
                     value={footerDraft.sections}
@@ -3222,6 +3212,17 @@ export default function AdminDashboard({
                     </label>
                   </div>
                   </FooterFold>
+                </div>
+                {/* 儲存按鈕置底懸浮:捲到哪裡都能直接儲存 */}
+                <div className="sticky bottom-0 z-20 -mx-5 -mb-5 mt-6 flex items-center justify-end gap-3 rounded-b-xl border-t border-[#e5ded4] bg-white/95 px-5 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] backdrop-blur">
+                  <span className="min-w-0 flex-1 truncate text-xs text-[#8a7f72]">修改後記得按儲存</span>
+                  <button
+                    onClick={() => void saveFooterSettings()}
+                    disabled={savingSettings}
+                    className="shrink-0 rounded-full bg-[#1f1b19] px-6 py-2.5 text-sm font-semibold text-white shadow-lg disabled:opacity-60"
+                  >
+                    {savingSettings ? '儲存中...' : '儲存頁尾'}
+                  </button>
                 </div>
               </Card>
               )}
@@ -3740,10 +3741,10 @@ function FooterPagesEditor({ value, onChange }: { value: string; onChange: (valu
   );
 
   return (
-    <div className="min-w-0 rounded-lg border border-[#e5ded4] p-3 sm:p-4 lg:col-span-2">
+    <FooterFold className="lg:col-span-2" title="頁尾選單設定" badge={`${sections.length} 個大標題`}>
       <div className="flex items-center justify-between gap-2 pb-3">
-        <p className="text-sm text-[#8a7f72]">點大標題展開,編輯裡面的小標題</p>
-        <button type="button" onClick={addSection} className="shrink-0 whitespace-nowrap rounded-lg border border-[#1f1b19] px-3 py-2 text-sm font-semibold">
+        <p className="text-xs leading-5 text-[#8a7f72]">點大標題展開,編輯裡面的小標題</p>
+        <button type="button" onClick={addSection} className="shrink-0 whitespace-nowrap rounded-lg border border-[#1f1b19] bg-white px-3 py-2 text-sm font-semibold">
           + 大標題
         </button>
       </div>
@@ -3877,7 +3878,7 @@ function FooterPagesEditor({ value, onChange }: { value: string; onChange: (valu
           );
         })}
       </div>
-    </div>
+    </FooterFold>
   );
 }
 
@@ -3927,28 +3928,30 @@ function FooterSocialLinksEditor({ value, onChange, onCommit }: { value: string;
     setEditing(null);
   }
 
-  const icon = (item: FooterSocialDraft, size: string) => (
-    <span className={`flex shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#1f1b19] text-[11px] font-bold text-white ${size}`}>
-      {item.image ? <img src={item.image} alt="" className="h-full w-full object-cover" /> : item.label.slice(0, 4) || '@'}
-    </span>
-  );
+  // 有上傳圖片用圖片;沒有就依名稱/連結顯示彩色品牌 logo;都認不出才顯示文字
+  const icon = (item: FooterSocialDraft, size: string) => {
+    const brand = item.image ? null : detectSocialBrand(item.label, item.url);
+    return (
+      <span className={`flex shrink-0 items-center justify-center overflow-hidden rounded-full text-[11px] font-bold text-white ${brand ? '' : 'bg-[#1f1b19]'} ${size}`}>
+        {item.image ? <img src={item.image} alt="" className="h-full w-full object-cover" /> : brand ? <SocialBrandIcon brand={brand} /> : item.label.slice(0, 4) || '@'}
+      </span>
+    );
+  };
 
   return (
-    <div className="min-w-0 lg:col-span-2 rounded-lg border border-[#e5ded4] p-4">
-      <div className="flex flex-wrap items-center gap-3">
-        <h3 className="text-lg font-bold">頁尾社群按鈕</h3>
+    <FooterFold className="lg:col-span-2" title="頁尾社群按鈕" badge={`${items.length} 個按鈕`} desc={`頁尾的圓形社群按鈕,最多 ${MAX_FOOTER_SOCIAL_LINKS} 個;點一下編輯,有填連結的才會顯示。沒上傳圖片時,Instagram、Facebook、LINE、YouTube、TikTok、Threads、X、Email 會自動用彩色 logo。`}>
+      <div className="flex justify-end">
         <button
           type="button"
           onClick={() => setEditing({ index: -1, item: { label: '', image: '', url: '' } })}
           disabled={items.length >= MAX_FOOTER_SOCIAL_LINKS}
-          className="ml-auto rounded-full border border-[#1f1b19] px-4 py-1.5 text-sm font-semibold disabled:opacity-40"
+          className="rounded-full border border-[#1f1b19] bg-white px-4 py-1.5 text-sm font-semibold disabled:opacity-40"
         >
           + 新增按鈕
         </button>
       </div>
-      <p className="mt-1 text-sm text-[#8a7f72]">頁尾的圓形社群按鈕,最多 {MAX_FOOTER_SOCIAL_LINKS} 個;點一下編輯,有填連結的才會顯示。</p>
-      {items.length === 0 ? <p className="mt-4 rounded-lg bg-[#faf7f2] py-6 text-center text-sm text-[#a99e8f]">目前沒有社群按鈕,頁尾不會顯示這一排。</p> : (
-        <div className="mt-4 divide-y divide-[#f0ebe2] overflow-hidden rounded-lg border border-[#e5ded4] bg-white">
+      {items.length === 0 ? <p className="mt-3 rounded-lg bg-[#faf7f2] py-6 text-center text-sm text-[#a99e8f]">目前沒有社群按鈕,頁尾不會顯示這一排。</p> : (
+        <div className="mt-3 divide-y divide-[#f0ebe2] overflow-hidden rounded-lg border border-[#e5ded4] bg-white">
           {items.map((item, index) => (
             <button key={index} type="button" onClick={() => setEditing({ index, item: { ...item } })} className="flex w-full items-center gap-3 px-3 py-2.5 text-left hover:bg-[#faf7f2]">
               {icon(item, 'h-10 w-10')}
@@ -3996,7 +3999,7 @@ function FooterSocialLinksEditor({ value, onChange, onCommit }: { value: string;
           </div>
         </div>
       ) : null}
-    </div>
+    </FooterFold>
   );
 }
 
