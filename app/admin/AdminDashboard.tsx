@@ -2867,6 +2867,7 @@ export default function AdminDashboard({
               onCampaignDeleted={(campaignId) => { setProducts((list) => list.filter((product) => product.campaign_id !== campaignId)); setCampaignCategories((list) => list.filter((c) => c.campaign_id !== campaignId)); }}
               categories={campaignCategories}
               onCategoriesChange={setCampaignCategories}
+              onProductChange={(updated) => setProducts((list) => list.map((p) => (p.id === updated.id ? updated : p)))}
               onReorder={(ordered) => setProducts((list) => list.map((p) => { const i = ordered.findIndex((o) => o.id === p.id); return i >= 0 ? { ...p, sort_order: i } : p; }))}
             />
           )}

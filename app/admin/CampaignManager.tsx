@@ -3,8 +3,8 @@
 import { type ReactNode, useEffect, useMemo, useState } from 'react';
 import { lockScroll } from '@/lib/scroll-lock';
 import type { Campaign, Category, Product } from '@/lib/types';
-import { uiAlert } from '@/lib/ui-dialog';
 import { useLongPressReorder } from './useLongPressReorder';
+import CampaignCategoryManager from './CampaignCategoryManager';
 import { uiConfirm } from '@/lib/ui-dialog';
 import FixedBannerCropModal from './FixedBannerCropModal';
 
@@ -38,6 +38,7 @@ export default function CampaignManager({
   categories = [],
   onCategoriesChange,
   onReorder,
+  onProductChange,
 }: {
   initialCampaigns: Campaign[];
   products: Product[];
@@ -48,6 +49,7 @@ export default function CampaignManager({
   categories?: Category[]; // 促銷活動頁專屬分類(所有活動)
   onCategoriesChange?: (list: Category[]) => void;
   onReorder?: (ordered: Product[]) => void;
+  onProductChange?: (product: Product) => void;
 }) {
   const [campaigns, setCampaigns] = useState(initialCampaigns);
   const [selectedId, setSelectedId] = useState(initialCampaigns[0]?.id ?? '');
@@ -70,27 +72,10 @@ export default function CampaignManager({
   // 活動專屬分類(和主站分類分開)
   const campaignCats = categories.filter((c) => c.campaign_id === selectedId).sort((a, b) => a.sort_order - b.sort_order);
   const catName = (slug: string) => campaignCats.find((c) => c.slug === slug)?.name ?? (slug || '未分類');
-  const [catInput, setCatInput] = useState('');
   const [catTab, setCatTab] = useState('all'); // 商品列表的分類分頁
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [catManagerOpen, setCatManagerOpen] = useState(false);
   useEffect(() => (previewOpen ? lockScroll() : undefined), [previewOpen]);
-  async function addCategory() {
-    const name = catInput.trim();
-    if (!name || !selected) return;
-    const slug = `cp-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`;
-    const res = await fetch('/api/categories', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ slug, name, en: '', campaign_id: selected.id, sort_order: campaignCats.length }) });
-    const data = await res.json().catch(() => null);
-    if (!res.ok) return void uiAlert(data?.error ?? '新增分類失敗');
-    onCategoriesChange?.([...categories, data as Category]);
-    setCatInput('');
-  }
-  async function removeCategory(cat: Category) {
-    if (!(await uiConfirm(`刪除分類「${cat.name}」?這個分類的商品會變成未分類。`, { danger: true }))) return;
-    const res = await fetch(`/api/categories/${cat.id}`, { method: 'DELETE' });
-    if (!res.ok) return void uiAlert('刪除分類失敗');
-    onCategoriesChange?.(categories.filter((c) => c.id !== cat.id));
-  }
-
   // 商品排序:長按(手機)或按住把手拖曳;只能在「全部」且沒有搜尋時排序
   const sortable = !query.trim() && catTab === 'all';
   const reorder = useLongPressReorder(campaignProducts.map((p) => p.id), (ids) => {
@@ -223,20 +208,16 @@ export default function CampaignManager({
                 <button type="button" onClick={() => onNewProduct(selected.id)} className="rounded-md bg-[#702838] px-4 py-2 text-sm font-semibold text-white">＋ 新增活動商品</button>
               </div>
               <div className="mt-4 rounded-md bg-[#faf7f2] p-3">
-                <p className="text-sm font-semibold">活動分類</p>
-                <p className="text-xs text-[#8a7f72]">只用在這個活動頁,和主站分類分開。編輯活動商品時可選擇。</p>
-                <div className="mt-2 flex flex-wrap gap-1.5">
-                  {campaignCats.map((c) => (
-                    <span key={c.id} className="inline-flex items-center gap-1 rounded-full border border-[#d8d0c6] bg-white px-3 py-1 text-xs">
-                      {c.name}
-                      <button type="button" onClick={() => void removeCategory(c)} aria-label={`刪除分類 ${c.name}`} className="text-[#b23a3a]">×</button>
-                    </span>
-                  ))}
-                  {!campaignCats.length ? <span className="text-xs text-[#a99e8f]">尚未建立分類</span> : null}
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold">活動分類</p>
+                    <p className="text-xs text-[#8a7f72]">只用在這個活動頁,和主站分類分開。</p>
+                  </div>
+                  <button type="button" onClick={() => setCatManagerOpen(true)} className="shrink-0 rounded-md bg-[#702838] px-3 py-2 text-xs font-semibold text-white">分類管理</button>
                 </div>
-                <div className="mt-2 flex gap-2">
-                  <input value={catInput} onChange={(e) => setCatInput(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); void addCategory(); } }} placeholder="新分類名稱,例如:上衣" className="h-10 min-w-0 flex-1 border border-[#d8d0c6] bg-white px-3 text-sm outline-none focus:border-[#702838]" />
-                  <button type="button" onClick={() => void addCategory()} className="h-10 shrink-0 border border-[#702838] px-4 text-sm font-semibold text-[#702838]">新增分類</button>
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {campaignCats.map((c) => <span key={c.id} className={`rounded-full border border-[#d8d0c6] bg-white px-3 py-1 text-xs ${c.sort_order < 0 ? 'opacity-50' : ''}`}>{c.name}</span>)}
+                  {!campaignCats.length ? <span className="text-xs text-[#a99e8f]">尚未建立分類,按「分類管理」新增</span> : null}
                 </div>
               </div>
               <div className="mt-4 flex gap-2">
@@ -264,6 +245,18 @@ export default function CampaignManager({
           </div>
         ) : <div className="border border-dashed border-[#d8d0c6] bg-white p-16 text-center text-[#8a7f72]">建立一個促銷專頁開始編輯。</div>}
       </div>
+
+      {catManagerOpen && selected ? (
+        <CampaignCategoryManager
+          campaignId={selected.id}
+          campaignName={selected.name || selected.title}
+          categories={categories}
+          products={products.filter((p) => p.campaign_id === selected.id)}
+          onCategoriesChange={(list) => onCategoriesChange?.(list)}
+          onProductChange={(p) => onProductChange?.(p)}
+          onClose={() => setCatManagerOpen(false)}
+        />
+      ) : null}
 
       {previewOpen && selected ? (
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 p-0 sm:p-6" onClick={() => setPreviewOpen(false)}>
