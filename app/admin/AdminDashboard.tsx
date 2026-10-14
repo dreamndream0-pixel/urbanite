@@ -3651,8 +3651,10 @@ type FooterItemDraft = { subtitle: string; content: string; url: string };
 type FooterSectionDraft = { title: string; items: FooterItemDraft[] };
 type FooterSocialDraft = { label: string; image: string; url: string };
 
+// 頁尾頁面:開合式。大標題一列一列收合,點開後裡面是小標題清單;小標題也可再點開編輯內文
 function FooterPagesEditor({ value, onChange }: { value: string; onChange: (value: string) => void }) {
-  const [active, setActive] = useState(0);
+  const [openSection, setOpenSection] = useState<number | null>(null);
+  const [openItem, setOpenItem] = useState<number | null>(null);
   const [sections, setSections] = useState<FooterSectionDraft[]>(() => {
     try {
       const parsed = JSON.parse(value);
@@ -3677,9 +3679,15 @@ function FooterPagesEditor({ value, onChange }: { value: string; onChange: (valu
     onChange(JSON.stringify(next, null, 2));
   }
 
+  function toggleSection(index: number) {
+    setOpenSection(openSection === index ? null : index);
+    setOpenItem(null);
+  }
+
   function addSection() {
     const next = [...sections, { title: '新大標題', items: [{ subtitle: '新小標題', content: '', url: '' }] }];
-    setActive(next.length - 1);
+    setOpenSection(next.length - 1);
+    setOpenItem(0);
     update(next);
   }
 
@@ -3688,111 +3696,153 @@ function FooterPagesEditor({ value, onChange }: { value: string; onChange: (valu
   }
 
   function deleteSection(index: number) {
-    const next = sections.filter((_, i) => i !== index);
-    setActive(Math.max(0, Math.min(active, next.length - 1)));
-    update(next);
+    setOpenSection(null);
+    setOpenItem(null);
+    update(sections.filter((_, i) => i !== index));
   }
 
-  const section = sections[active];
+  function updateItem(sectionIndex: number, itemIndex: number, patch: Partial<FooterItemDraft>) {
+    const section = sections[sectionIndex];
+    updateSection(sectionIndex, { items: section.items.map((x, i) => (i === itemIndex ? { ...x, ...patch } : x)) });
+  }
+
+  function addItem(sectionIndex: number) {
+    const section = sections[sectionIndex];
+    updateSection(sectionIndex, { items: [...section.items, { subtitle: '新小標題', content: '', url: '' }] });
+    setOpenItem(section.items.length);
+  }
+
+  function deleteItem(sectionIndex: number, itemIndex: number) {
+    const section = sections[sectionIndex];
+    updateSection(sectionIndex, { items: section.items.filter((_, i) => i !== itemIndex) });
+    setOpenItem(null);
+  }
+
+  const chevron = (open: boolean) => (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden className={`shrink-0 transition-transform ${open ? 'rotate-180' : ''}`}>
+      <path d="m6 9 6 6 6-6" />
+    </svg>
+  );
 
   return (
-    <div className="min-w-0 lg:col-span-2 rounded-lg border border-[#e5ded4] p-4">
-      {/* 大標題選單:左右滑動 */}
-      <div className="flex items-center gap-2 border-b border-[#e5ded4] pb-3">
-        <div className="flex min-w-0 flex-1 gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        {sections.map((entry, index) => (
-          <button
-            key={`${entry.title}-${index}`}
-            type="button"
-            onClick={() => setActive(index)}
-            className={`shrink-0 whitespace-nowrap rounded-lg px-4 py-2 text-sm font-semibold ${
-              active === index ? 'bg-[#7da185] text-white' : 'border border-[#e5ded4] bg-white'
-            }`}
-          >
-            {entry.title || '未命名大標題'}
-          </button>
-        ))}
-        </div>
+    <div className="min-w-0 rounded-lg border border-[#e5ded4] p-3 sm:p-4 lg:col-span-2">
+      <div className="flex items-center justify-between gap-2 pb-3">
+        <p className="text-sm text-[#8a7f72]">點大標題展開,編輯裡面的小標題</p>
         <button type="button" onClick={addSection} className="shrink-0 whitespace-nowrap rounded-lg border border-[#1f1b19] px-3 py-2 text-sm font-semibold">
           + 大標題
         </button>
       </div>
 
-      {section ? (
-        <div className="mt-5 space-y-5">
-          <div className="flex gap-2">
-            <label className="block min-w-0 flex-1 text-sm text-[#8a7f72]">
-              大標題
-              <input
-                value={section.title}
-                onChange={(e) => updateSection(active, { title: e.target.value })}
-                placeholder="例如：關於我們 ABOUT US"
-                className="mt-2 w-full rounded-lg border border-[#e5ded4] px-3 py-2 text-base font-semibold text-[#1f1b19]"
-              />
-            </label>
-            <button
-              type="button"
-              onClick={() => deleteSection(active)}
-              className="mt-7 rounded-lg border border-[#e0b4b4] px-3 py-2 text-sm font-semibold text-[#a64d45]"
-            >
-              刪除大標題
-            </button>
-          </div>
+      {sections.length === 0 && <p className="py-4 text-sm text-[#8a7f72]">尚未新增頁尾大標題,按右上角開始建立。</p>}
 
-          <div className="space-y-4">
-            {section.items.map((item, itemIndex) => (
-              <div key={itemIndex} className="rounded-lg bg-[#f8f5f0] p-4">
-                <div className="flex items-center justify-between gap-3">
-                  <label className="block min-w-0 flex-1 text-sm text-[#8a7f72]">
-                    小標題
-                    <input
-                      value={item.subtitle}
-                      onChange={(e) => updateSection(active, { items: section.items.map((x, i) => i === itemIndex ? { ...x, subtitle: e.target.value } : x) })}
-                      placeholder="例如：優惠資訊 / Coupon"
-                      className="mt-2 w-full rounded-lg border border-[#e5ded4] bg-white px-3 py-2 text-base text-[#1f1b19]"
-                    />
-                  </label>
+      <div className="space-y-2">
+        {sections.map((section, sectionIndex) => {
+          const sectionOpen = openSection === sectionIndex;
+          return (
+            <div key={sectionIndex} className={`min-w-0 overflow-hidden rounded-lg border ${sectionOpen ? 'border-[#7da185]' : 'border-[#e5ded4]'}`}>
+              <button
+                type="button"
+                onClick={() => toggleSection(sectionIndex)}
+                aria-expanded={sectionOpen}
+                className={`flex w-full items-center gap-2 px-4 py-3 text-left ${sectionOpen ? 'bg-[#7da185] text-white' : 'bg-white text-[#1f1b19]'}`}
+              >
+                <span className="min-w-0 flex-1 truncate font-semibold">{section.title || '未命名大標題'}</span>
+                <span className={`shrink-0 text-xs ${sectionOpen ? 'text-white/80' : 'text-[#8a7f72]'}`}>{section.items.length} 個小標題</span>
+                {chevron(sectionOpen)}
+              </button>
+
+              {sectionOpen && (
+                <div className="space-y-3 bg-[#fcfbf8] p-3 sm:p-4">
+                  <div className="flex items-end gap-2">
+                    <label className="block min-w-0 flex-1 text-sm text-[#8a7f72]">
+                      大標題
+                      <input
+                        value={section.title}
+                        onChange={(e) => updateSection(sectionIndex, { title: e.target.value })}
+                        placeholder="例如：關於我們 ABOUT US"
+                        className="mt-2 w-full rounded-lg border border-[#e5ded4] bg-white px-3 py-2 text-base font-semibold text-[#1f1b19]"
+                      />
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => deleteSection(sectionIndex)}
+                      className="shrink-0 whitespace-nowrap rounded-lg border border-[#e0b4b4] px-3 py-2 text-sm font-semibold text-[#a64d45]"
+                    >
+                      刪除大標題
+                    </button>
+                  </div>
+
+                  {section.items.map((item, itemIndex) => {
+                    const itemOpen = openItem === itemIndex;
+                    return (
+                      <div key={itemIndex} className="min-w-0 overflow-hidden rounded-lg border border-[#ece5da] bg-[#f8f5f0]">
+                        <button
+                          type="button"
+                          onClick={() => setOpenItem(itemOpen ? null : itemIndex)}
+                          aria-expanded={itemOpen}
+                          className="flex w-full items-center gap-2 px-4 py-3 text-left text-[#1f1b19]"
+                        >
+                          <span className="min-w-0 flex-1 truncate">{item.subtitle || '未命名小標題'}</span>
+                          {!item.content && !item.url && <span className="shrink-0 text-xs text-[#b9b0a8]">尚無內容</span>}
+                          {chevron(itemOpen)}
+                        </button>
+                        {itemOpen && (
+                          <div className="space-y-3 border-t border-[#ece5da] px-4 pb-4 pt-3">
+                            <div className="flex items-end gap-2">
+                              <label className="block min-w-0 flex-1 text-sm text-[#8a7f72]">
+                                小標題
+                                <input
+                                  value={item.subtitle}
+                                  onChange={(e) => updateItem(sectionIndex, itemIndex, { subtitle: e.target.value })}
+                                  placeholder="例如：優惠資訊 / Coupon"
+                                  className="mt-2 w-full rounded-lg border border-[#e5ded4] bg-white px-3 py-2 text-base text-[#1f1b19]"
+                                />
+                              </label>
+                              <button
+                                type="button"
+                                onClick={() => deleteItem(sectionIndex, itemIndex)}
+                                className="shrink-0 rounded-lg border border-[#e0b4b4] px-3 py-2 text-sm font-semibold text-[#a64d45]"
+                              >
+                                刪除
+                              </button>
+                            </div>
+                            <label className="block text-sm text-[#8a7f72]">
+                              頁面內容
+                              <textarea
+                                value={item.content}
+                                onChange={(e) => updateItem(sectionIndex, itemIndex, { content: e.target.value })}
+                                placeholder="輸入這個小標題點開後要顯示的完整內文..."
+                                rows={8}
+                                className="mt-2 w-full rounded-lg border border-[#e5ded4] bg-white px-3 py-3 text-base leading-7 text-[#1f1b19]"
+                              />
+                            </label>
+                            <label className="block text-sm text-[#8a7f72]">
+                              連結網址(選填)
+                              <input
+                                value={item.url}
+                                onChange={(e) => updateItem(sectionIndex, itemIndex, { url: e.target.value })}
+                                placeholder="https://..."
+                                className="mt-2 w-full rounded-lg border border-[#e5ded4] bg-white px-3 py-2 text-base text-[#1f1b19]"
+                              />
+                            </label>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                   <button
                     type="button"
-                    onClick={() => updateSection(active, { items: section.items.filter((_, i) => i !== itemIndex) })}
-                    className="mt-7 rounded-lg border border-[#e0b4b4] px-3 py-2 text-sm font-semibold text-[#a64d45]"
+                    onClick={() => addItem(sectionIndex)}
+                    className="rounded-lg border border-[#7da185] px-3 py-2 text-sm font-semibold text-[#5f8066]"
                   >
-                    刪除
+                    + 新增小標題
                   </button>
                 </div>
-                <label className="mt-3 block text-sm text-[#8a7f72]">
-                  頁面內容
-                  <textarea
-                    value={item.content}
-                    onChange={(e) => updateSection(active, { items: section.items.map((x, i) => i === itemIndex ? { ...x, content: e.target.value } : x) })}
-                    placeholder="輸入這個小標題點開後要顯示的完整內文..."
-                    rows={10}
-                    className="mt-2 w-full rounded-lg border border-[#e5ded4] bg-white px-3 py-3 text-base leading-7 text-[#1f1b19]"
-                  />
-                </label>
-                <label className="mt-3 block text-sm text-[#8a7f72]">
-                  連結網址（選填）
-                  <input
-                    value={item.url}
-                    onChange={(e) => updateSection(active, { items: section.items.map((x, i) => i === itemIndex ? { ...x, url: e.target.value } : x) })}
-                    placeholder="https://..."
-                    className="mt-2 w-full rounded-lg border border-[#e5ded4] bg-white px-3 py-2 text-base text-[#1f1b19]"
-                  />
-                </label>
-              </div>
-            ))}
-            <button
-              type="button"
-              onClick={() => updateSection(active, { items: [...section.items, { subtitle: '新小標題', content: '', url: '' }] })}
-              className="rounded-lg border border-[#7da185] px-3 py-2 text-sm font-semibold text-[#5f8066]"
-            >
-              + 新增小標題
-            </button>
-          </div>
-        </div>
-      ) : (
-        <p className="mt-5 text-sm text-[#8a7f72]">尚未新增頁尾大標題，按右上角開始建立。</p>
-      )}
+              )}
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
