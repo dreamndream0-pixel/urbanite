@@ -9,6 +9,7 @@ import { computeShipping, resolveMethodFee } from '@/lib/shipping';
 import ShopHeader from '@/app/components/ShopHeader';
 import { useShopHome } from '@/lib/shop-home';
 import LineContactCard from '@/app/components/LineContactCard';
+import { useScrollLock } from '@/app/components/useScrollLock';
 
 const CART_KEY = 'cart';
 
@@ -102,6 +103,9 @@ export default function CheckoutPage() {
   const [note, setNote] = useState('');
   const [recipients, setRecipients] = useState<Recipient[]>([]);
   const [isMember, setIsMember] = useState(false);
+  // 訪客進結帳頁:提示加入會員領取折扣優惠券(每個瀏覽階段只跳一次)
+  const [guestPrompt, setGuestPrompt] = useState(false);
+  useScrollLock(guestPrompt);
   const [savingRecipient, setSavingRecipient] = useState(false);
   const [toast, setToast] = useState('');
   const [shippingMethod, setShippingMethod] = useState(SHIPPING_METHODS[0]);
@@ -148,6 +152,11 @@ export default function CheckoutPage() {
     fetch('/api/me')
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
+        if (!data?.email) {
+          try {
+            if (!sessionStorage.getItem('urbanite-guest-prompt')) { sessionStorage.setItem('urbanite-guest-prompt', '1'); setGuestPrompt(true); }
+          } catch { /* 略過 */ }
+        }
         // 只補空白欄位,不蓋掉買家已填(或從地圖回來帶回)的資料
         if (data?.email) { setEmail((v) => v || data.email); setIsMember(true); }
         if (data?.name) setName((v) => v || data.name);
@@ -548,6 +557,9 @@ export default function CheckoutPage() {
             <p className="text-lg font-semibold text-[#1f7a44]">訂單成立！</p>
             <p className="mt-2 text-[var(--c-text2)]">單號：{orderNo}</p>
             <p className="mt-1 text-sm text-[var(--c-muted)]">我們會盡快為你備貨，感謝購買。</p>
+            {!isMember && (
+              <p className="mx-auto mt-3 max-w-sm rounded-lg bg-[#fff6e5] px-3 py-2 text-sm font-medium text-[#9a6412]">訪客結帳，請截圖此訂單編號，以利後續追蹤訂單</p>
+            )}
             {showAccountInfo && paymentAccount ? (
               <div className="mx-auto mt-5 max-w-sm rounded-xl border border-[#d8c7a8] bg-[var(--c-header)] p-4 text-left">
                 <p className="text-sm font-semibold text-[var(--c-gold)]">{paymentAccount.name} — 收款資訊</p>
@@ -995,6 +1007,19 @@ export default function CheckoutPage() {
           {toast}
         </div>
       </div>
+      {guestPrompt && !orderNo && cart.length > 0 && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 px-4" onClick={() => setGuestPrompt(false)}>
+          <div role="dialog" aria-modal="true" className="w-full max-w-sm rounded-2xl bg-[var(--c-surface)] p-6 text-center shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <p className="text-lg font-semibold">加入會員領取折扣優惠券</p>
+            <p className="mt-2 text-sm leading-6 text-[var(--c-text2)]">註冊會員即可領取折扣優惠券，還能隨時查詢訂單、累積回饋。</p>
+            <div className="mt-5 grid gap-2">
+              <Link href="/register?next=/checkout" className="rounded-full bg-[var(--c-button)] px-5 py-3 font-semibold text-[var(--c-button-text)]">加入會員領優惠券</Link>
+              <Link href="/login?next=/checkout" className="rounded-full border border-[var(--c-border)] px-5 py-3 text-sm font-medium">已是會員，登入</Link>
+              <button type="button" onClick={() => setGuestPrompt(false)} className="py-2 text-sm text-[var(--c-muted)] underline-offset-4 hover:underline">繼續以訪客結帳</button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

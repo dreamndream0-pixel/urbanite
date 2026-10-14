@@ -43,9 +43,9 @@ export default function LineContactCard({ settings }: { settings?: SiteSettings 
   return (
     <div className="mx-auto mt-6 max-w-sm rounded-xl border border-[#cfe9d6] bg-[#f3fbf5] p-4 text-center">
       <p className="text-sm leading-6 text-[#3d5a45]">
-        {linkMember ? '訂閱 LINE 通知' : '歡迎加入官方 LINE'}
+        訂閱 LINE 通知
         <br />
-        {linkMember ? '訂單出貨、到貨都會用 LINE 通知你,查詢訂單也更方便' : '查詢出貨進度,以及聯絡客服人員'}
+        {linkMember ? '訂單出貨、到貨都會用 LINE 通知你,查詢訂單也更方便' : '加入官方 LINE,查詢出貨進度及聯絡客服人員'}
       </p>
       {lineId && (
         <p className="mt-2 text-sm font-semibold text-[#1f5a33]">
@@ -58,7 +58,7 @@ export default function LineContactCard({ settings }: { settings?: SiteSettings 
         className="mt-3 inline-flex items-center gap-2 rounded-full bg-[#06C755] px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#05b14c]"
       >
         <LineLogo />
-        {linkMember ? '訂閱 LINE 通知' : '加入官方 LINE'}
+        訂閱 LINE 通知
       </a>
     </div>
   );
