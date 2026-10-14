@@ -42,7 +42,13 @@
 }
 
 html {
-  scroll-behavior: smooth;
+  scroll-padding-top: 100px;
+}
+
+/* Touch pages use the document scroller; no sticky header over the content. */
+@media (max-width: 767px), (hover: none) and (pointer: coarse) {
+  html { scroll-padding-top: 16px; }
+  .page-header { position: relative; top: auto; }
 }
 
 body {

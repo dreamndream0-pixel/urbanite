@@ -12,10 +12,6 @@ export default function ScrollHero({ children }: { children: ReactNode }) {
     const motion = window.matchMedia("(prefers-reduced-motion: reduce)");
     const compact = window.matchMedia("(max-height: 570px)");
     const phoneLayout = window.matchMedia("(max-width: 760px)");
-    // 量「一定看得到的畫面高度」(100svh)
-    const probe = document.createElement("div");
-    probe.style.cssText = "position:fixed;top:0;left:0;width:0;height:100vh;height:100svh;visibility:hidden;pointer-events:none";
-    document.body.appendChild(probe);
     let frame = 0;
     const update = () => {
       frame = 0;
@@ -38,14 +34,7 @@ export default function ScrollHero({ children }: { children: ReactNode }) {
       }
       element.style.setProperty("--spread", `${eased * 5}%`);
       element.style.setProperty("--tilt", `${(1 - eased) * 5 + 8}deg`);
-      // 主視覺上方有公告條 / 表頭時,第一屏會被往下推、底部超出畫面:
-      // 把整個主視覺往上收(上緣藏到表頭後面),手、手機示意圖、輸入框都完整出現在畫面裡
-      // 用 svh 實際高度,iPhone Chrome 的 innerHeight 含底部工具列後方
-      const visible = Math.min(window.innerHeight, probe.offsetHeight || window.innerHeight);
-      const prev = element.previousElementSibling;
-      const above = prev ? prev.getBoundingClientRect().bottom + window.scrollY : 0;
-      const crop = Math.max(0, Math.min(above, Math.round(above + stage.offsetHeight - visible)));
-      element.style.marginTop = crop ? `-${crop}px` : "";
+      // Scroll effects only transform artwork, never move the document layout.
       // 往下滑的提示箭頭:快滑到底時淡出
       element.style.setProperty("--hint", progress > 0.92 ? "0" : "1");
       element.style.setProperty(
@@ -68,7 +57,6 @@ export default function ScrollHero({ children }: { children: ReactNode }) {
       window.removeEventListener("resize", schedule);
       motion.removeEventListener("change", schedule);
       resize.disconnect();
-      probe.remove();
     };
   }, []);
 

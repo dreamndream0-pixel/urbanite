@@ -1,0 +1,22 @@
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const ts = require('typescript');
+function style(value = '', priority = '') {
+  return { getPropertyValue: () => value, getPropertyPriority: () => priority,
+    setProperty: (_key, next, p = '') => { value = next; priority = p; }, removeProperty: () => { value = ''; priority = ''; } };
+}
+global.document = { documentElement: { style: style('auto', 'important') }, body: { style: style() } };
+const mod = { exports: {} };
+const js = ts.transpileModule(fs.readFileSync('lib/scroll-lock.ts', 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText;
+new Function('module', 'exports', js)(mod, mod.exports);
+for (let round = 0; round < 20; round++) {
+  const a = mod.exports.acquireScrollLock(), b = mod.exports.acquireScrollLock();
+  assert.equal(document.body.style.getPropertyValue('overflow'), 'hidden');
+  a(); a();
+  assert.equal(document.body.style.getPropertyValue('overflow'), 'hidden');
+  b();
+  assert.equal(document.body.style.getPropertyValue('overflow'), '');
+  assert.equal(document.documentElement.style.getPropertyValue('overflow'), 'auto');
+  assert.equal(document.documentElement.style.getPropertyPriority('overflow'), 'important');
+}
+console.log('Scroll lock: 20 nested/out-of-order/duplicate-cleanup cycles passed; original styles restored.');

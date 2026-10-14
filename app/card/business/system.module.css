@@ -8,7 +8,7 @@
   --green: #1f4d45;
   --scroll-progress: 0;
   min-height: 100vh;
-  overflow: hidden;
+  overflow: clip;
   background: var(--paper);
   color: var(--ink);
   font-family: Arial, Helvetica, sans-serif;
@@ -49,6 +49,10 @@
   border-bottom: 1px solid rgba(33, 29, 27, .14);
   background: rgba(244, 244, 241, .92);
   backdrop-filter: blur(16px);
+}
+
+@media (max-width: 767px), (hover: none) and (pointer: coarse) {
+  .header { position: relative; top: auto; }
 }
 
 .brand { display: inline-flex; align-items: center; gap: 12px; width: max-content; }

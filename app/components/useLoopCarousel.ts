@@ -58,7 +58,7 @@ export function useLoopCarousel<T>(items: T[], { autoplayMs = 0 }: { autoplayMs?
   const axis = useRef<'x' | 'y' | null>(null); // 手勢方向判定:x = 左右滑照片,y = 上下捲頁面
   const moved = useRef(false); // 有拖曳過:放開時不要觸發點擊(例如輪播圖連結)
   const lastWheel = useRef(0);
-  const [trackEl, setTrackEl] = useState<HTMLElement | null>(null);
+  const pointerId = useRef<number | null>(null);
 
   function start(x: number, y: number, el: HTMLElement) {
     if (!looping) return;
@@ -79,7 +79,7 @@ export function useLoopCarousel<T>(items: T[], { autoplayMs = 0 }: { autoplayMs?
     const dy = y - startY.current;
     if (!axis.current) {
       if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return false;
-      axis.current = Math.abs(dx) > Math.abs(dy) ? 'x' : 'y';
+      axis.current = Math.abs(dx) > Math.abs(dy) * 1.4 ? 'x' : 'y';
       if (axis.current === 'y') {
         // 上下捲動:交還給頁面,這次不滑照片
         startX.current = null;
@@ -93,47 +93,17 @@ export function useLoopCarousel<T>(items: T[], { autoplayMs = 0 }: { autoplayMs?
     return true;
   }
   function end(cancelled: boolean) {
-    if (startX.current === null) return;
-    const d = cancelled || axis.current !== 'x' ? 0 : dragXRef.current;
+    const d = cancelled || startX.current === null || axis.current !== 'x' ? 0 : dragXRef.current;
     const threshold = Math.min(width.current * 0.12, 60);
-    if (d <= -threshold) step(1);
-    else if (d >= threshold) step(-1);
+    if (d < 0 && d <= -threshold) step(1);
+    else if (d > 0 && d >= threshold) step(-1);
     startX.current = null;
     axis.current = null;
     dragXRef.current = 0;
     setDragging(false);
     setDragX(0);
+    pointerId.current = null;
   }
-
-  // 觸控用原生事件:touchmove 需設 passive:false 才能在左右滑時阻止頁面捲動。
-  // (iOS 上的 Safari / Chrome 對 touch-action 支援不一致,不依賴它)
-  const handlers = useRef({ start, move, end });
-  useEffect(() => {
-    handlers.current = { start, move, end };
-  });
-  useEffect(() => {
-    if (!trackEl) return;
-    const onTouchStart = (e: TouchEvent) => {
-      if (e.touches.length !== 1) return handlers.current.end(true);
-      handlers.current.start(e.touches[0].clientX, e.touches[0].clientY, trackEl);
-    };
-    const onTouchMove = (e: TouchEvent) => {
-      if (e.touches.length !== 1) return;
-      if (handlers.current.move(e.touches[0].clientX, e.touches[0].clientY) && e.cancelable) e.preventDefault();
-    };
-    const onTouchEnd = () => handlers.current.end(false);
-    const onTouchCancel = () => handlers.current.end(true);
-    trackEl.addEventListener('touchstart', onTouchStart, { passive: true });
-    trackEl.addEventListener('touchmove', onTouchMove, { passive: false });
-    trackEl.addEventListener('touchend', onTouchEnd);
-    trackEl.addEventListener('touchcancel', onTouchCancel);
-    return () => {
-      trackEl.removeEventListener('touchstart', onTouchStart);
-      trackEl.removeEventListener('touchmove', onTouchMove);
-      trackEl.removeEventListener('touchend', onTouchEnd);
-      trackEl.removeEventListener('touchcancel', onTouchCancel);
-    };
-  }, [trackEl]);
 
   // 觸控板左右兩指滑動
   function onWheel(e: React.WheelEvent<HTMLElement>) {
@@ -146,21 +116,25 @@ export function useLoopCarousel<T>(items: T[], { autoplayMs = 0 }: { autoplayMs?
 
   const dragPercent = widthPx ? (dragX / widthPx) * 100 : 0;
 
-  // 套在 flex 軌道上的屬性(觸控走上方原生事件;滑鼠拖曳走 Pointer Events)
+  // Native vertical pan/pinch wins; the browser cancels our pointer on page scroll.
   const trackProps = {
-    ref: setTrackEl,
     className: `flex ${dragging || instant ? '' : 'transition-transform duration-500 ease-out'}`,
-    style: { transform: `translateX(calc(-${pos * 100}% + ${dragPercent}%))` },
+    style: { transform: `translateX(calc(-${pos * 100}% + ${dragPercent}%))`, touchAction: 'pan-y pinch-zoom' },
     onPointerDown: (e: React.PointerEvent<HTMLElement>) => {
-      if (e.pointerType !== 'mouse' || e.button !== 0) return;
+      if (!e.isPrimary) { end(true); return; }
+      if (e.button !== 0) return;
+      pointerId.current = e.pointerId;
       start(e.clientX, e.clientY, e.currentTarget);
     },
     onPointerMove: (e: React.PointerEvent<HTMLElement>) => {
-      if (e.pointerType === 'mouse') move(e.clientX, e.clientY);
+      if (pointerId.current !== e.pointerId) return;
+      if (move(e.clientX, e.clientY) && !e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.setPointerCapture(e.pointerId);
     },
     onPointerUp: (e: React.PointerEvent<HTMLElement>) => {
-      if (e.pointerType === 'mouse') end(false);
+      if (pointerId.current === e.pointerId) end(false);
     },
+    onPointerCancel: () => end(true),
+    onLostPointerCapture: () => end(true),
     onPointerLeave: (e: React.PointerEvent<HTMLElement>) => {
       if (e.pointerType === 'mouse') end(false);
     },

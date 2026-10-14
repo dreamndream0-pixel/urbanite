@@ -20,6 +20,7 @@ import { resolveSiteTheme } from '@/lib/site-theme';
 import { resolveStorefront } from '@/lib/storefront-template';
 import { StorefrontDesignHero, StorefrontDesignFeature } from './StorefrontDesign';
 import StorefrontBlocks from './StorefrontBlocks';
+import { useScrollLock } from './useScrollLock';
 
 // 購物車存在瀏覽器本機的 key(結帳頁會讀同一份)
 const CART_KEY = 'cart';
@@ -631,17 +632,19 @@ function FavoritesDrawer({
   onRemove: (id: string) => void;
   onAdd: (product: Product) => void;
 }) {
+  useScrollLock(open);
   return (
     <>
       <div
-        className={`fixed inset-x-0 bottom-0 top-[72px] z-40 bg-black/30 transition-opacity duration-300 sm:top-[80px] ${
+        className={`fixed inset-x-0 bottom-0 top-0 z-40 bg-black/30 transition-opacity duration-300 sm:top-[80px] ${
           open ? 'opacity-100' : 'pointer-events-none opacity-0'
         }`}
         onClick={onClose}
       />
       <aside
-        className={`fixed bottom-0 right-0 top-[72px] z-50 flex w-full max-w-md flex-col bg-[var(--c-surface)] shadow-2xl transition-transform duration-300 sm:top-[80px] ${
-          open ? 'translate-x-0' : 'translate-x-full'
+        inert={!open}
+        className={`fixed bottom-0 right-0 top-0 z-50 flex w-full max-w-md flex-col bg-[var(--c-surface)] shadow-2xl transition-transform duration-300 sm:top-[80px] ${
+          open ? 'translate-x-0' : 'pointer-events-none invisible translate-x-full'
         }`}
       >
         <div className="flex items-center justify-between border-b border-[var(--c-border)] px-5 py-4">
@@ -653,7 +656,7 @@ function FavoritesDrawer({
           </button>
         </div>
 
-        <div className="flex-1 space-y-4 overflow-auto p-5">
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain p-5">
           {items.length === 0 ? (
             <p className="rounded-lg bg-[var(--c-bg)] p-5 text-[var(--c-text2)]">
               還沒有收藏商品。點商品右上角的折角即可加入收藏。
@@ -1163,6 +1166,7 @@ function SideMenu({
   current: string;
   onSelect: (key: string) => void;
 }) {
+  useScrollLock(open);
   // 使用者手動開合的狀態;未操作過的分類依「是否正在瀏覽其子分類」決定
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   function toggle(slug: string, isOpen: boolean) {
@@ -1178,8 +1182,9 @@ function SideMenu({
         onClick={onClose}
       />
       <aside
+        inert={!open}
         className={`fixed inset-y-0 left-0 z-50 flex w-full max-w-xs flex-col bg-[var(--c-header)] shadow-2xl transition-transform duration-300 ${
-          open ? 'translate-x-0' : '-translate-x-full'
+          open ? 'translate-x-0' : 'pointer-events-none invisible -translate-x-full'
         }`}
       >
         <div className="flex items-center justify-between border-b border-[var(--c-border)] px-5 py-4">
@@ -1188,7 +1193,7 @@ function SideMenu({
             <IconClose />
           </button>
         </div>
-        <nav className="flex-1 overflow-auto px-5 py-6">
+        <nav className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-6">
           {categories.map((c) => {
             const hasChildren = Boolean(c.children?.length);
             // 子分類預設收合;目前所在的子分類其上層自動展開
@@ -1289,17 +1294,19 @@ function CartDrawer({
   imageOf: (item: CartItem) => string;
   onCheckout: () => void;
 }) {
+  useScrollLock(open);
   return (
     <>
       <div
-        className={`fixed inset-x-0 bottom-0 top-[72px] z-40 bg-black/30 transition-opacity duration-300 sm:top-[80px] ${
+        className={`fixed inset-x-0 bottom-0 top-0 z-40 bg-black/30 transition-opacity duration-300 sm:top-[80px] ${
           open ? 'opacity-100' : 'pointer-events-none opacity-0'
         }`}
         onClick={onClose}
       />
       <aside
-        className={`fixed bottom-0 right-0 top-[72px] z-50 flex w-full max-w-md flex-col bg-[var(--c-surface)] shadow-2xl transition-transform duration-300 sm:top-[80px] ${
-          open ? 'translate-x-0' : 'translate-x-full'
+        inert={!open}
+        className={`fixed bottom-0 right-0 top-0 z-50 flex w-full max-w-md flex-col bg-[var(--c-surface)] shadow-2xl transition-transform duration-300 sm:top-[80px] ${
+          open ? 'translate-x-0' : 'pointer-events-none invisible translate-x-full'
         }`}
       >
         <div className="flex items-center justify-between border-b border-[var(--c-border)] px-5 py-4">
@@ -1309,7 +1316,7 @@ function CartDrawer({
           </button>
         </div>
 
-        <div className="flex-1 space-y-4 overflow-auto p-5">
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain p-5">
           {cart.length === 0 ? (
             <p className="rounded-lg bg-[var(--c-bg)] p-5 text-[var(--c-text2)]">購物車目前是空的。</p>
           ) : (
@@ -1456,6 +1463,7 @@ function QuickAddModal({
   onAdd: (variant: string, quantity: number, buyNow: boolean) => void;
   onFly?: (imgUrl: string, rect: DOMRect | null) => void;
 }) {
+  useScrollLock(true);
   const specs = product.specs ?? [];
   const hasSpecs = specs.length > 0;
   const imgRef = useRef<HTMLImageElement>(null);

@@ -1,4 +1,5 @@
 'use client';
+import { useScrollLock } from '@/app/components/useScrollLock';
 
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
@@ -1619,7 +1620,7 @@ export default function AdminDashboard({
 
   return (
     <div className="admin-root min-h-screen bg-[#f6f2ec] text-[#1f1b19]">
-      <header className="sticky top-0 z-30 border-b border-[#e5ded4] bg-[#faf7f2]">
+      <header className="page-header sticky top-0 z-30 border-b border-[#e5ded4] bg-[#faf7f2]">
         <nav className="mx-auto grid max-w-7xl grid-cols-[1fr_auto_1fr] items-center px-4 py-4 sm:px-6">
           <div className="flex items-center">
             <button
@@ -3403,13 +3404,7 @@ function BannerCropModal({
 
   useEffect(() => () => URL.revokeObjectURL(url), [url]);
 
-  useEffect(() => {
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.body.style.overflow = prev;
-    };
-  }, []);
+  useScrollLock(true);
 
   function clamp(next: CropRect) {
     const w = Math.min(1, Math.max(0.12, next.w));

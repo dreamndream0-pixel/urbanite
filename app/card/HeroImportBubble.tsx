@@ -1,4 +1,5 @@
 'use client';
+import { useScrollLock } from '@/app/components/useScrollLock';
 
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -57,15 +58,13 @@ export default function HeroImportBubble({ loggedIn }: { loggedIn: boolean }) {
     };
   }, [data]);
 
-  // 預覽開著時鎖住背景捲動,Esc 關閉
+  useScrollLock(Boolean(data));
+  // 預覽開著時 Esc 關閉
   useEffect(() => {
     if (!data) return;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setData(null);
     document.addEventListener('keydown', onKey);
     return () => {
-      document.body.style.overflow = prev;
       document.removeEventListener('keydown', onKey);
     };
   }, [data]);

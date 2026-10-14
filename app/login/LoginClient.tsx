@@ -50,7 +50,7 @@ export default function LoginClient({
 
   return (
     <main className="min-h-screen bg-[var(--c-surface)] text-[#242830]">
-      <header className="sticky top-0 z-30 border-b border-[#e6e1d8] bg-[var(--c-surface)]">
+      <header className="page-header sticky top-0 z-30 border-b border-[#e6e1d8] bg-[var(--c-surface)]">
         <nav className="mx-auto grid max-w-4xl grid-cols-[1fr_auto_1fr] items-center px-5 py-4">
           <div className="flex items-center gap-5">
             {isCard ? null : (

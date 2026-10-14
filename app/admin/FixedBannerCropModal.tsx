@@ -1,4 +1,5 @@
 'use client';
+import { useScrollLock } from '@/app/components/useScrollLock';
 
 import { useEffect, useRef, useState } from 'react';
 
@@ -40,11 +41,7 @@ export default function FixedBannerCropModal({
   const pointers = useRef(new Map<number, Point>());
   const gesture = useRef<{ pan: Point; zoom: number; mid: Point; dist: number } | null>(null);
 
-  useEffect(() => {
-    const previous = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => { document.body.style.overflow = previous; };
-  }, []);
+  useScrollLock(true);
   useEffect(() => {
     const el = frameRef.current;
     if (!el) return;

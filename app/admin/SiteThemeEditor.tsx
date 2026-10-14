@@ -1,4 +1,5 @@
 'use client';
+import { useScrollLock } from '@/app/components/useScrollLock';
 
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { Eye, X, Monitor, Smartphone, Save, Send } from 'lucide-react';
@@ -38,15 +39,13 @@ export default function SiteThemeEditor({ initial, onSaved, categoryImageStyle =
   const [previewDevice, setPreviewDevice] = useState<'mobile' | 'desktop'>('mobile');
   const [previewOpen, setPreviewOpen] = useState(false);
   const previewDialog = useRef<HTMLDialogElement>(null);
+  useScrollLock(previewOpen);
   useEffect(() => {
     if (!previewOpen) return;
     const dialog = previewDialog.current;
-    const previousOverflow = document.body.style.overflow;
     dialog?.showModal();
-    document.body.style.overflow = 'hidden';
     return () => {
       dialog?.close();
-      document.body.style.overflow = previousOverflow;
     };
   }, [previewOpen]);
   const [previewImages, setPreviewImages] = useState<string[]>([]);

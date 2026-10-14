@@ -10,8 +10,7 @@
 .hero {
   position: sticky;
   top: 0;
-  /* 釘住時剛好填滿「一定看得到的畫面高度」(svh,扣掉瀏覽器工具列),下方不會露出空白;
-     第一屏被公告條、表頭往下推時,整個主視覺往上收到表頭後面(見 ScrollHero) */
+  /* Stable viewport height; the section remains below its header in normal flow. */
   height: 100vh;
   height: 100svh;
   min-height: 570px;
