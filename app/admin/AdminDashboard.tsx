@@ -3116,7 +3116,7 @@ export default function AdminDashboard({
                   </button>
                 }
               >
-                <div className="grid gap-4 lg:grid-cols-2">
+                <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                   <FooterPagesEditor
                     value={footerDraft.sections}
                     onChange={(sections) => setFooterDraft({ ...footerDraft, sections })}
@@ -3845,7 +3845,7 @@ function FooterSocialLinksEditor({ value, onChange, onCommit }: { value: string;
   );
 
   return (
-    <div className="lg:col-span-2 rounded-lg border border-[#e5ded4] p-4">
+    <div className="min-w-0 lg:col-span-2 rounded-lg border border-[#e5ded4] p-4">
       <div className="flex flex-wrap items-center gap-3">
         <h3 className="text-lg font-bold">頁尾社群按鈕</h3>
         <button
@@ -3865,7 +3865,7 @@ function FooterSocialLinksEditor({ value, onChange, onCommit }: { value: string;
               {icon(item, 'h-10 w-10')}
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-sm font-semibold">{item.label || '未命名'}</span>
-                <span className={`block truncate text-xs ${item.url ? 'text-[#8a7f72]' : 'text-[#c0392b]'}`}>{item.url || '尚未填連結(不會顯示)'}</span>
+                <span className={`block truncate break-all text-xs ${item.url ? 'text-[#8a7f72]' : 'text-[#c0392b]'}`}>{item.url || '尚未填連結(不會顯示)'}</span>
               </span>
               <span className="text-[#b3a897]">›</span>
             </button>
