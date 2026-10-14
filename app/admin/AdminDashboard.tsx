@@ -6533,14 +6533,20 @@ function ProductModal({
     else void uiAlert(data.error ?? '圖片上傳失敗');
   }
   const colorDim = modalSpecs.find((s) => s.name.includes('色'));
+  // 空白 = 全部(和系統設定一樣):畫面上顯示成全部勾選,取消勾選時從全部扣掉
+  const payList = draft.available_payment_methods.length ? draft.available_payment_methods : paymentMethods;
+  const shipChosen = draft.available_shipping_methods.filter((item) => item !== '免運');
+  const shipList = shipChosen.length ? shipChosen : shippingMethods;
   function toggleMethod(
     key: 'available_payment_methods' | 'available_shipping_methods',
     method: string,
     checked: boolean,
   ) {
-    const current = draft[key];
-    const next = checked ? [...current, method] : current.filter((item) => item !== method);
-    set(key, next);
+    const current = key === 'available_payment_methods' ? payList : shipList;
+    const next = checked ? [...current.filter((item) => item !== method), method] : current.filter((item) => item !== method);
+    if (!next.length) return void uiAlert(key === 'available_payment_methods' ? '至少要保留一種金流' : '至少要保留一種物流');
+    const free = key === 'available_shipping_methods' && draft.available_shipping_methods.includes('免運') ? ['免運'] : [];
+    set(key, [...free, ...next]);
   }
   function toggleFreeShipping(checked: boolean) {
     const current = draft.available_shipping_methods.filter((item) => item !== '免運');
@@ -6879,7 +6885,7 @@ function ProductModal({
 	            </Field>
 	          </div>
 	          <div className="grid gap-3 sm:grid-cols-2">
-            <FieldGroup label="可用金流(未勾選=全部)">
+            <FieldGroup label="可用金流(預設同系統設定)">
               <div className="space-y-2 rounded-lg border border-[#e5ded4] p-3">
                 {paymentMethods.length === 0 ? (
                   <p className="text-sm text-[#8a7f72]">請先到系統設定新增金流方式。</p>
@@ -6888,7 +6894,7 @@ function ProductModal({
                     <label key={method} className="flex items-center gap-2 text-sm">
                       <input
                         type="checkbox"
-                        checked={draft.available_payment_methods.includes(method)}
+                        checked={payList.includes(method)}
                         onChange={(e) => toggleMethod('available_payment_methods', method, e.target.checked)}
                       />
                       <span>{method}</span>
@@ -6897,7 +6903,7 @@ function ProductModal({
                 )}
               </div>
             </FieldGroup>
-            <FieldGroup label="可用物流與運費(未勾選=全部;運費留空=用後台預設)">
+            <FieldGroup label="可用物流與運費(預設同系統設定;運費留空=用後台預設)">
               <div className="space-y-2 rounded-lg border border-[#e5ded4] p-3">
                 {shippingMethods.length === 0 ? (
                   <p className="text-sm text-[#8a7f72]">請先到系統設定新增物流方式。</p>
@@ -6910,7 +6916,7 @@ function ProductModal({
                         <label className="flex items-center gap-2">
                           <input
                             type="checkbox"
-                            checked={draft.available_shipping_methods.includes(method)}
+                            checked={shipList.includes(method)}
                             onChange={(e) => toggleMethod('available_shipping_methods', method, e.target.checked)}
                           />
                           <span>{method}</span>
