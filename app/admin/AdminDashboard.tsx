@@ -3136,10 +3136,8 @@ export default function AdminDashboard({
                     onCommit={(socialLinks) => void saveFooterSettings({ ...footerDraft, socialLinks })}
                   />
                   {/* 頁尾最下方的兩個連結 */}
-                  <div className="lg:col-span-2 rounded-lg border border-[#e5ded4] p-4">
-                    <h3 className="text-lg font-bold">隱私權政策 / 使用者條款</h3>
-                    <p className="mt-1 text-sm text-[#8a7f72]">顯示在頁尾最下方,點了會打開完整內容。空白就不顯示該連結;空一行代表換段落。</p>
-                    <div className="mt-4 grid gap-4 md:grid-cols-2">
+                  <FooterFold className="lg:col-span-2" title="隱私權政策 / 使用者條款" desc="顯示在頁尾最下方,點了會打開完整內容。空白就不顯示該連結;空一行代表換段落。">
+                    <div className="grid gap-4 md:grid-cols-2">
                       {(['privacy', 'terms'] as const).map((kind) => (
                         <label key={kind} className="block text-sm text-[#8a7f72]">
                           {POLICY_LABEL[kind]}
@@ -3153,14 +3151,12 @@ export default function AdminDashboard({
                         </label>
                       ))}
                     </div>
-                  </div>
+                  </FooterFold>
                 </div>
-                {/* 頁尾「尋找我們」與「訂閱最新消息」 */}
-                <div className="mt-6 grid gap-4 lg:grid-cols-2">
-                  <div className="rounded-lg border border-[#e5ded4] p-4">
-                    <h3 className="text-lg font-bold">尋找我們 FOLLOW US</h3>
-                    <p className="mt-1 text-xs leading-5 text-[#8a7f72]">空白的欄位不會顯示。若在上方頁尾分頁自己建了「尋找我們」分頁,會改用那個分頁的內容。</p>
-                    <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                {/* 頁尾「尋找我們」「訂閱最新消息」與結帳頁 LINE:一樣開合式 */}
+                <div className="mt-4 grid grid-cols-1 gap-4">
+                  <FooterFold title="尋找我們 FOLLOW US" desc="空白的欄位不會顯示。若在上方頁尾分頁自己建了「尋找我們」分頁,會改用那個分頁的內容。">
+                    <div className="grid gap-3 sm:grid-cols-2">
                       <label className="block text-sm">
                         <span className="mb-1 block font-semibold text-[#6b6156]">服務時間</span>
                         <input value={footerDraft.serviceHours} onChange={(e) => setFooterDraft({ ...footerDraft, serviceHours: e.target.value })} placeholder="例如 上班日 11:00 - 18:00" className="w-full rounded-lg border border-[#e5ded4] bg-white px-3 py-2" />
@@ -3186,17 +3182,13 @@ export default function AdminDashboard({
                         <input value={footerDraft.taxId} onChange={(e) => setFooterDraft({ ...footerDraft, taxId: e.target.value })} placeholder="" className="w-full rounded-lg border border-[#e5ded4] bg-white px-3 py-2" />
                       </label>
                     </div>
-                  </div>
-                  <div className="rounded-lg border border-[#e5ded4] p-4">
-                    <div className="flex items-center justify-between gap-2">
-                      <h3 className="text-lg font-bold">訂閱最新消息</h3>
-                      <label className="flex items-center gap-2 text-sm">
+                  </FooterFold>
+                  <FooterFold title="訂閱最新消息" badge={footerDraft.newsletterShow ? '顯示中' : '已隱藏'} desc="頁尾的 Email 訂閱區塊。不需要可以取消「顯示」。">
+                    <div className="space-y-3">
+                      <label className="flex items-center gap-2 text-sm font-semibold text-[#6b6156]">
                         <input type="checkbox" checked={footerDraft.newsletterShow} onChange={(e) => setFooterDraft({ ...footerDraft, newsletterShow: e.target.checked })} />
-                        顯示
+                        在頁尾顯示訂閱區塊
                       </label>
-                    </div>
-                    <p className="mt-1 text-xs leading-5 text-[#8a7f72]">頁尾的 Email 訂閱區塊。不需要可以取消「顯示」。</p>
-                    <div className="mt-3 space-y-3">
                       <label className="block text-sm">
                         <span className="mb-1 block font-semibold text-[#6b6156]">標題</span>
                         <input value={footerDraft.newsletterTitle} onChange={(e) => setFooterDraft({ ...footerDraft, newsletterTitle: e.target.value })} placeholder="訂閱最新消息" className="w-full rounded-lg border border-[#e5ded4] bg-white px-3 py-2" />
@@ -3206,15 +3198,10 @@ export default function AdminDashboard({
                         <textarea value={footerDraft.newsletterText} onChange={(e) => setFooterDraft({ ...footerDraft, newsletterText: e.target.value })} rows={3} className="w-full rounded-lg border border-[#e5ded4] bg-white px-3 py-2" />
                       </label>
                     </div>
-                  </div>
-                </div>
-                {/* 結帳完成頁的「加入官方 LINE」區塊 */}
-                <div className="mt-6 rounded-xl border border-[#cfe9d6] bg-[#f3fbf5] p-4">
-                  <h3 className="font-semibold text-[#1f5a33]">結帳頁 LINE 設定</h3>
-                  <p className="mt-1 text-xs leading-5 text-[#5f7a66]">
-                    顯示在訂單完成頁「歡迎加入官方 LINE」區塊。兩欄都空白時不顯示該區塊。
-                  </p>
-                  <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                  </FooterFold>
+                  {/* 結帳完成頁的「訂閱 LINE 通知」區塊 */}
+                  <FooterFold title="結帳頁 LINE 設定" desc="顯示在訂單完成頁「訂閱 LINE 通知」區塊。兩欄都空白時不顯示該區塊。">
+                  <div className="grid gap-3 sm:grid-cols-2">
                     <label className="block text-sm">
                       <span className="mb-1 block font-semibold text-[#6b6156]">LINE ID(顯示給客人看)</span>
                       <input
@@ -3234,6 +3221,7 @@ export default function AdminDashboard({
                       />
                     </label>
                   </div>
+                  </FooterFold>
                 </div>
               </Card>
               )}
@@ -3651,6 +3639,33 @@ type FooterItemDraft = { subtitle: string; content: string; url: string };
 type FooterSectionDraft = { title: string; items: FooterItemDraft[] };
 type FooterSocialDraft = { label: string; image: string; url: string };
 
+// 頁尾設定的開合區塊(隱私權、尋找我們、訂閱、結帳頁 LINE)
+function FooterFold({ title, desc, badge, className = '', children }: { title: string; desc?: string; badge?: string; className?: string; children: React.ReactNode }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className={`min-w-0 overflow-hidden rounded-lg border ${open ? 'border-[#7da185]' : 'border-[#e5ded4]'} ${className}`}>
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        aria-expanded={open}
+        className={`flex w-full items-center gap-2 px-4 py-3 text-left ${open ? 'bg-[#7da185] text-white' : 'bg-white text-[#1f1b19]'}`}
+      >
+        <span className="min-w-0 flex-1 truncate font-semibold">{title}</span>
+        {badge && <span className={`shrink-0 text-xs ${open ? 'text-white/80' : 'text-[#8a7f72]'}`}>{badge}</span>}
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden className={`shrink-0 transition-transform ${open ? 'rotate-180' : ''}`}>
+          <path d="m6 9 6 6 6-6" />
+        </svg>
+      </button>
+      {open && (
+        <div className="bg-[#fcfbf8] p-3 sm:p-4">
+          {desc && <p className="mb-3 text-xs leading-5 text-[#8a7f72]">{desc}</p>}
+          {children}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // 頁尾頁面:開合式。大標題一列一列收合,點開後裡面是小標題清單;小標題也可再點開編輯內文
 function FooterPagesEditor({ value, onChange }: { value: string; onChange: (value: string) => void }) {
   const [openSection, setOpenSection] = useState<number | null>(null);
@@ -3816,8 +3831,27 @@ function FooterPagesEditor({ value, onChange }: { value: string; onChange: (valu
                                 className="mt-2 w-full rounded-lg border border-[#e5ded4] bg-white px-3 py-3 text-base leading-7 text-[#1f1b19]"
                               />
                             </label>
+                            {/* 有內文就自動有一個內文頁面(前台頁尾點小標題會開這頁) */}
+                            {item.content.trim() && item.subtitle.trim() && section.title.trim() ? (
+                              <div className="flex min-w-0 items-center gap-2 rounded-lg border border-[#d9e6dc] bg-[#f3f8f4] px-3 py-2">
+                                <div className="min-w-0 flex-1">
+                                  <p className="text-xs text-[#5f7a66]">內文頁面連結(儲存頁尾後生效)</p>
+                                  <p className="truncate text-sm text-[#1f1b19]">/footer/{section.title}/{item.subtitle}</p>
+                                </div>
+                                <a
+                                  href={`/footer/${encodeURIComponent(section.title)}/${encodeURIComponent(item.subtitle)}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="shrink-0 whitespace-nowrap rounded-lg bg-[#7da185] px-3 py-2 text-sm font-semibold text-white"
+                                >
+                                  查看內文頁面
+                                </a>
+                              </div>
+                            ) : (
+                              <p className="text-xs text-[#8a7f72]">填入頁面內容後,會自動產生可點擊查看的內文頁面。</p>
+                            )}
                             <label className="block text-sm text-[#8a7f72]">
-                              連結網址(選填)
+                              外部連結網址(選填,沒有頁面內容時才會使用)
                               <input
                                 value={item.url}
                                 onChange={(e) => updateItem(sectionIndex, itemIndex, { url: e.target.value })}
