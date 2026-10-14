@@ -1,8 +1,8 @@
 # Mobile scrolling regression checks
 
 Public store, campaign and product pages share StoreHeader and useLoopCarousel.
-Touch-sized/coarse-pointer page headers stay in normal flow rather than covering
-the document. Desktop headers remain sticky. Native vertical pan and pinch are
+Page headers are sticky on all devices (sticky keeps their space in the flow, so they
+never cover content). Native vertical pan and pinch are
 allowed on carousels; only horizontal pointer drags change slides. No touchmove
 handler cancels document scrolling.
 

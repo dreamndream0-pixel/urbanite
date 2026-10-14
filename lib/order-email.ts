@@ -43,7 +43,8 @@ export async function sellerRecipients(shop: Shop, platform: boolean, notify: st
 }
 
 function orderTable(order: Order) {
-  const rows = (order.items ?? []).map((i) => `<tr><td style="padding:8px 0;border-bottom:1px solid #eee">${esc(i.name)}${i.variant ? `<br><span style="color:#8a7f72;font-size:12px">${esc(i.variant)}</span>` : ''}</td><td style="padding:8px 0;border-bottom:1px solid #eee;text-align:center">× ${i.quantity}</td><td style="padding:8px 0;border-bottom:1px solid #eee;text-align:right">${money(i.price * i.quantity)}</td></tr>`).join('');
+  const thumb = (src?: string) => (src && /^https:\/\//.test(src) ? `<img src="${esc(src)}" width="52" height="52" alt="" style="width:52px;height:52px;object-fit:cover;border-radius:6px;vertical-align:middle;margin-right:10px;background:#f2f2f2">` : '');
+  const rows = (order.items ?? []).map((i) => `<tr><td style="padding:8px 0;border-bottom:1px solid #eee"><table style="border-collapse:collapse"><tr><td style="padding:0;vertical-align:middle">${thumb(i.image)}</td><td style="padding:0;vertical-align:middle">${esc(i.name)}${i.variant ? `<br><span style="color:#8a7f72;font-size:12px">${esc(i.variant)}</span>` : ''}</td></tr></table></td><td style="padding:8px 0;border-bottom:1px solid #eee;text-align:center">× ${i.quantity}</td><td style="padding:8px 0;border-bottom:1px solid #eee;text-align:right">${money(i.price * i.quantity)}</td></tr>`).join('');
   const line = (label: string, value: string, bold = false) => `<tr><td colspan="2" style="padding:4px 0;color:#6b6156">${label}</td><td style="padding:4px 0;text-align:right;${bold ? 'font-weight:700;font-size:16px' : ''}">${value}</td></tr>`;
   return `<table style="width:100%;border-collapse:collapse;font-size:14px">${rows}
     ${line('小計', money(order.subtotal))}
@@ -102,6 +103,17 @@ export function orderEmailHtml(order: Order, shopName: string, transfer: string,
     <p style="margin:20px 0 0"><a href="${esc(siteUrl)}/admin" style="display:inline-block;background:#1f1b19;color:#fff;text-decoration:none;padding:10px 20px;border-radius:999px;font-size:14px">到後台處理訂單</a></p>`;
 
   return { buyer: frame(shopName, buyerBody), seller: frame(shopName, sellerBody) };
+}
+
+// 訂單狀態通知信(出貨、到貨、取消、退貨、已通知付款…):標題、說明、商品圖與明細、配送資訊、補充欄位、按鈕
+export function orderNoticeEmailHtml({ order, shopName, title, subtitle, link, buttonLabel, rows = [] }: { order: Order; shopName: string; title: string; subtitle?: string; link: string; buttonLabel: string; rows?: [string, string][] }) {
+  const extra = rows.filter(([, v]) => v).map(([k, v]) => `<p style="margin:4px 0"><b>${esc(k)}:</b>${esc(v)}</p>`).join('');
+  const body = `<p style="margin:0 0 4px;font-size:18px;font-weight:700">${esc(title)}</p>
+    <p style="margin:0 0 16px;color:#6b6156;font-size:14px">訂單編號 <b>${esc(order.order_no)}</b>${subtitle ? `<br>${esc(subtitle)}` : ''}</p>
+    ${extra ? `<div style="margin:0 0 16px;padding:12px 14px;background:#faf7f2;border-radius:8px;font-size:14px">${extra}</div>` : ''}
+    ${orderTable(order)}<div style="margin-top:16px;font-size:14px">${delivery(order)}</div>
+    <p style="margin:20px 0 0"><a href="${esc(link)}" style="display:inline-block;background:#1f1b19;color:#fff;text-decoration:none;padding:10px 20px;border-radius:999px;font-size:14px">${esc(buttonLabel)}</a></p>`;
+  return frame(shopName, body);
 }
 
 export function transferBlock(account: string) {

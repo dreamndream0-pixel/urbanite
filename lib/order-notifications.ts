@@ -4,7 +4,7 @@ import { getOrderNotificationConfig } from '@/lib/order-notification-config';
 import { noticeEnabled, ORDER_NOTICE_EVENTS, type OrderNoticeEvent, type NoticeAudience, type NoticeChannel } from '@/lib/order-notification-settings';
 import { getMessagingConfig } from '@/lib/line-messaging';
 import { getShopLineConfig } from '@/lib/shop-line';
-import { orderEmailHtml, sellerRecipients, transferBlock } from '@/lib/order-email';
+import { orderEmailHtml, orderNoticeEmailHtml, sellerRecipients, transferBlock } from '@/lib/order-email';
 import { shopUrl, URBANITE_SHOP_ID } from '@/lib/shop';
 import type { Order } from '@/lib/types';
 import { orderFlexMessage } from '@/lib/order-flex';
@@ -15,10 +15,12 @@ const BUYER_TEXT: Partial<Record<OrderNoticeEvent, string>> = {
   paid: '已確認收到您的款項。', arrived: '商品已送達,請記得取貨。', picked_up: '已完成取貨,感謝您的購買。',
   completed: '訂單已完成,期待再次為您服務。', cancelled: '您的訂單已取消。', refunded: '退款已處理。', return_requested: '已收到您的退貨申請,我們會盡快處理。',
   payment_reported: '已收到您的付款通知,我們確認款項後會盡快出貨。',
+  cancel_requested: '已收到您的取消申請,我們會盡快處理並通知您結果。',
 };
 const SELLER_TEXT: Partial<Record<OrderNoticeEvent, string>> = {
   created: '有一筆新訂單,請盡快處理。', paid: '買家已付款。', return_requested: '買家提出退貨申請,請到後台處理。', cancelled: '訂單已取消。',
   payment_reported: '買家已通知付款,請核對款項後標記已付款。',
+  cancel_requested: '買家申請取消訂單,請到後台審核。',
 };
 
 
@@ -28,7 +30,6 @@ type Job = {
   audience: NoticeAudience; channel: NoticeChannel; attempts: number; lease_token: string;
   first_send_at: string | null; created_at: string; payload: Payload | null;
 };
-const esc = (v: string) => v.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 const emails = (values: string[]) => [...new Set(values.map(s => s.trim().toLowerCase()).filter(s => /^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/.test(s)))];
 class NoticeError extends Error {
   constructor(message: string, public retry = false, public skip = false) { super(message); }
@@ -47,14 +48,27 @@ async function prepare(job: Job, sender: string, notify: string): Promise<Payloa
   const link = `${site}${job.audience === 'seller' ? '/admin' : '/account?tab=orders'}`;
   const subject = `【${shop.name}】${label} ${order.order_no}`;
   const sellerEmails = job.audience === 'seller' ? emails(await sellerRecipients(shop, platform, notify)) : [];
+  // 補充欄位:Email 與 LINE 共用
+  const extra: [string, string][] = [];
+  if (job.event === 'payment_reported') {
+    if (order.payment_ref) extra.push(['帳號後五碼', String(order.payment_ref)]);
+    if (order.payment_proof_note) extra.push(['備註', String(order.payment_proof_note)]);
+    if (order.payment_proof_url) extra.push(['付款截圖', '已附上(請到後台查看)']);
+  }
+  if (job.event === 'cancel_requested' && order.cancel_reason) extra.push(['取消原因', String(order.cancel_reason)]);
+  if (['shipped', 'arrived', 'ready'].includes(job.event)) {
+    const { data: ship } = await db.from('shipments').select('carrier,tracking_number').eq('order_id', order.id).order('created_at', { ascending: false }).limit(1).maybeSingle();
+    if (ship?.carrier) extra.push(['物流', String(ship.carrier)]);
+    if (ship?.tracking_number) extra.push(['物流單號', String(ship.tracking_number)]);
+  }
+  const seller = job.audience === 'seller';
+  const title = seller && job.event === 'created' ? '新訂單' : seller && job.event === 'payment_reported' ? '買家已通知付款' : seller && job.event === 'cancel_requested' ? '買家申請取消' : label;
+  const subtitle = (seller ? SELLER_TEXT : BUYER_TEXT)[job.event];
+  const buttonLabel = seller ? '到後台處理' : '查看訂單';
   if (job.channel === 'email') {
     const to = job.audience === 'buyer' ? emails([order.email]) : sellerEmails;
     if (!to.length) throw new NoticeError('未設定有效的收件信箱', false, true);
-    // 已通知付款:附上買家回報的帳號後五碼與備註
-    const reported = job.event === 'payment_reported'
-      ? `${order.payment_ref ? `<p>帳號後五碼:${esc(String(order.payment_ref))}</p>` : ''}${order.payment_proof_note ? `<p>備註:${esc(String(order.payment_proof_note))}</p>` : ''}${order.payment_proof_url ? '<p>已附付款截圖(請到後台查看)</p>' : ''}`
-      : '';
-    let html = `<p>${esc(subject)}</p><p>訂單金額：NT${Number(order.total).toLocaleString('en-US')}</p>${reported}<p><a href="${esc(link)}">查看訂單</a></p>`;
+    let html = orderNoticeEmailHtml({ order, shopName: shop.name, title, subtitle, link, buttonLabel, rows: extra });
     if (job.event === 'created') {
       let transfer = '';
       if (/轉帳|匯款/.test(order.payment_method ?? '')) {
@@ -91,25 +105,7 @@ async function prepare(job: Job, sender: string, notify: string): Promise<Payloa
   ids = [...new Set(ids)];
   if (!ids.length) throw new NoticeError('收件人尚未綁定本商店 LINE', false, true);
   if (ids.length > 500) throw new NoticeError('LINE 收件人超過上限');
-  const extra: [string, string][] = [];
-  if (job.event === 'payment_reported') {
-    if (order.payment_ref) extra.push(['帳號後五碼', String(order.payment_ref)]);
-    if (order.payment_proof_url) extra.push(['付款截圖', '已附上']);
-  }
-  if (['shipped', 'arrived', 'ready'].includes(job.event)) {
-    const { data: ship } = await db.from('shipments').select('carrier,tracking_number').eq('order_id', order.id).order('created_at', { ascending: false }).limit(1).maybeSingle();
-    if (ship?.carrier) extra.push(['物流', String(ship.carrier)]);
-    if (ship?.tracking_number) extra.push(['物流單號', String(ship.tracking_number)]);
-  }
-  const seller = job.audience === 'seller';
-  const messages = [orderFlexMessage({
-    shopName: shop.name,
-    title: seller && job.event === 'created' ? '新訂單' : seller && job.event === 'payment_reported' ? '買家已通知付款' : label,
-    subtitle: (seller ? SELLER_TEXT : BUYER_TEXT)[job.event],
-    order, link, extra,
-    buttonLabel: seller ? '到後台處理' : '查看訂單',
-    event: job.event,
-  })];
+  const messages = [orderFlexMessage({ shopName: shop.name, title, subtitle, order, link, extra, buttonLabel, event: job.event })];
   return ids.length === 1 ? { endpoint: 'push', body: { to: ids[0], messages } } : { endpoint: 'multicast', body: { to: ids, messages } };
 }
 

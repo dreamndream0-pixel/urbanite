@@ -1,4 +1,5 @@
-import { NextResponse } from 'next/server';
+import { after, NextResponse } from 'next/server';
+import { sendOrderNoticeNow } from '@/lib/order-notifications';
 import { getAdminUser, getSessionUser } from '@/lib/supabase/server';
 import { canRequestCancel, deriveStatuses } from '@/lib/order-status';
 import { restoreOrderStock } from '@/lib/inventory';
@@ -22,13 +23,13 @@ export async function POST(
   const supabase = (await shopAdminClient());
   const { data: order } = await supabase
     .from('orders')
-    .select('id, user_id, status, paid, fulfillment_status, cancel_status')
+    .select('id, shop_id, user_id, status, paid, fulfillment_status, cancel_status')
     .eq('id', id)
     .maybeSingle();
   if (!order || order.user_id !== user.id) {
     return NextResponse.json({ error: '找不到訂單' }, { status: 404 });
   }
-  if (!canRequestCancel(order as Order)) {
+  if (!canRequestCancel(order as unknown as Order)) {
     return NextResponse.json({ error: '此訂單目前無法申請取消' }, { status: 409 });
   }
 
@@ -45,6 +46,8 @@ export async function POST(
     order_id: id, type: 'order', from_status: '', to_status: 'CANCEL_REQUESTED',
     note: reason ? `客人申請取消:${reason}` : '客人申請取消', created_by: '客人',
   });
+  // 通知賣家審核、通知買家已收到申請(依通知設定)
+  if (order.shop_id) after(() => sendOrderNoticeNow(order.shop_id, id, 'cancel_requested').catch(() => {}));
 
   return NextResponse.json(data as Order);
 }

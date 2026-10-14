@@ -374,7 +374,7 @@ export function orderBubble(kind: OrderKind | string, d: OrderCardData, color?: 
     body.push(sep('#eeeeee', 'md'), ...extra, kv('合計金額', money(d.total), { bold: true }));
   } else {
     // 取消:訂單金額+取消日期,不顯示退貨進度
-    const cancelled = event === 'cancelled';
+    const cancelled = event === 'cancelled' || event === 'cancel_requested';
     if (k === 'created' || k === 'return') body.push(kv(k === 'return' && !cancelled ? '退款金額' : '訂單金額', money(d.total), { bold: k === 'created' }));
     if (d.date) body.push(kv(cancelled ? '下單日期' : k === 'return' ? '申請日期' : k === 'delivered' ? '送達時間' : '日期', d.date));
     body.push(...extra);
@@ -414,6 +414,7 @@ export function orderKindOf(event?: string): { kind: OrderKind; step?: number } 
     case 'return_requested': return { kind: 'return', step: 0 };
     case 'refunded': return { kind: 'return', step: 3 };
     case 'cancelled': return { kind: 'return', step: 3 };
+    case 'cancel_requested': return { kind: 'return', step: 0 };
     default: return { kind: 'detail' };
   }
 }

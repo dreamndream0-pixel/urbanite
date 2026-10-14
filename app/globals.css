@@ -45,10 +45,9 @@ html {
   scroll-padding-top: 100px;
 }
 
-/* Touch pages use the document scroller; no sticky header over the content. */
+/* 手機:頁首固定在上方(sticky 佔原本位置,不蓋住內容);錨點捲動預留頁首高度 */
 @media (max-width: 767px), (hover: none) and (pointer: coarse) {
-  html { scroll-padding-top: 16px; }
-  .page-header { position: relative; top: auto; }
+  html { scroll-padding-top: 80px; }
 }
 
 body {
