@@ -1,6 +1,7 @@
 'use client';
 
-import { type ReactNode, useMemo, useState } from 'react';
+import { type ReactNode, useEffect, useMemo, useState } from 'react';
+import { lockScroll } from '@/lib/scroll-lock';
 import type { Campaign, Category, Product } from '@/lib/types';
 import { uiAlert } from '@/lib/ui-dialog';
 import { useLongPressReorder } from './useLongPressReorder';
@@ -70,6 +71,9 @@ export default function CampaignManager({
   const campaignCats = categories.filter((c) => c.campaign_id === selectedId).sort((a, b) => a.sort_order - b.sort_order);
   const catName = (slug: string) => campaignCats.find((c) => c.slug === slug)?.name ?? (slug || '未分類');
   const [catInput, setCatInput] = useState('');
+  const [catTab, setCatTab] = useState('all'); // 商品列表的分類分頁
+  const [previewOpen, setPreviewOpen] = useState(false);
+  useEffect(() => (previewOpen ? lockScroll() : undefined), [previewOpen]);
   async function addCategory() {
     const name = catInput.trim();
     if (!name || !selected) return;
@@ -87,8 +91,8 @@ export default function CampaignManager({
     onCategoriesChange?.(categories.filter((c) => c.id !== cat.id));
   }
 
-  // 商品排序:長按(手機)或按住把手拖曳;搜尋中不能排序
-  const sortable = !query.trim();
+  // 商品排序:長按(手機)或按住把手拖曳;只能在「全部」且沒有搜尋時排序
+  const sortable = !query.trim() && catTab === 'all';
   const reorder = useLongPressReorder(campaignProducts.map((p) => p.id), (ids) => {
     const ordered = ids.map((id) => campaignProducts.find((p) => p.id === id)!).filter(Boolean);
     onReorder?.(ordered);
@@ -96,7 +100,9 @@ export default function CampaignManager({
       method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sort_order: i }),
     })))).then((results) => { if (results.some((r) => r && !r.ok)) flash('排序儲存失敗,請重新整理後再試'); else flash('已更新商品排序'); });
   });
-  const shownProducts = reorder.order.map((id) => campaignProducts.find((p) => p.id === id)!).filter(Boolean);
+  const shownProducts = reorder.order.map((id) => campaignProducts.find((p) => p.id === id)!).filter(Boolean)
+    .filter((p) => catTab === 'all' || (catTab === 'none' ? !campaignCats.some((c) => c.slug === p.category) : p.category === catTab));
+  const countOf = (tab: string) => campaignProducts.filter((p) => tab === 'none' ? !campaignCats.some((c) => c.slug === p.category) : p.category === tab).length;
 
   async function copyLink(slug: string) {
     try {
@@ -235,9 +241,14 @@ export default function CampaignManager({
               </div>
               <div className="mt-4 flex gap-2">
                 <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜尋此活動的商品、代碼或分類" className="h-11 flex-1 border border-[#d8d0c6] px-3 text-sm outline-none focus:border-[#702838]" />
-                <a href={`/promo/${selected.slug}?preview=1`} target="_blank" rel="noreferrer" className="inline-flex h-11 items-center border border-[#702838] px-4 text-sm font-semibold text-[#702838]">預覽頁面 ↗</a>
+                <button type="button" onClick={() => setPreviewOpen(true)} className="inline-flex h-11 shrink-0 items-center border border-[#702838] px-4 text-sm font-semibold text-[#702838]">預覽頁面</button>
               </div>
-              <p className="mt-3 text-xs text-[#8a7f72]">{sortable ? '長按商品(或按住左側 ⋮⋮)上下拖曳排序,活動頁依這個順序顯示。' : '清除搜尋後可以拖曳排序。'}</p>
+              <div className="mt-3 flex gap-1.5 overflow-x-auto pb-1 [scrollbar-width:none]">
+                {[{ key: 'all', label: '全部', n: campaignProducts.length }, ...campaignCats.map((c) => ({ key: c.slug, label: c.name, n: countOf(c.slug) })), { key: 'none', label: '未分類', n: countOf('none') }].map((t) => (
+                  <button key={t.key} type="button" onClick={() => setCatTab(t.key)} className={`shrink-0 rounded-full px-3.5 py-1.5 text-xs font-semibold ${catTab === t.key ? 'bg-[#702838] text-white' : 'border border-[#d8d0c6] bg-white text-[#6b6156]'}`}>{t.label} {t.n}</button>
+                ))}
+              </div>
+              <p className="mt-2 text-xs text-[#8a7f72]">{sortable ? '長按商品(或按住左側 ⋮⋮)上下拖曳排序,活動頁依這個順序顯示。' : '切到「全部」並清除搜尋後可以拖曳排序。'}</p>
               <div ref={reorder.listRef} className="mt-2 divide-y divide-[#eee7de] border-y border-[#eee7de]">
                 {shownProducts.map((product) => (
                   <div key={product.id} data-sort-row onPointerDown={sortable ? (e) => reorder.start(e, product.id) : undefined} onContextMenu={(e) => e.preventDefault()} className={`grid grid-cols-[18px_64px_minmax(0,1fr)_auto] items-center gap-3 py-3 select-none [-webkit-touch-callout:none] ${reorder.sorting === product.id ? 'bg-[#faf3ea] shadow-md' : ''}`}>
@@ -247,12 +258,24 @@ export default function CampaignManager({
                     <div className="flex gap-2"><button type="button" onClick={() => onEditProduct(product)} className="border border-[#d8d0c6] px-3 py-1.5 text-xs font-semibold">編輯</button><button type="button" onClick={() => onDeleteProduct(product.id)} className="px-2 text-xs text-[#b23a3a]">刪除</button></div>
                   </div>
                 ))}
-                {!campaignProducts.length ? <p className="py-10 text-center text-sm text-[#a99e8f]">這個活動還沒有商品。</p> : null}
+                {!shownProducts.length ? <p className="py-10 text-center text-sm text-[#a99e8f]">{campaignProducts.length ? '這個分類沒有商品。' : '這個活動還沒有商品。'}</p> : null}
               </div>
             </section>
           </div>
         ) : <div className="border border-dashed border-[#d8d0c6] bg-white p-16 text-center text-[#8a7f72]">建立一個促銷專頁開始編輯。</div>}
       </div>
+
+      {previewOpen && selected ? (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 p-0 sm:p-6" onClick={() => setPreviewOpen(false)}>
+          <div className="relative flex h-full w-full max-w-[480px] flex-col overflow-hidden bg-white sm:h-[90dvh] sm:rounded-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="flex shrink-0 items-center justify-between gap-3 border-b border-[#e5ded4] px-4 py-3">
+              <p className="min-w-0 truncate text-sm font-semibold">預覽:{selected.name || selected.title}</p>
+              <button type="button" onClick={() => setPreviewOpen(false)} aria-label="關閉預覽" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#1f1b19] text-lg text-white">×</button>
+            </div>
+            <iframe title="活動頁預覽" src={`/promo/${selected.slug}?preview=1`} className="min-h-0 w-full flex-1 border-0" />
+          </div>
+        </div>
+      ) : null}
 
       {newOpen ? <CampaignCreateModal draft={campaignDraft} busy={busy} onChange={setCampaignDraft} onClose={() => campaigns.length ? setNewOpen(false) : null} onCreate={createCampaign} /> : null}
     </div>
