@@ -175,7 +175,7 @@ export default function CampaignManager({
   }
 
   return (
-    <div className="space-y-5">
+    <div className="min-w-0 space-y-5">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <p className="text-xs font-semibold tracking-[.22em] text-[#9b3048]">CAMPAIGN PAGE</p>
@@ -187,7 +187,7 @@ export default function CampaignManager({
 
       {notice ? <div className="fixed right-5 top-5 z-[90] rounded-md bg-[#1f1b19] px-4 py-3 text-sm text-white shadow-xl">{notice}</div> : null}
 
-      <div className="grid gap-5 lg:grid-cols-[260px_minmax(0,1fr)]">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[260px_minmax(0,1fr)]">
         <aside className="border border-[#e5ded4] bg-white p-3">
           <p className="px-2 pb-2 text-xs font-semibold text-[#8a7f72]">活動清單</p>
           <div className="space-y-1">
@@ -208,7 +208,7 @@ export default function CampaignManager({
         </aside>
 
         {selected ? (
-          <div className="space-y-5">
+          <div className="min-w-0 space-y-5">
             <CampaignSettings key={selected.id} campaign={selected} busy={busy} onSave={updateCampaign} onUpload={async (file) => {
               setBusy(true);
               try { const url = await upload(file, 'campaigns'); await updateCampaign({ hero_image: url }); return url; }
@@ -217,7 +217,7 @@ export default function CampaignManager({
               return '';
             }} onDelete={removeCampaign} />
 
-            <section className="border border-[#e5ded4] bg-white p-4 sm:p-5">
+            <section className="min-w-0 border border-[#e5ded4] bg-white p-4 sm:p-5">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div><h3 className="text-lg font-bold">活動商品</h3><p className="text-xs text-[#8a7f72]">欄位與主站商品相同；不會出現在主站商品列表或主站搜尋。</p></div>
                 <button type="button" onClick={() => onNewProduct(selected.id)} className="rounded-md bg-[#702838] px-4 py-2 text-sm font-semibold text-white">＋ 新增活動商品</button>
@@ -243,7 +243,7 @@ export default function CampaignManager({
                 <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜尋此活動的商品、代碼或分類" className="h-11 flex-1 border border-[#d8d0c6] px-3 text-sm outline-none focus:border-[#702838]" />
                 <button type="button" onClick={() => setPreviewOpen(true)} className="inline-flex h-11 shrink-0 items-center border border-[#702838] px-4 text-sm font-semibold text-[#702838]">預覽頁面</button>
               </div>
-              <div className="mt-3 flex gap-1.5 overflow-x-auto pb-1 [scrollbar-width:none]">
+              <div className="mt-3 flex w-full max-w-full min-w-0 gap-1.5 overflow-x-auto pb-1 [scrollbar-width:none]">
                 {[{ key: 'all', label: '全部', n: campaignProducts.length }, ...campaignCats.map((c) => ({ key: c.slug, label: c.name, n: countOf(c.slug) })), { key: 'none', label: '未分類', n: countOf('none') }].map((t) => (
                   <button key={t.key} type="button" onClick={() => setCatTab(t.key)} className={`shrink-0 rounded-full px-3.5 py-1.5 text-xs font-semibold ${catTab === t.key ? 'bg-[#702838] text-white' : 'border border-[#d8d0c6] bg-white text-[#6b6156]'}`}>{t.label} {t.n}</button>
                 ))}
