@@ -76,6 +76,7 @@ export const SHOP_TABLES = new Set([
   'banners', 'campaigns', 'campaign_products', 'categories', 'customers', 'discounts', 'user_coupons', 'coupon_usages',
   'favorites', 'orders', 'order_status_history', 'payments', 'refunds', 'returns', 'shipments', 'shipment_events',
   'products', 'site_settings', 'stock_movements',
+  'line_bot_config', 'line_bot_rules', 'line_rich_menus', 'line_broadcasts', 'line_events',
 ]);
 
 function withShop<T>(values: T, shopId: string): T {

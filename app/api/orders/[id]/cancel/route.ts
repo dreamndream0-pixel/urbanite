@@ -4,12 +4,14 @@ import { canRequestCancel, deriveStatuses } from '@/lib/order-status';
 import { restoreOrderStock } from '@/lib/inventory';
 import type { Order } from '@/lib/types';
 import { shopAdminClient } from '@/lib/shop';
+import { kickOrderNotifications } from '@/lib/order-notification-kick';
 
 // POST /api/orders/[id]/cancel — 客人提出取消申請(需登入且為本人訂單)
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  kickOrderNotifications();
   const user = await getSessionUser();
   if (!user) return NextResponse.json({ error: '請先登入' }, { status: 401 });
 
@@ -53,6 +55,7 @@ export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  kickOrderNotifications();
   const admin = await getAdminUser();
   if (!admin) return NextResponse.json({ error: '未授權' }, { status: 401 });
 

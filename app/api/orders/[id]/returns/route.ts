@@ -1,10 +1,12 @@
-import { NextResponse } from 'next/server';
+import { after, NextResponse } from 'next/server';
 import { getAdminUser, getSessionUser } from '@/lib/supabase/server';
 import { canRequestReturn } from '@/lib/order-status';
 import type { Order, OrderItem, ReturnItem, ReturnRequest } from '@/lib/types';
 import { shopAdminClient } from '@/lib/shop';
 import { createAdminClient } from '@/lib/supabase/admin';
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { kickOrderNotifications } from '@/lib/order-notification-kick';
+import { sendOrderNoticeNow } from '@/lib/order-notifications';
 
 // 退貨 / 退款單號全站唯一:跨所有店家計數
 async function genNo(_supabase: SupabaseClient, table: string, prefix: string) {
@@ -41,6 +43,7 @@ export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  kickOrderNotifications();
   const user = await getSessionUser();
   if (!user) return NextResponse.json({ error: '請先登入' }, { status: 401 });
 
@@ -92,6 +95,9 @@ export async function POST(
     note: `客人申請退貨 ${returnNo}${reason ? `:${reason}` : ''}`, created_by: '客人',
   });
 
+  const shopId = (order as Order & { shop_id?: string }).shop_id;
+  if (shopId) after(() => sendOrderNoticeNow(shopId, id, 'return_requested').catch(() => {}));
+
   return NextResponse.json(ret as ReturnRequest, { status: 201 });
 }
 
@@ -102,6 +108,7 @@ export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  kickOrderNotifications();
   const { id } = await params;
   const body = await request.json().catch(() => ({}));
   const returnId = String(body?.return_id ?? '').trim();

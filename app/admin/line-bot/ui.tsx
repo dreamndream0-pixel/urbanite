@@ -11,7 +11,7 @@ export const primaryBtn = 'rounded-full bg-[#1f1b19] px-4 py-2 text-sm font-semi
 
 export function Card({ title, desc, action, children }: { title: string; desc?: string; action?: ReactNode; children: ReactNode }) {
   return (
-    <section className="rounded-xl border border-[#e5ded4] bg-white p-5">
+    <section className="min-w-0 rounded-xl border border-[#e5ded4] bg-white p-5">
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <h3 className="text-base font-semibold text-[#1f1b19]">{title}</h3>
@@ -44,7 +44,7 @@ export function Toggle({ on, onChange, label }: { on: boolean; onChange: (v: boo
 
 export function Field({ label, hint, children }: { label: string; hint?: ReactNode; children: ReactNode }) {
   return (
-    <div className="block">
+    <div className="block min-w-0">
       <div className="mb-1.5 flex items-baseline justify-between gap-2">
         <span className="text-xs font-medium text-[#6b6156]">{label}</span>
         {hint ? <span className="text-[11px] text-[#a99e8f]">{hint}</span> : null}
@@ -163,9 +163,9 @@ export async function sendTest(content: MessageSet) {
 // 兩欄:左邊編輯、右邊手機預覽
 export function EditorWithPreview({ editor, preview }: { editor: ReactNode; preview: ReactNode }) {
   return (
-    <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_300px]">
+    <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_300px]">
       <div className="min-w-0">{editor}</div>
-      <div className="lg:sticky lg:top-24 lg:self-start">
+      <div className="min-w-0 lg:sticky lg:top-24 lg:self-start">
         <p className="mb-2 text-center text-[11px] text-[#a99e8f]">手機預覽(變數以範例顯示)</p>
         {preview}
       </div>

@@ -20,7 +20,7 @@ export default function ManualFulfillmentAction({ order, action, onUpdated }: { 
   }, [order.id, key, action]);
   async function submit() {
     if (busy) return;
-    const message = action === 'complete' ? '確認已收到商品，並完成這筆訂單？此操作不會變更付款紀錄。' : '確認商品已到貨／到達取貨門市？此操作不會標記已收款。';
+    const message = action === 'complete' ? '確認已收到商品，並完成這筆訂單？此操作不會變更付款紀錄。' : '確認商品已到貨／到達取貨門市，並通知買家？此操作不會標記已收款。';
     if (!(await uiConfirm(message))) return;
     setBusy(true); setError('');
     try {
@@ -34,7 +34,7 @@ export default function ManualFulfillmentAction({ order, action, onUpdated }: { 
   if (!allowed && !error) return null;
   return <div className="flex max-w-full flex-col gap-1">
     {allowed && <button type="button" disabled={busy} onClick={submit} className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md bg-emerald-800 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
-      {action === 'complete' ? <CheckCheck size={16} /> : <PackageCheck size={16} />}{busy ? '更新中…' : action === 'complete' ? '確認收貨／完成訂單' : '已到貨'}
+      {action === 'complete' ? <CheckCheck size={16} /> : <PackageCheck size={16} />}{busy ? '更新中…' : action === 'complete' ? '確認收貨／完成訂單' : '通知已到貨'}
     </button>}
     {error && <p role="alert" className="max-w-xs text-sm text-red-700">{error}</p>}
   </div>;

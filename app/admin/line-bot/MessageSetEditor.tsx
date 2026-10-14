@@ -18,6 +18,10 @@ import {
 import type { Discount, Product } from '@/lib/types';
 import { uiAlert } from '@/lib/ui-dialog';
 import { Field, inputClass, smallBtn, Svg, TagInput, uploadBotImage } from './ui';
+import TemplatePicker from './TemplatePicker';
+import { useCampaigns } from './campaignContext';
+import { couponCard, memberCard, productCard, sellable } from './templateSamples';
+import { COUPON_STYLES, MEMBER_STYLES, PRODUCT_STYLES } from '@/lib/line-flex-templates';
 
 const formatter = new Intl.NumberFormat('zh-TW', { style: 'currency', currency: 'TWD', maximumFractionDigits: 0 });
 
@@ -77,7 +81,10 @@ export default function MessageSetEditor({
                   key={t.type}
                   type="button"
                   onClick={() => {
-                    setMessages([...value.messages, blankMessage(t.type)]);
+                    const next = blankMessage(t.type);
+                    // 商品卡:預設帶入前 3 個上架中的商品,可再增減
+                    if (next.type === 'products') next.productIds = sellable(products).slice(0, 3).map((p) => p.id);
+                    setMessages([...value.messages, next]);
                     setAdding(false);
                   }}
                   className="rounded-lg border border-[#efe8dd] px-2.5 py-2 text-left transition hover:border-[#1f1b19]/30 hover:bg-[#faf7f2]"
@@ -148,11 +155,35 @@ function MessageBody({
       </div>
     );
   }
-  if (m.type === 'products') return <ProductPicker ids={m.productIds} onChange={(productIds) => onChange({ ...m, productIds })} products={products} />;
+  if (m.type === 'products') {
+    const first = products.find((p) => p.id === m.productIds[0]) ?? sellable(products)[0];
+    return (
+      <div className="space-y-3">
+        <Field label="卡片樣式" hint="點選套用,右側預覽會即時更新">
+          <TemplatePicker options={PRODUCT_STYLES} value={m.style ?? ''} onChange={(style) => onChange({ ...m, style: style || undefined })} render={(k) => productCard(k, first)} extra={{ key: '', label: '簡約卡片', hint: '原本的圖片+按鈕樣式' }} />
+        </Field>
+        <ProductPicker ids={m.productIds} onChange={(productIds) => onChange({ ...m, productIds })} products={products} />
+      </div>
+    );
+  }
+  if (m.type === 'member') {
+    return (
+      <div className="space-y-2">
+        <Field label="會員卡樣式">
+          <TemplatePicker options={MEMBER_STYLES} value={m.style} onChange={(style) => onChange({ ...m, style })} render={(k) => memberCard(k)} />
+        </Field>
+        <p className="text-[11px] leading-5 text-[#a99e8f]">傳送時自動帶入會員姓名、會員編號、累計訂單與消費、可用優惠券。還沒綁定的人會改收到綁定卡片。</p>
+      </div>
+    );
+  }
   if (m.type === 'coupon') {
     const active = coupons.filter((c) => c.active !== false);
     return (
-      <Field label="優惠券" hint="客人按「領取優惠券」會到會員中心領取">
+      <div className="space-y-3">
+      <Field label="券面樣式">
+        <TemplatePicker options={COUPON_STYLES} value={m.style ?? ''} onChange={(style) => onChange({ ...m, style })} render={(k) => couponCard(k, coupons.find((c) => c.id === m.couponId))} extra={{ key: '', label: '自動', hint: '免運券用免運款,其他用折扣券款' }} />
+      </Field>
+      <Field label="優惠券" hint="客人按「立即領取」會到會員中心領取">
         <select value={m.couponId} onChange={(e) => onChange({ ...m, couponId: e.target.value })} className={inputClass}>
           <option value="">選擇優惠券</option>
           {active.map((c) => (
@@ -162,6 +193,7 @@ function MessageBody({
           ))}
         </select>
       </Field>
+      </div>
     );
   }
   return <p className="text-xs leading-5 text-[#8a7f72]">顯示「新會員 LINE 一鍵加入」與「已有官網帳號,綁定」兩個按鈕。已經綁定的會員不會看到這則。</p>;
@@ -302,10 +334,13 @@ function CardEditor({ card, onChange, variables }: { card: BotCard; onChange: (c
 
 function ProductPicker({ ids, onChange, products }: { ids: string[]; onChange: (ids: string[]) => void; products: Product[] }) {
   const [q, setQ] = useState('');
+  // 商品來源:全部 / 官網商品 / 某個活動頁
+  const campaigns = useCampaigns();
+  const [source, setSource] = useState('all');
   const chosen = ids.map((id) => products.find((p) => p.id === id)).filter(Boolean) as Product[];
-  const matches = q.trim()
-    ? products.filter((p) => p.status !== '已下架' && !ids.includes(p.id) && `${p.name} ${p.id}`.toLowerCase().includes(q.trim().toLowerCase())).slice(0, 8)
-    : [];
+  const pool = products.filter((p) => p.status !== '已下架' && (source === 'all' ? true : source === 'main' ? !p.campaign_id : p.campaign_id === source));
+  const matches = pool.filter((p) => !ids.includes(p.id) && (!q.trim() || `${p.name} ${p.id}`.toLowerCase().includes(q.trim().toLowerCase()))).slice(0, q.trim() ? 12 : 30);
+  const campaignName = (id?: string | null) => { const c = campaigns.find((x) => x.id === id); return c ? c.name || c.title || '活動頁' : ''; };
   return (
     <div className="space-y-2">
       {chosen.length ? (
@@ -323,13 +358,24 @@ function ProductPicker({ ids, onChange, products }: { ids: string[]; onChange: (
       ) : null}
       {ids.length < 10 ? (
         <>
-          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={`搜尋商品名稱加入(${ids.length}/10)`} className={inputClass} />
+          <div className="flex gap-1.5">
+            <select value={source} onChange={(e) => setSource(e.target.value)} aria-label="商品來源" className="w-36 shrink-0 rounded-lg border border-[#e5ded4] bg-white px-2 py-2 text-xs outline-none">
+              <option value="all">全部商品</option>
+              <option value="main">官網商品</option>
+              {campaigns.map((c) => <option key={c.id} value={c.id}>活動頁:{c.name || c.title || '未命名'}</option>)}
+            </select>
+            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={`搜尋商品名稱(${ids.length}/10)`} className={inputClass} />
+          </div>
+          {source !== 'all' && source !== 'main' && pool.some((p) => !ids.includes(p.id)) ? (
+            <button type="button" onClick={() => onChange([...ids, ...pool.filter((p) => !ids.includes(p.id)).map((p) => p.id)].slice(0, 10))} className={smallBtn}>＋ 加入這個活動頁的商品(最多 10 個)</button>
+          ) : null}
           {matches.length ? (
-            <div className="divide-y divide-[#f3eee7] overflow-hidden rounded-lg border border-[#efe8dd] bg-white">
+            <div className="max-h-64 divide-y divide-[#f3eee7] overflow-y-auto rounded-lg border border-[#efe8dd] bg-white">
               {matches.map((p) => (
                 <button key={p.id} type="button" onClick={() => { onChange([...ids, p.id]); setQ(''); }} className="flex w-full items-center gap-2.5 px-2.5 py-2 text-left text-xs hover:bg-[#faf7f2]">
                   <span className="aspect-[4/5] w-7 shrink-0 overflow-hidden rounded bg-[#f6f2ec]">{p.image ? <img src={p.image} alt="" className="h-full w-full object-cover" /> : null}</span>
                   <span className="min-w-0 flex-1 truncate">{p.name}</span>
+                  {p.campaign_id ? <span className="shrink-0 rounded bg-[#f3eee7] px-1.5 py-0.5 text-[10px] text-[#8a7f72]">{campaignName(p.campaign_id) || '活動頁'}</span> : null}
                   <span className="text-[#8a7f72]">{formatter.format(p.price)}</span>
                 </button>
               ))}

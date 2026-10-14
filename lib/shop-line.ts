@@ -3,12 +3,12 @@
 import { getShopSecret, setShopSecret } from '@/lib/integrations';
 import { scopedClient, shopUrl, type Shop } from '@/lib/shop';
 import { createBindToken, fetchBotProfile, replyMessage, verifyLineSignature, type LineMessage } from '@/lib/line-messaging';
-import type { Order } from '@/lib/types';
 import { getOrderNotificationConfig } from '@/lib/order-notification-config';
+import { orderFlexMessage, orderQueryMessage } from '@/lib/order-flex';
+import { runAsShop } from '@/lib/line-channel';
 
 export type ShopLineConfig = { channelSecret: string; accessToken: string; loginChannelId?: string; loginChannelSecret?: string };
 const KIND = 'LINE';
-const money = (n: number) => `NT$${Math.round(Number(n) || 0).toLocaleString('en-US')}`;
 
 export const getShopLineConfig = (shopId: string) => getShopSecret<ShopLineConfig>(KIND, shopId);
 export const saveShopLineConfig = (shopId: string, cfg: ShopLineConfig | null) => setShopSecret(KIND, shopId, cfg);
@@ -42,12 +42,10 @@ function bindLink(shop: Shop, lineUserId: string, cfg: ShopLineConfig) {
   return shopUrl(shop.slug, `/line/bind?t=${encodeURIComponent(createBindToken(lineUserId, cfg.channelSecret))}&openExternalBrowser=1`);
 }
 
-async function ordersReply(shop: Shop, userId: string) {
-  const { data } = await scopedClient(shop.id).from('orders').select('order_no, status, total, created_at').eq('user_id', userId).order('created_at', { ascending: false }).limit(5);
-  const orders = (data ?? []) as Pick<Order, 'order_no' | 'status' | 'total' | 'created_at'>[];
-  if (!orders.length) return '目前沒有訂單紀錄。';
-  const lines = orders.map((o) => `${o.order_no}\n${new Date(o.created_at ?? '').toLocaleDateString('zh-TW', { timeZone: 'Asia/Taipei' })}・${money(o.total)}\n狀態:${o.status}`);
-  return `最近 ${orders.length} 筆訂單\n\n${lines.join('\n\n')}\n\n完整明細:${shopUrl(shop.slug, '/account?tab=orders')}`;
+// 訂單查詢:最近 5 筆訂單,以 Flex 卡片輪播呈現
+async function ordersReply(shop: Shop, userId: string): Promise<LineMessage> {
+  const card = await orderQueryMessage(scopedClient(shop.id), userId, shop.name, shopUrl(shop.slug, '/account?tab=orders'));
+  return card ? { ...card, quickReply: QUICK } : text('目前沒有訂單紀錄。');
 }
 
 type LineEvent = { type: string; replyToken?: string; source?: { type: string; userId?: string }; message?: { type: string; text?: string } };
@@ -75,7 +73,8 @@ export async function handleShopWebhook(shop: Shop, raw: string, signature: stri
         return reply(userId ? '你已經綁定官網會員了。' : `點下面的連結登入官網,完成綁定(30 分鐘內有效):\n${bindLink(shop, lineUserId, cfg)}`);
       }
       if (/訂單/.test(input)) {
-        return reply(userId ? await ordersReply(shop, userId) : `查詢訂單前,要先綁定官網會員:\n${bindLink(shop, lineUserId, cfg)}`);
+        if (userId) return replyMessage(event.replyToken!, [await ordersReply(shop, userId)], cfg.accessToken);
+        return reply(`查詢訂單前,要先綁定官網會員:\n${bindLink(shop, lineUserId, cfg)}`);
       }
     } catch (error) {
       console.error('shop LINE event failed', error);
@@ -104,6 +103,8 @@ export async function bindShopLine(shop: Shop, cfg: ShopLineConfig, userId: stri
   }).eq('user_id', userId).select('user_id').single();
   if (error) throw new Error(error.message);
   if (!updated) throw new Error('會員綁定未完成，請重新訂閱');
+  // 有上線中的會員圖文選單時,換成會員選單(失敗不影響綁定)
+  await runAsShop(shop, async () => (await import('@/lib/line-bot')).syncMemberMenu(lineUserId, true)).catch(() => {});
   await push(cfg, lineUserId, [text(`綁定完成!之後在 ${shop.name} 的訂單成立、出貨都會在這裡通知你。`)]).catch(() => console.error('shop LINE binding confirmation unavailable'));
   return profile;
 }
@@ -114,13 +115,17 @@ export async function notifyShopOrder(shop: Shop, orderId: string, kind: 'create
   const cfg = await getShopLineConfig(shop.id);
   if (!cfg) return;
   const supabase = scopedClient(shop.id);
-  const { data: order } = await supabase.from('orders').select('order_no, total, user_id, payment_method').eq('id', orderId).maybeSingle();
+  const { data: order } = await supabase.from('orders').select('order_no, total, user_id, payment_method, shipping_method, store_name, items').eq('id', orderId).maybeSingle();
   if (!order?.user_id) return;
   const { data: customer } = await supabase.from('customers').select('line_user_id').eq('user_id', order.user_id).maybeSingle();
   if (!customer?.line_user_id) return;
   const link = shopUrl(shop.slug, '/account?tab=orders');
-  const body = kind === 'created'
-    ? `訂單成立通知\n\n訂單編號:${order.order_no}\n金額:${money(order.total)}\n付款方式:${order.payment_method ?? ''}\n\n查看訂單:${link}`
-    : `出貨通知\n\n訂單編號:${order.order_no} 已出貨${detail ? `\n${detail}` : ''}\n\n查看訂單:${link}`;
-  await push(cfg, customer.line_user_id as string, [text(body)]);
+  const card = orderFlexMessage({
+    shopName: shop.name, order, link,
+    title: kind === 'created' ? '下單成立' : '已出貨',
+    subtitle: kind === 'created' ? '感謝您的訂購,我們已收到訂單。' : '商品已出貨,請留意配送進度。',
+    extra: kind === 'shipped' && detail ? [['出貨資訊', detail]] : [],
+    event: kind,
+  });
+  await push(cfg, customer.line_user_id as string, [card as unknown as LineMessage]);
 }

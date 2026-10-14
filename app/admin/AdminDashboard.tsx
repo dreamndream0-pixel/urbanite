@@ -32,14 +32,13 @@ import {
 } from '@/lib/order-status';
 import { uiToast } from '@/lib/ui-toast';
 import NumberInput from './NumberInput';
-import ShopLineSettings from './ShopLineSettings';
 import OrderNotificationSettingsPanel from './OrderNotificationSettings';
 import ManualFulfillmentAction from '@/app/components/ManualFulfillmentAction';
 import { PRIMARY_SITE_URL } from '@/lib/site-url';
 import { defaultSelfShipCarrier, NO_TRACKING_CARRIERS, needsTracking } from '@/lib/self-ship';
 import { uiAlert, uiConfirm, uiPrompt } from '@/lib/ui-dialog';
 import { OrderCardBadges, orderNeedsAttention, AttentionDot, isPaymentReported } from '@/app/components/OrderStatusBadge';
-import { COUPON_PRESETS } from '@/lib/coupon-presets';
+import { COUPON_PRESETS, couponImageIsDark, couponImageStyle, couponScript } from '@/lib/coupon-presets';
 import { isoToTaipeiInput } from '@/lib/taipei-time';
 import CampaignManager from './CampaignManager';
 import FixedBannerCropModal from './FixedBannerCropModal';
@@ -112,7 +111,8 @@ const NAV = [
 
 type SectionKey = (typeof NAV)[number]['key'];
 // 個人名片:店家(U Pro 以上)也能在官網後台編輯自己的名片
-const PLATFORM_SECTIONS = new Set<string>(['card-members', 'line-bot', 'shops']);
+// LINE 機器人:主站與店家共用(店家用自己的官方帳號)
+const PLATFORM_SECTIONS = new Set<string>(['card-members', 'shops']);
 
 type Draft = {
   id: string;
@@ -2684,7 +2684,7 @@ export default function AdminDashboard({
                 {filteredDiscounts.length === 0 ? (
                   <div className="mt-5"><Empty>沒有符合條件的優惠券。</Empty></div>
                 ) : (
-                  <div className="mt-5 space-y-2">
+                  <div className="mt-5 space-y-3 rounded-[28px] bg-[#f8f1e9] p-3 sm:p-5">
                     {filteredDiscounts.map((d) => {
                       const usage = couponUsages.filter((item) => item.coupon_id === d.id);
                       const claimed = userCoupons.filter((item) => item.coupon_id === d.id).length;
@@ -2693,79 +2693,91 @@ export default function AdminDashboard({
                         : status === '停用' ? 'bg-[#fbe9e7] text-[#c0392b]'
                         : 'bg-[#efe9e0] text-[#8a7f72]';
                       const statusLabel = status === '啟用' ? '啟用中' : status === '停用' ? '已停用' : status;
+                      const couponImage = d.image ?? undefined;
+                      const darkImage = couponImageIsDark(couponImage, d.code);
+                      const discountLabel = d.type === 'free_shipping'
+                        ? '免運'
+                        : d.type === 'percent'
+                          ? `${d.value}% OFF`
+                          : `${formatter.format(d.value)} OFF`;
+                      const tags = [
+                        d.applicable_products?.length || d.applicable_categories?.length ? '指定商品' : '全站適用',
+                        d.end_at ? `到 ${new Date(d.end_at).toLocaleDateString('zh-TW')}` : '無期限',
+                        d.stackable ? '可併用' : '單張使用',
+                      ];
                       return (
-                        <div key={d.id} className="rounded-2xl bg-white p-3">
-                          <div className="flex items-start justify-between gap-3">
-                            <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${statusTone}`}>{statusLabel}</span>
-                            <div className="relative">
-                              <button onClick={() => setCouponMenuId(couponMenuId === d.id ? null : d.id)} aria-label="更多操作" className="rounded-full p-1 text-[#8a7f72] hover:bg-[#f3ede4]">
-                                <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.6" /><circle cx="12" cy="12" r="1.6" /><circle cx="19" cy="12" r="1.6" /></svg>
-                              </button>
-                              {couponMenuId === d.id ? (
-                                <>
-                                  <button aria-hidden tabIndex={-1} onClick={() => setCouponMenuId(null)} className="fixed inset-0 z-[64] cursor-default" />
-                                  <div className="absolute right-0 top-full z-[65] mt-1 w-28 overflow-hidden rounded-lg border border-[#e5ded4] bg-white shadow-lg">
-                                    <button onClick={() => { setCouponMenuId(null); copyDiscount(d); }} className="block w-full px-3.5 py-2 text-left text-sm hover:bg-[#f6f2ec]">複製</button>
-                                    <button onClick={() => { setCouponMenuId(null); deleteDiscount(d.id); }} className="block w-full px-3.5 py-2 text-left text-sm text-[#c0392b] hover:bg-[#fbf3f0]">刪除</button>
-                                  </div>
-                                </>
-                              ) : null}
+                        <article
+                          key={d.id}
+                          className="relative grid overflow-hidden rounded-2xl border border-[#eadfd4] bg-[#fffaf5] shadow-[0_10px_24px_rgba(65,52,43,0.08)] sm:grid-cols-[148px_minmax(0,1fr)_170px]"
+                        >
+                          <div
+                            className="relative min-h-[118px] bg-[#e5ded4] bg-cover bg-center sm:min-h-[150px]"
+                            style={couponImageStyle(couponImage, d.code)}
+                          >
+                            <div className="absolute inset-0 bg-black/[0.02]" />
+                            <span className={`font-serif-tc absolute left-3 top-1/2 origin-center -translate-y-1/2 -rotate-90 whitespace-nowrap text-[9px] tracking-[0.28em] ${darkImage ? 'text-white/85' : 'text-[#6b6156]/70'}`}>
+                              SPECIAL FOR YOU
+                            </span>
+                            <span className="absolute -right-3 top-1/2 hidden h-6 w-6 -translate-y-1/2 rounded-full bg-[#f8f1e9] sm:block" />
+                          </div>
+
+                          <div className="relative min-w-0 p-4 sm:p-5">
+                            <span className="absolute -left-3 top-1/2 hidden h-6 w-6 -translate-y-1/2 rounded-full bg-[#f8f1e9] sm:block" />
+                            <div className="flex flex-wrap items-start justify-between gap-2">
+                              <div className="min-w-0">
+                                <p className="font-mono text-xl font-bold tracking-wide text-[#2c2826] sm:text-2xl">{d.code}</p>
+                                <p className="mt-1 text-sm font-semibold text-[#6f675f]">{d.name || couponText(d)}</p>
+                              </div>
+                              <span className={`rounded-full px-3 py-1 text-xs font-semibold ${statusTone}`}>{statusLabel}</span>
+                            </div>
+                            <p className="mt-2 text-sm text-[#5f5852]">
+                              {d.min_spend ? `滿 ${formatter.format(d.min_spend)}，` : ''}
+                              {d.type === 'free_shipping' ? '免運' : d.type === 'percent' ? `${d.value}% 折扣` : `折抵 ${formatter.format(d.value)}`}
+                              {d.max_discount ? `，最高折抵 ${formatter.format(d.max_discount)}` : ''}
+                            </p>
+                            <div className="mt-3 flex flex-wrap gap-1.5">
+                              {tags.map((tag) => (
+                                <span key={tag} className="rounded-md bg-[#f2ebe2] px-2.5 py-1 text-xs text-[#8a7f72]">{tag}</span>
+                              ))}
+                            </div>
+                            <div className="mt-3 grid gap-1 text-xs text-[#6b6156] sm:grid-cols-2">
+                              <p>{d.applicable_users === 'new' || d.is_first_purchase_only ? '新會員首購' : d.applicable_users === 'vip' ? 'VIP 會員' : '全部會員'}・每人限用 {d.per_user_limit ?? 1} 次</p>
+                              <p>{d.total_limit ? `發放上限 ${d.total_limit.toLocaleString()} 張` : '發放數量不限'}</p>
+                              <p>已領取 {claimed} / 已使用 {usage.length}</p>
+                              <p>折抵 {formatter.format(usage.reduce((sum, item) => sum + item.discount_amount, 0))}</p>
                             </div>
                           </div>
 
-                          <div className="mt-1.5 flex items-start gap-4">
-                            <div className="min-w-0 flex-1">
-                              <p className="text-base font-bold">{d.name || couponText(d)}</p>
-                              <span className="mt-1 inline-flex items-center gap-1.5 rounded-lg bg-[#f4f0e8] px-2.5 py-1">
-                                <span className="font-mono text-sm">{d.code}</span>
-                                <button
-                                  onClick={() => { navigator.clipboard?.writeText(d.code); }}
-                                  aria-label="複製優惠碼"
-                                  className="text-[#a99e8f] hover:text-[#6b6156]"
-                                >
-                                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2" /><path d="M5 15V5a2 2 0 0 1 2-2h10" /></svg>
-                                </button>
-                              </span>
-                              <p className="mt-1 text-sm text-[#8a7f72]">
-                                {d.min_spend ? `滿 ${formatter.format(d.min_spend)}，` : ''}
-                                {d.type === 'free_shipping' ? '免運' : d.type === 'percent' ? `${d.value}% 折扣` : `折抵 ${formatter.format(d.value)}`}
-                                {d.max_discount ? `，最高折抵 ${formatter.format(d.max_discount)}` : ''}
-                              </p>
+                          <div className="relative flex items-center justify-between gap-3 border-t border-dashed border-[#ded5c8] p-4 sm:flex-col sm:justify-center sm:border-l sm:border-t-0 sm:p-5">
+                            {/* 手機版:打孔虛線兩端的缺角 */}
+                            <span className="absolute -left-3 -top-3 h-6 w-6 rounded-full bg-[#f8f1e9] sm:hidden" />
+                            <span className="absolute -right-3 -top-3 h-6 w-6 rounded-full bg-[#f8f1e9] sm:hidden" />
+                            <div className="text-left sm:text-center">
+                              <p className="font-serif-tc text-xl font-semibold text-[#2c2826]">{discountLabel}</p>
+                              <p className="font-script hidden text-[15px] leading-[1.15] text-[#c2b3a0] sm:mt-2 sm:block">{couponScript(d.code)}</p>
                             </div>
-                            <div className="shrink-0 rounded-xl bg-[#eef1e6] px-3 py-2 text-center text-[#414a33]">
-                              {d.type === 'free_shipping' ? (
-                                <p className="font-serif-tc text-xl font-semibold">免運</p>
-                              ) : d.type === 'percent' ? (
-                                <p className="font-serif-tc text-2xl font-semibold leading-none">{d.value}%<span className="ml-1 text-xs font-sans">OFF</span></p>
-                              ) : (
-                                <p className="font-serif-tc text-2xl font-semibold leading-none"><span className="mr-1 text-xs font-sans">NT$</span>{d.value}<span className="ml-1 text-xs font-sans">OFF</span></p>
-                              )}
-                            </div>
-                          </div>
-
-                          <div className="mt-2 flex flex-nowrap items-center justify-between gap-2 border-t border-[#f0ebe2] pt-2">
-                            <div className="min-w-0 flex-1 space-y-0.5 text-[clamp(9px,2.3vw,14px)] text-[#6b6156]">
-                              <p className="flex items-center gap-1 overflow-hidden text-ellipsis whitespace-nowrap">
-                                <svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="#a99e8f" strokeWidth="1.7" className="shrink-0" aria-hidden="true"><circle cx="12" cy="8" r="4" /><path d="M4 21c0-4 3.5-6 8-6s8 2 8 6" strokeLinecap="round" /></svg>
-                                {d.applicable_users === 'new' || d.is_first_purchase_only ? '新會員首購' : d.applicable_users === 'vip' ? 'VIP 會員' : '全部會員'}・每人限用 {d.per_user_limit ?? 1} 次
-                              </p>
-                              <p className="flex items-center gap-1 overflow-hidden text-ellipsis whitespace-nowrap">
-                                <svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="#a99e8f" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" className="shrink-0" aria-hidden="true"><path d="M12 3l9 4-9 4-9-4 9-4zM3 12l9 4 9-4M3 17l9 4 9-4" /></svg>
-                                {d.total_limit ? `發放上限 ${d.total_limit.toLocaleString()} 張` : '發放數量不限'}・{d.end_at ? `到 ${new Date(d.end_at).toLocaleDateString('zh-TW')}` : '無期限'}
-                              </p>
-                            </div>
-                            <div className="shrink-0 whitespace-nowrap text-[clamp(9px,2.3vw,14px)] text-[#6b6156]">
-                              <p>已領取 {claimed}</p>
-                              <p>已使用 {usage.length}</p>
-                            </div>
-                            <div className="flex shrink-0 gap-1.5">
-                              <button onClick={() => openEditCoupon(d)} className="inline-flex h-7 items-center whitespace-nowrap rounded-full border border-[#ded5c8] px-3 text-[clamp(9px,2.3vw,14px)] font-semibold text-[#6b6156] hover:bg-[#efe8dd]">編輯</button>
-                              <button onClick={() => toggleDiscount(d.id, !d.active)} className="inline-flex h-7 items-center whitespace-nowrap rounded-full bg-[#414a33] px-3 text-[clamp(9px,2.3vw,14px)] font-semibold text-white hover:bg-[#39412c]">
+                            <div className="flex shrink-0 flex-wrap justify-end gap-1.5">
+                              <button onClick={() => openEditCoupon(d)} className="inline-flex h-8 items-center rounded-full border border-[#ded5c8] px-3 text-xs font-semibold text-[#6b6156] hover:bg-[#efe8dd]">編輯</button>
+                              <button onClick={() => toggleDiscount(d.id, !d.active)} className="inline-flex h-8 items-center rounded-full bg-[#2b211d] px-3 text-xs font-semibold text-white hover:bg-[#3a302b]">
                                 {d.active ? '暫停' : '啟用'}
                               </button>
+                              <div className="relative">
+                                <button onClick={() => setCouponMenuId(couponMenuId === d.id ? null : d.id)} aria-label="更多操作" className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[#ded5c8] text-[#8a7f72] hover:bg-[#efe8dd]">
+                                  <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.6" /><circle cx="12" cy="12" r="1.6" /><circle cx="19" cy="12" r="1.6" /></svg>
+                                </button>
+                                {couponMenuId === d.id ? (
+                                  <>
+                                    <button aria-hidden tabIndex={-1} onClick={() => setCouponMenuId(null)} className="fixed inset-0 z-40 cursor-default" />
+                                    <div className="absolute right-0 top-full z-50 mt-1 w-28 overflow-hidden rounded-lg border border-[#e5ded4] bg-white shadow-lg">
+                                      <button onClick={() => { setCouponMenuId(null); copyDiscount(d); }} className="block w-full px-3.5 py-2 text-left text-sm hover:bg-[#f6f2ec]">複製</button>
+                                      <button onClick={() => { setCouponMenuId(null); deleteDiscount(d.id); }} className="block w-full px-3.5 py-2 text-left text-sm text-[#c0392b] hover:bg-[#fbf3f0]">刪除</button>
+                                    </div>
+                                  </>
+                                ) : null}
+                              </div>
                             </div>
                           </div>
-                        </div>
+                        </article>
                       );
                     })}
                   </div>
@@ -2837,7 +2849,7 @@ export default function AdminDashboard({
           )}
 
           {/* ===== 報表及分析 ===== */}
-          {section === 'line-bot' && <LineBotManager products={products} coupons={discounts} logoUrl={logoUrl} />}
+          {section === 'line-bot' && <LineBotManager products={products} coupons={discounts} logoUrl={logoUrl} platform={platform} campaigns={initialCampaigns} />}
           {section === 'card-members' && <CardMembersManager />}
           {section === 'shops' && platform && <ShopsManager />}
           {section === 'profile-card' && (platform
@@ -2902,8 +2914,7 @@ export default function AdminDashboard({
                   { key: 'shippings', label: '物流設定' },
                   { key: 'integrations', label: '串接設定' },
                   { key: 'notifications', label: '通知' },
-                  { key: 'shopline', label: '服務設定' },
-                ] as const).filter((t) => (platform ? t.key !== 'shopline' : t.key !== 'integrations')).map((t) => (
+                ] as const).filter((t) => platform || t.key !== 'integrations').map((t) => (
                   <button
                     key={t.key}
                     onClick={() => setSettingsTab(t.key)}
@@ -3252,7 +3263,6 @@ export default function AdminDashboard({
 
               {settingsTab === 'integrations' && <IntegrationSettings />}
               {settingsTab === 'notifications' && <OrderNotificationSettingsPanel />}
-              {settingsTab === 'shopline' && !platform && <ShopLineSettings />}
               {settingsTab === 'shippings' && (
               <Card
                 title="物流設定"
@@ -4389,6 +4399,7 @@ function AdminOrderProgress({ order, createdAt, paidAt }: { order: Order; create
     if (key === 'created') return (<svg {...p}><path d="M7 3h7l4 4v14H7z" /><path d="M14 3v4h4M9 12h7M9 16h7" /></svg>);
     if (key === 'paid') return (<svg {...p}><rect x="3" y="6" width="18" height="12" rx="2" /><path d="M3 10h18" /></svg>);
     if (key === 'shipped' || key === 'transit') return (<svg {...p}><path d="M3 7h11v9H3zM14 10h4l3 3v3h-7z" /><circle cx="7" cy="18" r="1.5" /><circle cx="17.5" cy="18" r="1.5" /></svg>);
+    if (key === 'arrived') return (<svg {...p}><path d="M3 7l9-4 9 4v10l-9 4-9-4z" /><path d="M8.5 12.5l2.5 2.5 4.5-5" /></svg>);
     if (key === 'done') return (<svg {...p}><path d="M5 13l4 4L19 7" strokeWidth={2.2} /></svg>);
     return (<svg {...p}><path d="M3 7l9-4 9 4-9 4-9-4zM3 7v10l9 4 9-4V7" /></svg>);
   };
@@ -4493,7 +4504,8 @@ function AdminOrderModal({
   const paidAt = detail?.history?.find((h) => h.type === 'payment' && h.to_status === 'PAID')?.created_at
     ?? detail?.payments?.find((p) => p.status === 'PAID')?.paid_at
     ?? undefined;
-  const hasShipment = (detail?.shipments?.length ?? 0) > 0;
+  // 已出貨的狀態直接視為有出貨單,避免明細還沒載入時先閃出「準備出貨」
+  const hasShipment = ['SHIPPED', 'IN_TRANSIT', 'AT_STORE', 'DELIVERED', 'PICKED_UP'].includes(order.fulfillment_status ?? '') || (detail?.shipments?.length ?? 0) > 0;
   // 宅配到府(非超商取貨):收款後才能出貨(貨到付款除外)
   // 手動超商取貨(店家自己寄,例如賣貨便):和宅配一樣手動填物流單號出貨,不建藍新物流單
   const isManualStore = order.store_lgs_type === 'MANUAL';
@@ -4665,7 +4677,7 @@ ${order.note ? `<div class="sec"><h2>備註</h2><p class="muted">${escapeHtml(or
           {/* 主要操作固定在內容最上方 */}
           <div className="flex flex-wrap gap-2">
             <ManualFulfillmentAction order={order} action="arrived" onUpdated={(updated) => { onOrderChange?.(updated); void loadDetail(); }} />
-            {isHomeDelivery && !hasShipment && order.status !== '取消' && order.status !== '退貨' ? (
+            {detail && isHomeDelivery && !hasShipment && order.status !== '取消' && order.status !== '退貨' ? (
               <button
                 onClick={() => {
                   if (!canShipHome) { void uiAlert('此訂單尚未收款,請先確認已收款(標記已付款)後再宅配出貨。'); return; }
@@ -4688,6 +4700,44 @@ ${order.note ? `<div class="sec"><h2>備註</h2><p class="muted">${escapeHtml(or
               }} className="inline-flex h-10 items-center rounded-full border border-[#e0b4b4] px-6 text-sm font-semibold text-[#c0392b] hover:bg-[#fbf3f0]">取消訂單</button>
             ) : null}
           </div>
+
+          {/* 退貨 / 退款(待處理的申請放在上方,方便核准) */}
+          {detail && (detail.returns.length > 0 || detail.refunds.length > 0) ? (
+            <div className="rounded-xl border border-[#f0d9b5] bg-[#fffaf2] p-4">
+              <h3 className="mb-3 font-semibold">退貨 / 退款</h3>
+              <div className="space-y-3">
+                {detail.returns.map((r) => (
+                  <div key={r.id} className="rounded-xl border border-[#e5ded4] bg-white p-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium">{r.return_no}</span>
+                      <span className="rounded-full bg-[#fbe9e7] px-2.5 py-1 text-xs font-semibold text-[#c0392b]">{RETURN_STATUS_LABEL[r.status] ?? r.status}</span>
+                    </div>
+                    <p className="mt-1 text-xs text-[#6b6156]">{r.items.map((it) => `${it.name}${it.variant ? `(${it.variant})` : ''}×${it.quantity}`).join('、')}</p>
+                    <p className="mt-0.5 text-xs text-[#8a7f72]">原因：{r.reason || '—'}｜退款 {formatter.format(r.refund_amount)}</p>
+                    {r.response ? <p className="mt-0.5 text-xs text-[#8a7f72]">回覆：{r.response}</p> : null}
+                    {r.return_tracking || r.return_carrier ? (
+                      <p className="mt-0.5 text-xs text-[#1f7a44]">買家已寄回：{r.return_carrier} {r.return_tracking}</p>
+                    ) : null}
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      {r.status === 'REQUESTED' ? (
+                        <>
+                          <button onClick={() => reviewReturn(r.id, 'approve')} disabled={busy} className="rounded-full bg-[#1f7a44] px-3 py-1 text-xs font-semibold text-white disabled:opacity-50">核准退貨</button>
+                          <button onClick={async () => { const resp = await uiPrompt('婉拒退貨,回覆客人(選填):'); if (resp !== null) reviewReturn(r.id, 'reject', resp); }} disabled={busy} className="rounded-full border border-[#e0b4b4] px-3 py-1 text-xs font-semibold text-[#c0392b] disabled:opacity-50">婉拒</button>
+                        </>
+                      ) : r.status !== 'REJECTED' && r.status !== 'REFUNDED' && r.status !== 'COMPLETED' ? (
+                        <ReturnStatusControl r={r} busy={busy} onAction={(action) => reviewReturn(r.id, action)} />
+                      ) : null}
+                    </div>
+                  </div>
+                ))}
+                {detail.refunds.map((rf) => (
+                  <div key={rf.id} className="rounded-lg bg-[#faf7f2] p-3 text-xs text-[#6b6156]">
+                    退款單 {rf.refund_no}｜{formatter.format(rf.amount)}｜{new Date(rf.created_at ?? '').toLocaleString('zh-TW')}
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
 
           {/* 寄件單號(取代原本重複的物流資訊) */}
           {detail?.shipments.map((sh) => {
@@ -4915,44 +4965,6 @@ ${order.note ? `<div class="sec"><h2>備註</h2><p class="muted">${escapeHtml(or
               {row('付款方式', order.payment_method)}
             </div>
           </div>
-
-          {/* 退貨 / 退款 */}
-          {detail && (detail.returns.length > 0 || detail.refunds.length > 0) ? (
-            <div className="border-t border-[#efe8dd] pt-4">
-              <h3 className="mb-3 font-semibold">退貨 / 退款</h3>
-              <div className="space-y-3">
-                {detail.returns.map((r) => (
-                  <div key={r.id} className="rounded-xl border border-[#e5ded4] p-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium">{r.return_no}</span>
-                      <span className="rounded-full bg-[#fbe9e7] px-2.5 py-1 text-xs font-semibold text-[#c0392b]">{RETURN_STATUS_LABEL[r.status] ?? r.status}</span>
-                    </div>
-                    <p className="mt-1 text-xs text-[#6b6156]">{r.items.map((it) => `${it.name}${it.variant ? `(${it.variant})` : ''}×${it.quantity}`).join('、')}</p>
-                    <p className="mt-0.5 text-xs text-[#8a7f72]">原因：{r.reason || '—'}｜退款 {formatter.format(r.refund_amount)}</p>
-                    {r.response ? <p className="mt-0.5 text-xs text-[#8a7f72]">回覆：{r.response}</p> : null}
-                    {r.return_tracking || r.return_carrier ? (
-                      <p className="mt-0.5 text-xs text-[#1f7a44]">買家已寄回：{r.return_carrier} {r.return_tracking}</p>
-                    ) : null}
-                    <div className="mt-2 flex flex-wrap items-center gap-2">
-                      {r.status === 'REQUESTED' ? (
-                        <>
-                          <button onClick={() => reviewReturn(r.id, 'approve')} disabled={busy} className="rounded-full bg-[#1f7a44] px-3 py-1 text-xs font-semibold text-white disabled:opacity-50">核准退貨</button>
-                          <button onClick={async () => { const resp = await uiPrompt('婉拒退貨,回覆客人(選填):'); if (resp !== null) reviewReturn(r.id, 'reject', resp); }} disabled={busy} className="rounded-full border border-[#e0b4b4] px-3 py-1 text-xs font-semibold text-[#c0392b] disabled:opacity-50">婉拒</button>
-                        </>
-                      ) : r.status !== 'REJECTED' && r.status !== 'REFUNDED' && r.status !== 'COMPLETED' ? (
-                        <ReturnStatusControl r={r} busy={busy} onAction={(action) => reviewReturn(r.id, action)} />
-                      ) : null}
-                    </div>
-                  </div>
-                ))}
-                {detail.refunds.map((rf) => (
-                  <div key={rf.id} className="rounded-lg bg-[#faf7f2] p-3 text-xs text-[#6b6156]">
-                    退款單 {rf.refund_no}｜{formatter.format(rf.amount)}｜{new Date(rf.created_at ?? '').toLocaleString('zh-TW')}
-                  </div>
-                ))}
-              </div>
-            </div>
-          ) : null}
 
         </div>
       </div>

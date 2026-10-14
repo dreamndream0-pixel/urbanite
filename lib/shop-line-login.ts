@@ -27,11 +27,17 @@ export function shopLinePkce(state: string, shopId: string, secret: string) {
   return { verifier, challenge: createHash('sha256').update(verifier).digest('base64url') };
 }
 
-export async function requireLineFriend(accessToken: string) {
+// friendFlag 只反映 Login channel「連結的官方帳號」;連結設定不一致時會誤報 false,
+// 所以只當參考,真正的判斷交給 Messaging API(fetchBotProfile 只有好友才查得到)。
+export async function lineFriendFlag(accessToken: string) {
   const response = await fetch('https://api.line.me/friendship/v1/status', {
     headers: { Authorization: `Bearer ${accessToken}` }, cache: 'no-store',
-  });
-  if (!response.ok || (await response.json()).friendFlag !== true) {
-    throw new Error('請在 LINE 授權畫面加入官方帳號好友後，再重新訂閱');
+  }).catch(() => null);
+  if (!response?.ok) {
+    console.error('shop LINE friendship status failed', response?.status ?? 'network', (await response?.text().catch(() => '') ?? '').slice(0, 200));
+    return null;
   }
+  return (await response.json().catch(() => ({}))).friendFlag === true;
 }
+
+export const LINE_FRIEND_ERROR = '請在 LINE 授權畫面加入官方帳號好友後，再重新訂閱';

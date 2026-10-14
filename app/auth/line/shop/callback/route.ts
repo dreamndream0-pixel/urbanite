@@ -1,10 +1,10 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { getSessionUser } from '@/lib/supabase/server';
+import { createServerSupabase, getSessionUser } from '@/lib/supabase/server';
 import { getCurrentShop, isPlatformShop, scopedClient, shopUrl } from '@/lib/shop';
 import { bindShopLine, getShopLineConfig } from '@/lib/shop-line';
 import { exchangeLineCode, fetchLineProfile } from '@/lib/line-login';
 import { fetchBotProfile } from '@/lib/line-messaging';
-import { requireLineFriend, SHOP_LINE_COOKIE, shopLinePkce, verifyShopLineState } from '@/lib/shop-line-login';
+import { LINE_FRIEND_ERROR, lineFriendFlag, SHOP_LINE_COOKIE, shopLinePkce, verifyShopLineState } from '@/lib/shop-line-login';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,13 +27,28 @@ export async function GET(request: NextRequest) {
     if (customerError || (customer?.line_bound_at && new Date(customer.line_bound_at).getTime() >= since)) throw new Error('會員授權已失效，請重新訂閱');
     const { verifier } = shopLinePkce(state, shop.id, cfg.loginChannelSecret);
     const token = await exchangeLineCode({ code, redirectUri: shopUrl(shop.slug, '/auth/line/shop/callback'), channelId: cfg.loginChannelId, channelSecret: cfg.loginChannelSecret, codeVerifier: verifier });
-    await requireLineFriend(token);
+    const friendFlag = await lineFriendFlag(token);
     const profile = await fetchLineProfile(token);
     // Messaging API must recognize this exact Login identity: providers/bots must match.
     const botProfile = await fetchBotProfile(profile.userId, cfg.accessToken).catch(() => null);
-    if (!botProfile || botProfile.userId !== profile.userId) throw new Error('無法確認官方帳號好友，請確認已加入此商店的 LINE，或聯絡商店檢查 LINE 設定');
+    if (!botProfile || botProfile.userId !== profile.userId) {
+      const probe = await fetch(`https://api.line.me/v2/bot/profile/${encodeURIComponent(profile.userId)}`, { headers: { Authorization: `Bearer ${cfg.accessToken}` } }).catch(() => null);
+      console.error('shop LINE bind not friend', { shop: shop.slug, friendFlag, botProfileStatus: probe?.status ?? 'network', botProfileError: (await probe?.text().catch(() => '') ?? '').slice(0, 200) });
+      throw new Error(friendFlag ? '無法確認官方帳號好友，請確認已加入此商店的 LINE，或聯絡商店檢查 LINE 設定' : LINE_FRIEND_ERROR);
+    }
+    if (friendFlag !== true) console.warn('shop LINE friendFlag mismatch; check Linked LINE Official Account', { shop: shop.slug, friendFlag });
     await bindShopLine(shop, cfg, userId, member.user.email ?? '', profile.userId);
     target.searchParams.set('ok', '1');
+    // LINE 授權後常回到另一個瀏覽器(沒有原本的登入狀態):用剛綁定的會員直接登入,返回商店不用重登
+    if (!session && member.user.email) {
+      try {
+        const { data: link } = await db.auth.admin.generateLink({ type: 'magiclink', email: member.user.email });
+        const tokenHash = link?.properties?.hashed_token;
+        if (tokenHash) await (await createServerSupabase()).auth.verifyOtp({ type: 'magiclink', token_hash: tokenHash });
+      } catch (loginError) {
+        console.error('shop LINE auto login failed', loginError instanceof Error ? loginError.message : loginError);
+      }
+    }
   } catch (error) {
     // Do not expose provider token-exchange responses or credentials to the URL.
     const message = error instanceof Error && /^(授權驗證|會員授權|登入已失效|商店尚未|尚未完成|請在 LINE|無法確認|這個 LINE)/.test(error.message)

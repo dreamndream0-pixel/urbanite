@@ -11,8 +11,9 @@ export type BotMessage =
   | { id: string; type: 'image'; url: string }
   | { id: string; type: 'card'; card: BotCard }
   | { id: string; type: 'carousel'; cards: BotCard[] }
-  | { id: string; type: 'products'; productIds: string[] }
-  | { id: string; type: 'coupon'; couponId: string }
+  | { id: string; type: 'products'; productIds: string[]; style?: string }
+  | { id: string; type: 'coupon'; couponId: string; style?: string }
+  | { id: string; type: 'member'; style: string }
   | { id: string; type: 'bind' };
 
 export type MessageSet = { messages: BotMessage[]; quickReplies: string[] };
@@ -35,12 +36,13 @@ export const MESSAGE_TYPES: { type: BotMessage['type']; label: string; hint: str
   { type: 'image', label: '圖片', hint: '單張圖片' },
   { type: 'card', label: '圖文卡片', hint: '圖片、標題、按鈕' },
   { type: 'carousel', label: '多頁卡片', hint: '左右滑動' },
-  { type: 'products', label: '商品', hint: '選網站商品' },
-  { type: 'coupon', label: '優惠券', hint: '附領取按鈕' },
+  { type: 'products', label: '商品', hint: '5 款商品卡模板' },
+  { type: 'coupon', label: '優惠券', hint: '5 款券面模板' },
+  { type: 'member', label: '會員卡', hint: '5 款會員卡模板' },
   { type: 'bind', label: '會員綁定', hint: '加入會員/綁定' },
 ];
 
-export const VARIABLES = ['{LINE名稱}', '{會員姓名}'];
+export const VARIABLES = ['{LINE名稱}', '{會員姓名}', '{商店名稱}'];
 export const ORDER_VARIABLES = ['{會員姓名}', '{訂單編號}', '{訂單金額}', '{取貨門市}', '{物流單號}', '{退款金額}'];
 
 const uid = () => Math.random().toString(36).slice(2, 10);
@@ -53,8 +55,9 @@ export function blankMessage(type: BotMessage['type']): BotMessage {
     case 'image': return { id, type, url: '' };
     case 'card': return { id, type, card: blankCard() };
     case 'carousel': return { id, type, cards: [blankCard(), blankCard()] };
-    case 'products': return { id, type, productIds: [] };
-    case 'coupon': return { id, type, couponId: '' };
+    case 'products': return { id, type, productIds: [], style: 'fashion' };
+    case 'coupon': return { id, type, couponId: '', style: '' };
+    case 'member': return { id, type, style: 'classic' };
     default: return { id, type: 'bind' };
   }
 }
@@ -71,7 +74,7 @@ export type BuiltinKey = 'orders' | 'coupons' | 'credit' | 'member' | 'bind';
 export type Builtin = { enabled: boolean; keywords: string[]; intro: string };
 
 export const BUILTIN_LABELS: Record<BuiltinKey, { label: string; hint: string }> = {
-  orders: { label: '訂單查詢', hint: '回覆最近 5 筆訂單與狀態' },
+  orders: { label: '訂單查詢', hint: '回覆處理中的訂單與出貨狀態(最多 5 筆)' },
   coupons: { label: '優惠券', hint: '回覆可使用的優惠券' },
   credit: { label: '購物金', hint: '回覆購物金餘額' },
   member: { label: '會員資料', hint: '回覆會員資料(手機、Email 遮蔽)' },
@@ -98,6 +101,7 @@ export type BotConfig = {
   builtins: Record<BuiltinKey, Builtin>;
   notify: Record<NotifyKey, NotifyRule>;
   brandColor: string;
+  memberStyle: string; // 內建「會員資料」回覆的會員卡模板
 };
 
 export const DEFAULT_BOT_CONFIG: BotConfig = {
@@ -124,10 +128,33 @@ export const DEFAULT_BOT_CONFIG: BotConfig = {
     cancelled: { enabled: false, button: false, text: '訂單 {訂單編號} 已取消,有任何問題都可以直接在這裡留言給我們。' },
   },
   brandColor: '#1f1b19',
+  memberStyle: 'classic',
 };
 
-// 合併預設值(舊資料缺的欄位補上)
-export function resolveBotConfig(raw: unknown): BotConfig {
+// 店家官網的預設機器人(和店家 LINE 原本的行為一致):歡迎+綁定、訂單查詢;優惠券、購物金、會員資料預設關閉
+export const SHOP_DEFAULT_BOT_CONFIG: BotConfig = {
+  welcomeGuest: set([
+    text('嗨 {LINE名稱},謝謝你加入 {商店名稱}!\n\n綁定官網會員後,訂單成立、出貨都會在這裡通知你。'),
+    { id: uid(), type: 'bind' },
+  ]),
+  welcomeMember: set([text('{會員姓名},歡迎回來 {商店名稱}!訂單成立、出貨都會在這裡通知你,輸入「訂單查詢」可以查看最近的訂單。')], ['訂單查詢']),
+  defaultReply: { enabled: false, ...set([text('收到你的訊息了,我們會盡快回覆你。')]) },
+  alreadyMember: '{會員姓名},你已經綁定 {商店名稱} 官網會員了。',
+  builtins: {
+    orders: { enabled: true, keywords: ['訂單'], intro: '' },
+    coupons: { enabled: false, keywords: ['優惠', '折價', '折扣'], intro: '' },
+    credit: { enabled: false, keywords: ['購物金'], intro: '' },
+    member: { enabled: false, keywords: ['會員資料', '我的資料'], intro: '' },
+    bind: { enabled: true, keywords: ['綁定'], intro: '點下面的按鈕登入官網,就會完成 LINE 綁定。' },
+  },
+  notify: DEFAULT_BOT_CONFIG.notify,
+  brandColor: '#1f1b19',
+  memberStyle: 'classic',
+};
+
+// 合併預設值(舊資料缺的欄位補上);defaults:主站或店家的預設
+export function resolveBotConfig(raw: unknown, defaults: BotConfig = DEFAULT_BOT_CONFIG): BotConfig {
+  const DEFAULT_BOT_CONFIG = defaults;
   const d = (raw && typeof raw === 'object' ? raw : {}) as Partial<BotConfig>;
   const pickSet = (v: unknown, fallback: MessageSet): MessageSet => {
     const s = v as Partial<MessageSet> | undefined;
@@ -145,6 +172,7 @@ export function resolveBotConfig(raw: unknown): BotConfig {
     builtins,
     notify,
     brandColor: typeof d.brandColor === 'string' && /^#[0-9a-f]{6}$/i.test(d.brandColor) ? d.brandColor : DEFAULT_BOT_CONFIG.brandColor,
+    memberStyle: typeof d.memberStyle === 'string' && d.memberStyle ? d.memberStyle : DEFAULT_BOT_CONFIG.memberStyle,
   };
 }
 

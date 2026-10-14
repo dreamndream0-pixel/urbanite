@@ -1,27 +1,24 @@
 import { NextResponse } from 'next/server';
-import { getPlatformAdmin } from '@/lib/supabase/server';
 import { loadBotConfig, pushMessages, toLineMessages } from '@/lib/line-bot';
+import { withLineBotAdmin } from '@/lib/line-bot-admin';
 import type { MessageSet } from '@/lib/line-bot-types';
-import { scopedClient, URBANITE_SHOP_ID } from '@/lib/shop';
+import { scopedClient } from '@/lib/shop';
 
 export const dynamic = 'force-dynamic';
 
-// POST /api/admin/line-bot/test { content } — 傳送給自己(管理員已綁定的 LINE)預覽
-export async function POST(request: Request) {
-  const admin = await getPlatformAdmin();
-  if (!admin) return NextResponse.json({ error: '未授權' }, { status: 401 });
-  const { content } = (await request.json().catch(() => ({}))) as { content?: MessageSet };
-  if (!content?.messages?.length) return NextResponse.json({ error: '沒有內容' }, { status: 400 });
-  const { data: me } = await scopedClient(URBANITE_SHOP_ID).from('customers').select('name, line_user_id, line_display_name').eq('user_id', admin.id).maybeSingle();
-  if (!me?.line_user_id) return NextResponse.json({ error: '你的管理員帳號還沒綁定 LINE,請先到會員中心按「加入 LINE」' }, { status: 400 });
-  try {
+// POST /api/admin/line-bot/test { content } — 傳送給自己(後台帳號已綁定這家店的 LINE)預覽
+export function POST(request: Request) {
+  return withLineBotAdmin(async ({ admin, shop }) => {
+    const { content } = (await request.json().catch(() => ({}))) as { content?: MessageSet };
+    if (!content?.messages?.length) return NextResponse.json({ error: '沒有內容' }, { status: 400 });
+    const { data: me } = await scopedClient(shop.id).from('customers').select('name, line_user_id, line_display_name').eq('user_id', admin.id).maybeSingle();
+    if (!me?.line_user_id) return NextResponse.json({ error: '你的帳號還沒綁定這家店的 LINE,請先到會員中心按「訂閱 LINE 通知」' }, { status: 400 });
     const { config } = await loadBotConfig();
     const name = me.name || me.line_display_name || '你';
-    const messages = await toLineMessages(content, { vars: { LINE名稱: me.line_display_name || name, 會員姓名: name }, lineUserId: me.line_user_id, trackKey: 'test' }, config.brandColor);
+    const vars = { LINE名稱: me.line_display_name || name, 會員姓名: name, 商店名稱: shop.name };
+    const messages = await toLineMessages(content, { vars, lineUserId: me.line_user_id, trackKey: 'test' }, config.brandColor);
     if (!messages.length) return NextResponse.json({ error: '內容是空的' }, { status: 400 });
     await pushMessages(me.line_user_id, messages);
     return NextResponse.json({ ok: true });
-  } catch (e) {
-    return NextResponse.json({ error: e instanceof Error ? e.message : '傳送失敗' }, { status: 400 });
-  }
+  });
 }

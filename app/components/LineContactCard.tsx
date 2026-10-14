@@ -22,17 +22,15 @@ export default function LineContactCard({ settings }: { settings?: SiteSettings 
 
   const current = settings === undefined ? fetched : settings;
   const line = getCheckoutLine(current);
-  // 店家網站:LINE 綁定/通知是 URBANITE 官方帳號的功能,只顯示店家自己的「加入官方 LINE」
-  const shopSite = current?.platform === false;
-  const href = lineAddFriendUrl(line);
+  // 店家網站也一樣:會員可訂閱店家自己的官方 LINE 通知(/api/me/line 依網域回傳)
+  const href = lineAddFriendUrl(line) || member.addFriendUrl;
   const lineId = formatLineId(line.id);
-  if (!href) return null;
-
-  const linkMember = !shopSite && member.loggedIn && !member.bound && member.linkUrl;
-  if (!shopSite && member.loggedIn && member.bound) {
+  const linkMember = member.loggedIn && !member.bound && member.linkUrl;
+  if (!href && !linkMember) return null;
+  if (member.loggedIn && member.bound && href) {
     return (
       <div className="mx-auto mt-6 max-w-sm rounded-xl border border-[#cfe9d6] bg-[#f3fbf5] p-4 text-center">
-        <p className="text-sm font-semibold text-[#1f5a33]">✓ 已綁定官方 LINE</p>
+        <p className="text-sm font-semibold text-[#1f5a33]">✓ 已訂閱 LINE 通知</p>
         <p className="mt-1 text-sm leading-6 text-[#3d5a45]">到官方 LINE 輸入「訂單查詢」,即可查看這筆訂單的出貨進度</p>
         <a href={href} target="_blank" rel="noreferrer" className="mt-3 inline-flex items-center gap-2 rounded-full bg-[#06C755] px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#05b14c]">
           <LineLogo />
@@ -45,9 +43,9 @@ export default function LineContactCard({ settings }: { settings?: SiteSettings 
   return (
     <div className="mx-auto mt-6 max-w-sm rounded-xl border border-[#cfe9d6] bg-[#f3fbf5] p-4 text-center">
       <p className="text-sm leading-6 text-[#3d5a45]">
-        歡迎加入官方 LINE
+        {linkMember ? '訂閱 LINE 通知' : '歡迎加入官方 LINE'}
         <br />
-        {linkMember ? '訂閱後,出貨與優惠活動會用 LINE 通知你,查詢訂單也更方便' : '查詢出貨進度,以及聯絡客服人員'}
+        {linkMember ? '訂單出貨、到貨都會用 LINE 通知你,查詢訂單也更方便' : '查詢出貨進度,以及聯絡客服人員'}
       </p>
       {lineId && (
         <p className="mt-2 text-sm font-semibold text-[#1f5a33]">
@@ -55,7 +53,7 @@ export default function LineContactCard({ settings }: { settings?: SiteSettings 
         </p>
       )}
       <a
-        href={linkMember ? member.linkUrl : href}
+        href={linkMember ? member.linkUrl : href ?? ''}
         {...(linkMember ? {} : { target: '_blank', rel: 'noreferrer' })}
         className="mt-3 inline-flex items-center gap-2 rounded-full bg-[#06C755] px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#05b14c]"
       >

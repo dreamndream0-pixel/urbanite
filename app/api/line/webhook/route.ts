@@ -1,21 +1,21 @@
 import { NextResponse } from 'next/server';
-import { createAdminClient } from '@/lib/supabase/admin';
 import {
   couponsText,
   creditText,
   fetchBotProfile,
   findCustomerByLine,
-  getMessagingConfig,
   memberText,
+  ordersFlex,
   ordersText,
   replyMessage,
   verifyLineSignature,
   type LineMessage,
 } from '@/lib/line-messaging';
-import { fillVars, keywordMatches, loadBotConfig, loadRules, logEvent, ruleActiveNow, toLineMessages } from '@/lib/line-bot';
+import { fillVars, keywordMatches, loadBotConfig, loadRules, logEvent, memberCardMessage, ruleActiveNow, toLineMessages } from '@/lib/line-bot';
 import type { BuiltinKey, MessageSet } from '@/lib/line-bot-types';
 import { getCurrentShop, isPlatformShop } from '@/lib/shop';
 import { handleShopWebhook } from '@/lib/shop-line';
+import { botChannel, botShop, lineBotDb, lineBotSchemaReady, runAsShop } from '@/lib/line-channel';
 
 export const dynamic = 'force-dynamic';
 
@@ -39,7 +39,7 @@ async function handleEvent(event: LineEvent, accessToken: string) {
   const customer = await findCustomerByLine(lineUserId);
   const profile = await fetchBotProfile(lineUserId, accessToken).catch(() => null);
   const lineName = profile?.displayName || '你';
-  const vars = { LINE名稱: lineName, 會員姓名: customer?.name || customer?.line_display_name || lineName };
+  const vars = { LINE名稱: lineName, 會員姓名: customer?.name || customer?.line_display_name || lineName, 商店名稱: botShop().name };
   const reply = async (set: MessageSet, trackKey: string) => {
     const messages = await toLineMessages(set, { vars, lineUserId, trackKey }, config.brandColor);
     if (messages.length) await replyMessage(event.replyToken!, messages, accessToken);
@@ -62,7 +62,7 @@ async function handleEvent(event: LineEvent, accessToken: string) {
     const rule = rules.find((r) => r.match === match && keywordMatches(r.keywords, input, match));
     if (!rule) return false;
     await logEvent('rule', lineUserId, rule.id);
-    await createAdminClient().from('line_bot_rules').update({ hits: (rule.hits ?? 0) + 1 }).eq('id', rule.id);
+    await (await lineBotDb()).from('line_bot_rules').update({ hits: (rule.hits ?? 0) + 1 }).eq('id', rule.id);
     await reply(rule.content, `rule:${rule.id}`);
     return true;
   };
@@ -85,6 +85,22 @@ async function handleEvent(event: LineEvent, accessToken: string) {
         'bind',
       );
     }
+    if (key === 'orders') {
+      const quick = memberQuick.length ? { items: memberQuick.slice(0, 13).map((t) => ({ type: 'action', action: { type: 'message', label: t.slice(0, 20), text: t } })) } : undefined;
+      const card = await ordersFlex(customer.user_id, quick).catch(() => null);
+      if (card) {
+        const intro = (b.intro || '').trim();
+        return replyMessage(event.replyToken!, intro ? [{ type: 'text', text: intro.slice(0, 4900) }, card] : [card], accessToken);
+      }
+    }
+    if (key === 'member') {
+      // 會員資料:以會員卡模板回覆(後台「內建查詢與設定」選擇款式)
+      const card = await memberCardMessage(lineUserId, config.memberStyle, 'builtin:member').catch(() => null);
+      if (card) {
+        const intro = (b.intro || '').trim();
+        return replyMessage(event.replyToken!, intro ? [{ type: 'text', text: intro.slice(0, 4900) }, card] : [card], accessToken);
+      }
+    }
     const text =
       key === 'orders' ? await ordersText(customer.user_id, b.intro)
       : key === 'coupons' ? await couponsText(customer.user_id, b.intro)
@@ -103,18 +119,24 @@ async function handleEvent(event: LineEvent, accessToken: string) {
   }
 }
 
-// POST /api/line/webhook — LINE 官方帳號 Webhook
+// POST /api/line/webhook — LINE 官方帳號 Webhook(主站與店家共用;依網域決定是哪家店、用哪組金鑰)
 export async function POST(request: Request) {
   const raw = await request.text();
-  // 店家子網域:店家自己的 LINE 官方帳號(與主站分開)
   const shop = await getCurrentShop();
-  if (shop && !isPlatformShop(shop)) {
-    const result = await handleShopWebhook(shop, raw, request.headers.get('x-line-signature'));
+  const platform = !shop || isPlatformShop(shop);
+  if (shop && shop.status === 'suspended') return NextResponse.json({ error: '找不到商店' }, { status: 404 });
+  // 資料庫尚未分店家時,店家沿用舊的固定回覆
+  if (!platform && !(await lineBotSchemaReady())) {
+    const result = await handleShopWebhook(shop!, raw, request.headers.get('x-line-signature'));
     return NextResponse.json(result.body, { status: result.status });
   }
-  const { channelSecret, accessToken } = await getMessagingConfig();
+  return runAsShop(platform ? null : shop, () => handleWebhook(raw, request.headers.get('x-line-signature')));
+}
+
+async function handleWebhook(raw: string, signature: string | null) {
+  const { channelSecret, accessToken } = await botChannel();
   if (!channelSecret || !accessToken) return NextResponse.json({ error: 'LINE 官方帳號尚未設定' }, { status: 503 });
-  if (!verifyLineSignature(raw, request.headers.get('x-line-signature'), channelSecret)) {
+  if (!verifyLineSignature(raw, signature, channelSecret)) {
     return NextResponse.json({ error: 'invalid signature' }, { status: 401 });
   }
   const body = JSON.parse(raw || '{}') as { events?: LineEvent[] };

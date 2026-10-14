@@ -211,7 +211,7 @@ function BroadcastEditor({
               <input value={draft.title} maxLength={80} onChange={(e) => setDraft({ ...draft, title: e.target.value })} placeholder="例如:秋季新品上架" className={inputClass} />
             </Field>
             <Field label="傳送對象" hint={estimate === null ? '' : `約 ${estimate} 人`}>
-              <div className="grid gap-1.5 sm:grid-cols-2">
+              <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
                 {AUDIENCE_OPTIONS.map((a) => (
                   <label key={a.key} className={`flex cursor-pointer items-start gap-2 rounded-lg border px-3 py-2 transition ${draft.audience === a.key ? 'border-[#1f1b19] bg-white' : 'border-[#e5ded4] bg-white/60'}`}>
                     <input type="radio" className="mt-0.5 accent-[#1f1b19]" checked={draft.audience === a.key} onChange={() => setDraft({ ...draft, audience: a.key as BroadcastAudience })} />

@@ -4,6 +4,7 @@ import { getCurrentShop } from '@/lib/shop';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { manualOrderActions } from '@/lib/manual-order';
 import type { Order, Shipment } from '@/lib/types';
+import { kickOrderNotifications } from '@/lib/order-notification-kick';
 
 type Context = { params: Promise<{ id: string }> };
 async function access(context: Context) {
@@ -33,6 +34,7 @@ export async function GET(_request: Request, context: Context) {
   return NextResponse.json({ ready: true, arrived: seller && actions.arrived, complete: order.user_id === user.id && actions.complete }, { headers: { 'Cache-Control': 'private, no-store' } });
 }
 export async function POST(request: Request, context: Context) {
+  kickOrderNotifications();
   const ctx = await access(context);
   if (ctx.response) return ctx.response;
   const { db, order, shop, user, seller } = ctx;

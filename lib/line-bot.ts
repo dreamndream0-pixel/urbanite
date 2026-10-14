@@ -1,12 +1,14 @@
 import crypto from 'crypto';
 import { getOrderNotificationConfig } from '@/lib/order-notification-config';
-import { getConfiguredSiteUrl } from '@/lib/site-url';
-import { bindUrl, createBindToken, getMessagingConfig, type LineMessage } from '@/lib/line-messaging';
+import { bindUrl, createBindToken, type LineMessage } from '@/lib/line-messaging';
+import { botChannel, botIsPlatform, botShop, botShopId, botSiteUrl, lineBotDb } from '@/lib/line-channel';
 import {
   MENU_LAYOUTS,
   MENU_SIZE,
+  NOTIFY_LABELS,
   PAGE_OPTIONS,
   resolveBotConfig,
+  SHOP_DEFAULT_BOT_CONFIG,
   type BotAction,
   type BotCard,
   type BotConfig,
@@ -18,6 +20,8 @@ import {
 } from '@/lib/line-bot-types';
 import type { Discount } from '@/lib/types';
 import { scopedClient, URBANITE_SHOP_ID } from '@/lib/shop';
+import { orderFlexMessage } from '@/lib/order-flex';
+import { couponBubble as couponTemplate, couponValueText, defaultCouponStyle, memberBubble as memberTemplate, productBubble as productTemplate } from '@/lib/line-flex-templates';
 
 const API = 'https://api.line.me/v2/bot';
 const DATA_API = 'https://api-data.line.me/v2/bot';
@@ -25,22 +29,26 @@ const formatter = new Intl.NumberFormat('zh-TW', { style: 'currency', currency: 
 
 // ---------- 設定 ----------
 export async function loadBotConfig(): Promise<{ config: BotConfig; raw: Record<string, unknown> }> {
-  const { data } = await scopedClient(URBANITE_SHOP_ID).from('line_bot_config').select('data').eq('id', 1).maybeSingle();
+  const db = await lineBotDb();
+  const { data } = await db.from('line_bot_config').select('data').order('id').limit(1).maybeSingle();
   const raw = (data?.data ?? {}) as Record<string, unknown>;
-  return { config: resolveBotConfig(raw), raw };
+  return { config: resolveBotConfig(raw, botIsPlatform() ? undefined : SHOP_DEFAULT_BOT_CONFIG), raw };
 }
 
 export async function saveBotConfig(patch: Record<string, unknown>) {
-  const supabase = scopedClient(URBANITE_SHOP_ID);
+  const db = await lineBotDb();
   const { raw } = await loadBotConfig();
   const next = { ...raw, ...patch };
-  const { error } = await supabase.from('line_bot_config').upsert({ id: 1, data: next, updated_at: new Date().toISOString() });
+  const row = { data: next, updated_at: new Date().toISOString() };
+  // 已有設定列就更新;沒有就新增(主站的舊資料列 id=1)
+  const { data: existing } = await db.from('line_bot_config').select('id').order('id').limit(1).maybeSingle();
+  const { error } = existing ? await db.from('line_bot_config').update(row).eq('id', existing.id) : await db.from('line_bot_config').insert(row);
   if (error) throw new Error(error.message);
   return next;
 }
 
 export async function loadRules(onlyEnabled = false): Promise<BotRule[]> {
-  let q = scopedClient(URBANITE_SHOP_ID).from('line_bot_rules').select('*').order('sort_order').order('created_at');
+  let q = (await lineBotDb()).from('line_bot_rules').select('*').order('sort_order').order('created_at');
   if (onlyEnabled) q = q.eq('enabled', true);
   const { data } = await q;
   return (data ?? []) as BotRule[];
@@ -49,7 +57,7 @@ export async function loadRules(onlyEnabled = false): Promise<BotRule[]> {
 // ---------- 事件紀錄 ----------
 export async function logEvent(type: string, lineUserId: string | null, key = '') {
   try {
-    await scopedClient(URBANITE_SHOP_ID).from('line_events').insert({ type, line_user_id: lineUserId, key: key.slice(0, 200) });
+    await (await lineBotDb()).from('line_events').insert({ type, line_user_id: lineUserId, key: key.slice(0, 200) });
   } catch {
     /* 紀錄失敗不影響回覆 */
   }
@@ -61,11 +69,11 @@ function sign(value: string, secret: string) {
 }
 
 export function trackedUrl(url: string, key: string, secret: string) {
-  const target = url.startsWith('/') ? `${getConfiguredSiteUrl()}${url}` : url;
+  const target = url.startsWith('/') ? `${botSiteUrl()}${url}` : url;
   if (!secret) return target;
   const params = new URLSearchParams({ u: target, k: key.slice(0, 60) });
   params.set('s', sign(`${target}|${params.get('k')}`, secret));
-  return `${getConfiguredSiteUrl()}/api/line/r?${params.toString()}`;
+  return `${botSiteUrl()}/api/line/r?${params.toString()}`;
 }
 
 export function verifyTracked(u: string, k: string, s: string, secret: string) {
@@ -104,7 +112,7 @@ export function fillVars(text: string, vars: Record<string, string>) {
   return text.replace(/\{([^{}]+)\}/g, (m, name) => (name in vars ? vars[name] : m));
 }
 
-const abs = (url: string) => (url.startsWith('/') ? `${getConfiguredSiteUrl()}${url}` : url);
+const abs = (url: string) => (url.startsWith('/') ? `${botSiteUrl()}${url}` : url);
 const label = (t: string) => (t.trim() || '查看').slice(0, 20);
 
 function lineAction(action: BotAction, text: string, ctx: SendContext, secret: string, index: number) {
@@ -153,32 +161,43 @@ function bubble(card: BotCard, brand: string, ctx: SendContext, secret: string, 
   };
 }
 
-function couponBubble(c: Discount, brand: string, ctx: SendContext, secret: string) {
-  const value = c.type === 'percent' ? `${c.value}% OFF` : c.type === 'free_shipping' ? '免運' : `折 ${formatter.format(c.value)}`;
-  const rule = [c.min_spend ? `滿 ${formatter.format(c.min_spend)} 可用` : '無消費門檻', c.end_at ? `${new Date(c.end_at).toLocaleDateString('zh-TW', { timeZone: 'Asia/Taipei' })} 前有效` : ''].filter(Boolean).join('・');
-  return {
-    type: 'bubble',
-    body: {
-      type: 'box',
-      layout: 'vertical',
-      paddingAll: '20px',
-      spacing: 'sm',
-      contents: [
-        { type: 'text', text: 'COUPON', size: 'xxs', color: '#a99e8f', weight: 'bold' },
-        { type: 'text', text: (c.name || c.code).slice(0, 60), size: 'md', weight: 'bold', color: '#1f1b19', wrap: true },
-        { type: 'text', text: value, size: 'xxl', weight: 'bold', color: brand, margin: 'md' },
-        { type: 'text', text: rule, size: 'xs', color: '#8a7f72', wrap: true },
-        { type: 'separator', margin: 'lg', color: '#eee6db' },
-        { type: 'text', text: `代碼 ${c.code}`, size: 'xs', color: '#6b6156', margin: 'md' },
-      ],
-    },
-    footer: {
-      type: 'box',
-      layout: 'vertical',
-      paddingAll: '12px',
-      contents: [{ type: 'button', style: 'primary', height: 'sm', color: brand, action: lineAction({ type: 'page', value: 'coupons' }, '領取優惠券', ctx, secret, 0) }],
-    },
-  };
+// 優惠券:套用券面模板(style 空白時依券種自動選:免運 → 免運券,其他 → 折扣券)
+function couponBubble(c: Discount, style: string | undefined, ctx: SendContext, secret: string) {
+  const site = botSiteUrl();
+  return couponTemplate(style || defaultCouponStyle(c.type), {
+    name: c.name || c.code,
+    valueText: couponValueText(c),
+    condition: c.min_spend ? `滿 ${formatter.format(c.min_spend)} 可用` : '無消費門檻',
+    code: c.code,
+    expiry: c.end_at ? new Date(c.end_at).toLocaleDateString('zh-TW', { timeZone: 'Asia/Taipei' }) : '',
+    claimUrl: trackedUrl('/account?tab=coupons', `${ctx.trackKey}:coupon`, secret),
+    shopUrl: trackedUrl('/', `${ctx.trackKey}:shop`, secret) || `${site}/`,
+  });
+}
+
+// 會員卡:依 LINE 使用者找出這家店的會員,帶入訂單數、累計消費、可用優惠券
+export async function memberCardMessage(lineUserId: string | undefined, style: string, trackKey: string): Promise<LineMessage | null> {
+  if (!lineUserId) return null;
+  const supabase = scopedClient(botShopId());
+  const { data: customer } = await supabase.from('customers').select('id, user_id, name, line_display_name, line_picture_url').eq('line_user_id', lineUserId).maybeSingle();
+  if (!customer?.user_id) return null;
+  const [{ data: orders }, { count: coupons }] = await Promise.all([
+    supabase.from('orders').select('total, status').eq('user_id', customer.user_id),
+    supabase.from('user_coupons').select('id', { count: 'exact', head: true }).eq('user_id', customer.user_id).eq('status', 'available'),
+  ]);
+  const valid = (orders ?? []).filter((o) => o.status !== '已取消');
+  const { channelSecret } = await botChannel();
+  const link = (path: string, key: string) => trackedUrl(path, `${trackKey}:${key}`, channelSecret);
+  const contents = memberTemplate(style, {
+    shopName: botShop().name,
+    name: customer.name || customer.line_display_name || '會員',
+    memberNo: String(customer.id ?? customer.user_id).replace(/-/g, '').slice(0, 10).toUpperCase(),
+    avatar: customer.line_picture_url || '',
+    orderCount: valid.length,
+    couponCount: coupons ?? 0,
+    spent: valid.reduce((n, o) => n + (Number(o.total) || 0), 0),
+  }, { account: link('/account', 'account'), orders: link('/account?tab=orders', 'orders'), coupons: link('/account?tab=coupons', 'coupons'), home: link('/', 'home') });
+  return { type: 'flex', altText: `${botShop().name} 會員卡`.slice(0, 300), contents };
 }
 
 function quickReply(items: string[]) {
@@ -187,8 +206,8 @@ function quickReply(items: string[]) {
 }
 
 export async function toLineMessages(set: MessageSet, ctx: SendContext, brand: string): Promise<LineMessage[]> {
-  const { channelSecret } = await getMessagingConfig();
-  const supabase = scopedClient(URBANITE_SHOP_ID);
+  const { channelSecret } = await botChannel();
+  const supabase = scopedClient(botShopId());
   const out: LineMessage[] = [];
   for (const m of set.messages.slice(0, 5)) {
     if (m.type === 'text') {
@@ -209,37 +228,48 @@ export async function toLineMessages(set: MessageSet, ctx: SendContext, brand: s
       }
     } else if (m.type === 'products') {
       if (!m.productIds.length) continue;
-      const { data } = await supabase.from('products').select('id, name, price, original_price, image, images, status').in('id', m.productIds.slice(0, 10));
+      const { data } = await supabase.from('products').select('id, name, tagline, price, original_price, image, images, status').in('id', m.productIds.slice(0, 10));
       const rows = (data ?? []).filter((p) => p.status !== '已下架');
       const sorted = m.productIds.map((id) => rows.find((p) => p.id === id)).filter(Boolean) as typeof rows;
       if (!sorted.length) continue;
+      const productUrl = (id: string) => trackedUrl(`/products/${encodeURIComponent(id)}`, `${ctx.trackKey}:p:${id}`, channelSecret);
       out.push({
         type: 'flex',
         altText: `推薦商品:${sorted[0].name}`.slice(0, 300),
         contents: {
           type: 'carousel',
           contents: sorted.map((p) =>
-            bubble(
-              {
-                image: p.image || p.images?.[0] || '',
-                title: p.name,
-                body: p.original_price && p.original_price > p.price ? `${formatter.format(p.price)}  原價 ${formatter.format(p.original_price)}` : formatter.format(p.price),
-                buttons: [{ label: '查看商品', action: { type: 'url', value: `/products/${encodeURIComponent(p.id)}` } }],
-              },
-              brand,
-              { ...ctx, trackKey: `${ctx.trackKey}:p:${p.id}` },
-              channelSecret,
-              { aspect: '4:5' },
-            ),
+            m.style
+              ? productTemplate(m.style, { name: p.name, subtitle: p.tagline || '', price: p.price, originalPrice: p.original_price, image: abs(p.image || p.images?.[0] || ''), url: productUrl(p.id) })
+              : bubble(
+                  {
+                    image: p.image || p.images?.[0] || '',
+                    title: p.name,
+                    body: p.original_price && p.original_price > p.price ? `${formatter.format(p.price)}  原價 ${formatter.format(p.original_price)}` : formatter.format(p.price),
+                    buttons: [{ label: '查看商品', action: { type: 'url', value: `/products/${encodeURIComponent(p.id)}` } }],
+                  },
+                  brand,
+                  { ...ctx, trackKey: `${ctx.trackKey}:p:${p.id}` },
+                  channelSecret,
+                  { aspect: '4:5' },
+                ),
           ),
         },
       });
     } else if (m.type === 'coupon') {
       if (!m.couponId) continue;
       const { data: c } = await supabase.from('discounts').select('*').eq('id', m.couponId).maybeSingle();
-      if (c) out.push({ type: 'flex', altText: `優惠券:${c.name || c.code}`.slice(0, 300), contents: couponBubble(c as Discount, brand, ctx, channelSecret) });
+      if (c) out.push({ type: 'flex', altText: `優惠券:${c.name || c.code}`.slice(0, 300), contents: couponBubble(c as Discount, m.style, ctx, channelSecret) });
+    } else if (m.type === 'member') {
+      // 已綁定會員才有會員卡;還沒綁定的人改送綁定卡片
+      const card = await memberCardMessage(ctx.lineUserId, m.style, `${ctx.trackKey}:member`);
+      if (card) out.push(card);
+      else if (ctx.lineUserId) out.push(...(await toLineMessages({ messages: [{ id: 'bind', type: 'bind' }], quickReplies: [] }, ctx, brand)));
     } else if (m.type === 'bind') {
-      const bindLink = ctx.lineUserId ? bindUrl(createBindToken(ctx.lineUserId, channelSecret)) : `${getConfiguredSiteUrl()}/account`;
+      const site = botSiteUrl();
+      const bindLink = ctx.lineUserId ? bindUrl(createBindToken(ctx.lineUserId, channelSecret), site) : `${site}/account`;
+      // 主站:新會員可用 LINE 一鍵加入;店家:登入(或註冊)店家官網後綁定
+      const platform = botIsPlatform();
       out.push({
         type: 'flex',
         altText: '加入會員 / 綁定帳號',
@@ -252,7 +282,7 @@ export async function toLineMessages(set: MessageSet, ctx: SendContext, brand: s
             paddingAll: '18px',
             contents: [
               { type: 'text', text: '綁定官網會員', weight: 'bold', size: 'md', color: '#1f1b19' },
-              { type: 'text', text: '第一次來選「新會員」。已經用 Google 或 Email 註冊過的,選「已有官網帳號」。', size: 'sm', wrap: true, color: '#6b6156' },
+              { type: 'text', text: platform ? '第一次來選「新會員」。已經用 Google 或 Email 註冊過的,選「已有官網帳號」。' : `登入 ${botShop().name} 官網會員,就會完成 LINE 綁定,之後訂單通知都會傳到這裡。`, size: 'sm', wrap: true, color: '#6b6156' },
             ],
           },
           footer: {
@@ -260,10 +290,12 @@ export async function toLineMessages(set: MessageSet, ctx: SendContext, brand: s
             layout: 'vertical',
             spacing: 'xs',
             paddingAll: '12px',
-            contents: [
-              { type: 'button', style: 'primary', height: 'sm', color: '#06C755', action: { type: 'uri', label: '新會員 LINE 一鍵加入', uri: `${getConfiguredSiteUrl()}/auth/line/start?next=/account` } },
-              { type: 'button', style: 'link', height: 'sm', color: '#6b6156', action: { type: 'uri', label: '已有官網帳號,綁定', uri: bindLink } },
-            ],
+            contents: platform
+              ? [
+                  { type: 'button', style: 'primary', height: 'sm', color: '#06C755', action: { type: 'uri', label: '新會員 LINE 一鍵加入', uri: `${site}/auth/line/start?next=/account` } },
+                  { type: 'button', style: 'link', height: 'sm', color: '#6b6156', action: { type: 'uri', label: '已有官網帳號,綁定', uri: bindLink } },
+                ]
+              : [{ type: 'button', style: 'primary', height: 'sm', color: '#06C755', action: { type: 'uri', label: '登入官網完成綁定', uri: bindLink } }],
           },
         },
       });
@@ -276,8 +308,8 @@ export async function toLineMessages(set: MessageSet, ctx: SendContext, brand: s
 
 // ---------- LINE API ----------
 async function lineFetch(path: string, init: RequestInit & { data?: boolean } = {}) {
-  const { accessToken } = await getMessagingConfig();
-  if (!accessToken) throw new Error('LINE 官方帳號尚未設定(串接設定)');
+  const { accessToken } = await botChannel();
+  if (!accessToken) throw new Error(botIsPlatform() ? 'LINE 官方帳號尚未設定(串接設定)' : 'LINE 官方帳號尚未設定(LINE 機器人 → 連線設定)');
   const res = await fetch(`${init.data ? DATA_API : API}${path}`, {
     ...init,
     headers: { Authorization: `Bearer ${accessToken}`, ...(init.body && typeof init.body === 'string' ? { 'Content-Type': 'application/json' } : {}), ...(init.headers ?? {}) },
@@ -314,7 +346,7 @@ export async function getFollowerCount() {
 
 // ---------- 推播對象 ----------
 export async function audienceUserIds(audience: BroadcastAudience): Promise<string[]> {
-  const supabase = scopedClient(URBANITE_SHOP_ID);
+  const supabase = scopedClient(botShopId());
   const { data: members } = await supabase.from('customers').select('user_id, line_user_id, birthday').not('line_user_id', 'is', null);
   const list = (members ?? []) as { user_id: string; line_user_id: string; birthday: string | null }[];
   if (audience === 'members' || audience === 'all') return list.map((m) => m.line_user_id);
@@ -349,7 +381,7 @@ export async function audienceUserIds(audience: BroadcastAudience): Promise<stri
 const BROADCAST_VARS = { LINE名稱: '你', 會員姓名: '你' };
 
 export async function sendBroadcast(id: string) {
-  const supabase = scopedClient(URBANITE_SHOP_ID);
+  const supabase = await lineBotDb();
   const { data: b } = await supabase.from('line_broadcasts').select('*').eq('id', id).maybeSingle();
   if (!b) throw new Error('找不到推播');
   if (b.status === 'sent' || b.status === 'sending') throw new Error('這則推播已經送出');
@@ -430,23 +462,18 @@ export async function processOrderNotifications() {
       退款金額: formatter.format(order.refund_amount ?? order.total ?? 0),
     };
     const body = fillVars(rule.text, vars);
-    const { channelSecret } = await getMessagingConfig();
-    const message: LineMessage = rule.button
-      ? {
-          type: 'flex',
-          altText: body.slice(0, 300),
-          contents: {
-            type: 'bubble',
-            body: { type: 'box', layout: 'vertical', paddingAll: '18px', contents: [{ type: 'text', text: body.slice(0, 1000), wrap: true, size: 'sm', color: '#1f1b19' }] },
-            footer: {
-              type: 'box',
-              layout: 'vertical',
-              paddingAll: '12px',
-              contents: [{ type: 'button', style: 'primary', height: 'sm', color: config.brandColor, action: { type: 'uri', label: '查看訂單', uri: trackedUrl('/account?tab=orders', `notify:${key}`, channelSecret) } }],
-            },
-          },
-        }
-      : { type: 'text', text: body.slice(0, 5000) };
+    const { channelSecret } = await botChannel();
+    // 與店家相同的訂單卡片;後台設定的通知文字放在標題下方
+    const { data: full } = await supabase.from('orders').select('order_no, total, items, payment_method, shipping_method, store_name').eq('id', order.id).maybeSingle();
+    const message = orderFlexMessage({
+      shopName: 'URBANITE',
+      title: NOTIFY_LABELS[key].label,
+      subtitle: body.slice(0, 120),
+      order: full ?? order,
+      link: trackedUrl('/account?tab=orders', `notify:${key}`, channelSecret),
+      extra: key === 'shipped' && ship?.tracking_number ? [['物流單號', String(ship.tracking_number)]] : [],
+      event: key,
+    }) as LineMessage;
     try {
       await pushMessages(customer.line_user_id, [message]);
       await logEvent('notify', customer.line_user_id, dedupe);
@@ -467,8 +494,8 @@ function menuAction(action: BotAction, labelText: string, secret: string, key: s
 }
 
 export async function publishRichMenu(menu: RichMenu) {
-  const supabase = scopedClient(URBANITE_SHOP_ID);
-  const { channelSecret } = await getMessagingConfig();
+  const supabase = await lineBotDb();
+  const { channelSecret } = await botChannel();
   const layout = MENU_LAYOUTS.find((l) => l.key === menu.layout);
   if (!layout) throw new Error('格局設定錯誤');
   if (!menu.image_url) throw new Error('請先產生或上傳選單圖片');
@@ -515,7 +542,7 @@ export async function publishRichMenu(menu: RichMenu) {
 }
 
 export async function unpublishRichMenu(menu: RichMenu) {
-  const supabase = scopedClient(URBANITE_SHOP_ID);
+  const supabase = await lineBotDb();
   if (menu.line_rich_menu_id) {
     if (menu.audience === 'guest') await lineFetch('/user/all/richmenu', { method: 'DELETE' }).catch(() => {});
     else {
@@ -530,7 +557,7 @@ export async function unpublishRichMenu(menu: RichMenu) {
 // 綁定 / 解除綁定時切換會員選單
 export async function syncMemberMenu(lineUserId: string, bound: boolean) {
   try {
-    const { data } = await scopedClient(URBANITE_SHOP_ID).from('line_rich_menus').select('line_rich_menu_id').eq('audience', 'member').not('line_rich_menu_id', 'is', null).maybeSingle();
+    const { data } = await (await lineBotDb()).from('line_rich_menus').select('line_rich_menu_id').eq('audience', 'member').not('line_rich_menu_id', 'is', null).maybeSingle();
     if (bound && data?.line_rich_menu_id) await lineFetch(`/user/${lineUserId}/richmenu/${data.line_rich_menu_id}`, { method: 'POST' });
     if (!bound) await lineFetch(`/user/${lineUserId}/richmenu`, { method: 'DELETE' });
   } catch {

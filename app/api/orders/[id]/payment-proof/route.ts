@@ -1,4 +1,5 @@
-import { NextResponse } from 'next/server';
+import { after, NextResponse } from 'next/server';
+import { sendOrderNoticeNow } from '@/lib/order-notifications';
 import { getAdminUser, getSessionUser } from '@/lib/supabase/server';
 import { randomUUID } from 'node:crypto';
 import type { Order } from '@/lib/types';
@@ -6,6 +7,7 @@ import { shopAdminClient } from '@/lib/shop';
 import { sanitizeImage } from '@/lib/safe-image';
 import { limitedFormData } from '@/lib/limited-form';
 import { PAYMENT_PROOF_BUCKET, PRIVATE_PROOF_PREFIX, paymentProofPath, legacyPaymentProofPath } from '@/lib/payment-proof';
+import { kickOrderNotifications } from '@/lib/order-notification-kick';
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const headers = { 'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff', 'Content-Security-Policy': "default-src 'none'; frame-ancestors 'none'" };
@@ -39,6 +41,7 @@ export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  kickOrderNotifications();
   const user = await getSessionUser();
   if (!user) return NextResponse.json({ error: '請先登入' }, { status: 401 });
 
@@ -95,6 +98,8 @@ export async function POST(
     note: `買家回報付款${last5 ? `(後五碼 ${last5})` : ''}${update.payment_proof_url ? '(附截圖)' : ''}`,
     created_by: '客人',
   });
+  // 通知買家(已收到付款通知)與賣家(請核對款項),依店家通知設定
+  if (order.shop_id) after(() => sendOrderNoticeNow(order.shop_id, id, 'payment_reported').catch(() => {}));
 
   return NextResponse.json(data as Order);
 }

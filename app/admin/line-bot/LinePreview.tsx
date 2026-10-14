@@ -2,10 +2,12 @@
 
 import type { BotCard, MessageSet } from '@/lib/line-bot-types';
 import type { Discount, Product } from '@/lib/types';
+import FlexView from './FlexView';
+import { couponCard, memberCard, productCard, sellable } from './templateSamples';
 
 const formatter = new Intl.NumberFormat('zh-TW', { style: 'currency', currency: 'TWD', maximumFractionDigits: 0 });
 
-const SAMPLE_VARS: Record<string, string> = { LINE名稱: '小宇', 會員姓名: '黃小宇', 訂單編號: 'UB20261005001', 訂單金額: 'NT$1,280', 取貨門市: '全家 信義店', 物流單號: '8123456789', 退款金額: 'NT$1,280' };
+const SAMPLE_VARS: Record<string, string> = { 商店名稱: '你的商店', LINE名稱: '小宇', 會員姓名: '黃小宇', 訂單編號: 'UB20261005001', 訂單金額: 'NT$1,280', 取貨門市: '全家 信義店', 物流單號: '8123456789', 退款金額: 'NT$1,280' };
 export const fill = (t: string, vars = SAMPLE_VARS) => t.replace(/\{([^{}]+)\}/g, (m, k) => vars[k] ?? m);
 
 // 手機 LINE 聊天畫面預覽(後台編輯時即時顯示)
@@ -58,6 +60,12 @@ export default function LinePreview({
                 <Bubble card={m.card} brand={brand} />
               ) : m.type === 'carousel' ? (
                 <Scroller>{m.cards.map((c, j) => <Bubble key={j} card={c} brand={brand} width={180} />)}</Scroller>
+              ) : m.type === 'products' && m.style ? (
+                m.productIds.length ? (
+                  <FlexView scale={0.62} contents={{ type: 'carousel', contents: m.productIds.map((id) => productCard(m.style!, products.find((x) => x.id === id))) }} />
+                ) : (
+                  <FlexView scale={0.62} contents={productCard(m.style, sellable(products)[0])} />
+                )
               ) : m.type === 'products' ? (
                 m.productIds.length ? (
                   <Scroller>
@@ -71,7 +79,9 @@ export default function LinePreview({
                   <Placeholder text="選擇商品" />
                 )
               ) : m.type === 'coupon' ? (
-                <CouponBubble coupon={coupons.find((c) => c.id === m.couponId)} brand={brand} />
+                <FlexView scale={0.68} contents={couponCard(m.style ?? '', coupons.find((c) => c.id === m.couponId))} />
+              ) : m.type === 'member' ? (
+                <FlexView scale={0.68} contents={memberCard(m.style)} />
               ) : (
                 <BindBubble />
               )}
@@ -117,26 +127,6 @@ function Bubble({ card, brand, width = 220, tall = false }: { card: BotCard; bra
           ))}
         </div>
       ) : null}
-    </div>
-  );
-}
-
-function CouponBubble({ coupon, brand }: { coupon?: Discount; brand: string }) {
-  if (!coupon) return <Placeholder text="選擇優惠券" />;
-  const value = coupon.type === 'percent' ? `${coupon.value}% OFF` : coupon.type === 'free_shipping' ? '免運' : `折 ${formatter.format(coupon.value)}`;
-  return (
-    <div className="w-[220px] overflow-hidden rounded-xl bg-white">
-      <div className="px-4 py-3">
-        <p className="text-[9px] font-bold tracking-wider text-[#a99e8f]">COUPON</p>
-        <p className="text-[13px] font-bold text-[#1f1b19]">{coupon.name || coupon.code}</p>
-        <p className="mt-1 text-2xl font-bold" style={{ color: brand }}>{value}</p>
-        <p className="text-[10px] text-[#8a7f72]">{coupon.min_spend ? `滿 ${formatter.format(coupon.min_spend)} 可用` : '無消費門檻'}</p>
-        <div className="my-2 h-px bg-[#eee6db]" />
-        <p className="text-[10px] text-[#6b6156]">代碼 {coupon.code}</p>
-      </div>
-      <div className="px-2.5 pb-2.5">
-        <span className="block rounded-md py-1.5 text-center text-[12px] font-semibold text-white" style={{ background: brand }}>領取優惠券</span>
-      </div>
     </div>
   );
 }
