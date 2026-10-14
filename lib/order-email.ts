@@ -49,6 +49,7 @@ function orderTable(order: Order) {
     ${line('小計', money(order.subtotal))}
     ${line('運費', money(order.shipping))}
     ${order.discount ? line('折扣', `-${money(order.discount)}`) : ''}
+    ${order.credit_used ? line('回饋金折抵', `-${money(order.credit_used)}`) : ''}
     ${line('總計', money(order.total), true)}</table>`;
 }
 

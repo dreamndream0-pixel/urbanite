@@ -49,6 +49,7 @@ import ShopsManager from './ShopsManager';
 import { POLICY_LABEL, policyText, stripPolicies, withPolicies } from '@/lib/footer-policies';
 import SiteThemeEditor from './SiteThemeEditor';
 import LineBotManager from './line-bot/LineBotManager';
+import LoyaltyManager from './LoyaltyManager';
 import { isCollectOnDelivery } from '@/lib/payment';
 import { buildReturnSteps, historyKind, isReturnOrder } from '@/lib/return-progress';
 import { getCheckoutLine, getNewsletter, HIDDEN_FOOTER_SECTION_TITLES, lineAddFriendUrl, withCheckoutLine, withNewsletter } from '@/lib/checkout-line';
@@ -99,6 +100,7 @@ const NAV = [
   { key: 'products', label: '商品及分類', Icon: IconTag },
   { key: 'inventory', label: '庫存管理', Icon: IconBox },
   { key: 'customers', label: '顧客管理', Icon: IconUsers },
+  { key: 'loyalty', label: '會員回饋', Icon: IconGift },
   { key: 'promotions', label: '促銷管理', Icon: IconGift },
   { key: 'campaign-pages', label: '一頁式促銷頁', Icon: IconGrid },
   { key: 'profile-card', label: '個人名片', Icon: IconIdCard },
@@ -2838,6 +2840,7 @@ export default function AdminDashboard({
 
           {/* ===== 報表及分析 ===== */}
           {section === 'line-bot' && <LineBotManager products={products} coupons={discounts} logoUrl={logoUrl} platform={platform} campaigns={initialCampaigns} />}
+          {section === 'loyalty' && <LoyaltyManager />}
           {section === 'card-members' && <CardMembersManager />}
           {section === 'shops' && platform && <ShopsManager />}
           {section === 'profile-card' && (platform

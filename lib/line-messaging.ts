@@ -177,9 +177,20 @@ export async function couponsText(userId: string, intro = '') {
   return `${intro || `可使用的優惠券 ${rows.length} 張`}\n\n${lines.join('\n\n')}`;
 }
 
-// 購物金目前尚未開放累積,先回覆餘額 0
-export async function creditText(intro = '') {
-  return `${intro ? `${intro}\n\n` : ''}購物金餘額:${formatter.format(0)}\n\n消費與活動累積的購物金會顯示在這裡。`;
+// 回饋金查詢:可用、待入帳、30 天內到期(店家未開啟回饋時說明沒有活動)
+export async function creditText(userId: string, intro = '') {
+  const { getLoyalty, creditSummary } = await import('@/lib/loyalty');
+  const head = intro ? [intro, ''] : [];
+  if (!(await getLoyalty(botShopId())).enabled) return [...head, '目前沒有回饋金活動。'].join('\n');
+  const c = await creditSummary(botShopId(), userId);
+  return [
+    ...head,
+    `可用回饋金:${formatter.format(c.balance)}`,
+    ...(c.pending ? [`待入帳:${formatter.format(c.pending)}`] : []),
+    ...(c.expiringSoon ? [`30 天內到期:${formatter.format(c.expiringSoon)}`] : []),
+    '',
+    `結帳時 1 元折抵 NT$1。明細:${botSiteUrl()}/account`,
+  ].join('\n');
 }
 
 // 個資遮蔽:0989****58、dr****@gmail.com

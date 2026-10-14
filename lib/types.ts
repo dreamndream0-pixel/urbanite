@@ -265,6 +265,11 @@ export type Order = {
   member_discount?: number;
   point_discount?: number;
   shipping_discount?: number;
+  credit_used?: number; // 會員回饋金折抵(等同現金)
+  credit_returned?: number;
+  credit_rate?: number; // 下單時等級的回饋率(%)
+  tier_at_order?: string;
+  completed_at?: string | null;
   tax_amount?: number;
   paid_amount?: number;
   refund_amount?: number;

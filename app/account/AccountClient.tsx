@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import LineBindingRow from './LineBindingCard';
+import CreditCard from './CreditCard';
 import ManualFulfillmentAction from '@/app/components/ManualFulfillmentAction';
 import LineCouponBanner from './LineCouponBanner';
 import Link from 'next/link';
@@ -35,7 +36,7 @@ const PROVIDER_LABEL: Record<string, string> = { google: 'Google', line: 'LINE',
 type TabKey = 'profile' | 'coupons' | 'orders' | 'favorites';
 const TABS: { key: TabKey; label: string }[] = [
   { key: 'profile', label: '個人資訊' },
-  { key: 'coupons', label: '優惠券及購物金' },
+  { key: 'coupons', label: '優惠券及回饋金' },
   { key: 'orders', label: '訂單紀錄' },
   { key: 'favorites', label: '追蹤清單' },
 ];
@@ -835,19 +836,7 @@ function CouponsTab({ coupons, heroImage = '', platform }: { coupons: Discount[]
           <p className="mt-3 text-[11px] tracking-[0.4em] text-[#a2957f] sm:text-xs">MY COUPONS</p>
           <p className="mt-3.5 text-sm text-[var(--c-text2)] sm:text-base">收藏喜歡的優惠，享受更好的購物體驗。</p>
 
-          <div className="mt-7 flex items-center gap-4 rounded-[22px] bg-[var(--c-surface)]/55 p-4 shadow-[0_8px_24px_rgba(64,52,43,0.06)] backdrop-blur-[2px] sm:p-5">
-            <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-[var(--c-surface)]/60 text-[var(--c-text2)]">
-              <svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M20 12v9H4v-9M2 7h20v5H2zM12 22V7M12 7S9 3 6.5 4.5 8 9 12 7zM12 7s3-4 5.5-2.5S16 9 12 7z" /></svg>
-            </span>
-            <div className="min-w-0">
-              <p className="text-base font-medium text-[#5f564b]">購物金</p>
-              <p className="flex items-center gap-2 text-[34px] font-bold leading-tight text-[var(--c-text)]">
-                {formatter.format(0)}
-                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#a2957f" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6" /></svg>
-              </p>
-              <p className="mt-1 text-xs text-[#7d7264] sm:text-sm">目前尚無購物金，消費與活動可累積。</p>
-            </div>
-          </div>
+          <CreditCard />
         </div>
       </section>
 
