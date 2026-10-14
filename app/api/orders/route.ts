@@ -1,6 +1,7 @@
 import { after, NextResponse } from 'next/server';
 import { getAdminUser, getSessionUser } from '@/lib/supabase/server';
 import { evaluateCoupon } from '@/lib/discount';
+import { consumeCredit, creditQuote } from '@/lib/loyalty';
 import { isStorePickup, shipTypeFromMethod } from '@/lib/newebpay-logistics';
 import { deriveStatuses } from '@/lib/order-status';
 import { initialOrderStatus } from '@/lib/payment';
@@ -248,7 +249,13 @@ export async function POST(request: Request) {
     }
   }
 
-  const total = Math.max(0, subtotal + shipping - discount);
+  // 會員回饋金(等同現金):可和優惠券併用;上限 = 商品折扣後金額 × 店家設定 %,運費不可折抵
+  const shopId = currentShop?.id ?? '';
+  const itemDiscount = Math.max(0, discount - (Number(couponSnapshot.shipping_discount ?? 0) || 0));
+  const quote = user && shopId ? await creditQuote(shopId, user.id, subtotal - itemDiscount).catch(() => null) : null;
+  const requestedCredit = Math.max(0, Math.floor(Number(body?.use_credit ?? 0) || 0));
+  const creditUsed = quote ? Math.min(requestedCredit, quote.max) : 0;
+  const total = Math.max(0, subtotal + shipping - discount - creditUsed);
   // 需線上付款 → 尚未付款;門市代收/貨到付款 → 待出貨
   const initialStatus = initialOrderStatus(shippingMethod, paymentMethod);
 
@@ -301,11 +308,27 @@ export async function POST(request: Request) {
       stock_committed: true,
       ...deriveStatuses(initialStatus, false),
       user_id: user?.id ?? null,
+      credit_used: creditUsed,
+      credit_rate: quote?.tier.rate ?? 0,
+      tier_at_order: quote?.tier.name ?? '',
     })
     .select()
     .single();
 
   if (orderErr) return NextResponse.json({ error: orderErr.message }, { status: 400 });
+
+  // 扣用回饋金(原子操作);同時有其他訂單用掉而不足時,改成不折抵、金額補回
+  let createdOrder = order as Order;
+  if (creditUsed > 0 && user) {
+    try {
+      await consumeCredit(shopId, user.id, createdOrder.id, creditUsed);
+    } catch {
+      const { data: fixed } = await supabase.from('orders')
+        .update({ credit_used: 0, total: total + creditUsed, net_amount: total + creditUsed })
+        .eq('id', createdOrder.id).select().single();
+      if (fixed) createdOrder = fixed as Order;
+    }
+  }
 
   // 建立初始付款紀錄 + 訂單成立歷程(失敗不影響下單)
   try {
@@ -316,7 +339,7 @@ export async function POST(request: Request) {
       order_id: order.id,
       provider: providerMap[paymentMethod] ?? '',
       payment_method: paymentMethod,
-      amount: total,
+      amount: createdOrder.total,
       status: 'PENDING',
     });
     await supabase.from('order_status_history').insert({
@@ -346,7 +369,7 @@ export async function POST(request: Request) {
       order_id: order.id,
       original_amount: subtotal,
       discount_amount: discount,
-      final_amount: total,
+      final_amount: createdOrder.total,
     });
   }
 
@@ -409,7 +432,7 @@ export async function POST(request: Request) {
 
   // 回應送出後再寄訂單通知信(買家+賣家),寄信失敗不影響下單
   after(() => sendOrderEmails({
-    order: order as Order,
+    order: createdOrder,
     shop: currentShop ? { id: currentShop.id, name: currentShop.name, slug: currentShop.slug } : null,
     platform: platformShop,
     siteUrl: platformShop || !currentShop ? getConfiguredSiteUrl().replace(/\/$/, '') : shopUrl(currentShop.slug, ''),
@@ -418,7 +441,7 @@ export async function POST(request: Request) {
   // 店家:用店家自己的 LINE 通知買家訂單成立
   if (currentShop && !platformShop) after(() => notifyShopOrder(currentShop, (order as Order).id, 'created').catch((error) => console.error('shop LINE notify', error)));
 
-  const response = NextResponse.json(order as Order, { status: 201, headers: { 'Cache-Control': 'private, no-store' } });
+  const response = NextResponse.json(createdOrder, { status: 201, headers: { 'Cache-Control': 'private, no-store' } });
   if (guestAccess) response.cookies.set(orderAccessCookieName(orderNo), guestAccess, {
     httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax',
     path: '/', maxAge: ORDER_ACCESS_MAX_AGE,

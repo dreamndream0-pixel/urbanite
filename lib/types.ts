@@ -182,6 +182,7 @@ export type Category = {
   sort_order: number;
   parent_id?: string | null;
   image?: string; // 首頁分類導覽的圓形圖片
+  campaign_id?: string | null; // 促銷活動頁專屬分類;null = 主站分類
   created_at?: string;
 };
 
@@ -204,6 +205,7 @@ export type Campaign = {
   title: string;
   description: string;
   hero_image: string;
+  hero_ratio?: 'portrait' | 'square' | 'wide'; // 輪播圖比例:4:5 / 1:1 / 16:9
   status: 'draft' | 'published' | 'archived';
   start_at?: string | null;
   end_at?: string | null;
@@ -265,6 +267,11 @@ export type Order = {
   member_discount?: number;
   point_discount?: number;
   shipping_discount?: number;
+  credit_used?: number; // 會員回饋金折抵(等同現金)
+  credit_returned?: number;
+  credit_rate?: number; // 下單時等級的回饋率(%)
+  tier_at_order?: string;
+  completed_at?: string | null;
   tax_amount?: number;
   paid_amount?: number;
   refund_amount?: number;

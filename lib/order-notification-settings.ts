@@ -5,9 +5,13 @@ export const ORDER_NOTICE_EVENTS = [
   { key: 'completed', label: '訂單完成' }, { key: 'cancelled', label: '訂單取消' },
   { key: 'refunded', label: '退款' }, { key: 'return_requested', label: '退貨申請' },
   { key: 'payment_reported', label: '已通知付款' },
+  { key: 'credit_earned', label: '回饋金入帳' }, { key: 'credit_expiring', label: '回饋金即將到期' },
+  { key: 'tier_up', label: '會員升級' },
 ] as const;
+// 會員(非訂單)事件:只通知買家
+export const MEMBER_NOTICE_EVENTS: readonly string[] = ['credit_earned', 'credit_expiring', 'tier_up'];
 // 後來新增的事件:舊的設定沒有這一列時預設開啟
-const DEFAULT_ON: readonly string[] = ['return_requested', 'payment_reported'];
+const DEFAULT_ON: readonly string[] = ['return_requested', 'payment_reported', 'credit_earned', 'credit_expiring', 'tier_up'];
 export type OrderNoticeEvent = typeof ORDER_NOTICE_EVENTS[number]['key'];
 export type NoticeAudience = 'buyer' | 'seller';
 export type NoticeChannel = 'email' | 'line';

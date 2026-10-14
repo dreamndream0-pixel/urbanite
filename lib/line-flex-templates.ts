@@ -429,3 +429,25 @@ export const SAMPLE_ORDER: OrderCardData = {
   items: [{ name: '質感風衣外套', variant: '米色 / M', quantity: 1, price: 2980 }, { name: '經典皮革包', quantity: 1, price: 4280 }],
   link: 'https://example.com', homeLink: 'https://example.com',
 };
+
+// ---------- 會員通知卡(回饋金入帳、即將到期、升級) ----------
+export type NoticeCardData = { shopName: string; title: string; subtitle: string; highlight: string; rows: [string, string][]; link: string; buttonLabel: string; icon: string; color: string };
+
+export function noticeBubble(d: NoticeCardData): Flex {
+  return {
+    type: 'bubble', size: 'mega',
+    body: box('vertical', [
+      box('horizontal', [
+        box('vertical', [icon(d.icon, '#ffffff', '20px')], { width: '36px', height: '36px', cornerRadius: '18px', backgroundColor: d.color, justifyContent: 'center', alignItems: 'center', flex: 0 }),
+        box('vertical', [
+          txt(safe(d.shopName, 30, ''), { size: 'xxs', color: '#999999', weight: 'bold' }),
+          txt(safe(d.title, 30), { size: 'lg', weight: 'bold', color: d.color }),
+        ], { paddingStart: '12px', flex: 1 }),
+      ], { alignItems: 'center' }),
+      txt(safe(d.highlight, 30), { size: '3xl', weight: 'bold', color: '#222222', margin: 'lg' }),
+      txt(safe(d.subtitle, 120), { size: 'sm', color: '#666666', wrap: true }),
+      ...(d.rows.length ? [sep('#eeeeee', 'lg'), ...d.rows.filter(([, v]) => v).map(([k, v]) => kv(k, v))] : []),
+    ], { paddingAll: '18px' }),
+    footer: box('vertical', [pill(clip(d.buttonLabel, 20) || '查看', d.link, { bg: d.color, fg: '#ffffff' })], { paddingAll: '14px', paddingTop: '0px' }),
+  };
+}

@@ -162,7 +162,7 @@ export default function Storefront({ campaign = null, preview = false }: { campa
       .catch(() => setProducts([]))
       .finally(() => setLoading(false));
 
-    fetch('/api/categories')
+    fetch(campaign ? `/api/categories?campaign=${encodeURIComponent(campaign.id)}` : '/api/categories')
       .then((res) => (res.ok ? res.json() : []))
       .then((data: Category[]) => {
         setDbCategories(data);
@@ -492,7 +492,7 @@ export default function Storefront({ campaign = null, preview = false }: { campa
       />
 
       {showBlocks ? <StorefrontBlocks designStyle={design.style} categoryImageStyle={settings?.category_image_style} onBrowseAll={browseAllProducts} blocks={design.blocks!} banners={banners.filter((b) => b.active)} products={products} categories={categoryTabs.filter((c) => c.slug !== 'all')} images={[...heroBanners.map((b) => b.image), ...liveProducts.map((p) => p.image)].filter(Boolean)} onCategory={browseCategory} loading={loading} renderProduct={(product) => <ProductCard product={product} favorited={favorites.has(product.id)} favoritePending={favoritePending.has(product.id)} favoritesLoaded={favoritesLoaded} onFavoriteChange={(next) => setFavoriteSaved(product.id, next)} onAdd={() => setQuickAdd(product)} />} /> : <>
-      {customDesign && !modularDesign ? <StorefrontDesignHero design={design} image={heroBanners[0]?.image || products.find(isVisibleInStore)?.image} categories={categoryTabs.filter((c) => c.slug !== 'all')} onCategory={browseCategory} onBrowse={browseProducts} /> : !modularDesign ? <HeroCarousel banners={heroBanners} /> : null}
+      {customDesign && !modularDesign ? <StorefrontDesignHero design={design} image={heroBanners[0]?.image || products.find(isVisibleInStore)?.image} categories={categoryTabs.filter((c) => c.slug !== 'all')} onCategory={browseCategory} onBrowse={browseProducts} /> : !modularDesign ? <HeroCarousel banners={heroBanners} ratio={campaign ? campaign.hero_ratio ?? 'portrait' : undefined} /> : null}
       <CategoryNavigation categories={categoryTabs} value={category} onSelect={setCategory} imageStyle={settings?.category_image_style ?? 'circle'} />
 
       <div className="mx-auto max-w-6xl px-4 pb-8 sm:px-6">

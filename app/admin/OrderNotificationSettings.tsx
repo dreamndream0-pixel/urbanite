@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { Bell, Save, RefreshCw } from 'lucide-react';
-import { ORDER_NOTICE_EVENTS, resolveOrderNotificationSettings, type OrderNotificationSettings, type OrderNoticeEvent, type NoticeAudience, type NoticeChannel } from '@/lib/order-notification-settings';
+import { MEMBER_NOTICE_EVENTS, ORDER_NOTICE_EVENTS, resolveOrderNotificationSettings, type OrderNotificationSettings, type OrderNoticeEvent, type NoticeAudience, type NoticeChannel } from '@/lib/order-notification-settings';
 
 type Recent = { id: string; event: string; audience: string; channel: string; status: string; attempts: number; last_error: string | null; created_at: string };
 const labels: Record<string, string> = { pending: '待發送', processing: '發送中', sent: '已送出', skipped: '未發送', failed: '發送失敗' };
@@ -80,7 +80,7 @@ export default function OrderNotificationSettingsPanel() {
                   </th>)}
                 </tr>
               </thead>
-              <tbody>{ORDER_NOTICE_EVENTS.map(event => <tr key={event.key} className="border-b border-[#e5ded4]">
+              <tbody>{ORDER_NOTICE_EVENTS.filter(event => audience === 'buyer' || !MEMBER_NOTICE_EVENTS.includes(event.key)).map(event => <tr key={event.key} className="border-b border-[#e5ded4]">
                 <th scope="row" className="break-words px-2 py-4 text-left font-medium">{event.label}</th>
                 {channels.map(channel => <td key={channel} className="text-center">
                   <label className="flex min-h-12 items-center justify-center">

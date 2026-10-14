@@ -116,6 +116,9 @@ export default function CheckoutPage() {
   const [orderNo, setOrderNo] = useState('');
   const [transferOpen, setTransferOpen] = useState(true);
   const [pickupStore, setPickupStore] = useState<PickupStore | null>(null);
+  // 會員回饋金(等同現金,可和優惠券併用)
+  const [credit, setCredit] = useState<{ balance: number; maxPct: number; tierName: string; rate: number } | null>(null);
+  const [useCredit, setUseCredit] = useState(false);
 
   useEffect(() => {
     Promise.resolve().then(() => {
@@ -164,6 +167,11 @@ export default function CheckoutPage() {
       .then((data: SiteSettings | null) => setSettings(data))
       .catch(() => setSettings(null));
 
+    fetch('/api/me/credit', { cache: 'no-store' })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => { if (data?.enabled) setCredit({ balance: data.balance ?? 0, maxPct: data.rules?.maxRedeemPct ?? 20, tierName: data.tier?.name ?? '', rate: Number(data.tier?.rate ?? 0) }); })
+      .catch(() => {});
+
     fetch('/api/user-coupons')
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => setMemberCoupons((data?.owned ?? []).filter((item: UserCoupon) => item.status === 'available')))
@@ -194,7 +202,11 @@ export default function CheckoutPage() {
     ? shippingMethod
     : availableShippingMethods[0] ?? '';
   const shipping = computeShipping(subtotal, cart, products, selectedShippingMethod, resolveMethodFee(settings, selectedShippingMethod));
-  const total = Math.max(0, subtotal + shipping - (applied?.amount ?? 0));
+  // 回饋金上限:商品折扣後金額 × 店家設定 %(運費不可折抵),最終金額以伺服器計算為準
+  const creditMax = credit ? Math.max(0, Math.min(credit.balance, Math.floor((Math.max(0, subtotal - (applied?.amount ?? 0)) * credit.maxPct) / 100))) : 0;
+  const creditUsed = useCredit ? creditMax : 0;
+  const creditEarn = credit ? Math.floor((Math.max(0, subtotal - (applied?.amount ?? 0) - creditUsed) * credit.rate) / 100) : 0;
+  const total = Math.max(0, subtotal + shipping - (applied?.amount ?? 0) - creditUsed);
   const needsPickupStore = isStorePickupMethod(selectedShippingMethod);
   // 其他店家沒有串藍新物流:超商取貨不開地圖,改成買家自己填門市資料,店家自己寄
   const manualStore = settings?.platform === false;
@@ -490,6 +502,7 @@ export default function CheckoutPage() {
           store_ship_type: needsPickupStore ? pickupStore?.store_ship_type ?? shipTypeFromCheckout(selectedShippingMethod) : '',
           store_lgs_type: needsPickupStore ? pickupStore?.store_lgs_type ?? 'C2C' : '',
           discount_code: applied?.code ?? '',
+          use_credit: creditUsed,
           user_coupon_id: applied?.userCouponId ?? '',
           items: cart.map((item) => ({
             productId: item.productId,
@@ -602,6 +615,24 @@ export default function CheckoutPage() {
                 })}
               </div>
             </section>
+
+            {/* 會員回饋金 */}
+            {credit ? (
+              <section className="rounded-2xl bg-[var(--c-surface)] p-5 shadow-sm">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <h2 className="font-semibold">回饋金</h2>
+                    <p className="mt-1 text-sm text-[var(--c-text2)]">可用 {formatter.format(credit.balance)}{credit.tierName ? `・${credit.tierName}` : ''}</p>
+                    <p className="mt-0.5 text-xs text-[var(--c-muted)]">1 元折抵 NT$1,每筆最多折抵商品金額 {credit.maxPct}%,運費不可折抵</p>
+                  </div>
+                  <label className={`flex shrink-0 items-center gap-2 text-sm ${creditMax > 0 ? '' : 'opacity-40'}`}>
+                    <input type="checkbox" checked={useCredit && creditMax > 0} disabled={creditMax <= 0} onChange={(e) => setUseCredit(e.target.checked)} className="h-5 w-5 accent-[var(--c-brand)]" />
+                    折抵 {formatter.format(creditMax)}
+                  </label>
+                </div>
+                {creditEarn > 0 ? <p className="mt-3 rounded-lg bg-[var(--c-soft)] px-3 py-2 text-xs text-[var(--c-text2)]">訂單完成後可獲得約 {formatter.format(creditEarn)} 回饋金</p> : null}
+              </section>
+            ) : null}
 
             {/* 優惠券 */}
             <section className="rounded-2xl bg-[var(--c-surface)] p-5 shadow-sm">
@@ -878,6 +909,12 @@ export default function CheckoutPage() {
                     <span>-{formatter.format(applied.amount)}</span>
                   </div>
                 )}
+                {creditUsed > 0 && (
+                  <div className="flex justify-between text-[#1f7a44]">
+                    <span>回饋金折抵</span>
+                    <span>-{formatter.format(creditUsed)}</span>
+                  </div>
+                )}
                 <div className="flex justify-between pt-2 text-lg font-semibold">
                   <span>合計</span>
                   <span className="text-[var(--c-sale)]">{formatter.format(total)}</span>
@@ -906,6 +943,7 @@ export default function CheckoutPage() {
                         <div className="flex justify-between text-[var(--c-text2)]"><span>小計</span><span>{formatter.format(subtotal)}</span></div>
                         <div className="flex justify-between text-[var(--c-text2)]"><span>運費</span><span>{shipping === 0 ? '免運' : formatter.format(shipping)}</span></div>
                         {applied ? <div className="flex justify-between text-[#1f7a44]"><span>折扣 {applied.code}</span><span>-{formatter.format(applied.amount)}</span></div> : null}
+                        {creditUsed > 0 ? <div className="flex justify-between text-[#1f7a44]"><span>回饋金折抵</span><span>-{formatter.format(creditUsed)}</span></div> : null}
                         <div className="flex justify-between pt-1 font-semibold"><span>應付總額</span><span className="text-[var(--c-sale)]">{formatter.format(total)}</span></div>
                       </div>
                       <div className="border-t border-[#e8d9b6] pt-2">

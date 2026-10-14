@@ -39,7 +39,7 @@ import { PRIMARY_SITE_URL } from '@/lib/site-url';
 import { defaultSelfShipCarrier, NO_TRACKING_CARRIERS, needsTracking } from '@/lib/self-ship';
 import { uiAlert, uiConfirm, uiPrompt } from '@/lib/ui-dialog';
 import { OrderCardBadges, orderNeedsAttention, AttentionDot, isPaymentReported } from '@/app/components/OrderStatusBadge';
-import { COUPON_PRESETS, couponImageIsDark, couponImageStyle, couponScript } from '@/lib/coupon-presets';
+import { COUPON_PRESETS } from '@/lib/coupon-presets';
 import { isoToTaipeiInput } from '@/lib/taipei-time';
 import CampaignManager from './CampaignManager';
 import FixedBannerCropModal from './FixedBannerCropModal';
@@ -50,6 +50,7 @@ import ShopsManager from './ShopsManager';
 import { POLICY_LABEL, policyText, stripPolicies, withPolicies } from '@/lib/footer-policies';
 import SiteThemeEditor from './SiteThemeEditor';
 import LineBotManager from './line-bot/LineBotManager';
+import LoyaltyManager from './LoyaltyManager';
 import { isCollectOnDelivery } from '@/lib/payment';
 import { buildReturnSteps, historyKind, isReturnOrder } from '@/lib/return-progress';
 import { getCheckoutLine, getNewsletter, HIDDEN_FOOTER_SECTION_TITLES, lineAddFriendUrl, withCheckoutLine, withNewsletter } from '@/lib/checkout-line';
@@ -100,8 +101,9 @@ const NAV = [
   { key: 'products', label: '商品及分類', Icon: IconTag },
   { key: 'inventory', label: '庫存管理', Icon: IconBox },
   { key: 'customers', label: '顧客管理', Icon: IconUsers },
+  { key: 'loyalty', label: '會員回饋', Icon: IconGift },
   { key: 'promotions', label: '促銷管理', Icon: IconGift },
-  { key: 'campaign-pages', label: '一頁式促銷頁', Icon: IconGrid },
+  { key: 'campaign-pages', label: '促銷活動頁', Icon: IconGrid },
   { key: 'profile-card', label: '個人名片', Icon: IconIdCard },
   { key: 'card-members', label: '名片會員', Icon: IconUsers },
   { key: 'line-bot', label: 'LINE 機器人', Icon: IconChat },
@@ -492,7 +494,9 @@ export default function AdminDashboard({
   const [sidebarOpen, setSidebarOpen] = useState(true); // 桌機側邊選單預設常開
   const [products, setProducts] = useState<Product[]>(initialProducts);
   const [orders, setOrders] = useState<Order[]>(initialOrders);
-  const [categories, setCategories] = useState<Category[]>(initialCategories);
+  // 主站分類;促銷活動頁的專屬分類另外放(不出現在主站分類管理與首頁)
+  const [categories, setCategories] = useState<Category[]>(() => initialCategories.filter((c) => !c.campaign_id));
+  const [campaignCategories, setCampaignCategories] = useState<Category[]>(() => initialCategories.filter((c) => c.campaign_id));
   const [discounts, setDiscounts] = useState<Discount[]>(initialDiscounts);
   const [customers] = useState<Customer[]>(initialCustomers);
   const [banners, setBanners] = useState<Banner[]>(initialBanners);
@@ -1516,7 +1520,8 @@ export default function AdminDashboard({
     else void uiAlert('刪除失敗');
   }
 
-  async function saveFooterSettings() {
+  async function saveFooterSettings(override?: typeof footerDraft) {
+    const d = override ?? footerDraft;
     setSavingSettings(true);
     try {
       const toLines = (value: string) =>
@@ -1525,24 +1530,24 @@ export default function AdminDashboard({
           .map((line) => line.trim())
           .filter(Boolean);
       const footerSections = withPolicies(
-        mergeFooterSocialLinksIntoSections(JSON.parse(footerDraft.sections || '[]'), JSON.parse(footerDraft.socialLinks || '[]')),
-        { privacy: footerDraft.privacy, terms: footerDraft.terms },
+        mergeFooterSocialLinksIntoSections(JSON.parse(d.sections || '[]'), JSON.parse(d.socialLinks || '[]')),
+        { privacy: d.privacy, terms: d.terms },
       );
       const res = await fetch('/api/settings', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          footer_about_links: toLines(footerDraft.about),
-          footer_service_links: toLines(footerDraft.service),
-          footer_service_hours: footerDraft.serviceHours.trim(),
-          footer_email: footerDraft.email.trim(),
-          footer_company_name: footerDraft.companyName.trim(),
-          footer_tax_id: footerDraft.taxId.trim(),
-          footer_instagram_url: footerDraft.instagramUrl.trim(),
-          footer_line_url: footerDraft.lineUrl.trim(),
+          footer_about_links: toLines(d.about),
+          footer_service_links: toLines(d.service),
+          footer_service_hours: d.serviceHours.trim(),
+          footer_email: d.email.trim(),
+          footer_company_name: d.companyName.trim(),
+          footer_tax_id: d.taxId.trim(),
+          footer_instagram_url: d.instagramUrl.trim(),
+          footer_line_url: d.lineUrl.trim(),
           footer_sections: withNewsletter(
-            withCheckoutLine(footerSections, { id: footerDraft.checkoutLineId, url: footerDraft.checkoutLineUrl }),
-            { show: footerDraft.newsletterShow, title: footerDraft.newsletterTitle, text: footerDraft.newsletterText },
+            withCheckoutLine(footerSections, { id: d.checkoutLineId, url: d.checkoutLineUrl }),
+            { show: d.newsletterShow, title: d.newsletterTitle, text: d.newsletterText },
           ),
           // 金流/物流各自在「金流設定」「物流設定」儲存,頁尾不要覆蓋
         }),
@@ -2685,7 +2690,7 @@ export default function AdminDashboard({
                 {filteredDiscounts.length === 0 ? (
                   <div className="mt-5"><Empty>沒有符合條件的優惠券。</Empty></div>
                 ) : (
-                  <div className="mt-5 space-y-3 rounded-[28px] bg-[#f8f1e9] p-3 sm:p-5">
+                  <div className="mt-5 space-y-2">
                     {filteredDiscounts.map((d) => {
                       const usage = couponUsages.filter((item) => item.coupon_id === d.id);
                       const claimed = userCoupons.filter((item) => item.coupon_id === d.id).length;
@@ -2694,91 +2699,79 @@ export default function AdminDashboard({
                         : status === '停用' ? 'bg-[#fbe9e7] text-[#c0392b]'
                         : 'bg-[#efe9e0] text-[#8a7f72]';
                       const statusLabel = status === '啟用' ? '啟用中' : status === '停用' ? '已停用' : status;
-                      const couponImage = d.image ?? undefined;
-                      const darkImage = couponImageIsDark(couponImage, d.code);
-                      const discountLabel = d.type === 'free_shipping'
-                        ? '免運'
-                        : d.type === 'percent'
-                          ? `${d.value}% OFF`
-                          : `${formatter.format(d.value)} OFF`;
-                      const tags = [
-                        d.applicable_products?.length || d.applicable_categories?.length ? '指定商品' : '全站適用',
-                        d.end_at ? `到 ${new Date(d.end_at).toLocaleDateString('zh-TW')}` : '無期限',
-                        d.stackable ? '可併用' : '單張使用',
-                      ];
                       return (
-                        <article
-                          key={d.id}
-                          className="relative grid overflow-hidden rounded-2xl border border-[#eadfd4] bg-[#fffaf5] shadow-[0_10px_24px_rgba(65,52,43,0.08)] sm:grid-cols-[148px_minmax(0,1fr)_170px]"
-                        >
-                          <div
-                            className="relative min-h-[118px] bg-[#e5ded4] bg-cover bg-center sm:min-h-[150px]"
-                            style={couponImageStyle(couponImage, d.code)}
-                          >
-                            <div className="absolute inset-0 bg-black/[0.02]" />
-                            <span className={`font-serif-tc absolute left-3 top-1/2 origin-center -translate-y-1/2 -rotate-90 whitespace-nowrap text-[9px] tracking-[0.28em] ${darkImage ? 'text-white/85' : 'text-[#6b6156]/70'}`}>
-                              SPECIAL FOR YOU
-                            </span>
-                            <span className="absolute -right-3 top-1/2 hidden h-6 w-6 -translate-y-1/2 rounded-full bg-[#f8f1e9] sm:block" />
-                          </div>
-
-                          <div className="relative min-w-0 p-4 sm:p-5">
-                            <span className="absolute -left-3 top-1/2 hidden h-6 w-6 -translate-y-1/2 rounded-full bg-[#f8f1e9] sm:block" />
-                            <div className="flex flex-wrap items-start justify-between gap-2">
-                              <div className="min-w-0">
-                                <p className="font-mono text-xl font-bold tracking-wide text-[#2c2826] sm:text-2xl">{d.code}</p>
-                                <p className="mt-1 text-sm font-semibold text-[#6f675f]">{d.name || couponText(d)}</p>
-                              </div>
-                              <span className={`rounded-full px-3 py-1 text-xs font-semibold ${statusTone}`}>{statusLabel}</span>
-                            </div>
-                            <p className="mt-2 text-sm text-[#5f5852]">
-                              {d.min_spend ? `滿 ${formatter.format(d.min_spend)}，` : ''}
-                              {d.type === 'free_shipping' ? '免運' : d.type === 'percent' ? `${d.value}% 折扣` : `折抵 ${formatter.format(d.value)}`}
-                              {d.max_discount ? `，最高折抵 ${formatter.format(d.max_discount)}` : ''}
-                            </p>
-                            <div className="mt-3 flex flex-wrap gap-1.5">
-                              {tags.map((tag) => (
-                                <span key={tag} className="rounded-md bg-[#f2ebe2] px-2.5 py-1 text-xs text-[#8a7f72]">{tag}</span>
-                              ))}
-                            </div>
-                            <div className="mt-3 grid gap-1 text-xs text-[#6b6156] sm:grid-cols-2">
-                              <p>{d.applicable_users === 'new' || d.is_first_purchase_only ? '新會員首購' : d.applicable_users === 'vip' ? 'VIP 會員' : '全部會員'}・每人限用 {d.per_user_limit ?? 1} 次</p>
-                              <p>{d.total_limit ? `發放上限 ${d.total_limit.toLocaleString()} 張` : '發放數量不限'}</p>
-                              <p>已領取 {claimed} / 已使用 {usage.length}</p>
-                              <p>折抵 {formatter.format(usage.reduce((sum, item) => sum + item.discount_amount, 0))}</p>
+                        <div key={d.id} className="rounded-2xl bg-white p-3">
+                          <div className="flex items-start justify-between gap-3">
+                            <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${statusTone}`}>{statusLabel}</span>
+                            <div className="relative">
+                              <button onClick={() => setCouponMenuId(couponMenuId === d.id ? null : d.id)} aria-label="更多操作" className="rounded-full p-1 text-[#8a7f72] hover:bg-[#f3ede4]">
+                                <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.6" /><circle cx="12" cy="12" r="1.6" /><circle cx="19" cy="12" r="1.6" /></svg>
+                              </button>
+                              {couponMenuId === d.id ? (
+                                <>
+                                  <button aria-hidden tabIndex={-1} onClick={() => setCouponMenuId(null)} className="fixed inset-0 z-[64] cursor-default" />
+                                  <div className="absolute right-0 top-full z-[65] mt-1 w-28 overflow-hidden rounded-lg border border-[#e5ded4] bg-white shadow-lg">
+                                    <button onClick={() => { setCouponMenuId(null); copyDiscount(d); }} className="block w-full px-3.5 py-2 text-left text-sm hover:bg-[#f6f2ec]">複製</button>
+                                    <button onClick={() => { setCouponMenuId(null); deleteDiscount(d.id); }} className="block w-full px-3.5 py-2 text-left text-sm text-[#c0392b] hover:bg-[#fbf3f0]">刪除</button>
+                                  </div>
+                                </>
+                              ) : null}
                             </div>
                           </div>
 
-                          <div className="relative flex items-center justify-between gap-3 border-t border-dashed border-[#ded5c8] p-4 sm:flex-col sm:justify-center sm:border-l sm:border-t-0 sm:p-5">
-                            {/* 手機版:打孔虛線兩端的缺角 */}
-                            <span className="absolute -left-3 -top-3 h-6 w-6 rounded-full bg-[#f8f1e9] sm:hidden" />
-                            <span className="absolute -right-3 -top-3 h-6 w-6 rounded-full bg-[#f8f1e9] sm:hidden" />
-                            <div className="text-left sm:text-center">
-                              <p className="font-serif-tc text-xl font-semibold text-[#2c2826]">{discountLabel}</p>
-                              <p className="font-script hidden text-[15px] leading-[1.15] text-[#c2b3a0] sm:mt-2 sm:block">{couponScript(d.code)}</p>
+                          <div className="mt-1.5 flex items-start gap-4">
+                            <div className="min-w-0 flex-1">
+                              <p className="text-base font-bold">{d.name || couponText(d)}</p>
+                              <span className="mt-1 inline-flex items-center gap-1.5 rounded-lg bg-[#f4f0e8] px-2.5 py-1">
+                                <span className="font-mono text-sm">{d.code}</span>
+                                <button
+                                  onClick={() => { navigator.clipboard?.writeText(d.code); }}
+                                  aria-label="複製優惠碼"
+                                  className="text-[#a99e8f] hover:text-[#6b6156]"
+                                >
+                                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2" /><path d="M5 15V5a2 2 0 0 1 2-2h10" /></svg>
+                                </button>
+                              </span>
+                              <p className="mt-1 text-sm text-[#8a7f72]">
+                                {d.min_spend ? `滿 ${formatter.format(d.min_spend)}，` : ''}
+                                {d.type === 'free_shipping' ? '免運' : d.type === 'percent' ? `${d.value}% 折扣` : `折抵 ${formatter.format(d.value)}`}
+                                {d.max_discount ? `，最高折抵 ${formatter.format(d.max_discount)}` : ''}
+                              </p>
                             </div>
-                            <div className="flex shrink-0 flex-wrap justify-end gap-1.5">
-                              <button onClick={() => openEditCoupon(d)} className="inline-flex h-8 items-center rounded-full border border-[#ded5c8] px-3 text-xs font-semibold text-[#6b6156] hover:bg-[#efe8dd]">編輯</button>
-                              <button onClick={() => toggleDiscount(d.id, !d.active)} className="inline-flex h-8 items-center rounded-full bg-[#2b211d] px-3 text-xs font-semibold text-white hover:bg-[#3a302b]">
+                            <div className="shrink-0 rounded-xl bg-[#eef1e6] px-3 py-2 text-center text-[#414a33]">
+                              {d.type === 'free_shipping' ? (
+                                <p className="font-serif-tc text-xl font-semibold">免運</p>
+                              ) : d.type === 'percent' ? (
+                                <p className="font-serif-tc text-2xl font-semibold leading-none">{d.value}%<span className="ml-1 text-xs font-sans">OFF</span></p>
+                              ) : (
+                                <p className="font-serif-tc text-2xl font-semibold leading-none"><span className="mr-1 text-xs font-sans">NT$</span>{d.value}<span className="ml-1 text-xs font-sans">OFF</span></p>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="mt-2 flex flex-nowrap items-center justify-between gap-2 border-t border-[#f0ebe2] pt-2">
+                            <div className="min-w-0 flex-1 space-y-0.5 text-[clamp(9px,2.3vw,14px)] text-[#6b6156]">
+                              <p className="flex items-center gap-1 overflow-hidden text-ellipsis whitespace-nowrap">
+                                <svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="#a99e8f" strokeWidth="1.7" className="shrink-0" aria-hidden="true"><circle cx="12" cy="8" r="4" /><path d="M4 21c0-4 3.5-6 8-6s8 2 8 6" strokeLinecap="round" /></svg>
+                                {d.applicable_users === 'new' || d.is_first_purchase_only ? '新會員首購' : d.applicable_users === 'vip' ? 'VIP 會員' : '全部會員'}・每人限用 {d.per_user_limit ?? 1} 次
+                              </p>
+                              <p className="flex items-center gap-1 overflow-hidden text-ellipsis whitespace-nowrap">
+                                <svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="#a99e8f" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" className="shrink-0" aria-hidden="true"><path d="M12 3l9 4-9 4-9-4 9-4zM3 12l9 4 9-4M3 17l9 4 9-4" /></svg>
+                                {d.total_limit ? `發放上限 ${d.total_limit.toLocaleString()} 張` : '發放數量不限'}・{d.end_at ? `到 ${new Date(d.end_at).toLocaleDateString('zh-TW')}` : '無期限'}
+                              </p>
+                            </div>
+                            <div className="shrink-0 whitespace-nowrap text-[clamp(9px,2.3vw,14px)] text-[#6b6156]">
+                              <p>已領取 {claimed}</p>
+                              <p>已使用 {usage.length}</p>
+                            </div>
+                            <div className="flex shrink-0 gap-1.5">
+                              <button onClick={() => openEditCoupon(d)} className="inline-flex h-7 items-center whitespace-nowrap rounded-full border border-[#ded5c8] px-3 text-[clamp(9px,2.3vw,14px)] font-semibold text-[#6b6156] hover:bg-[#efe8dd]">編輯</button>
+                              <button onClick={() => toggleDiscount(d.id, !d.active)} className="inline-flex h-7 items-center whitespace-nowrap rounded-full bg-[#414a33] px-3 text-[clamp(9px,2.3vw,14px)] font-semibold text-white hover:bg-[#39412c]">
                                 {d.active ? '暫停' : '啟用'}
                               </button>
-                              <div className="relative">
-                                <button onClick={() => setCouponMenuId(couponMenuId === d.id ? null : d.id)} aria-label="更多操作" className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[#ded5c8] text-[#8a7f72] hover:bg-[#efe8dd]">
-                                  <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.6" /><circle cx="12" cy="12" r="1.6" /><circle cx="19" cy="12" r="1.6" /></svg>
-                                </button>
-                                {couponMenuId === d.id ? (
-                                  <>
-                                    <button aria-hidden tabIndex={-1} onClick={() => setCouponMenuId(null)} className="fixed inset-0 z-40 cursor-default" />
-                                    <div className="absolute right-0 top-full z-50 mt-1 w-28 overflow-hidden rounded-lg border border-[#e5ded4] bg-white shadow-lg">
-                                      <button onClick={() => { setCouponMenuId(null); copyDiscount(d); }} className="block w-full px-3.5 py-2 text-left text-sm hover:bg-[#f6f2ec]">複製</button>
-                                      <button onClick={() => { setCouponMenuId(null); deleteDiscount(d.id); }} className="block w-full px-3.5 py-2 text-left text-sm text-[#c0392b] hover:bg-[#fbf3f0]">刪除</button>
-                                    </div>
-                                  </>
-                                ) : null}
-                              </div>
                             </div>
                           </div>
-                        </article>
+                        </div>
                       );
                     })}
                   </div>
@@ -2851,6 +2844,7 @@ export default function AdminDashboard({
 
           {/* ===== 報表及分析 ===== */}
           {section === 'line-bot' && <LineBotManager products={products} coupons={discounts} logoUrl={logoUrl} platform={platform} campaigns={initialCampaigns} />}
+          {section === 'loyalty' && <LoyaltyManager />}
           {section === 'card-members' && <CardMembersManager />}
           {section === 'shops' && platform && <ShopsManager />}
           {section === 'profile-card' && (platform
@@ -2871,7 +2865,11 @@ export default function AdminDashboard({
                 setIsNew(false);
               }}
               onDeleteProduct={deleteProduct}
-              onCampaignDeleted={(campaignId) => setProducts((list) => list.filter((product) => product.campaign_id !== campaignId))}
+              onCampaignDeleted={(campaignId) => { setProducts((list) => list.filter((product) => product.campaign_id !== campaignId)); setCampaignCategories((list) => list.filter((c) => c.campaign_id !== campaignId)); }}
+              categories={campaignCategories}
+              onCategoriesChange={setCampaignCategories}
+              onProductChange={(updated) => setProducts((list) => list.map((p) => (p.id === updated.id ? updated : p)))}
+              onReorder={(ordered) => setProducts((list) => list.map((p) => { const i = ordered.findIndex((o) => o.id === p.id); return i >= 0 ? { ...p, sort_order: i } : p; }))}
             />
           )}
 
@@ -3107,10 +3105,10 @@ export default function AdminDashboard({
 
               {settingsTab === 'footer' && (
               <Card
-                title="頁尾資訊"
+                title=""
                 action={
                   <button
-                    onClick={saveFooterSettings}
+                    onClick={() => void saveFooterSettings()}
                     disabled={savingSettings}
                     className="rounded-full bg-[#1f1b19] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
                   >
@@ -3118,7 +3116,7 @@ export default function AdminDashboard({
                   </button>
                 }
               >
-                <div className="grid gap-4 lg:grid-cols-2">
+                <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                   <FooterPagesEditor
                     value={footerDraft.sections}
                     onChange={(sections) => setFooterDraft({ ...footerDraft, sections })}
@@ -3126,6 +3124,7 @@ export default function AdminDashboard({
                   <FooterSocialLinksEditor
                     value={footerDraft.socialLinks}
                     onChange={(socialLinks) => setFooterDraft({ ...footerDraft, socialLinks })}
+                    onCommit={(socialLinks) => void saveFooterSettings({ ...footerDraft, socialLinks })}
                   />
                   {/* 頁尾最下方的兩個連結 */}
                   <div className="lg:col-span-2 rounded-lg border border-[#e5ded4] p-4">
@@ -3317,7 +3316,7 @@ export default function AdminDashboard({
         <ProductModal
           draft={editing}
           isNew={isNew}
-          categories={categories}
+          categories={editing.campaign_id ? campaignCategories.filter((c) => c.campaign_id === editing.campaign_id) : categories}
           paymentMethods={enabledPaymentMethods}
           shippingMethods={enabledShippingMethods}
           shippingFees={shippingFees}
@@ -3688,30 +3687,26 @@ function FooterPagesEditor({ value, onChange }: { value: string; onChange: (valu
   const section = sections[active];
 
   return (
-    <div className="lg:col-span-2 rounded-lg border border-[#e5ded4] p-4">
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <h3 className="text-lg font-bold">頁尾頁面設定</h3>
-          <p className="mt-1 text-sm text-[#8a7f72]">大標題、小標題、內文與網址都可自行新增、刪除與編輯。</p>
-        </div>
-        <button type="button" onClick={addSection} className="rounded-lg border border-[#1f1b19] px-3 py-2 text-sm font-semibold">
-          + 新增大標題
-        </button>
-      </div>
-
-      <div className="mt-5 flex flex-wrap gap-2 border-b border-[#e5ded4] pb-3">
+    <div className="min-w-0 lg:col-span-2 rounded-lg border border-[#e5ded4] p-4">
+      {/* 大標題選單:左右滑動 */}
+      <div className="flex items-center gap-2 border-b border-[#e5ded4] pb-3">
+        <div className="flex min-w-0 flex-1 gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {sections.map((entry, index) => (
           <button
             key={`${entry.title}-${index}`}
             type="button"
             onClick={() => setActive(index)}
-            className={`rounded-lg px-4 py-2 text-sm font-semibold ${
+            className={`shrink-0 whitespace-nowrap rounded-lg px-4 py-2 text-sm font-semibold ${
               active === index ? 'bg-[#7da185] text-white' : 'border border-[#e5ded4] bg-white'
             }`}
           >
             {entry.title || '未命名大標題'}
           </button>
         ))}
+        </div>
+        <button type="button" onClick={addSection} className="shrink-0 whitespace-nowrap rounded-lg border border-[#1f1b19] px-3 py-2 text-sm font-semibold">
+          + 大標題
+        </button>
       </div>
 
       {section ? (
@@ -3793,112 +3788,121 @@ function FooterPagesEditor({ value, onChange }: { value: string; onChange: (valu
   );
 }
 
-function FooterSocialLinksEditor({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+// 頁尾社群按鈕:清單只顯示圖示與名稱,點一下跳出視窗編輯(名稱、連結、上傳圖片),儲存後直接更新頁尾
+function FooterSocialLinksEditor({ value, onChange, onCommit }: { value: string; onChange: (value: string) => void; onCommit?: (value: string) => void }) {
   const [items, setItems] = useState<FooterSocialDraft[]>(() => parseFooterSocialLinks(value));
-  const [uploadingIndex, setUploadingIndex] = useState<number | null>(null);
+  const [editing, setEditing] = useState<{ index: number; item: FooterSocialDraft } | null>(null); // index -1 = 新增
+  const [uploading, setUploading] = useState(false);
 
-  function update(next: FooterSocialDraft[]) {
+  function commit(next: FooterSocialDraft[]) {
     const normalized = normalizeFooterSocialLinks(next);
+    const json = JSON.stringify(normalized, null, 2);
     setItems(normalized);
-    onChange(JSON.stringify(normalized, null, 2));
+    onChange(json);
+    onCommit?.(json);
   }
 
-  function updateItem(index: number, patch: Partial<FooterSocialDraft>) {
-    update(items.map((item, i) => (i === index ? { ...item, ...patch } : item)));
-  }
-
-  async function uploadSocialImage(index: number, file: File) {
-    setUploadingIndex(index);
+  async function uploadImage(file: File) {
+    if (!editing) return;
+    setUploading(true);
     try {
       const fd = new FormData();
       fd.append('file', file);
-      fd.append('productId', `footer-social-${index + 1}`);
+      fd.append('productId', `footer-social-${Date.now()}`);
       const res = await fetch('/api/products/image', { method: 'POST', body: fd });
       const data = await res.json();
       if (!res.ok || !data.image_url) throw new Error(data.error ?? '上傳失敗');
-      updateItem(index, { image: data.image_url });
+      setEditing((cur) => (cur ? { ...cur, item: { ...cur.item, image: data.image_url } } : cur));
     } catch (error) {
       void uiAlert(error instanceof Error ? error.message : '上傳發生問題');
     } finally {
-      setUploadingIndex(null);
+      setUploading(false);
     }
   }
 
-  return (
-    <div className="lg:col-span-2 rounded-lg border border-[#e5ded4] p-4">
-      <div>
-        <div className="flex flex-wrap items-center gap-3">
-          <h3 className="text-lg font-bold">頁尾社群按鈕</h3>
-          <button
-            type="button"
-            onClick={() => update([...items, { label: '', image: '', url: '' }])}
-            disabled={items.length >= MAX_FOOTER_SOCIAL_LINKS}
-            className="ml-auto rounded-full border border-[#1f1b19] px-4 py-1.5 text-sm font-semibold disabled:opacity-40"
-          >
-            + 新增按鈕
-          </button>
-        </div>
-        <p className="mt-1 text-sm text-[#8a7f72]">頁尾的圓形社群按鈕(Instagram、LINE、Facebook…),可新增、刪除,最多 {MAX_FOOTER_SOCIAL_LINKS} 個;有填連結的才會顯示。</p>
-      </div>
-      {items.length === 0 ? <p className="mt-5 rounded-lg bg-[#faf7f2] py-6 text-center text-sm text-[#a99e8f]">目前沒有社群按鈕,頁尾不會顯示這一排。</p> : null}
+  function save() {
+    if (!editing) return;
+    const item = { ...editing.item, label: editing.item.label.trim(), url: editing.item.url.trim() };
+    if (!item.label) return void uiAlert('請填寫按鈕名稱');
+    commit(editing.index < 0 ? [...items, item] : items.map((x, i) => (i === editing.index ? item : x)));
+    setEditing(null);
+  }
 
-      <div className="mt-5 grid gap-4 md:grid-cols-3">
-        {items.map((item, index) => (
-          <div key={index} className="relative rounded-lg border border-[#e5ded4] bg-white p-4">
-            <button
-              type="button"
-              onClick={() => update(items.filter((_, i) => i !== index))}
-              aria-label="刪除這個按鈕"
-              className="absolute right-2 top-2 rounded-full px-2 py-0.5 text-xs text-[#a33a2b] hover:bg-[#fbeaea]"
-            >
-              刪除
+  async function remove(index: number) {
+    if (!(await uiConfirm(`刪除「${items[index]?.label || '這個按鈕'}」?`, { danger: true }))) return;
+    commit(items.filter((_, i) => i !== index));
+    setEditing(null);
+  }
+
+  const icon = (item: FooterSocialDraft, size: string) => (
+    <span className={`flex shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#1f1b19] text-[11px] font-bold text-white ${size}`}>
+      {item.image ? <img src={item.image} alt="" className="h-full w-full object-cover" /> : item.label.slice(0, 4) || '@'}
+    </span>
+  );
+
+  return (
+    <div className="min-w-0 lg:col-span-2 rounded-lg border border-[#e5ded4] p-4">
+      <div className="flex flex-wrap items-center gap-3">
+        <h3 className="text-lg font-bold">頁尾社群按鈕</h3>
+        <button
+          type="button"
+          onClick={() => setEditing({ index: -1, item: { label: '', image: '', url: '' } })}
+          disabled={items.length >= MAX_FOOTER_SOCIAL_LINKS}
+          className="ml-auto rounded-full border border-[#1f1b19] px-4 py-1.5 text-sm font-semibold disabled:opacity-40"
+        >
+          + 新增按鈕
+        </button>
+      </div>
+      <p className="mt-1 text-sm text-[#8a7f72]">頁尾的圓形社群按鈕,最多 {MAX_FOOTER_SOCIAL_LINKS} 個;點一下編輯,有填連結的才會顯示。</p>
+      {items.length === 0 ? <p className="mt-4 rounded-lg bg-[#faf7f2] py-6 text-center text-sm text-[#a99e8f]">目前沒有社群按鈕,頁尾不會顯示這一排。</p> : (
+        <div className="mt-4 divide-y divide-[#f0ebe2] overflow-hidden rounded-lg border border-[#e5ded4] bg-white">
+          {items.map((item, index) => (
+            <button key={index} type="button" onClick={() => setEditing({ index, item: { ...item } })} className="flex w-full items-center gap-3 px-3 py-2.5 text-left hover:bg-[#faf7f2]">
+              {icon(item, 'h-10 w-10')}
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-sm font-semibold">{item.label || '未命名'}</span>
+                <span className={`block truncate break-all text-xs ${item.url ? 'text-[#8a7f72]' : 'text-[#c0392b]'}`}>{item.url || '尚未填連結(不會顯示)'}</span>
+              </span>
+              <span className="text-[#b3a897]">›</span>
             </button>
-            <div className="mx-auto flex h-16 w-16 items-center justify-center overflow-hidden rounded-full bg-[#1f1b19] text-xs font-bold text-white">
-              {item.image ? <img src={item.image} alt="" className="h-full w-full object-cover" /> : item.label.slice(0, 4) || '@'}
+          ))}
+        </div>
+      )}
+
+      {editing ? (
+        <div className="fixed inset-0 z-[70] flex items-end justify-center bg-black/50 sm:items-center sm:p-4" onClick={() => setEditing(null)}>
+          <div className="w-full max-w-md rounded-t-2xl bg-white p-5 sm:rounded-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <p className="text-lg font-bold">{editing.index < 0 ? '新增社群按鈕' : '編輯社群按鈕'}</p>
+              <button type="button" onClick={() => setEditing(null)} aria-label="關閉" className="rounded p-1 text-xl leading-none hover:bg-[#efe8dd]">×</button>
+            </div>
+            <div className="mt-4 flex items-center gap-4">
+              {icon(editing.item, 'h-16 w-16')}
+              <div className="flex flex-wrap gap-2">
+                <label className="cursor-pointer rounded-full bg-[#1f1b19] px-4 py-2 text-sm font-semibold text-white">
+                  {uploading ? '上傳中...' : editing.item.image ? '更換圖片' : '上傳圖片'}
+                  <input type="file" accept="image/png,image/jpeg,image/webp,image/gif" className="hidden" disabled={uploading}
+                    onChange={(e) => { const file = e.target.files?.[0]; e.target.value = ''; if (file) void uploadImage(file); }} />
+                </label>
+                {editing.item.image ? <button type="button" onClick={() => setEditing({ ...editing, item: { ...editing.item, image: '' } })} className="text-sm text-[#8a7f72]">移除圖片</button> : null}
+              </div>
             </div>
             <label className="mt-4 block text-sm text-[#8a7f72]">
               按鈕名稱
-              <input
-                value={item.label}
-                onChange={(e) => updateItem(index, { label: e.target.value })}
-                className="mt-2 w-full rounded-lg border border-[#e5ded4] px-3 py-2 text-[#1f1b19]"
-              />
+              <input value={editing.item.label} onChange={(e) => setEditing({ ...editing, item: { ...editing.item, label: e.target.value } })} placeholder="例如:Instagram" className="mt-1.5 w-full rounded-lg border border-[#e5ded4] px-3 py-2 text-[#1f1b19]" />
             </label>
             <label className="mt-3 block text-sm text-[#8a7f72]">
               連結網址
-              <input
-                value={item.url}
-                onChange={(e) => updateItem(index, { url: e.target.value })}
-                placeholder="https:// 或 mailto:"
-                className="mt-2 w-full rounded-lg border border-[#e5ded4] px-3 py-2 text-[#1f1b19]"
-              />
+              <input value={editing.item.url} onChange={(e) => setEditing({ ...editing, item: { ...editing.item, url: e.target.value } })} placeholder="https:// 或 mailto:" className="mt-1.5 w-full rounded-lg border border-[#e5ded4] px-3 py-2 text-[#1f1b19]" />
             </label>
-            <label className="mt-3 block text-sm text-[#8a7f72]">
-              圖片網址
-              <input
-                value={item.image}
-                onChange={(e) => updateItem(index, { image: e.target.value })}
-                placeholder="可貼圖片網址"
-                className="mt-2 w-full rounded-lg border border-[#e5ded4] px-3 py-2 text-[#1f1b19]"
-              />
-            </label>
-            <label className="mt-4 inline-block cursor-pointer rounded-full bg-[#1f1b19] px-4 py-2 text-sm font-semibold text-white">
-              {uploadingIndex === index ? '上傳中...' : '上傳圖片'}
-              <input
-                type="file"
-                accept="image/png,image/jpeg,image/webp,image/gif"
-                className="hidden"
-                disabled={uploadingIndex !== null}
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  e.target.value = '';
-                  if (file) uploadSocialImage(index, file);
-                }}
-              />
-            </label>
+            <div className="mt-5 flex items-center gap-2">
+              {editing.index >= 0 ? <button type="button" onClick={() => void remove(editing.index)} className="px-2 text-sm font-semibold text-[#c0392b]">刪除</button> : null}
+              <button type="button" onClick={() => setEditing(null)} className="ml-auto rounded-full border border-[#d7c9bd] px-4 py-2 text-sm">取消</button>
+              <button type="button" disabled={uploading} onClick={save} className="rounded-full bg-[#1f1b19] px-5 py-2 text-sm font-semibold text-white disabled:opacity-50">儲存</button>
+            </div>
           </div>
-        ))}
-      </div>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -6537,14 +6541,20 @@ function ProductModal({
     else void uiAlert(data.error ?? '圖片上傳失敗');
   }
   const colorDim = modalSpecs.find((s) => s.name.includes('色'));
+  // 空白 = 全部(和系統設定一樣):畫面上顯示成全部勾選,取消勾選時從全部扣掉
+  const payList = draft.available_payment_methods.length ? draft.available_payment_methods : paymentMethods;
+  const shipChosen = draft.available_shipping_methods.filter((item) => item !== '免運');
+  const shipList = shipChosen.length ? shipChosen : shippingMethods;
   function toggleMethod(
     key: 'available_payment_methods' | 'available_shipping_methods',
     method: string,
     checked: boolean,
   ) {
-    const current = draft[key];
-    const next = checked ? [...current, method] : current.filter((item) => item !== method);
-    set(key, next);
+    const current = key === 'available_payment_methods' ? payList : shipList;
+    const next = checked ? [...current.filter((item) => item !== method), method] : current.filter((item) => item !== method);
+    if (!next.length) return void uiAlert(key === 'available_payment_methods' ? '至少要保留一種金流' : '至少要保留一種物流');
+    const free = key === 'available_shipping_methods' && draft.available_shipping_methods.includes('免運') ? ['免運'] : [];
+    set(key, [...free, ...next]);
   }
   function toggleFreeShipping(checked: boolean) {
     const current = draft.available_shipping_methods.filter((item) => item !== '免運');
@@ -6564,10 +6574,24 @@ function ProductModal({
     if (!url) return;
     runDescriptionCommand('createLink', url);
   }
+  // 商品描述插入圖片:選檔上傳後插入(不再貼網址)
+  const descriptionImageInput = useRef<HTMLInputElement>(null);
   function addDescriptionImage() {
-    const url = prompt('貼上圖片網址')?.trim();
-    if (!url) return;
-    runDescriptionCommand('insertImage', url);
+    descriptionImageInput.current?.click();
+  }
+  async function uploadDescriptionImage(file: File) {
+    try {
+      const prepared = await prepareProductImage(file, 0);
+      const fd = new FormData();
+      fd.append('file', prepared.blob, prepared.filename);
+      fd.append('productId', draft.id || 'description');
+      const res = await fetch('/api/products/image', { method: 'POST', body: fd });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.image_url) throw new Error(data?.error ?? '圖片上傳失敗');
+      runDescriptionCommand('insertImage', data.image_url);
+    } catch (error) {
+      void uiAlert(error instanceof Error ? error.message : '圖片上傳失敗');
+    }
   }
   function addDescriptionTable() {
     runDescriptionCommand(
@@ -6638,15 +6662,6 @@ function ProductModal({
     onChange({ ...draft, images: next });
   }
 
-  function addImageByUrl() {
-    const url = prompt('貼上圖片網址')?.trim();
-    if (!url) return;
-    if (draft.images.length >= MAX_PRODUCT_IMAGES) {
-      void uiAlert(`最多只能放 ${MAX_PRODUCT_IMAGES} 張圖片`);
-      return;
-    }
-    onChange({ ...draft, images: [...draft.images, url] });
-  }
 
 	  return (
 	    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
@@ -6718,6 +6733,7 @@ function ProductModal({
 	                <EditorButton label="分隔線" onClick={() => runDescriptionCommand('insertHorizontalRule')}>—</EditorButton>
 	                <EditorButton label="連結" onClick={addDescriptionLink}>Link</EditorButton>
 	                <EditorButton label="圖片" onClick={addDescriptionImage}>▧</EditorButton>
+	                <input ref={descriptionImageInput} type="file" accept="image/png,image/jpeg,image/webp,image/gif" className="hidden" onChange={(e) => { const file = e.target.files?.[0]; e.target.value = ''; if (file) void uploadDescriptionImage(file); }} />
 	                <EditorButton label="影片" onClick={addDescriptionVideo}>▻</EditorButton>
 	                <EditorButton label="表格" onClick={addDescriptionTable}>▦</EditorButton>
 	                <EditorButton label="清除格式" onClick={() => runDescriptionCommand('removeFormat')}>Tx</EditorButton>
@@ -6859,7 +6875,7 @@ function ProductModal({
 	            )}
 	          </div>
 	          <div className="grid gap-3 sm:grid-cols-2">
-	            <Field label="分類(首頁篩選用)">
+	            <Field label={draft.campaign_id ? "活動分類(活動頁篩選用)" : "分類(首頁篩選用)"}>
 	              <select
 	                className="w-full rounded-lg border border-[#e5ded4] px-3 py-2"
 	                value={draft.category}
@@ -6883,7 +6899,7 @@ function ProductModal({
 	            </Field>
 	          </div>
 	          <div className="grid gap-3 sm:grid-cols-2">
-            <FieldGroup label="可用金流(未勾選=全部)">
+            <FieldGroup label="可用金流(預設同系統設定)">
               <div className="space-y-2 rounded-lg border border-[#e5ded4] p-3">
                 {paymentMethods.length === 0 ? (
                   <p className="text-sm text-[#8a7f72]">請先到系統設定新增金流方式。</p>
@@ -6892,7 +6908,7 @@ function ProductModal({
                     <label key={method} className="flex items-center gap-2 text-sm">
                       <input
                         type="checkbox"
-                        checked={draft.available_payment_methods.includes(method)}
+                        checked={payList.includes(method)}
                         onChange={(e) => toggleMethod('available_payment_methods', method, e.target.checked)}
                       />
                       <span>{method}</span>
@@ -6901,7 +6917,7 @@ function ProductModal({
                 )}
               </div>
             </FieldGroup>
-            <FieldGroup label="可用物流與運費(未勾選=全部;運費留空=用後台預設)">
+            <FieldGroup label="可用物流與運費(預設同系統設定;運費留空=用後台預設)">
               <div className="space-y-2 rounded-lg border border-[#e5ded4] p-3">
                 {shippingMethods.length === 0 ? (
                   <p className="text-sm text-[#8a7f72]">請先到系統設定新增物流方式。</p>
@@ -6914,7 +6930,7 @@ function ProductModal({
                         <label className="flex items-center gap-2">
                           <input
                             type="checkbox"
-                            checked={draft.available_shipping_methods.includes(method)}
+                            checked={shipList.includes(method)}
                             onChange={(e) => toggleMethod('available_shipping_methods', method, e.target.checked)}
                           />
                           <span>{method}</span>
@@ -7010,14 +7026,6 @@ function ProductModal({
                     }}
                   />
                 </label>
-                <button
-                  type="button"
-                  onClick={addImageByUrl}
-                  disabled={draft.images.length >= MAX_PRODUCT_IMAGES}
-                  className="rounded-full border border-[#d7c9bd] px-4 py-2 text-sm font-semibold disabled:opacity-40"
-                >
-                  貼上網址
-                </button>
               </div>
               {uploadProgress && (
                 <div>

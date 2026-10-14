@@ -84,6 +84,18 @@ export async function GET(request: Request) {
         // LINE 授權已證明是本人的 LINE:若綁在本人的其他帳號,轉到這個帳號
         await bindLineToUser(member.user.id, member.user.email ?? '', profile.userId, profile, { transfer: true });
         linked.searchParams.set('ok', '1');
+        // 授權後常回到另一個瀏覽器(沒有原本的登入狀態):用剛綁定的會員直接登入,回官網不用重登
+        try {
+          const supabase = await createServerSupabase();
+          const { data: current } = await supabase.auth.getUser();
+          if (!current.user && member.user.email) {
+            const { data: link } = await admin.auth.admin.generateLink({ type: 'magiclink', email: member.user.email });
+            const tokenHash = link?.properties?.hashed_token;
+            if (tokenHash) await supabase.auth.verifyOtp({ type: 'magiclink', token_hash: tokenHash });
+          }
+        } catch (loginError) {
+          console.error('LINE link auto login failed', loginError instanceof Error ? loginError.message : loginError);
+        }
       } catch (e) {
         linked.searchParams.set('error', e instanceof Error ? e.message : 'LINE 綁定失敗');
       }

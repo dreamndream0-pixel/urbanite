@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { loadBotConfig, processOrderNotifications, sendBroadcast } from '@/lib/line-bot';
 import { processOrderNotificationQueue } from '@/lib/order-notifications';
+import { processLoyalty } from '@/lib/loyalty';
 import { lineBotSchemaReady, runAsShop } from '@/lib/line-channel';
 import { URBANITE_SHOP_ID } from '@/lib/shop';
 
@@ -44,6 +45,13 @@ export async function GET(request: Request) {
     result.notifications += (await processOrderNotificationQueue()).sent;
   } catch (e) {
     result.errors.push(e instanceof Error ? e.message : 'notify failed');
+  }
+
+  // 會員回饋金:到貨自動完成、回饋入帳 / 到期、退款退回與追回
+  try {
+    Object.assign(result, { loyalty: await processLoyalty() });
+  } catch (e) {
+    result.errors.push(e instanceof Error ? e.message : 'loyalty failed');
   }
   return NextResponse.json(result);
 }

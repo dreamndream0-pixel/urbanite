@@ -159,7 +159,6 @@ function ImageField({ label, spec, hint, value, output, uploading, onUpload, onC
         </div>
         <p className="text-[11px] leading-4 text-[#6b6156]">{spec}</p>
         {hint && <p className="text-[11px] leading-4 text-[#a99e8f]">{hint}</p>}
-        <details className="text-xs text-[#8a7f72]"><summary className="cursor-pointer">或貼上圖片網址</summary><input value={value} maxLength={2048} onChange={(e) => onChange(e.target.value)} placeholder="https://..." className={input} /></details>
       </div>
       <input ref={file} type="file" hidden accept="image/png,image/jpeg,image/webp,image/gif" onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) setCrop(f); }} />
       {crop && <FixedBannerCropModal file={crop} busy={uploading} title={`${label} — 裁切取景`} outputW={output[0]} outputH={output[1]} hint={`取景框 ${output[0]} × ${output[1]} px。拖曳照片移動位置,雙指或滑桿縮放。`} onCancel={() => setCrop(null)} onConfirm={(blob, name) => { setCrop(null); onUpload(new File([blob], name, { type: 'image/jpeg' })); }} />}
@@ -213,11 +212,20 @@ function useLongPressSort(blocks: StorefrontBlock[], onChange: (blocks: Storefro
     window.addEventListener('pointermove', move);
     window.addEventListener('pointerup', end);
     window.addEventListener('pointercancel', end);
+    // pointerup 漏接時(拖曳中列表重排、iOS 手勢中斷、切到背景)也要結束,否則整頁一直被擋住無法捲動
+    window.addEventListener('touchend', end);
+    window.addEventListener('touchcancel', end);
+    window.addEventListener('blur', end);
+    document.addEventListener('visibilitychange', end);
     return () => {
       document.removeEventListener('touchmove', blockScroll);
       window.removeEventListener('pointermove', move);
       window.removeEventListener('pointerup', end);
       window.removeEventListener('pointercancel', end);
+      window.removeEventListener('touchend', end);
+      window.removeEventListener('touchcancel', end);
+      window.removeEventListener('blur', end);
+      document.removeEventListener('visibilitychange', end);
     };
   }, []);
 

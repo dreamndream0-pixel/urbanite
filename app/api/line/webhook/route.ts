@@ -104,7 +104,7 @@ async function handleEvent(event: LineEvent, accessToken: string) {
     const text =
       key === 'orders' ? await ordersText(customer.user_id, b.intro)
       : key === 'coupons' ? await couponsText(customer.user_id, b.intro)
-      : key === 'credit' ? await creditText(b.intro)
+      : key === 'credit' ? await creditText(customer.user_id, b.intro)
       : await memberText(customer, b.intro);
     return replyText(text.slice(0, 4900), memberQuick);
   }

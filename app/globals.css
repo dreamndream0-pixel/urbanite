@@ -323,13 +323,6 @@ img {
   -webkit-mask-size: 100% 100%;
   mask-size: 100% 100%;
   -webkit-mask-image:
-    radial-gradient(circle var(--ticket-hole-r) at 100% 17%, transparent calc(var(--ticket-hole-r) - 0.2px), #000 var(--ticket-hole-r)),
-    radial-gradient(circle var(--ticket-hole-r) at 100% 28%, transparent calc(var(--ticket-hole-r) - 0.2px), #000 var(--ticket-hole-r)),
-    radial-gradient(circle var(--ticket-hole-r) at 100% 39%, transparent calc(var(--ticket-hole-r) - 0.2px), #000 var(--ticket-hole-r)),
-    radial-gradient(circle var(--ticket-hole-r) at 100% 50%, transparent calc(var(--ticket-hole-r) - 0.2px), #000 var(--ticket-hole-r)),
-    radial-gradient(circle var(--ticket-hole-r) at 100% 61%, transparent calc(var(--ticket-hole-r) - 0.2px), #000 var(--ticket-hole-r)),
-    radial-gradient(circle var(--ticket-hole-r) at 100% 72%, transparent calc(var(--ticket-hole-r) - 0.2px), #000 var(--ticket-hole-r)),
-    radial-gradient(circle var(--ticket-hole-r) at 100% 83%, transparent calc(var(--ticket-hole-r) - 0.2px), #000 var(--ticket-hole-r)),
     radial-gradient(circle var(--ticket-end-hole-r) at 0 0, transparent calc(var(--ticket-end-hole-r) - 0.2px), #000 var(--ticket-end-hole-r)),
     radial-gradient(circle var(--ticket-end-hole-r) at 0 100%, transparent calc(var(--ticket-end-hole-r) - 0.2px), #000 var(--ticket-end-hole-r)),
     radial-gradient(circle var(--ticket-end-hole-r) at var(--ticket-photo-x) 0, transparent calc(var(--ticket-end-hole-r) - 0.2px), #000 var(--ticket-end-hole-r)),
@@ -351,13 +344,6 @@ img {
     radial-gradient(circle var(--ticket-hole-r) at var(--ticket-photo-x) 72%, transparent calc(var(--ticket-hole-r) - 0.2px), #000 var(--ticket-hole-r)),
     radial-gradient(circle var(--ticket-hole-r) at var(--ticket-photo-x) 83%, transparent calc(var(--ticket-hole-r) - 0.2px), #000 var(--ticket-hole-r));
   mask-image:
-    radial-gradient(circle var(--ticket-hole-r) at 100% 17%, transparent calc(var(--ticket-hole-r) - 0.2px), #000 var(--ticket-hole-r)),
-    radial-gradient(circle var(--ticket-hole-r) at 100% 28%, transparent calc(var(--ticket-hole-r) - 0.2px), #000 var(--ticket-hole-r)),
-    radial-gradient(circle var(--ticket-hole-r) at 100% 39%, transparent calc(var(--ticket-hole-r) - 0.2px), #000 var(--ticket-hole-r)),
-    radial-gradient(circle var(--ticket-hole-r) at 100% 50%, transparent calc(var(--ticket-hole-r) - 0.2px), #000 var(--ticket-hole-r)),
-    radial-gradient(circle var(--ticket-hole-r) at 100% 61%, transparent calc(var(--ticket-hole-r) - 0.2px), #000 var(--ticket-hole-r)),
-    radial-gradient(circle var(--ticket-hole-r) at 100% 72%, transparent calc(var(--ticket-hole-r) - 0.2px), #000 var(--ticket-hole-r)),
-    radial-gradient(circle var(--ticket-hole-r) at 100% 83%, transparent calc(var(--ticket-hole-r) - 0.2px), #000 var(--ticket-hole-r)),
     radial-gradient(circle var(--ticket-end-hole-r) at 0 0, transparent calc(var(--ticket-end-hole-r) - 0.2px), #000 var(--ticket-end-hole-r)),
     radial-gradient(circle var(--ticket-end-hole-r) at 0 100%, transparent calc(var(--ticket-end-hole-r) - 0.2px), #000 var(--ticket-end-hole-r)),
     radial-gradient(circle var(--ticket-end-hole-r) at var(--ticket-photo-x) 0, transparent calc(var(--ticket-end-hole-r) - 0.2px), #000 var(--ticket-end-hole-r)),
@@ -480,4 +466,9 @@ html[data-heading='serif'] .store-title { font-family: 'Noto Serif TC', 'Songti 
 }
 .ui-toast {
   animation: ui-toast-life 3s ease forwards;
+}
+
+/* 後台:格線(grid)裡的區塊不能被內容撐寬(長網址、橫向捲動的標籤列會把整頁撐出螢幕、標題列只剩一半) */
+.admin-root .grid > * {
+  min-width: 0;
 }
