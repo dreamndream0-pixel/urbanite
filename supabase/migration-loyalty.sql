@@ -214,3 +214,6 @@ grant execute on function public.credit_balance(uuid, uuid), public.consume_cred
   public.grant_credit(uuid, uuid, integer, text, text, uuid, integer, text, text), public.activate_credit_lots(),
   public.expire_credit_lots(), public.reduce_order_credit(uuid, integer), public.auto_complete_orders(integer)
   to service_role;
+
+-- 到期提醒只寄一次
+alter table public.credit_lots add column if not exists expiry_notified_at timestamptz;

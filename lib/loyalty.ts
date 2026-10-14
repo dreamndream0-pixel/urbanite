@@ -4,6 +4,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getShopSecret, setShopSecret } from '@/lib/integrations';
 import { scopedClient } from '@/lib/shop';
+import { sendMemberNotice } from '@/lib/member-notices';
 import { AUTO_COMPLETE_DAYS, earnAmount, maxRedeem, nextTier, resolveLoyalty, tierForSpend, type LoyaltySettings, type LoyaltyTier } from '@/lib/loyalty-settings';
 
 const KIND = 'LOYALTY';
@@ -47,18 +48,24 @@ export async function memberTier(db: SupabaseClient, userId: string, settings: L
   return { tier, next, spend, toNext: next ? Math.max(0, next.threshold - spend) : 0, keptUntil: kept === tier ? c?.tier_until ?? null : null };
 }
 
-// 升級(或保級到期後重算)時記下等級與保級期限
-async function refreshStoredTier(db: SupabaseClient, userId: string, settings: LoyaltySettings) {
+// 升級(或保級到期後重算)時記下等級與保級期限;升級時回傳新等級(用來通知)
+async function refreshStoredTier(db: SupabaseClient, userId: string, settings: LoyaltySettings): Promise<LoyaltyTier | null> {
   const spend = await effectiveSpend(db, userId, settings.keepMonths);
   const bySpend = tierForSpend(settings, spend);
   const { data: c } = await db.from('customers').select('tier, tier_until').eq('user_id', userId).maybeSingle();
-  if (!c) return;
+  if (!c) return null;
   const stored = settings.tiers.find((t) => t.key === c.tier);
   const valid = stored && c.tier_until && new Date(c.tier_until).getTime() > Date.now();
   if (!valid || bySpend.threshold > (stored?.threshold ?? -1)) {
     await db.from('customers').update({ tier: bySpend.key, tier_until: new Date(Date.now() + settings.keepMonths * 30 * DAY).toISOString() }).eq('user_id', userId);
+    const before = valid ? stored!.threshold : (stored?.threshold ?? settings.tiers[0].threshold);
+    if (bySpend.threshold > before) return bySpend;
   }
+  return null;
 }
+
+const money = (n: number) => `NT${Math.round(n).toLocaleString('en-US')}`;
+const day = (iso: string | null | undefined) => (iso ? new Date(iso).toLocaleDateString('zh-TW', { timeZone: 'Asia/Taipei' }) : '');
 
 // 會員的回饋金摘要:可用、待入帳、30 天內到期、最近紀錄
 export async function creditSummary(shopId: string, userId: string) {
@@ -144,7 +151,13 @@ export async function processLoyalty() {
             expires_at: new Date(availableAt.getTime() + settings.validDays * DAY).toISOString(),
           });
           if (!error && amount > 0) result.earned++;
-          if (!error) await refreshStoredTier(db, o.user_id!, settings).catch(() => {});
+          if (!error) {
+            const up = await refreshStoredTier(db, o.user_id!, settings).catch(() => null);
+            if (up) await sendMemberNotice(shopId, o.user_id!, 'tier_up', {
+              title: '會員升級', highlight: up.name,
+              subtitle: `恭喜升級為「${up.name}」,之後的訂單享 ${up.rate}% 回饋金,保級 ${settings.keepMonths} 個月。`,
+            }).catch(() => {});
+          }
         }
       }
     }
@@ -167,10 +180,41 @@ export async function processLoyalty() {
     }
   }
 
-  // 3) 到期入帳、過期歸零(所有店家)
+  // 3) 到期入帳(入帳後通知)、過期歸零(所有店家)
+  const { data: due } = await admin.from('credit_lots').select('id').eq('status', 'pending').lte('available_at', new Date().toISOString()).limit(500);
   const [{ data: activated }, { data: expired }] = await Promise.all([admin.rpc('activate_credit_lots'), admin.rpc('expire_credit_lots')]);
   result.activated = Number(activated ?? 0);
   result.expired = Number(expired ?? 0);
+  if (due?.length) {
+    const { data: now } = await admin.from('credit_lots').select('id, shop_id, user_id, amount, expires_at').in('id', due.map((d) => d.id)).eq('status', 'active');
+    for (const lot of now ?? []) {
+      await sendMemberNotice(lot.shop_id, lot.user_id, 'credit_earned', {
+        title: '回饋金入帳', highlight: `+${money(lot.amount)}`,
+        subtitle: '訂單回饋金已入帳,結帳時 1 元折抵 NT$1。',
+        rows: [['可用至', day(lot.expires_at)]],
+      }).catch(() => {});
+    }
+  }
+
+  // 4) 7 天內到期提醒(每批只提醒一次,同一會員合併)
+  const soon = new Date(Date.now() + 7 * DAY).toISOString();
+  const { data: expiring } = await admin.from('credit_lots').select('id, shop_id, user_id, remaining, expires_at').eq('status', 'active').gt('remaining', 0).lte('expires_at', soon).is('expiry_notified_at', null).limit(500);
+  const groups = new Map<string, { shopId: string; userId: string; amount: number; first: string; ids: string[] }>();
+  for (const l of expiring ?? []) {
+    const k = `${l.shop_id}:${l.user_id}`;
+    const g = groups.get(k) ?? { shopId: l.shop_id, userId: l.user_id, amount: 0, first: l.expires_at, ids: [] as string[] };
+    g.amount += l.remaining; g.ids.push(l.id); if (l.expires_at < g.first) g.first = l.expires_at;
+    groups.set(k, g);
+  }
+  for (const g of groups.values()) {
+    const { data: marked } = await admin.from('credit_lots').update({ expiry_notified_at: new Date().toISOString() }).in('id', g.ids).is('expiry_notified_at', null).select('id');
+    if (!marked?.length) continue;
+    await sendMemberNotice(g.shopId, g.userId, 'credit_expiring', {
+      title: '回饋金即將到期', highlight: money(g.amount),
+      subtitle: `這些回饋金將在 ${day(g.first)} 到期,記得在到期前使用。`,
+      rows: [['到期日', day(g.first)]],
+    }).catch(() => {});
+  }
   return result;
 }
 
