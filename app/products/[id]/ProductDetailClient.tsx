@@ -1,6 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
+import { cleanRichText } from '@/lib/rich-text';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Product } from '@/lib/types';
 import { FREE_SHIPPING_THRESHOLD } from '@/lib/shipping';
@@ -544,7 +545,7 @@ export default function ProductDetailClient({ product, homeHref = '/' }: { produ
               {product.tagline ? (
                 <div
                   className="mx-auto max-w-none text-left leading-8 [&_a]:text-[var(--c-sale)] [&_img]:my-4 [&_img]:max-w-full [&_ol]:list-decimal [&_ol]:pl-6 [&_table]:my-4 [&_table]:w-full [&_table]:border-collapse [&_td]:border [&_td]:border-[var(--c-border)] [&_td]:p-2 [&_th]:border [&_th]:border-[var(--c-border)] [&_th]:bg-[var(--c-bg)] [&_th]:p-2 [&_ul]:list-disc [&_ul]:pl-6"
-                  dangerouslySetInnerHTML={{ __html: product.tagline }}
+                  dangerouslySetInnerHTML={{ __html: cleanRichText(product.tagline) }}
                 />
               ) : (
                 <p>精選商品,適合日常穿搭與送禮。</p>

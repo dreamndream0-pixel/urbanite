@@ -33,6 +33,7 @@ import {
 } from '@/lib/order-status';
 import { uiToast } from '@/lib/ui-toast';
 import NumberInput from './NumberInput';
+import { cleanRichText } from '@/lib/rich-text';
 import { orderRevenue, productRevenue, refundableShipping, shippingRevenue } from '@/lib/revenue';
 import OrderNotificationSettingsPanel from './OrderNotificationSettings';
 import ManualFulfillmentAction from '@/app/components/ManualFulfillmentAction';
@@ -6581,6 +6582,15 @@ function ProductModal({
   function syncDescription() {
     set('tagline', descriptionRef.current?.innerHTML ?? '');
   }
+  // 貼上時清掉外部字體、字級等樣式,前台字體才會一致
+  function pasteDescription(e: React.ClipboardEvent<HTMLDivElement>) {
+    const html = e.clipboardData.getData('text/html');
+    if (!html) return;
+    e.preventDefault();
+    const body = html.match(/<body[^>]*>([\s\S]*)<\/body>/i)?.[1] ?? html;
+    document.execCommand('insertHTML', false, cleanRichText(body.replace(/<!--[\s\S]*?-->/g, '')));
+    syncDescription();
+  }
   function runDescriptionCommand(command: string, value?: string) {
     descriptionRef.current?.focus();
     document.execCommand(command, false, value);
@@ -6766,6 +6776,7 @@ function ProductModal({
 	              }`}
 	              data-placeholder="請在此輸入您的商品描述內容"
 	              onInput={syncDescription}
+              onPaste={pasteDescription}
 	              onBlur={syncDescription}
 	            />
 	            </div>

@@ -20,13 +20,15 @@ export async function generateMetadata({
   const product = data as Product | null;
 
   if (!product) return { title: '商品不存在' };
+  // 描述是 HTML,轉成純文字給搜尋引擎與分享預覽
+  const description = (product.tagline ?? '').replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 160) || undefined;
 
   return {
     title: product.name,
-    description: product.tagline,
+    description,
     openGraph: {
       title: product.name,
-      description: product.tagline,
+      description,
       images: product.image ? [{ url: product.image }] : undefined,
     },
   };
