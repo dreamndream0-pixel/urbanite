@@ -19,15 +19,22 @@ export async function saveLoyalty(shopId: string, raw: unknown) {
 
 type OrderAmounts = { subtotal: number; discount: number; shipping_discount?: number | null; credit_used?: number | null; total: number; refund_amount?: number | null; status?: string; order_status?: string | null };
 
-// 商品實付金額(扣掉商品折扣與回饋金折抵,不含運費);退款依比例扣除;取消為 0
+// 商品實付金額(扣掉商品折扣與回饋金折抵,不含運費);退款先扣商品金額(退貨退的是商品);取消為 0
 export function paidProductAmount(o: OrderAmounts) {
   if (o.status === '取消' || o.order_status === 'CANCELLED') return 0;
-  const itemDiscount = Math.max(0, Number(o.discount || 0) - Number(o.shipping_discount || 0));
-  const product = Math.max(0, Number(o.subtotal || 0) - itemDiscount - Number(o.credit_used || 0));
-  const total = Number(o.total || 0);
-  const refundRatio = total > 0 ? Math.min(1, Number(o.refund_amount || 0) / total) : 0;
-  return Math.floor(product * (1 - refundRatio));
+  return Math.max(0, productCash(o) - Number(o.refund_amount || 0));
 }
+
+function productCash(o: OrderAmounts) {
+  const itemDiscount = Math.max(0, Number(o.discount || 0) - Number(o.shipping_discount || 0));
+  return Math.max(0, Number(o.subtotal || 0) - itemDiscount - Number(o.credit_used || 0));
+}
+
+// 退款占商品實付的比例(0~1):用來依比例退回用掉的回饋金
+const refundShare = (o: OrderAmounts) => {
+  const cash = productCash(o);
+  return cash > 0 ? Math.min(1, Number(o.refund_amount || 0) / cash) : Number(o.refund_amount || 0) > 0 ? 1 : 0;
+};
 
 // 近 N 個月有效消費:已完成訂單的商品實付金額(扣退款)
 export async function effectiveSpend(db: SupabaseClient, userId: string, months: number) {
@@ -167,7 +174,7 @@ export async function processLoyalty() {
       .or('status.eq.取消,order_status.eq.CANCELLED,refund_amount.gt.0').gte('created_at', new Date(Date.now() - 400 * DAY).toISOString()).limit(500);
     for (const o of (changed ?? []) as JobOrder[]) {
       const cancelled = o.status === '取消' || o.order_status === 'CANCELLED';
-      const ratio = cancelled ? 1 : Number(o.total) > 0 ? Math.min(1, Number(o.refund_amount || 0) / Number(o.total)) : 0;
+      const ratio = cancelled ? 1 : refundShare(o);
       const target = Math.floor(Number(o.credit_used || 0) * ratio);
       const delta = target - Number(o.credit_returned || 0);
       if (delta > 0) {
