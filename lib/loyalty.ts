@@ -17,12 +17,12 @@ export async function saveLoyalty(shopId: string, raw: unknown) {
   return settings;
 }
 
-type OrderAmounts = { subtotal: number; discount: number; shipping_discount?: number | null; credit_used?: number | null; total: number; refund_amount?: number | null; status?: string; order_status?: string | null };
+type OrderAmounts = { subtotal: number; discount: number; shipping_discount?: number | null; credit_used?: number | null; total: number; refund_amount?: number | null; shipping_refund?: number | null; status?: string; order_status?: string | null };
 
 // 商品實付金額(扣掉商品折扣與回饋金折抵,不含運費);退款先扣商品金額(退貨退的是商品);取消為 0
 export function paidProductAmount(o: OrderAmounts) {
   if (o.status === '取消' || o.order_status === 'CANCELLED') return 0;
-  return Math.max(0, productCash(o) - Number(o.refund_amount || 0));
+  return Math.max(0, productCash(o) - productRefund(o));
 }
 
 function productCash(o: OrderAmounts) {
@@ -30,16 +30,19 @@ function productCash(o: OrderAmounts) {
   return Math.max(0, Number(o.subtotal || 0) - itemDiscount - Number(o.credit_used || 0));
 }
 
+// 商品退款 = 退款 − 退運費
+const productRefund = (o: OrderAmounts) => Math.max(0, Number(o.refund_amount || 0) - Number(o.shipping_refund || 0));
+
 // 退款占商品實付的比例(0~1):用來依比例退回用掉的回饋金
 const refundShare = (o: OrderAmounts) => {
   const cash = productCash(o);
-  return cash > 0 ? Math.min(1, Number(o.refund_amount || 0) / cash) : Number(o.refund_amount || 0) > 0 ? 1 : 0;
+  return cash > 0 ? Math.min(1, productRefund(o) / cash) : productRefund(o) > 0 ? 1 : 0;
 };
 
 // 近 N 個月有效消費:已完成訂單的商品實付金額(扣退款)
 export async function effectiveSpend(db: SupabaseClient, userId: string, months: number) {
   const since = new Date(Date.now() - months * 30 * DAY).toISOString();
-  const { data } = await db.from('orders').select('subtotal, discount, shipping_discount, credit_used, total, refund_amount, status, order_status')
+  const { data } = await db.from('orders').select('subtotal, discount, shipping_discount, credit_used, total, refund_amount, shipping_refund, status, order_status')
     .eq('user_id', userId).eq('order_status', 'COMPLETED').gte('completed_at', since);
   return ((data ?? []) as OrderAmounts[]).reduce((n, o) => n + paidProductAmount(o), 0);
 }
@@ -126,7 +129,7 @@ export async function adjustCredit(shopId: string, userId: string, amount: numbe
 }
 
 type JobOrder = OrderAmounts & { id: string; shop_id: string; user_id: string | null; completed_at: string | null; credit_rate: number; credit_returned: number };
-const ORDER_FIELDS = 'id, shop_id, user_id, subtotal, discount, shipping_discount, credit_used, credit_returned, credit_rate, total, refund_amount, status, order_status, completed_at';
+const ORDER_FIELDS = 'id, shop_id, user_id, subtotal, discount, shipping_discount, credit_used, credit_returned, credit_rate, total, refund_amount, shipping_refund, status, order_status, completed_at';
 
 // 排程(每 5 分鐘):自動完成、回饋入帳 / 到期、退款退回與追回
 export async function processLoyalty() {

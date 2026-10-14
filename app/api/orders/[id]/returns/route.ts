@@ -116,7 +116,7 @@ export async function PATCH(
   const response = String(body?.response ?? '').trim();
 
   const supabase = (await shopAdminClient());
-  const { data: order } = await supabase.from('orders').select('id, user_id, total, refund_amount, paid').eq('id', id).maybeSingle();
+  const { data: order } = await supabase.from('orders').select('id, user_id, total, refund_amount, paid, shipping, shipping_discount, shipping_refund').eq('id', id).maybeSingle();
   if (!order) return NextResponse.json({ error: '找不到訂單' }, { status: 404 });
   const { data: ret } = await supabase.from('returns').select('*').eq('id', returnId).eq('order_id', id).maybeSingle();
   if (!ret) return NextResponse.json({ error: '找不到退貨單' }, { status: 404 });
@@ -188,13 +188,15 @@ export async function PATCH(
   }
 
   if (action === 'refund') {
-    const amount = Number(ret.refund_amount) || 0;
+    // 勾選「一併退運費」:加上尚未退的運費
+    const shippingBack = body?.refund_shipping ? Math.max(0, Number(order.shipping || 0) - Number(order.shipping_discount || 0) - Number(order.shipping_refund || 0)) : 0;
+    const amount = (Number(ret.refund_amount) || 0) + shippingBack;
     const refundNo = await genNo(supabase, 'refunds', 'RF');
     await supabase.from('refunds').insert({ refund_no: refundNo, order_id: id, return_id: returnId, amount, reason: '退貨退款', status: 'COMPLETED', created_by: actor });
 
     const newRefundTotal = (Number(order.refund_amount) || 0) + amount;
     const payStatus = newRefundTotal >= Number(order.total) ? 'REFUNDED' : 'PARTIALLY_REFUNDED';
-    await supabase.from('orders').update({ refund_amount: newRefundTotal, net_amount: Number(order.total) - newRefundTotal, payment_status: payStatus, fulfillment_status: 'RETURNED' }).eq('id', id);
+    await supabase.from('orders').update({ refund_amount: newRefundTotal, net_amount: Number(order.total) - newRefundTotal, payment_status: payStatus, fulfillment_status: 'RETURNED', ...(shippingBack ? { shipping_refund: (Number(order.shipping_refund) || 0) + shippingBack } : {}) }).eq('id', id);
 
     const { data } = await supabase.from('returns').update({ status: 'REFUNDED', completed_at: nowIso }).eq('id', returnId).select().single();
     await supabase.from('order_status_history').insert({ order_id: id, type: 'payment', from_status: order.paid ? 'PAID' : 'UNPAID', to_status: payStatus, note: `退貨退款 ${refundNo}(${amount})`, created_by: actor });

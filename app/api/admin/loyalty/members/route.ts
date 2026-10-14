@@ -16,7 +16,7 @@ export async function GET() {
   const [{ data: customers }, { data: lots }, { data: orders }] = await Promise.all([
     db.from('customers').select('user_id, name, email, phone, tier, tier_until, created_at').not('user_id', 'is', null).order('created_at', { ascending: false }).limit(1000),
     db.from('credit_lots').select('user_id, remaining, status').in('status', ['pending', 'active']),
-    db.from('orders').select('user_id, subtotal, discount, shipping_discount, credit_used, total, refund_amount, status, order_status, completed_at').not('user_id', 'is', null),
+    db.from('orders').select('user_id, subtotal, discount, shipping_discount, credit_used, total, refund_amount, shipping_refund, status, order_status, completed_at').not('user_id', 'is', null),
   ]);
   const stat = new Map<string, { balance: number; pending: number; spend: number; orders: number }>();
   const get = (id: string) => stat.get(id) ?? (stat.set(id, { balance: 0, pending: 0, spend: 0, orders: 0 }), stat.get(id)!);

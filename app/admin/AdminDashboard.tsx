@@ -33,6 +33,7 @@ import {
 } from '@/lib/order-status';
 import { uiToast } from '@/lib/ui-toast';
 import NumberInput from './NumberInput';
+import { orderRevenue, productRevenue, refundableShipping, shippingRevenue } from '@/lib/revenue';
 import OrderNotificationSettingsPanel from './OrderNotificationSettings';
 import ManualFulfillmentAction from '@/app/components/ManualFulfillmentAction';
 import { PRIMARY_SITE_URL } from '@/lib/site-url';
@@ -71,11 +72,6 @@ const CANCEL_REVIEW_TAB = '待審核取消';
 const PROCESSED_TAB = '已處理';
 const ORDER_TAB_KEYS = ['全部', CANCEL_REVIEW_TAB, '尚未付款', '待出貨', PROCESSED_TAB, '已出貨', '已完成', '取消', '退貨'];
 
-// 訂單計入營收的金額:取消的訂單為 0;有退款則扣除退款金額
-function orderRevenue(order: Order) {
-  if (order.status === '取消') return 0;
-  return Math.max(0, order.total - (order.refund_amount ?? 0));
-}
 
 function orderMatchesTab(order: Order, tab: string) {
   if (tab === '全部') return true;
@@ -652,15 +648,19 @@ export default function AdminDashboard({
   }, [customers, orders]);
 
   const report = useMemo(() => {
+    // 營收只算已付款訂單:總營收含運費,運費另外列「代收款(運費)」
     const counted = orders.filter((o) => o.status !== '取消');
-    const totalRevenue = counted.reduce((s, o) => s + orderRevenue(o), 0);
-    const paidRevenue = counted.filter((o) => o.paid).reduce((s, o) => s + orderRevenue(o), 0);
+    const paid = orders.filter((o) => o.paid);
+    const totalRevenue = paid.reduce((s, o) => s + orderRevenue(o), 0);
+    const shippingIncome = paid.reduce((s, o) => s + shippingRevenue(o), 0);
+    const productIncome = paid.reduce((s, o) => s + productRevenue(o), 0);
     const orderCount = counted.length;
-    const avg = orderCount ? Math.round(totalRevenue / orderCount) : 0;
+    const paidCount = paid.filter((o) => orderRevenue(o) > 0).length;
+    const avg = paidCount ? Math.round(totalRevenue / paidCount) : 0;
     const prodMap = new Map<string, number>();
     for (const o of counted) for (const it of o.items) prodMap.set(it.name, (prodMap.get(it.name) || 0) + it.quantity);
     const topProducts = [...prodMap.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5);
-    return { totalRevenue, paidRevenue, orderCount, avg, topProducts };
+    return { totalRevenue, shippingIncome, productIncome, orderCount, avg, topProducts };
   }, [orders]);
 
   const todayRevenue = useMemo(() => {
@@ -753,7 +753,7 @@ export default function AdminDashboard({
     router.refresh();
   }
 
-  async function updateOrder(id: string, patch: Partial<Pick<Order, 'status' | 'paid' | 'admin_note' | 'refund_amount'>>) {
+  async function updateOrder(id: string, patch: Partial<Pick<Order, 'status' | 'paid' | 'admin_note' | 'refund_amount' | 'shipping_refund'>>) {
     const res = await fetch(`/api/orders/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -1750,14 +1750,18 @@ export default function AdminDashboard({
                 <p className="font-serif-tc mt-5 text-[44px] font-semibold leading-none tracking-normal sm:text-[58px]">
                   {formatOverviewCurrency(report.totalRevenue)}
                 </p>
-                <div className="mt-7 grid grid-cols-2 border-t border-white/55 pt-4">
-                  <div>
-                    <p className="text-sm text-white/70">今日營收</p>
-                    <p className="font-serif-tc mt-1 text-2xl font-semibold">{formatOverviewCurrency(todayRevenue)}</p>
+                <div className="mt-7 grid grid-cols-3 border-t border-white/55 pt-4">
+                  <div className="min-w-0">
+                    <p className="text-xs text-white/70 sm:text-sm">今日營收</p>
+                    <p className="font-serif-tc mt-1 break-all text-lg font-semibold sm:text-2xl">{formatOverviewCurrency(todayRevenue)}</p>
                   </div>
-                  <div className="border-l border-white/45 pl-7">
-                    <p className="text-sm text-white/70">總訂單</p>
-                    <p className="font-serif-tc mt-1 text-2xl font-semibold">{orders.length}</p>
+                  <div className="min-w-0 border-l border-white/45 pl-3 sm:pl-4">
+                    <p className="text-xs text-white/70 sm:text-sm">代收款(運費)</p>
+                    <p className="font-serif-tc mt-1 break-all text-lg font-semibold sm:text-2xl">{formatOverviewCurrency(report.shippingIncome)}</p>
+                  </div>
+                  <div className="min-w-0 border-l border-white/45 pl-3 sm:pl-4">
+                    <p className="text-xs text-white/70 sm:text-sm">總訂單</p>
+                    <p className="font-serif-tc mt-1 break-all text-lg font-semibold sm:text-2xl">{orders.length}</p>
                   </div>
                 </div>
               </section>
@@ -2877,8 +2881,9 @@ export default function AdminDashboard({
           {section === 'reports' && (
             <div className="space-y-6">
               <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-                <StatCard label="總營收" value={formatter.format(report.totalRevenue)} />
-                <StatCard label="已付款營收" value={formatter.format(report.paidRevenue)} />
+                <StatCard label="總營收(含運費)" value={formatter.format(report.totalRevenue)} />
+                <StatCard label="商品營收" value={formatter.format(report.productIncome)} />
+                <StatCard label="代收款(運費)" value={formatter.format(report.shippingIncome)} />
                 <StatCard label="總訂單數" value={String(report.orderCount)} />
                 <StatCard label="平均客單價" value={formatter.format(report.avg)} />
               </div>
@@ -4355,12 +4360,15 @@ function ReturnStatusControl({
   r,
   busy,
   onAction,
+  shippingFee = 0,
 }: {
   r: ReturnRequest;
   busy: boolean;
-  onAction: (action: 'received' | 'processing' | 'refund' | 'complete') => void;
+  onAction: (action: 'received' | 'processing' | 'refund' | 'complete', refundShipping?: boolean) => void;
+  shippingFee?: number; // 可退的運費
 }) {
   const [sel, setSel] = useState<'received' | 'processing' | 'refund' | 'complete'>('received');
+  const [refundShipping, setRefundShipping] = useState(false);
   return (
     <div className="flex flex-wrap items-center gap-2">
       <select
@@ -4373,11 +4381,18 @@ function ReturnStatusControl({
         <option value="refund">已退款(建立退款單)</option>
         <option value="complete">已完成</option>
       </select>
+      {sel === 'refund' && shippingFee > 0 ? (
+        <label className="flex items-center gap-1.5 text-xs text-[#6b6156]">
+          <input type="checkbox" checked={refundShipping} onChange={(e) => setRefundShipping(e.target.checked)} className="h-4 w-4 accent-[#1f1b19]" />
+          一併退運費 {formatter.format(shippingFee)}
+        </label>
+      ) : null}
       <button
         onClick={async () => {
           if (sel === 'received' && !(await uiConfirm('標記已收到退貨?將回補庫存。'))) return;
-          if (sel === 'refund' && !(await uiConfirm(`退款 ${formatter.format(r.refund_amount)}?\n(實際退刷仍需至金流後台操作)`))) return;
-          onAction(sel);
+          const total = r.refund_amount + (refundShipping ? shippingFee : 0);
+          if (sel === 'refund' && !(await uiConfirm(`退款 ${formatter.format(total)}${refundShipping ? `(含運費 ${formatter.format(shippingFee)})` : ''}?\n(實際退刷仍需至金流後台操作)`))) return;
+          onAction(sel, sel === 'refund' && refundShipping);
         }}
         disabled={busy}
         className="rounded-full bg-[#1f1b19] px-3 py-1 text-xs font-semibold text-white disabled:opacity-50"
@@ -4540,14 +4555,14 @@ function AdminOrderModal({
   }, [order.id, onOrderChange]);
   useEffect(() => { loadDetail(); }, [loadDetail]);
 
-  async function reviewReturn(returnId: string, action: 'approve' | 'reject' | 'received' | 'processing' | 'refund' | 'complete', response = '') {
+  async function reviewReturn(returnId: string, action: 'approve' | 'reject' | 'received' | 'processing' | 'refund' | 'complete', response = '', refundShipping = false) {
     if (busy) return;
     setBusy(true);
     try {
       const res = await fetch(`/api/orders/${order.id}/returns`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ return_id: returnId, action, response }),
+        body: JSON.stringify({ return_id: returnId, action, response, refund_shipping: refundShipping }),
       });
       if (!res.ok) { void uiAlert((await res.json()).error ?? '操作失敗'); return; }
       await loadDetail();
@@ -4646,7 +4661,9 @@ ${order.note ? `<div class="sec"><h2>備註</h2><p class="muted">${escapeHtml(or
     if (input === null) return;
     const amount = Math.floor(Number(input));
     if (!Number.isFinite(amount) || amount < 0) { void uiAlert('金額不正確'); return; }
-    onUpdate({ refund_amount: amount });
+    const ship = refundableShipping(order) + Number(order.shipping_refund || 0);
+    const withShipping = ship > 0 && amount > 0 ? await uiConfirm(`這筆退款是否包含退運費 ${formatter.format(ship)}?`) : false;
+    onUpdate({ refund_amount: amount, shipping_refund: withShipping ? Math.min(ship, amount) : 0 });
   }
 
   return (
@@ -4695,7 +4712,7 @@ ${order.note ? `<div class="sec"><h2>備註</h2><p class="muted">${escapeHtml(or
               <button onClick={async () => {
                 if (!(await uiConfirm('確定要取消這筆訂單嗎?', { danger: true }))) return;
                 const refunded = order.paid ? await uiConfirm(`此訂單已付款 ${formatter.format(order.total)},是否一併標記已退款?\n(實際退刷仍需至金流後台操作)`) : false;
-                onUpdate(refunded ? { status: '取消', refund_amount: order.total } : { status: '取消' });
+                onUpdate(refunded ? { status: '取消', refund_amount: order.total, shipping_refund: Number(order.shipping || 0) - Number(order.shipping_discount || 0) } : { status: '取消' });
               }} className="inline-flex h-10 items-center rounded-full border border-[#e0b4b4] px-6 text-sm font-semibold text-[#c0392b] hover:bg-[#fbf3f0]">取消訂單</button>
             ) : null}
           </div>
@@ -4724,7 +4741,7 @@ ${order.note ? `<div class="sec"><h2>備註</h2><p class="muted">${escapeHtml(or
                           <button onClick={async () => { const resp = await uiPrompt('婉拒退貨,回覆客人(選填):'); if (resp !== null) reviewReturn(r.id, 'reject', resp); }} disabled={busy} className="rounded-full border border-[#e0b4b4] px-3 py-1 text-xs font-semibold text-[#c0392b] disabled:opacity-50">婉拒</button>
                         </>
                       ) : r.status !== 'REJECTED' && r.status !== 'REFUNDED' && r.status !== 'COMPLETED' ? (
-                        <ReturnStatusControl r={r} busy={busy} onAction={(action) => reviewReturn(r.id, action)} />
+                        <ReturnStatusControl r={r} busy={busy} shippingFee={refundableShipping(order)} onAction={(action, refundShipping) => reviewReturn(r.id, action, '', refundShipping)} />
                       ) : null}
                     </div>
                   </div>

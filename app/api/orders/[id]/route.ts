@@ -70,7 +70,7 @@ export async function PATCH(
   const supabase = (await shopAdminClient());
   const { data: current } = await supabase
     .from('orders')
-    .select('status, paid, total, order_status, payment_status, fulfillment_status')
+    .select('status, paid, total, shipping, shipping_discount, order_status, payment_status, fulfillment_status')
     .eq('id', id)
     .maybeSingle();
   if (!current) return NextResponse.json({ error: '找不到訂單' }, { status: 404 });
@@ -89,6 +89,11 @@ export async function PATCH(
   if (typeof body.admin_note === 'string') update.admin_note = body.admin_note;
   const hasRefund = typeof body.refund_amount === 'number';
   if (hasRefund) update.refund_amount = Math.max(0, Math.min(current.total, Math.floor(body.refund_amount)));
+  // 退款中屬於運費的金額(勾選「退運費」),不超過運費與退款金額
+  if (typeof body.shipping_refund === 'number') {
+    const ship = Math.max(0, Number(current.shipping || 0) - Number(current.shipping_discount || 0));
+    update.shipping_refund = Math.max(0, Math.min(ship, Math.floor(body.shipping_refund), hasRefund ? Number(update.refund_amount) : current.total));
+  }
   if (Object.keys(update).length === 0) {
     return NextResponse.json({ error: '沒有可更新的欄位' }, { status: 400 });
   }
