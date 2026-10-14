@@ -15,6 +15,13 @@ const blankCampaign: CampaignDraft = {
   status: 'draft', start_at: null, end_at: null, theme_color: '#702838',
 };
 
+// 活動頁輪播圖比例(和首頁模板的圖片尺寸選項一致)
+const HERO_RATIOS = [
+  { key: 'portrait', label: '直式 4:5(1080 × 1350 px)', w: 1080, h: 1350, cls: 'aspect-[4/5]' },
+  { key: 'square', label: '正方形 1:1(1200 × 1200 px)', w: 1200, h: 1200, cls: 'aspect-square' },
+  { key: 'wide', label: '橫式 16:9(1600 × 900 px)', w: 1600, h: 900, cls: 'aspect-[16/9]' },
+] as const;
+
 const STATUS_LABEL: Record<Campaign['status'], string> = { draft: '草稿', published: '已發布', archived: '已封存' };
 
 // 完整的活動頁網址(依目前網域,例如 https://urbanite.com.tw/promo/xxx)
@@ -279,6 +286,7 @@ function CampaignSettings({ campaign, busy, onSave, onUpload, onDelete }: { camp
   const [draft, setDraft] = useState(campaign);
   const [cropFile, setCropFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
+  const heroRatio = HERO_RATIOS.find((r) => r.key === (draft.hero_ratio ?? 'portrait')) ?? HERO_RATIOS[0];
   return <section className="border border-[#e5ded4] bg-white p-4 sm:p-5">
     <div className="flex flex-wrap items-center justify-between gap-3"><div className="flex flex-wrap items-center gap-3"><div><h3 className="text-lg font-bold">頁面設定</h3><p className="text-xs text-[#8a7f72]">公開網址：/promo/{campaign.slug}</p></div><select aria-label="狀態" value={draft.status} onChange={(e) => setDraft({ ...draft, status: e.target.value as Campaign['status'] })} className="h-10 border border-[#d8d0c6] bg-white px-3 text-sm font-semibold"><option value="draft">草稿</option><option value="published">發布</option><option value="archived">封存</option></select></div><div className="flex gap-2"><button type="button" onClick={onDelete} className="px-3 text-sm text-[#b23a3a]">刪除</button><button type="button" disabled={busy} onClick={() => onSave(draft)} className="rounded-md bg-[#1f1b19] px-5 py-2 text-sm font-semibold text-white disabled:opacity-50">儲存設定</button></div></div>
     <div className="mt-5 grid gap-4 sm:grid-cols-2">
@@ -288,13 +296,17 @@ function CampaignSettings({ campaign, busy, onSave, onUpload, onDelete }: { camp
       <Field label="結束時間"><input type="datetime-local" value={dateInput(draft.end_at)} onChange={(e) => setDraft({ ...draft, end_at: e.target.value || null })} /></Field>
       <Field label="主色"><input type="color" value={draft.theme_color} onChange={(e) => setDraft({ ...draft, theme_color: e.target.value })} className="h-11" /></Field>
       <Field label="頁面說明" className="sm:col-span-2"><textarea rows={3} value={draft.description} onChange={(e) => setDraft({ ...draft, description: e.target.value })} /></Field>
-      <Field label="首圖（輪播圖，建議 1080 × 1350 px，4:5）" className="sm:col-span-2"><div className="flex items-center gap-3">{draft.hero_image ? <img src={draft.hero_image} alt="" className="aspect-[4/5] h-24 bg-[#f5f1eb] object-cover" /> : null}<label className="cursor-pointer border border-[#d8d0c6] px-4 py-2 text-sm font-semibold">上傳首圖<input type="file" accept="image/*" className="hidden" onChange={(e) => { const file = e.target.files?.[0]; e.target.value = ''; if (file) setCropFile(file); }} /></label></div></Field>
+      <Field label="輪播圖尺寸" className="sm:col-span-2"><select value={draft.hero_ratio ?? 'portrait'} onChange={(e) => setDraft({ ...draft, hero_ratio: e.target.value as NonNullable<Campaign['hero_ratio']> })} className="h-11 w-full border border-[#d8d0c6] bg-white px-3 text-sm">{HERO_RATIOS.map((r) => <option key={r.key} value={r.key}>{r.label}</option>)}</select><p className="mt-1 text-xs text-[#8a7f72]">先選尺寸再上傳,裁切框會照這個比例;建議上傳 {heroRatio.w} × {heroRatio.h} px 以上。換尺寸後請重新上傳首圖。</p></Field>
+      <Field label="首圖(輪播圖)" className="sm:col-span-2"><div className="flex items-center gap-3">{draft.hero_image ? <img src={draft.hero_image} alt="" className={`h-24 bg-[#f5f1eb] object-cover ${heroRatio.cls}`} /> : null}<label className="cursor-pointer border border-[#d8d0c6] px-4 py-2 text-sm font-semibold">上傳首圖<input type="file" accept="image/*" className="hidden" onChange={(e) => { const file = e.target.files?.[0]; e.target.value = ''; if (file) setCropFile(file); }} /></label></div></Field>
     </div>
     {cropFile ? (
       <FixedBannerCropModal
         file={cropFile}
         busy={uploading}
-        title="活動頁首圖 — 固定首頁比例取景"
+        title={`活動頁首圖 — ${heroRatio.label}`}
+        outputW={heroRatio.w}
+        outputH={heroRatio.h}
+        hint={`輸出 ${heroRatio.w} × ${heroRatio.h} px`}
         onCancel={() => setCropFile(null)}
         onConfirm={async (blob, filename) => {
           setUploading(true);

@@ -205,6 +205,7 @@ export type Campaign = {
   title: string;
   description: string;
   hero_image: string;
+  hero_ratio?: 'portrait' | 'square' | 'wide'; // 輪播圖比例:4:5 / 1:1 / 16:9
   status: 'draft' | 'published' | 'archived';
   start_at?: string | null;
   end_at?: string | null;

@@ -4,7 +4,7 @@ import type { Campaign } from '@/lib/types';
 import { shopAdminClient } from '@/lib/shop';
 
 const editable: (keyof Campaign)[] = [
-  'name', 'slug', 'eyebrow', 'title', 'description', 'hero_image',
+  'name', 'slug', 'eyebrow', 'title', 'description', 'hero_image', 'hero_ratio',
   'status', 'start_at', 'end_at', 'theme_color',
 ];
 
@@ -15,6 +15,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   const body = await request.json();
   const update: Record<string, unknown> = { updated_at: new Date().toISOString() };
   for (const key of editable) if (key in body) update[key] = body[key] || (key === 'start_at' || key === 'end_at' ? null : body[key]);
+  if ('hero_ratio' in update && !['portrait', 'square', 'wide'].includes(String(update.hero_ratio))) update.hero_ratio = 'portrait';
   if (typeof update.slug === 'string' && !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(update.slug)) {
     return NextResponse.json({ error: '網址只能使用小寫英文、數字與連字號' }, { status: 400 });
   }
