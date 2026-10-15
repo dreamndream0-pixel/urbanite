@@ -134,7 +134,11 @@ export function useLoopCarousel<T>(items: T[], { autoplayMs = 0 }: { autoplayMs?
       if (pointerId.current === e.pointerId) end(false);
     },
     onPointerCancel: () => end(true),
-    onLostPointerCapture: () => end(true),
+    // 觸控時瀏覽器會先把指標隱式捕捉在手指下的子元素;改由軌道捕捉時,子元素的 lostpointercapture 會冒泡上來,
+    // 不能當成手勢結束(否則手機一開始滑就被取消)。只有軌道本身失去捕捉才結束。
+    onLostPointerCapture: (e: React.PointerEvent<HTMLElement>) => {
+      if (e.target === e.currentTarget && pointerId.current === e.pointerId) end(true);
+    },
     onPointerLeave: (e: React.PointerEvent<HTMLElement>) => {
       if (e.pointerType === 'mouse') end(false);
     },
