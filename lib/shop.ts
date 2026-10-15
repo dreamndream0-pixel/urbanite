@@ -75,7 +75,7 @@ export const isPlatformShop = (shop: Pick<Shop, 'id'> | null | undefined) => Boo
 export const SHOP_TABLES = new Set([
   'banners', 'campaigns', 'campaign_products', 'categories', 'customers', 'discounts', 'user_coupons', 'coupon_usages',
   'favorites', 'orders', 'order_status_history', 'payments', 'refunds', 'returns', 'shipments', 'shipment_events',
-  'products', 'site_settings', 'stock_movements',
+  'products', 'site_settings', 'stock_movements', 'stocktakes',
   'line_bot_config', 'line_bot_rules', 'line_rich_menus', 'line_broadcasts', 'line_events',
   'credit_lots', 'credit_entries',
 ]);

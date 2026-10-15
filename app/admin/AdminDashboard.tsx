@@ -53,6 +53,8 @@ import { POLICY_LABEL, policyText, stripPolicies, withPolicies } from '@/lib/foo
 import SiteThemeEditor from './SiteThemeEditor';
 import LineBotManager from './line-bot/LineBotManager';
 import LoyaltyManager from './LoyaltyManager';
+import StocktakeManager, { type StocktakeApplied } from './StocktakeManager';
+import { downloadCsv } from '@/lib/stocktake';
 import { isCollectOnDelivery } from '@/lib/payment';
 import { buildReturnSteps, historyKind, isReturnOrder } from '@/lib/return-progress';
 import { getCheckoutLine, getNewsletter, HIDDEN_FOOTER_SECTION_TITLES, lineAddFriendUrl, withCheckoutLine, withNewsletter } from '@/lib/checkout-line';
@@ -2415,6 +2417,11 @@ export default function AdminDashboard({
               onDeleteStockRow={deleteStockRow}
               onDeleteMovement={deleteMovement}
               onImportInventory={importInventoryRows}
+              onStocktakeApplied={(r) => {
+                const byId = new Map(r.products.map((p) => [p.id, p]));
+                setProducts((list) => list.map((p) => (byId.has(p.id) ? { ...p, ...byId.get(p.id)! } : p)));
+                if (r.movements.length) setMovements((l) => [...r.movements, ...l]);
+              }}
               onEditProduct={(product) => {
                 setEditing(toDraft(product));
                 setIsNew(false);
@@ -5405,6 +5412,7 @@ function InventorySection({
   onDeleteStockRow,
   onDeleteMovement,
   onImportInventory,
+  onStocktakeApplied,
   onEditProduct,
   onCreateProduct,
 }: {
@@ -5425,6 +5433,7 @@ function InventorySection({
   onDeleteStockRow: (productId: string, variantKey: string) => void;
   onDeleteMovement: (movement: StockMovement) => void;
   onImportInventory: (rows: InventoryImportRow[]) => void;
+  onStocktakeApplied: (r: StocktakeApplied) => void;
   onEditProduct: (product: Product) => void;
   onCreateProduct: () => void;
 }) {
@@ -5435,7 +5444,7 @@ function InventorySection({
     productId: 'all',
   });
   const [selectedInventoryProduct, setSelectedInventoryProduct] = useState<Product | null>(null);
-  const [inventoryTab, setInventoryTab] = useState<'products' | 'stock' | 'movement' | 'history'>('products');
+  const [inventoryTab, setInventoryTab] = useState<'products' | 'stock' | 'movement' | 'history' | 'stocktake'>('products');
   const [movementPicker, setMovementPicker] = useState<{
     lineId: string;
     field: 'product' | 'color' | 'size';
@@ -5515,6 +5524,7 @@ function InventorySection({
     { key: 'stock', label: '庫存總表' },
     { key: 'movement', label: '入庫 / 出庫' },
     { key: 'history', label: '進出庫紀錄' },
+    { key: 'stocktake', label: '盤點' },
   ] as const;
   const updateMovementLine = (id: string, patch: Partial<MovementLine>) => {
     setMovementLines(movementLines.map((line) => (line.id === id ? { ...line, ...patch } : line)));
@@ -5665,6 +5675,16 @@ function InventorySection({
     link.download = `urbanite-inventory-${new Date().toISOString().slice(0, 10)}.csv`;
     link.click();
     URL.revokeObjectURL(url);
+  };
+  // 進出庫紀錄匯出(目前載入的紀錄)
+  const exportMovementsCsv = () => {
+    downloadCsv(`urbanite-stock-movements-${new Date().toISOString().slice(0, 10)}.csv`, [
+      ['登錄日期', '單號', '品項編號', '品名', '規格', '類型', '數量', '單價', '地點 / 對象', '經手人', '備註'],
+      ...movements.map((m) => {
+        const doc = parseMovementNote(m.note);
+        return [m.created_at ? new Date(m.created_at).toLocaleString('zh-TW', { hour12: false }) : '', doc.document_no || '', m.product_id, nameById(m.product_id), m.variant_key || '', m.type === 'in' ? '入庫' : '出庫', m.quantity, m.unit_price, m.location || '', m.handler || '', doc.note || m.note || ''];
+      }),
+    ]);
   };
   const importInventoryCsv = async (file: File) => {
     const text = await file.text();
@@ -6177,8 +6197,19 @@ function InventorySection({
       )}
 
       {/* 進出庫紀錄 */}
+      {inventoryTab === 'stocktake' && (
+        <StocktakeManager products={products} categories={categories} onApplied={onStocktakeApplied} />
+      )}
+
       {inventoryTab === 'history' && (
-      <Card title="進出庫紀錄">
+      <Card
+        title="進出庫紀錄"
+        action={movements.length ? (
+          <button type="button" onClick={exportMovementsCsv} className="rounded-full border border-[#d7c9bd] px-4 py-2 text-sm font-semibold">
+            匯出紀錄
+          </button>
+        ) : undefined}
+      >
         {movements.length === 0 ? (
           <Empty>目前沒有進出庫紀錄。</Empty>
         ) : (
