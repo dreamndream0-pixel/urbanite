@@ -33,6 +33,7 @@ import {
 } from '@/lib/order-status';
 import { uiToast } from '@/lib/ui-toast';
 import NumberInput from './NumberInput';
+import DraggableChips from './DraggableChips';
 import { cleanRichText } from '@/lib/rich-text';
 import { orderRevenue, productRevenue, refundableShipping, shippingRevenue } from '@/lib/revenue';
 import OrderNotificationSettingsPanel from './OrderNotificationSettings';
@@ -6934,12 +6935,12 @@ function ProductModal({
 	                      className="rounded-lg border border-[#e5ded4] px-3 py-2 text-sm"
 	                    />
 	                    <div className="flex min-h-11 flex-wrap items-center gap-2 rounded-lg border border-[#e5ded4] px-2 py-1">
-	                      {parseOptions(s.optionsText).map((option) => (
-	                        <span key={option} className="inline-flex items-center gap-1 rounded-lg bg-[#e9eefc] px-3 py-1.5 text-sm font-semibold text-[#2868d8]">
-	                          {option}
-	                          <button type="button" onClick={() => removeSpecOption(i, option)} className="text-[#88a8ea]">×</button>
-	                        </span>
-	                      ))}
+	                      {/* 選項可拖曳排序(電腦按住拖、手機長按後拖) */}
+	                      <DraggableChips
+	                        items={parseOptions(s.optionsText)}
+	                        onReorder={(next) => updateSpec(i, { optionsText: next.join(', ') })}
+	                        onRemove={(option) => removeSpecOption(i, option)}
+	                      />
 	                      <input
 	                        placeholder="輸入選項後按 Enter"
 	                        value={specInputs[i] ?? ''}
