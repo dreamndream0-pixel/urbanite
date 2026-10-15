@@ -1712,7 +1712,8 @@ export default function AdminDashboard({
               <IconClose />
             </button>
           </div>
-          <nav className="flex flex-col gap-1 p-3">
+          {/* 選單項目比畫面高時可以在選單內捲動(手機) */}
+          <nav className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto overscroll-contain p-3">
             {nav.map((n) => (
               <button
                 key={n.key}
