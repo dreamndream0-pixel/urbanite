@@ -120,21 +120,15 @@ export default function Storefront({ campaign = null, preview = false }: { campa
   const [logoUrl, setLogoUrl] = useState(cached?.settings?.logo_url ?? '');
   const [settings, setSettings] = useState<SiteSettings | null>(cached?.settings ?? null);
   const [loading, setLoading] = useState(!cached);
-  // 主站開啟頁面預設停在「精選商品」;活動頁預設顯示全部活動商品
-  const [category, setCategory] = useState(() => {
-    if (initialReturn) return initialReturn.category;
-    let c = campaign ? 'all' : 'spring';
-    if (cached && c !== 'all' && !cached.categories!.some((cat) => cat.slug === c)) c = 'all';
-    if (cached?.settings && !campaign && c === 'spring' && resolveSiteTheme(cached.settings.site_theme).storefront?.blocks !== undefined) c = 'all';
-    return c;
-  });
+  // 使用者選的分類;空字串 = 還沒選,首頁 / 活動頁預設停在分類列最左邊的分類(見下方 category)
+  const [pickedCategory, setCategory] = useState(() => initialReturn?.category ?? '');
   // 官網模板首頁按「查看更多」→ 改顯示全部商品列表
   const [browseAll, setBrowseAll] = useState(initialReturn?.browseAll ?? false);
   const [displayCount, setDisplayCount] = useState(initialReturn ? Math.max(12, initialReturn.displayCount) : 12);
   // 切換分類/搜尋時,顯示數量重設回 12(在換的當下一起重設,不另外多畫一次)
-  const [listKey, setListKey] = useState(`${category}|${query}`);
-  if (listKey !== `${category}|${query}`) {
-    setListKey(`${category}|${query}`);
+  const [listKey, setListKey] = useState(`${pickedCategory}|${query}`);
+  if (listKey !== `${pickedCategory}|${query}`) {
+    setListKey(`${pickedCategory}|${query}`);
     setDisplayCount(12);
   }
   const [menuOpen, setMenuOpen] = useState(false);
@@ -236,7 +230,7 @@ export default function Storefront({ campaign = null, preview = false }: { campa
         setDbCategories(data);
         cacheStore(cacheKey, { categories: data });
         // 預設分類(spring)是 URBANITE 的;其他店家沒有這個分類時改顯示全部商品
-        setCategory((c) => (c === 'all' || data.some((cat) => cat.slug === c) ? c : 'all'));
+        setCategory((c) => (c === '' || c === 'all' || data.some((cat) => cat.slug === c) ? c : ''));
       })
       .catch(() => setDbCategories([]));
 
@@ -247,7 +241,6 @@ export default function Storefront({ campaign = null, preview = false }: { campa
         cacheStore(cacheKey, { settings: s ?? null });
         if (s) {
           setSettings(s);
-          if (!campaign && resolveSiteTheme(s.site_theme).storefront?.blocks !== undefined) setCategory((current) => current === 'spring' ? 'all' : current);
         }
       })
       .catch(() => {});
@@ -345,6 +338,11 @@ export default function Storefront({ campaign = null, preview = false }: { campa
         children: childrenOf(c.id),
       })),
   ];
+
+  // 預設分類:板塊模板首頁 → 'all'(顯示首頁板塊);其他 → 分類列最左邊的分類(「全部商品」在最右邊)
+  const homeDesign = resolveStorefront(resolveSiteTheme(settings?.site_theme).storefront);
+  const blocksHome = !campaign && homeDesign.enabled && homeDesign.blocks !== undefined;
+  const category = pickedCategory || (blocksHome ? 'all' : categoryTabs[1]?.slug ?? 'all');
 
   // 未上架、以及售完的純現貨商品(自動下架)不顯示;預購商品售完仍顯示
   const liveProducts = products.filter(isVisibleInStore);
@@ -594,7 +592,7 @@ export default function Storefront({ campaign = null, preview = false }: { campa
         <section id="store-products" className="mt-6 scroll-mt-24">
           <div className="mb-5">
             <h1 className="store-title text-2xl font-semibold tracking-wide sm:text-3xl">
-              {customDesign && !query && (category === 'all' || category === 'spring') ? design.productsTitle : activeCategory.slug === 'all' ? '全部商品' : activeCategory.name}
+              {customDesign && !query && category === 'all' ? design.productsTitle : activeCategory.slug === 'all' ? '全部商品' : activeCategory.name}
             </h1>
           </div>
           {loading ? (
