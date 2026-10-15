@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
+import { onPageScroll, scrollMetrics } from '@/lib/page-scroll';
 
 export default function SystemEffects() {
   useEffect(() => {
@@ -51,12 +52,13 @@ export default function SystemEffects() {
     sections.forEach((section) => sectionObserver.observe(section));
 
     const updateScroll = () => {
-      const scrollable = document.documentElement.scrollHeight - window.innerHeight;
-      const progress = scrollable > 0 ? Math.min(1, window.scrollY / scrollable) : 0;
+      const { y, height, viewport } = scrollMetrics();
+      const scrollable = height - viewport;
+      const progress = scrollable > 0 ? Math.min(1, y / scrollable) : 0;
       page.style.setProperty('--scroll-progress', progress.toString());
     };
     updateScroll();
-    window.addEventListener('scroll', updateScroll, { passive: true });
+    const stopScroll = onPageScroll(updateScroll);
 
     const tilt = page.querySelector<HTMLElement>('[data-tilt]');
     const moveTilt = (event: PointerEvent) => {
@@ -82,7 +84,7 @@ export default function SystemEffects() {
     return () => {
       revealObserver?.disconnect();
       sectionObserver.disconnect();
-      window.removeEventListener('scroll', updateScroll);
+      stopScroll();
       tilt?.removeEventListener('pointermove', moveTilt);
       tilt?.removeEventListener('pointerleave', resetTilt);
     };

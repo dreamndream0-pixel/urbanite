@@ -49,23 +49,20 @@ html {
 @media (max-width: 767px), (hover: none) and (pointer: coarse) {
   html { scroll-padding-top: 80px; }
 }
-/* iPhone 上 Safari 以外的瀏覽器(Chrome、Firefox、Edge、App 內建瀏覽器):網址列伸縮時 sticky 頁首位置會算錯、蓋住或切到內容,
-   改成一般排版的頁首(隨頁面捲動),Safari 維持固定頁首。data-browser 由 app/layout.tsx 的內嵌腳本設定。 */
-html[data-browser='ios-chrome'] .page-header,
-html[data-browser='ios-other'] .page-header { position: relative; top: auto; }
+/* iPhone 上 Safari 以外的瀏覽器(Chrome、Firefox、Edge、LINE / IG / FB 內建瀏覽器):
+   網址列伸縮時,固定頁首和內容的位置會對不上(內容被藏在頁首下面)。
+   改成 html 不捲動(網址列就不會伸縮)、由 body 自己捲動,sticky 頁首相對 body 定位,位置永遠正確。
+   data-browser 由 app/layout.tsx 的內嵌腳本在畫面出現前設定;讀寫捲動位置請用 lib/page-scroll.ts。 */
 html[data-browser='ios-chrome'],
-html[data-browser='ios-other'] { scroll-padding-top: 16px; }
-/* 上面是備援(程式還沒載入時);載入後由 HeadroomHeader 加上 .headroom:
-   頁首一直固定在最上方;body 留出頁首高度(--hh),內容從頁首下方開始、在頁首底下捲動 */
-html.headroom body { padding-top: var(--hh, 0px); }
-html.headroom .page-header {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  z-index: 40;
+html[data-browser='ios-other'] { height: 100%; overflow: hidden; }
+html[data-browser='ios-chrome'] body,
+html[data-browser='ios-other'] body {
+  height: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  scroll-padding-top: 80px;
 }
-html.headroom { scroll-padding-top: calc(var(--hh, 0px) + 12px); }
 
 body {
   margin: 0;

@@ -22,6 +22,7 @@ import { StorefrontDesignHero, StorefrontDesignFeature } from './StorefrontDesig
 import StorefrontBlocks from './StorefrontBlocks';
 import { useScrollLock } from './useScrollLock';
 import SocialBrandIcon, { detectSocialBrand } from './SocialBrandIcon';
+import { getScrollY, onPageScroll, scrollMetrics, scrollToY } from '@/lib/page-scroll';
 
 // 購物車存在瀏覽器本機的 key(結帳頁會讀同一份)
 const CART_KEY = 'cart';
@@ -157,8 +158,8 @@ export default function Storefront({ campaign = null, preview = false }: { campa
     cameBack = false;
     if (initialReturn) {
       const y = initialReturn.scrollY;
-      window.scrollTo(0, y);
-      requestAnimationFrame(() => { if (Math.abs(window.scrollY - y) > 2) window.scrollTo(0, y); });
+      scrollToY(y);
+      requestAnimationFrame(() => { if (Math.abs(getScrollY() - y) > 2) scrollToY(y); });
       return;
     }
     if (cached) return;
@@ -382,14 +383,14 @@ export default function Storefront({ campaign = null, preview = false }: { campa
     if (loading || !saved) return;
     returnState.current = null;
     setDisplayCount(Math.max(12, saved.displayCount));
-    requestAnimationFrame(() => requestAnimationFrame(() => window.scrollTo(0, saved.scrollY)));
+    requestAnimationFrame(() => requestAnimationFrame(() => scrollToY(saved.scrollY)));
   }, [loading]);
 
   // 點商品進入商品頁前,記下目前的分類與位置
   function rememberStoreState(e: React.MouseEvent) {
     if (!(e.target as HTMLElement).closest?.('a[href^="/products/"]')) return;
     try {
-      const state: StoreState = { path: location.pathname + location.search, category, browseAll, displayCount, scrollY: window.scrollY, at: Date.now() };
+      const state: StoreState = { path: location.pathname + location.search, category, browseAll, displayCount, scrollY: getScrollY(), at: Date.now() };
       sessionStorage.setItem(STORE_STATE_KEY, JSON.stringify(state));
     } catch { /* 略過 */ }
   }
@@ -398,12 +399,10 @@ export default function Storefront({ campaign = null, preview = false }: { campa
   useEffect(() => {
     if (!hasMore) return;
     function onScroll() {
-      const nearBottom =
-        window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 400;
-      if (nearBottom) setDisplayCount((c) => c + 12);
+      const { y, height, viewport } = scrollMetrics();
+      if (viewport + y >= height - 400) setDisplayCount((c) => c + 12);
     }
-    window.addEventListener('scroll', onScroll, { passive: true });
-    return () => window.removeEventListener('scroll', onScroll);
+    return onPageScroll(onScroll);
   }, [hasMore]);
 
   const cartCount = cart.reduce((sum, item) => sum + item.quantity, 0);
