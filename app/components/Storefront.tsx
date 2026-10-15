@@ -1,6 +1,6 @@
 'use client';
 
-import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
+import { type ReactNode, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createBrowserSupabase } from '@/lib/supabase/client';
@@ -33,10 +33,9 @@ if (typeof window !== 'undefined') {
   window.addEventListener('popstate', () => { cameBack = true; });
   document.addEventListener('click', () => { cameBack = false; }, true);
 }
-function takeReturnState(): StoreState | null {
+function peekReturnState(): StoreState | null {
   const nav = performance.getEntriesByType?.('navigation')[0] as PerformanceNavigationTiming | undefined;
   const back = cameBack || nav?.type === 'back_forward';
-  cameBack = false;
   if (!back) return null;
   try {
     const saved = JSON.parse(sessionStorage.getItem(STORE_STATE_KEY) || 'null') as StoreState | null;
@@ -45,6 +44,17 @@ function takeReturnState(): StoreState | null {
   } catch {
     return null;
   }
+}
+
+// 商店資料暫存在記憶體:站內換頁回來(例如從商品頁返回)直接用上次的資料畫出來,不會先閃「載入中」
+type StoreData = { products?: Product[]; categories?: Category[]; settings?: SiteSettings | null; banners?: Banner[] };
+const storeCache = new Map<string, StoreData>();
+function cacheStore(key: string, patch: StoreData) {
+  storeCache.set(key, { ...storeCache.get(key), ...patch });
+}
+function cachedStore(key: string, campaign: boolean) {
+  const c = storeCache.get(key);
+  return c && c.products && c.categories && c.settings !== undefined && (campaign || c.banners) ? c : undefined;
 }
 
 // 依商品/規格計算目前可加入的庫存;預購商品不受限。
@@ -99,20 +109,36 @@ function readCart(): CartItem[] {
 export default function Storefront({ campaign = null, preview = false }: { campaign?: Campaign | null; preview?: boolean }) {
   const router = useRouter();
   const homeHref = campaign ? campaignHomeHref(campaign.slug) : '/';
-  const [products, setProducts] = useState<Product[]>([]);
-  const [banners, setBanners] = useState<Banner[]>([]);
-  const [dbCategories, setDbCategories] = useState<Category[]>([]);
-  const [logoUrl, setLogoUrl] = useState('');
-  const [settings, setSettings] = useState<SiteSettings | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [query, setQuery] = useState('');
+  const cacheKey = campaign ? `campaign:${campaign.id}` : 'main';
+  // 只有站內換頁才會有快取(第一次開網頁沒有,伺服器與瀏覽器的初次畫面一致)
+  const [cached] = useState(() => (typeof window === 'undefined' ? undefined : cachedStore(cacheKey, !!campaign)));
+  const [initialReturn] = useState(() => (cached ? peekReturnState() : null));
+  const [products, setProducts] = useState<Product[]>(cached?.products ?? []);
+  const [banners, setBanners] = useState<Banner[]>(cached?.banners ?? []);
+  const [dbCategories, setDbCategories] = useState<Category[]>(cached?.categories ?? []);
+  const [logoUrl, setLogoUrl] = useState(cached?.settings?.logo_url ?? '');
+  const [settings, setSettings] = useState<SiteSettings | null>(cached?.settings ?? null);
+  const [loading, setLoading] = useState(!cached);
   // 主站開啟頁面預設停在「精選商品」;活動頁預設顯示全部活動商品
-  const [category, setCategory] = useState(campaign ? 'all' : 'spring');
+  const [category, setCategory] = useState(() => {
+    if (initialReturn) return initialReturn.category;
+    let c = campaign ? 'all' : 'spring';
+    if (cached && c !== 'all' && !cached.categories!.some((cat) => cat.slug === c)) c = 'all';
+    if (cached?.settings && !campaign && c === 'spring' && resolveSiteTheme(cached.settings.site_theme).storefront?.blocks !== undefined) c = 'all';
+    return c;
+  });
   // 官網模板首頁按「查看更多」→ 改顯示全部商品列表
-  const [browseAll, setBrowseAll] = useState(false);
-  const [displayCount, setDisplayCount] = useState(12);
+  const [browseAll, setBrowseAll] = useState(initialReturn?.browseAll ?? false);
+  const [displayCount, setDisplayCount] = useState(initialReturn ? Math.max(12, initialReturn.displayCount) : 12);
+  // 切換分類/搜尋時,顯示數量重設回 12(在換的當下一起重設,不另外多畫一次)
+  const [listKey, setListKey] = useState(`${category}|${query}`);
+  if (listKey !== `${category}|${query}`) {
+    setListKey(`${category}|${query}`);
+    setDisplayCount(12);
+  }
   const [menuOpen, setMenuOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
-  const [query, setQuery] = useState('');
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
   const [confirmedFavorites, setConfirmedFavorites] = useState<Set<string>>(new Set());
   const [favoritesLoaded, setFavoritesLoaded] = useState(false);
@@ -122,8 +148,8 @@ export default function Storefront({ campaign = null, preview = false }: { campa
   const [cartOpen, setCartOpen] = useState(false);
   // 購物車一律先以空陣列渲染,掛載後再從 localStorage 載入,
   // 這樣伺服器與瀏覽器第一次渲染一致,避免 hydration 不匹配警告。
-  const [cart, setCart] = useState<CartItem[]>([]);
-  const [cartHydrated, setCartHydrated] = useState(false);
+  const [cart, setCart] = useState<CartItem[]>(() => (cached ? readCart() : []));
+  const [cartHydrated, setCartHydrated] = useState(!!cached);
   const [user, setUser] = useState<{ email: string; name: string; isAdmin: boolean } | null>(null);
   const [quickAdd, setQuickAdd] = useState<Product | null>(null);
   const cartIconRef = useRef<HTMLButtonElement>(null);
@@ -133,15 +159,23 @@ export default function Storefront({ campaign = null, preview = false }: { campa
   const returnState = useRef<StoreState | null>(null);
 
   // 返回時先還原分類(商品載入完成後再還原數量與捲動位置)
-  useEffect(() => {
-    const saved = takeReturnState();
+  useLayoutEffect(() => {
+    cameBack = false;
+    if (initialReturn) {
+      const y = initialReturn.scrollY;
+      window.scrollTo(0, y);
+      requestAnimationFrame(() => { if (Math.abs(window.scrollY - y) > 2) window.scrollTo(0, y); });
+      return;
+    }
+    if (cached) return;
+    const saved = peekReturnState();
     if (!saved) return;
     returnState.current = saved;
     Promise.resolve().then(() => {
       setCategory(saved.category);
       setBrowseAll(saved.browseAll);
     });
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   function notifyAdded() {
     setCartToast(true);
@@ -192,7 +226,7 @@ export default function Storefront({ campaign = null, preview = false }: { campa
   useEffect(() => {
     fetch(campaign ? `/api/products?campaign=${encodeURIComponent(campaign.id)}` : '/api/products')
       .then((res) => (res.ok ? res.json() : []))
-      .then((data: Product[]) => setProducts(data))
+      .then((data: Product[]) => { setProducts(data); cacheStore(cacheKey, { products: data }); })
       .catch(() => setProducts([]))
       .finally(() => setLoading(false));
 
@@ -200,6 +234,7 @@ export default function Storefront({ campaign = null, preview = false }: { campa
       .then((res) => (res.ok ? res.json() : []))
       .then((data: Category[]) => {
         setDbCategories(data);
+        cacheStore(cacheKey, { categories: data });
         // 預設分類(spring)是 URBANITE 的;其他店家沒有這個分類時改顯示全部商品
         setCategory((c) => (c === 'all' || data.some((cat) => cat.slug === c) ? c : 'all'));
       })
@@ -209,6 +244,7 @@ export default function Storefront({ campaign = null, preview = false }: { campa
       .then((res) => (res.ok ? res.json() : null))
       .then((s) => {
         if (s?.logo_url) setLogoUrl(s.logo_url);
+        cacheStore(cacheKey, { settings: s ?? null });
         if (s) {
           setSettings(s);
           if (!campaign && resolveSiteTheme(s.site_theme).storefront?.blocks !== undefined) setCategory((current) => current === 'spring' ? 'all' : current);
@@ -219,17 +255,18 @@ export default function Storefront({ campaign = null, preview = false }: { campa
     if (campaign) return; // 活動頁的輪播圖使用活動主視覺(見 heroBanners)
     fetch('/api/banners')
       .then((res) => (res.ok ? res.json() : []))
-      .then((data: Banner[]) => setBanners(data))
+      .then((data: Banner[]) => { setBanners(data); cacheStore(cacheKey, { banners: data }); })
       .catch(() => setBanners([]));
-  }, [campaign]);
+  }, [campaign, cacheKey]);
 
   // 掛載後才從 localStorage 載入購物車
   useEffect(() => {
+    if (cached) return;
     Promise.resolve().then(() => {
       setCart(readCart());
       setCartHydrated(true);
     });
-  }, []);
+  }, [cached]);
 
   useEffect(() => {
     if (!cartHydrated) return; // 尚未載入前不要寫入,以免把已存的購物車覆蓋成空
@@ -251,8 +288,8 @@ export default function Storefront({ campaign = null, preview = false }: { campa
       });
       return;
     }
-    setFavoritesLoaded(false);
-    fetch('/api/favorites')
+    Promise.resolve()
+      .then(() => { setFavoritesLoaded(false); return fetch('/api/favorites'); })
       .then((res) => (res.ok ? res.json() : { productIds: [] }))
       .then((data: { productIds?: string[] }) => {
         const next = new Set(data.productIds ?? []);
@@ -319,7 +356,7 @@ export default function Storefront({ campaign = null, preview = false }: { campa
       : []
     : banners.filter((b) => b.active && (b.group_no ?? 1) === 1); // 原本首頁只用輪播圖1
 
-  const visibleProducts = useMemo(() => {
+  const visibleProducts = (() => {
     let list = liveProducts;
     if (category !== 'all') {
       const parent = visibleCats.find((c) => c.slug === category);
@@ -336,7 +373,7 @@ export default function Storefront({ campaign = null, preview = false }: { campa
       );
     }
     return list;
-  }, [liveProducts, category, query, visibleCats]);
+  })();
 
   const shown = visibleProducts.slice(0, displayCount);
   const hasMore = displayCount < visibleProducts.length;
@@ -358,11 +395,6 @@ export default function Storefront({ campaign = null, preview = false }: { campa
       sessionStorage.setItem(STORE_STATE_KEY, JSON.stringify(state));
     } catch { /* 略過 */ }
   }
-
-  // 切換分類/搜尋時,顯示數量重設回 12
-  useEffect(() => {
-    setDisplayCount(12);
-  }, [category, query]);
 
   // 捲動到接近底部時,載入下一批 12 個(每次捲到底加一批,不會一次全載)
   useEffect(() => {
