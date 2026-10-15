@@ -6,6 +6,7 @@ import { unstable_cache } from 'next/cache';
 import { resolveSiteTheme, siteThemeCss } from '@/lib/site-theme';
 import { getCurrentShop, isPlatformShop, scopedClient, shopUrl, URBANITE_SHOP_ID } from '@/lib/shop';
 import ScrollLockGuard from '@/app/components/ScrollLockGuard';
+import HeadroomHeader from '@/app/components/HeadroomHeader';
 
 // 網站外觀(後台 系統設定 → 一般設定);每家店各自快取,儲存時會清除快取
 const loadSiteTheme = unstable_cache(
@@ -112,6 +113,7 @@ export default async function RootLayout({
       </head>
       <body>
         <ScrollLockGuard />
+        <HeadroomHeader />
         {shop && shop.status !== 'suspended' ? (
           children
         ) : (

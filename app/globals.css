@@ -55,6 +55,20 @@ html[data-browser='ios-chrome'] .page-header,
 html[data-browser='ios-other'] .page-header { position: relative; top: auto; }
 html[data-browser='ios-chrome'],
 html[data-browser='ios-other'] { scroll-padding-top: 16px; }
+/* 上面是備援(程式還沒載入時);載入後由 HeadroomHeader 加上 .headroom:
+   頁首固定在最上方,往下滑收起、往上滑出現;body 留出頁首高度(--hh)避免內容被蓋住 */
+html.headroom body { padding-top: var(--hh, 0px); }
+html.headroom .page-header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 40;
+  transition: transform 0.25s ease;
+  will-change: transform;
+}
+html.headroom.headroom-hidden .page-header { transform: translateY(-100%); }
+html.headroom { scroll-padding-top: calc(var(--hh, 0px) + 12px); }
 
 body {
   margin: 0;
