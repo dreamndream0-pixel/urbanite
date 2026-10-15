@@ -20,6 +20,9 @@ type Props = {
 const order = (c: Category) => Math.abs(c.sort_order || 0);
 const byOrder = (a: { sort_order?: number }, b: { sort_order?: number }) => Math.abs(a.sort_order ?? 0) - Math.abs(b.sort_order ?? 0);
 
+// 活動分類代碼:時間 + 亂數,不會和其他分類重複(在元件外產生,避免被當成畫面計算的一部分)
+const newCategorySlug = () => `cp-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`;
+
 // 上層分類在前、子分類縮排接在後面(和主站分類管理相同)
 function tree(cats: Category[]) {
   const result: { cat: Category; depth: number }[] = [];
@@ -55,7 +58,7 @@ export default function CampaignCategoryManager({ campaignId, campaignName, cate
   async function add() {
     const name = draft.name.trim();
     if (!name) return void uiAlert('請輸入分類名稱');
-    const slug = `cp-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`;
+    const slug = newCategorySlug();
     const siblings = mine.filter((c) => (c.parent_id || '') === draft.parent_id);
     const res = await fetch('/api/categories', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ slug, name, en: draft.en.trim() || name.toUpperCase(), campaign_id: campaignId, parent_id: draft.parent_id || null, sort_order: siblings.length + 1 }) });
     const data = await res.json().catch(() => null);
