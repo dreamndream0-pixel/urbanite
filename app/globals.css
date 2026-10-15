@@ -132,8 +132,8 @@ img {
 }
 .store-category-row--images .store-category-button + .store-category-button::before { top: 46px; height: 28px; }
 .store-category-row--images .store-category-button::after { left: 50%; right: auto; width: 28px; margin-left: -14px; bottom: 2px; border-radius: 2px; }
-.store-category-row--images .store-category-button:hover,
 .store-category-row--images .store-category-button[aria-expanded='true'] { background: transparent; }
+@media (hover: hover) { .store-category-row--images .store-category-button:hover { background: transparent; } }
 .store-category-image {
   display: flex;
   width: 68px;
@@ -153,9 +153,10 @@ img {
 /* 去背 PNG:沒有底色與框,圖案直接浮在頁面上 */
 .store-category-row--images.store-category-row--cutout .store-category-image { border-radius: 0; background: transparent; overflow: visible; }
 .store-category-row--images.store-category-row--cutout .store-category-image img { object-fit: contain; filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.08)); }
-.store-category-row--images.store-category-row--cutout .store-category-button:hover .store-category-image { box-shadow: none; }
+@media (hover: hover) { .store-category-row--images.store-category-row--cutout .store-category-button:hover .store-category-image { box-shadow: none; } }
 .store-category-row--images.store-category-row--cutout .store-category-button[aria-current='page'] .store-category-image { box-shadow: none; transform: scale(1.06); }
-.store-category-row--images .store-category-button:hover .store-category-image { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08); }
+/* 只在有滑鼠的裝置做 hover 效果:iPhone 點第一下會被當成 hover,要點第二下才有反應 */
+@media (hover: hover) { .store-category-row--images .store-category-button:hover .store-category-image { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08); } }
 .store-category-row--images .store-category-button[aria-current='page'] .store-category-image { box-shadow: 0 0 0 2px var(--fold-active); }
 .store-category-row--images .store-category-label { font-size: 13px; letter-spacing: 0.08em; }
 @media (min-width: 768px) {
@@ -180,6 +181,8 @@ img {
   font-weight: 500;
   white-space: nowrap;
   transition: color 160ms ease, background-color 160ms ease;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
 }
 .store-category-button + .store-category-button::before {
   content: '';
@@ -207,8 +210,8 @@ img {
   font-weight: 600;
 }
 .store-category-button[aria-current='page']::after { transform: scaleX(1); }
-.store-category-button:hover,
 .store-category-button[aria-expanded='true'] { background: var(--c-soft); }
+@media (hover: hover) { .store-category-button:hover { background: var(--c-soft); } }
 .store-category-button:focus-visible,
 .store-category-menu button:focus-visible {
   outline: 2px solid var(--fold-active);

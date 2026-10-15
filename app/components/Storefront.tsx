@@ -25,6 +25,27 @@ import SocialBrandIcon, { detectSocialBrand } from './SocialBrandIcon';
 
 // 購物車存在瀏覽器本機的 key(結帳頁會讀同一份)
 const CART_KEY = 'cart';
+// 從商品頁按返回時,回到原本選的分類、已載入的數量與捲動位置
+const STORE_STATE_KEY = 'urbanite-store-state';
+type StoreState = { path: string; category: string; browseAll: boolean; displayCount: number; scrollY: number; at: number };
+let cameBack = false;
+if (typeof window !== 'undefined') {
+  window.addEventListener('popstate', () => { cameBack = true; });
+  document.addEventListener('click', () => { cameBack = false; }, true);
+}
+function takeReturnState(): StoreState | null {
+  const nav = performance.getEntriesByType?.('navigation')[0] as PerformanceNavigationTiming | undefined;
+  const back = cameBack || nav?.type === 'back_forward';
+  cameBack = false;
+  if (!back) return null;
+  try {
+    const saved = JSON.parse(sessionStorage.getItem(STORE_STATE_KEY) || 'null') as StoreState | null;
+    if (!saved || saved.path !== location.pathname + location.search || Date.now() - saved.at > 60 * 60 * 1000) return null;
+    return saved;
+  } catch {
+    return null;
+  }
+}
 
 // 依商品/規格計算目前可加入的庫存;預購商品不受限。
 function stockOf(product: Product | undefined, variant: string): number {
@@ -109,6 +130,18 @@ export default function Storefront({ campaign = null, preview = false }: { campa
   const [cartToast, setCartToast] = useState(false);
   const cartToastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const favoriteNoticeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const returnState = useRef<StoreState | null>(null);
+
+  // 返回時先還原分類(商品載入完成後再還原數量與捲動位置)
+  useEffect(() => {
+    const saved = takeReturnState();
+    if (!saved) return;
+    returnState.current = saved;
+    Promise.resolve().then(() => {
+      setCategory(saved.category);
+      setBrowseAll(saved.browseAll);
+    });
+  }, []);
 
   function notifyAdded() {
     setCartToast(true);
@@ -308,6 +341,24 @@ export default function Storefront({ campaign = null, preview = false }: { campa
   const shown = visibleProducts.slice(0, displayCount);
   const hasMore = displayCount < visibleProducts.length;
 
+  // 商品載入後:還原已載入數量,再捲回原本的位置
+  useEffect(() => {
+    const saved = returnState.current;
+    if (loading || !saved) return;
+    returnState.current = null;
+    setDisplayCount(Math.max(12, saved.displayCount));
+    requestAnimationFrame(() => requestAnimationFrame(() => window.scrollTo(0, saved.scrollY)));
+  }, [loading]);
+
+  // 點商品進入商品頁前,記下目前的分類與位置
+  function rememberStoreState(e: React.MouseEvent) {
+    if (!(e.target as HTMLElement).closest?.('a[href^="/products/"]')) return;
+    try {
+      const state: StoreState = { path: location.pathname + location.search, category, browseAll, displayCount, scrollY: window.scrollY, at: Date.now() };
+      sessionStorage.setItem(STORE_STATE_KEY, JSON.stringify(state));
+    } catch { /* 略過 */ }
+  }
+
   // 切換分類/搜尋時,顯示數量重設回 12
   useEffect(() => {
     setDisplayCount(12);
@@ -471,7 +522,7 @@ export default function Storefront({ campaign = null, preview = false }: { campa
   const browseAllProducts = () => { setBrowseAll(true); setCategory('all'); requestAnimationFrame(browseProducts); };
 
   return (
-    <main className="min-h-screen bg-[var(--c-bg)] text-[var(--c-text)]">
+    <main className="min-h-screen bg-[var(--c-bg)] text-[var(--c-text)]" onClickCapture={rememberStoreState}>
       {preview && (
         <div className="bg-[#221f1d] px-4 py-2 text-center text-xs font-semibold tracking-widest text-white">草稿預覽模式</div>
       )}

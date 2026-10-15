@@ -353,10 +353,10 @@ export default function ProductDetailClient({ product, homeHref = '/' }: { produ
         </div>
 
         <div className="px-1 py-6 sm:px-2 lg:py-0">
-          <p className="mb-3 text-xs font-semibold uppercase tracking-[0.25em] text-[var(--c-sale)]">
+          <p className="mb-2 text-xs font-semibold uppercase tracking-[0.15em] text-[var(--c-sale)]">
             {product.category || 'Urbanite'}
           </p>
-          <h1 className="store-title max-w-3xl text-3xl font-medium leading-tight tracking-wide sm:text-4xl">
+          <h1 className="store-title max-w-3xl text-3xl font-medium leading-[1.15] tracking-[0.015em] sm:text-4xl">
             {product.name}
           </h1>
           {product.sale_mode && (
@@ -365,7 +365,7 @@ export default function ProductDetailClient({ product, homeHref = '/' }: { produ
             </span>
           )}
 
-          <div className="mt-8 border-l-4 border-[var(--c-sale)] pl-4 text-sm leading-7 text-[var(--c-text)]">
+          <div className="mt-5 border-l-4 border-[var(--c-sale)] pl-4 text-sm leading-[1.6] text-[var(--c-text)]">
             {product.available_shipping_methods?.includes('免運') ? (
               <p>此商品免運費</p>
             ) : (
@@ -373,7 +373,7 @@ export default function ProductDetailClient({ product, homeHref = '/' }: { produ
             )}
           </div>
 
-          <div className="mt-8 flex items-baseline gap-4">
+          <div className="mt-5 flex items-baseline gap-4">
             <span className="text-3xl font-bold text-[var(--c-sale)]">{formatter.format(product.price)}</span>
             {product.original_price ? (
               <span className="text-xl text-[var(--c-muted)] line-through">
@@ -385,7 +385,7 @@ export default function ProductDetailClient({ product, homeHref = '/' }: { produ
           {hasSpecs ? (
             <>
               {specs.map((dim, i) => (
-                <section key={dim.name} className="mt-6">
+                <section key={dim.name} className="mt-4">
                   <p className="mb-2 text-sm text-[var(--c-muted)]">
                     {dim.name}：{specSel[i] || '請選擇'}
                   </p>
@@ -433,7 +433,7 @@ export default function ProductDetailClient({ product, homeHref = '/' }: { produ
           ) : (
             <>
               {product.colors.length > 0 && (
-                <section className="mt-7">
+                <section className="mt-4">
                   <p className="mb-2 text-sm text-[var(--c-muted)]">顏色: {selectedColor}</p>
                   <div className="flex flex-wrap gap-2">
                     {product.colors.map((color) => (
@@ -454,7 +454,7 @@ export default function ProductDetailClient({ product, homeHref = '/' }: { produ
               )}
 
               {product.sizes.length > 0 && (
-                <section className="mt-6">
+                <section className="mt-4">
                   <p className="mb-2 text-sm text-[var(--c-muted)]">尺寸: {selectedSize}</p>
                   <div className="flex flex-wrap gap-2">
                     {product.sizes.map((size) => (
@@ -477,7 +477,7 @@ export default function ProductDetailClient({ product, homeHref = '/' }: { produ
           )}
 
 
-          <section className="mt-6">
+          <section className="mt-4">
             <p className="mb-2 text-sm text-[var(--c-muted)]">數量</p>
             <div className="grid h-12 grid-cols-[48px_1fr_48px] border border-[var(--c-border)]">
               <button onClick={() => setQuantity((q) => Math.max(1, q - 1))} className="text-2xl font-bold">
@@ -541,10 +541,10 @@ export default function ProductDetailClient({ product, homeHref = '/' }: { produ
           </div>
 
           {tab === 'description' ? (
-            <div className="mx-auto max-w-2xl py-10 text-center leading-8 text-[#5d5652]">
+            <div className="mx-auto max-w-2xl py-6 text-center leading-[1.6] text-[#5d5652]">
               {product.tagline ? (
                 <div
-                  className="mx-auto max-w-none text-left leading-8 [&_a]:text-[var(--c-sale)] [&_img]:my-4 [&_img]:max-w-full [&_ol]:list-decimal [&_ol]:pl-6 [&_table]:my-4 [&_table]:w-full [&_table]:border-collapse [&_td]:border [&_td]:border-[var(--c-border)] [&_td]:p-2 [&_th]:border [&_th]:border-[var(--c-border)] [&_th]:bg-[var(--c-bg)] [&_th]:p-2 [&_ul]:list-disc [&_ul]:pl-6"
+                  className="mx-auto max-w-none text-left leading-[1.6] [&_a]:text-[var(--c-sale)] [&_img]:my-4 [&_img]:max-w-full [&_ol]:list-decimal [&_ol]:pl-6 [&_table]:my-4 [&_table]:w-full [&_table]:border-collapse [&_td]:border [&_td]:border-[var(--c-border)] [&_td]:p-2 [&_th]:border [&_th]:border-[var(--c-border)] [&_th]:bg-[var(--c-bg)] [&_th]:p-2 [&_ul]:list-disc [&_ul]:pl-6"
                   dangerouslySetInnerHTML={{ __html: cleanRichText(product.tagline) }}
                 />
               ) : (
@@ -552,7 +552,7 @@ export default function ProductDetailClient({ product, homeHref = '/' }: { produ
               )}
             </div>
           ) : (
-            <div className="mx-auto max-w-2xl py-10 text-center leading-8 text-[#5d5652]">
+            <div className="mx-auto max-w-2xl py-6 text-center leading-[1.6] text-[#5d5652]">
               <h3 className="text-xl font-medium text-[var(--c-text)]">送貨方式</h3>
               <p className="mt-4">
                 超商取貨、宅配到府。
