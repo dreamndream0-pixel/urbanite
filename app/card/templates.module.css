@@ -40,8 +40,10 @@
   color: #37332d;
   cursor: pointer;
 }
+@media (hover: hover) {
 .controls button:hover {
   background: #e9e1d7;
+}
 }
 .controls svg {
   width: 18px;

@@ -67,6 +67,15 @@ html[data-browser='ios-other'] body {
 /* 商品頁剩餘庫存數量:預設不顯示(網站外觀 → 商品頁剩餘庫存數量) */
 html:not([data-stock='show']) .product-stock-count { display: none; }
 
+/* 商品頁沒貨的規格按鈕:畫一條斜線(文字、圖片按鈕都適用) */
+.spec-sold-out::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to top right, transparent calc(50% - 0.5px), var(--c-muted) calc(50% - 0.5px), var(--c-muted) calc(50% + 0.5px), transparent calc(50% + 0.5px));
+  pointer-events: none;
+}
+
 body {
   margin: 0;
   background: var(--background);
@@ -113,10 +122,16 @@ img {
 .product-card {
   transition: transform 0.25s ease, box-shadow 0.25s ease;
 }
-.product-card:hover,
-.product-card:focus-within {
+/* 只有鍵盤操作時才有焦點效果;手指點擊不觸發(避免 iPhone 點第一下被效果吃掉) */
+.product-card:has(:focus-visible) {
   transform: scale(1.03);
   animation: card-wiggle 0.5s ease-in-out;
+}
+@media (hover: hover){
+.product-card:hover {
+  transform: scale(1.03);
+  animation: card-wiggle 0.5s ease-in-out;
+}
 }
 .product-card:active {
   animation: card-wiggle 0.4s ease-in-out;
@@ -268,7 +283,9 @@ img {
   font-size: 14px;
   text-align: left;
 }
+@media (hover: hover){
 .store-category-menu button:hover { background: var(--c-soft); }
+}
 .store-category-menu button[aria-checked='true'] {
   background: color-mix(in srgb, var(--c-brand) 10%, var(--c-header));
   color: var(--fold-active);
@@ -312,15 +329,20 @@ img {
 .favorite-fold[aria-disabled='true'] {
   cursor: default;
 }
-.product-card:has(.favorite-fold:hover),
 .product-card:has(.favorite-fold:focus) {
   transform: none;
   animation: none;
 }
+@media (hover: hover){
+.product-card:has(.favorite-fold:hover) {
+  transform: none;
+  animation: none;
+}
+}
 @media (prefers-reduced-motion: reduce) {
   .product-card,
   .product-card:hover,
-  .product-card:focus-within,
+  .product-card:has(:focus-visible),
   .product-card:active {
     animation: none;
     transform: none;
@@ -460,10 +482,14 @@ img {
 /* ===== 網站版面配置(後台 系統設定 → 一般設定),由 <html data-*> 切換 ===== */
 /* 商品卡樣式 */
 html[data-card='plain'] .product-card { background: transparent; padding: 0; box-shadow: none; }
+@media (hover: hover){
 html[data-card='plain'] .product-card:hover { box-shadow: none; }
+}
 html[data-card='bordered'] .product-card { background: var(--c-card); border: 1px solid var(--c-border); box-shadow: none; }
 html[data-card='elevated'] .product-card { background: var(--c-card); box-shadow: 0 10px 28px rgba(0, 0, 0, 0.08); }
+@media (hover: hover){
 html[data-card='elevated'] .product-card:hover { box-shadow: 0 16px 36px rgba(0, 0, 0, 0.12); }
+}
 /* 圓角 */
 html[data-radius='square'] .product-card,
 html[data-radius='square'] .product-card > div:first-child { border-radius: 0; }

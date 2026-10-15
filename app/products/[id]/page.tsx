@@ -51,5 +51,12 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
     homeHref = campaignHomeHref((campaign as Campaign).slug);
   }
 
-  return <ProductDetailClient product={product} homeHref={homeHref} />;
+  // 標題上方顯示分類名稱(活動分類的代碼是自動產生的,不顯示代碼)
+  let categoryName = '';
+  if (product.category) {
+    const { data: cat } = await supabase.from('categories').select('name').eq('slug', product.category).maybeSingle();
+    categoryName = String(cat?.name ?? '');
+  }
+
+  return <ProductDetailClient product={product} homeHref={homeHref} categoryName={categoryName} />;
 }

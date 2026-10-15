@@ -326,7 +326,7 @@ export default function Storefront({ campaign = null, preview = false }: { campa
   const childrenOf = (pid: string): CategoryTab[] =>
     visibleCats
       .filter((c) => c.parent_id === pid)
-      .map((c) => ({ slug: c.slug, name: c.name, en: c.en || c.slug.toUpperCase() }));
+      .map((c) => ({ slug: c.slug, name: c.name, en: c.en || (/^cp-/i.test(c.slug) ? '' : c.slug.toUpperCase()) }));
   const categoryTabs: CategoryTab[] = [
     ALL_TAB,
     ...visibleCats
@@ -334,7 +334,8 @@ export default function Storefront({ campaign = null, preview = false }: { campa
       .map((c) => ({
         slug: c.slug,
         name: c.name,
-        en: c.en || c.slug.toUpperCase(),
+        // 活動分類的代碼(cp-xxxx)是自動產生的,沒填英文名稱時不顯示
+        en: c.en || (/^cp-/i.test(c.slug) ? '' : c.slug.toUpperCase()),
         image: c.image || '',
         children: childrenOf(c.id),
       })),
@@ -1307,7 +1308,7 @@ function SideMenu({
                       current === c.slug ? 'text-[var(--c-text)]' : 'text-[var(--c-text2)] hover:text-[var(--c-text)]'
                     }`}
                   >
-                    <span className="block text-[11px] tracking-[0.2em] text-[var(--c-muted)]">{c.en}</span>
+                    {c.en ? <span className="block text-[11px] tracking-[0.2em] text-[var(--c-muted)]">{c.en}</span> : null}
                     <span className="mt-0.5 block text-lg font-medium">{c.name}</span>
                   </button>
                   {hasChildren && (

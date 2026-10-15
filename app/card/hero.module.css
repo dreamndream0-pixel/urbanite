@@ -150,8 +150,10 @@
   padding: 12px;
   font-size: 14px;
 }
+@media (hover: hover) {
 .menu nav a:hover {
   background: #eae2d6;
+}
 }
 .copy {
   position: absolute;
@@ -460,9 +462,11 @@
   box-shadow: inset 0 2px 5px #ffffff26;
   transition: transform 180ms ease;
 }
+@media (hover: hover) {
 .urlBubble a:hover,
 .urlBubble button:hover {
   transform: translateX(3px);
+}
 }
 .urlBubble svg {
   width: 23px;

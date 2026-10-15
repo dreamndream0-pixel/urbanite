@@ -24,7 +24,7 @@ type CartItem = {
 const ntd = (n: number) => `NT $${Math.round(Number(n) || 0).toLocaleString('en-US')}`;
 
 
-export default function ProductDetailClient({ product, homeHref = '/' }: { product: Product; homeHref?: string }) {
+export default function ProductDetailClient({ product, homeHref = '/', categoryName = '' }: { product: Product; homeHref?: string; categoryName?: string }) {
   const gallery = product.images?.length ? product.images : product.image ? [product.image] : [];
   const specs = product.specs ?? [];
   // 促銷管理 → 活動管理的商品頁促銷文字
@@ -355,7 +355,7 @@ export default function ProductDetailClient({ product, homeHref = '/' }: { produ
 
         <div className="px-1 pb-6 pt-1 sm:px-2 lg:py-0">
           <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.15em] text-[var(--c-sale)]">
-            {product.category || 'Urbanite'}
+            {categoryName || (product.category && !/^cp-/i.test(product.category) ? product.category : '')}
           </p>
           <h1 className="store-title max-w-3xl text-lg font-medium leading-[1.25] tracking-[0.015em] sm:text-[22px]">
             {product.name}
@@ -405,12 +405,12 @@ export default function ProductDetailClient({ product, homeHref = '/' }: { produ
                           }}
                           title={opt}
                           aria-label={opt}
-                          className={`${dim.display === 'image' && product.color_images?.[opt] ? 'h-11 w-11 overflow-hidden border-2 p-0' : 'min-w-10 border px-3 py-[7px] text-xs! font-semibold'} ${
+                          className={`relative bg-transparent ${dim.display === 'image' && product.color_images?.[opt] ? 'h-11 w-11 overflow-hidden p-0' : 'min-w-10 px-3 py-[7px] text-xs! font-semibold'} ${
                             grayed
-                              ? 'cursor-not-allowed border-[var(--c-border)] bg-[var(--c-bg)] text-[var(--c-text)] line-through opacity-30'
+                              ? 'spec-sold-out cursor-not-allowed border-[0.5px] border-[var(--c-border)] text-[var(--c-text)] opacity-40'
                               : selected
-                                ? 'border-[var(--c-sale)] text-[var(--c-sale)]'
-                                : 'border-[var(--c-border)] bg-[var(--c-bg)] text-[var(--c-text)]'
+                                ? 'border border-[var(--c-sale)] text-[var(--c-sale)]'
+                                : 'border-[0.5px] border-[var(--c-border-strong)] text-[var(--c-text)]'
                           }`}
                         >
                           {dim.display === 'image' && product.color_images?.[opt] ? <img src={product.color_images[opt]} alt="" className="h-full w-full object-cover" /> : opt}
@@ -440,10 +440,10 @@ export default function ProductDetailClient({ product, homeHref = '/' }: { produ
                       <button
                         key={color}
                         onClick={() => setSelectedColor(color)}
-                        className={`min-w-10 border px-3 py-[7px] text-xs! font-semibold ${
+                        className={`min-w-10 bg-transparent px-3 py-[7px] text-xs! font-semibold ${
                           selectedColor === color
-                            ? 'border-[var(--c-sale)] text-[var(--c-sale)]'
-                            : 'border-[var(--c-border)] bg-[var(--c-bg)] text-[var(--c-text)]'
+                            ? 'border border-[var(--c-sale)] text-[var(--c-sale)]'
+                            : 'border-[0.5px] border-[var(--c-border-strong)] text-[var(--c-text)]'
                         }`}
                       >
                         {color}
@@ -461,10 +461,10 @@ export default function ProductDetailClient({ product, homeHref = '/' }: { produ
                       <button
                         key={size}
                         onClick={() => setSelectedSize(size)}
-                        className={`h-8 min-w-10 border px-2 text-xs! font-semibold ${
+                        className={`h-8 min-w-10 bg-transparent px-2 text-xs! font-semibold ${
                           selectedSize === size
-                            ? 'border-2 border-[var(--c-sale)] bg-[var(--c-surface)] text-[var(--c-text)]'
-                            : 'border-[#ece7e2] bg-[var(--c-bg)] text-[var(--c-text)]'
+                            ? 'border border-[var(--c-sale)] text-[var(--c-text)]'
+                            : 'border-[0.5px] border-[var(--c-border-strong)] text-[var(--c-text)]'
                         }`}
                       >
                         {size}
