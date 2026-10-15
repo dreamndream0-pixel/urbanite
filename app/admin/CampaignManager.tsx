@@ -61,7 +61,8 @@ export default function CampaignManager({
   const [campaigns, setCampaigns] = useState(initialCampaigns);
   const [selectedId, setSelectedId] = useState(initialCampaigns[0]?.id ?? '');
   const selected = campaigns.find((campaign) => campaign.id === selectedId) ?? null;
-  const [newOpen, setNewOpen] = useState(initialCampaigns.length === 0);
+  // 不自動跳出新增視窗;沒有活動時頁面中間有「新增專頁」按鈕
+  const [newOpen, setNewOpen] = useState(false);
   const [campaignDraft, setCampaignDraft] = useState<CampaignDraft>(blankCampaign);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState('');
@@ -163,7 +164,6 @@ export default function CampaignManager({
     setCampaigns(next);
     onCampaignDeleted(selected.id);
     setSelectedId(next[0]?.id ?? '');
-    if (!next.length) setNewOpen(true);
   }
 
   return (
@@ -250,7 +250,7 @@ export default function CampaignManager({
               </div>
             </section>
           </div>
-        ) : <div className="border border-dashed border-[#d8d0c6] bg-white p-16 text-center text-[#8a7f72]">建立一個促銷專頁開始編輯。</div>}
+        ) : <div className="border border-dashed border-[#d8d0c6] bg-white px-6 py-16 text-center text-[#8a7f72]"><p>建立一個促銷專頁開始編輯。</p><button type="button" onClick={() => setNewOpen(true)} className="mt-4 rounded-md bg-[#1f1b19] px-5 py-2.5 text-sm font-semibold text-white">＋ 新增專頁</button></div>}
       </div>
 
       {catManagerOpen && selected ? (
@@ -277,7 +277,7 @@ export default function CampaignManager({
         </div>
       ) : null}
 
-      {newOpen ? <CampaignCreateModal draft={campaignDraft} busy={busy} onChange={setCampaignDraft} onClose={() => campaigns.length ? setNewOpen(false) : null} onCreate={createCampaign} /> : null}
+      {newOpen ? <CampaignCreateModal draft={campaignDraft} busy={busy} onChange={setCampaignDraft} onClose={() => setNewOpen(false)} onCreate={createCampaign} /> : null}
     </div>
   );
 }

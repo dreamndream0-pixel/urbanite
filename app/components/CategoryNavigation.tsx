@@ -28,6 +28,8 @@ export default function CategoryNavigation({ categories, value, onSelect, imageS
   const withImages = imageStyle !== 'text' && categories.some(category => category.image);
 
   useEffect(() => {
+    // 「全部商品」在最右邊:選它時不要把整列捲到最後面,維持從第一個分類開始顯示
+    if (value === 'all') return;
     const active = row.current?.querySelector<HTMLElement>('[aria-current="page"]');
     if (!active || !row.current) return;
     const container = row.current;

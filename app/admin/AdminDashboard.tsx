@@ -34,6 +34,7 @@ import {
 import { uiToast } from '@/lib/ui-toast';
 import NumberInput from './NumberInput';
 import DraggableChips from './DraggableChips';
+import { useLongPressReorder } from './useLongPressReorder';
 import { cleanRichText } from '@/lib/rich-text';
 import { orderRevenue, productRevenue, refundableShipping, shippingRevenue } from '@/lib/revenue';
 import OrderNotificationSettingsPanel from './OrderNotificationSettings';
@@ -723,8 +724,30 @@ export default function AdminDashboard({
   );
   const selectedCategory = categories.find((category) => category.id === selectedCategoryId) ?? null;
   const selectedCategoryProducts = selectedCategory
-    ? products.filter((product) => product.category === selectedCategory.slug)
+    ? products.filter((product) => product.category === selectedCategory.slug).sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
     : [];
+  // 分類內商品拖曳排序:前台依商品 sort_order 顯示。把這個分類的商品放回原本在整體順序中的位置,
+  // 再把主站商品重新編號(只更新有變動的),其他分類的相對順序不受影響。
+  const { listRef: categoryListRef, order: categoryOrder, sorting: categorySorting, start: startCategorySort } = useLongPressReorder(selectedCategoryProducts.map((p) => p.id), (ids) => {
+    const main = products.filter((p) => !p.campaign_id).sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
+    const moved = new Set(ids);
+    const queue = [...ids];
+    const nextIds = main.map((p) => (moved.has(p.id) ? queue.shift()! : p.id));
+    const updates = nextIds.map((id, i) => ({ id, sort_order: i })).filter(({ id, sort_order }) => products.find((p) => p.id === id)?.sort_order !== sort_order);
+    if (!updates.length) return;
+    const order = new Map(updates.map((u) => [u.id, u.sort_order]));
+    setProducts((list) => list.map((p) => (order.has(p.id) ? { ...p, sort_order: order.get(p.id)! } : p)));
+    void (async () => {
+      for (let i = 0; i < updates.length; i += 8) {
+        const results = await Promise.all(updates.slice(i, i + 8).map((u) => fetch(`/api/products/${encodeURIComponent(u.id)}`, {
+          method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sort_order: u.sort_order }),
+        }).then((r) => r.ok).catch(() => false)));
+        if (results.includes(false)) return void uiAlert('排序儲存失敗,請重新整理後再試');
+      }
+      uiToast('已更新商品排序');
+    })();
+  });
+  const shownCategoryProducts = categoryOrder.map((id) => selectedCategoryProducts.find((p) => p.id === id)!).filter(Boolean);
   const categoryCandidateProducts = selectedCategory
     ? products.filter((product) => {
         if (product.category === selectedCategory.slug) return false;
@@ -2328,13 +2351,27 @@ export default function AdminDashboard({
                     </div>
                     <div className="grid max-h-[72vh] gap-5 overflow-auto p-5 lg:grid-cols-2">
                       <section>
-                        <h4 className="mb-3 font-semibold">此分類商品</h4>
+                        <h4 className="font-semibold">此分類商品</h4>
+                        <p className="mb-3 mt-1 text-xs text-[#8a7f72]">長按商品(或按住左側 ⋮⋮)上下拖曳,前台依這個順序顯示。</p>
                         {selectedCategoryProducts.length === 0 ? (
                           <Empty>此分類目前沒有商品。</Empty>
                         ) : (
-                          <div className="space-y-2">
-                            {selectedCategoryProducts.map((product) => (
-                              <div key={product.id} className="flex items-center gap-3 rounded-lg border border-[#e5ded4] p-3">
+                          <div ref={categoryListRef} className="space-y-2">
+                            {shownCategoryProducts.map((product) => (
+                              <div
+                                key={product.id}
+                                data-sort-row
+                                onPointerDown={(e) => startCategorySort(e, product.id)}
+                                onContextMenu={(e) => e.preventDefault()}
+                                className={`flex select-none items-center gap-3 rounded-lg border p-3 [-webkit-touch-callout:none] ${categorySorting === product.id ? 'border-[#1f1b19] bg-[#faf3ea] shadow-md' : 'border-[#e5ded4]'}`}
+                              >
+                                <span
+                                  onPointerDown={(e) => { e.stopPropagation(); startCategorySort(e, product.id, true); }}
+                                  className="cursor-grab touch-none px-1 text-[#b3a897]"
+                                  aria-hidden="true"
+                                >
+                                  ⋮⋮
+                                </span>
                                 {product.image ? (
                                   <img src={product.image} alt="" className="h-12 w-12 rounded object-cover" />
                                 ) : (

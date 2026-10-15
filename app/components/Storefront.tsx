@@ -576,8 +576,18 @@ export default function Storefront({ campaign = null, preview = false }: { campa
       />
 
       {showBlocks ? <StorefrontBlocks designStyle={design.style} categoryImageStyle={settings?.category_image_style} onBrowseAll={browseAllProducts} blocks={design.blocks!} banners={banners.filter((b) => b.active)} products={products} categories={categoryTabs.filter((c) => c.slug !== 'all')} images={[...heroBanners.map((b) => b.image), ...liveProducts.map((p) => p.image)].filter(Boolean)} onCategory={browseCategory} loading={loading} renderProduct={(product) => <ProductCard product={product} favorited={favorites.has(product.id)} favoritePending={favoritePending.has(product.id)} favoritesLoaded={favoritesLoaded} onFavoriteChange={(next) => setFavoriteSaved(product.id, next)} onAdd={() => setQuickAdd(product)} />} /> : <>
-      {customDesign && !modularDesign ? <StorefrontDesignHero design={design} image={heroBanners[0]?.image || products.find(isVisibleInStore)?.image} categories={categoryTabs.filter((c) => c.slug !== 'all')} onCategory={browseCategory} onBrowse={browseProducts} /> : !modularDesign ? <HeroCarousel banners={heroBanners} ratio={campaign ? campaign.hero_ratio ?? 'portrait' : undefined} /> : null}
-      <CategoryNavigation categories={categoryTabs} value={category} onSelect={setCategory} imageStyle={settings?.category_image_style ?? 'circle'} />
+      {customDesign && !modularDesign ? <StorefrontDesignHero design={design} image={heroBanners[0]?.image || products.find(isVisibleInStore)?.image} categories={categoryTabs.filter((c) => c.slug !== 'all')} onCategory={browseCategory} onBrowse={browseProducts} /> : !modularDesign ? <HeroCarousel banners={heroBanners} ratio={campaign ? campaign.hero_ratio ?? 'portrait' : undefined} /> : (() => {
+        // 板塊模板切到某個分類時,和預設模板一樣保留上方的輪播 / 主視覺:
+        // 顯示分類、商品板塊之前的板塊;沒有輪播或主視覺時,改用預設的輪播圖1
+        const visibleBlocks = design.blocks!.filter((b) => b.visible);
+        const cut = visibleBlocks.findIndex((b) => b.type === 'categories' || b.type === 'products');
+        const lead = cut < 0 ? [] : visibleBlocks.slice(0, cut);
+        return lead.some((b) => b.type === 'carousel' || b.type === 'hero')
+          ? <StorefrontBlocks designStyle={design.style} categoryImageStyle={settings?.category_image_style} blocks={lead} banners={banners.filter((b) => b.active)} products={products} categories={[]} onCategory={browseCategory} onBrowseAll={browseAllProducts} renderProduct={() => null} />
+          : <HeroCarousel banners={heroBanners} />;
+      })()}
+      {/* 首頁分類列:「全部商品」放最右邊(左側漢堡選單仍在最上方) */}
+      <CategoryNavigation categories={[...categoryTabs.slice(1), categoryTabs[0]]} value={category} onSelect={setCategory} imageStyle={settings?.category_image_style ?? 'circle'} />
 
       <div className="mx-auto max-w-6xl px-4 pb-8 sm:px-6">
         {/* 商品格狀排列 */}
