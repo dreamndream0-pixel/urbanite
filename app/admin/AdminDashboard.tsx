@@ -552,6 +552,9 @@ export default function AdminDashboard({
   const [couponHero, setCouponHero] = useState(initialSettings?.coupon_hero_image ?? '');
   const [heroBusy, setHeroBusy] = useState(false);
   const [memberStamp, setMemberStamp] = useState(initialSettings?.member_stamp_image ?? '');
+  // 網頁頁籤圖示
+  const [faviconUrl, setFaviconUrl] = useState(initialSettings?.favicon_url ?? '');
+  const [faviconBusy, setFaviconBusy] = useState(false);
   const [stampBusy, setStampBusy] = useState(false);
   const [footerDraft, setFooterDraft] = useState({
     sections: JSON.stringify(stripPolicies(initialSettings?.footer_sections ?? []), null, 2),
@@ -1463,6 +1466,34 @@ export default function AdminDashboard({
       if (!res.ok) return void uiAlert((await res.json()).error ?? '移除失敗');
       setMemberStamp('');
     } finally { setStampBusy(false); }
+  }
+
+  async function uploadFavicon(file: File) {
+    setFaviconBusy(true);
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      const res = await fetch('/api/settings/favicon', { method: 'POST', body: fd });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) return void uiAlert(data?.error ?? '上傳失敗');
+      setFaviconUrl(data.favicon_url);
+      uiToast('已更新網頁頁籤圖示');
+    } catch {
+      void uiAlert('上傳發生問題');
+    } finally {
+      setFaviconBusy(false);
+    }
+  }
+
+  async function clearFavicon() {
+    setFaviconBusy(true);
+    try {
+      const res = await fetch('/api/settings', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ favicon_url: '' }) });
+      if (!res.ok) return void uiAlert((await res.json().catch(() => null))?.error ?? '移除失敗');
+      setFaviconUrl('');
+    } finally {
+      setFaviconBusy(false);
+    }
   }
 
   async function uploadLogo(file: File) {
@@ -3101,6 +3132,47 @@ export default function AdminDashboard({
                     </label>
                     <p className="mt-2 max-w-xs text-xs text-[#8a7f72]">
                       PNG / JPG / WEBP / GIF，建議寬版、透明背景，小於 3MB。SVG 請先轉成 PNG。上傳後首頁與後台 Logo 都會更新。
+                    </p>
+                  </div>
+                </div>
+              </Card>
+              )}
+
+              {settingsTab === 'general' && (
+              <Card title="網頁頁籤圖示">
+                <div className="flex flex-wrap items-center gap-5">
+                  {/* 預覽:瀏覽器頁籤的樣子 */}
+                  <div className="flex w-56 min-w-0 items-center gap-2 rounded-t-lg border border-b-0 border-[#e5ded4] bg-white px-3 py-2">
+                    {faviconUrl ? (
+                      <img src={faviconUrl} alt="" className="h-4 w-4 shrink-0 object-contain" />
+                    ) : (
+                      <img src="/favicon.png" alt="" className="h-4 w-4 shrink-0 object-contain" />
+                    )}
+                    <span className="truncate text-xs text-[#1f1b19]">{shopName || '我的商店'}</span>
+                  </div>
+                  <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-xl border border-[#e5ded4] bg-white">
+                    <img src={faviconUrl || '/favicon.png'} alt="頁籤圖示" className="h-12 w-12 object-contain" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <label className="inline-block cursor-pointer rounded-full bg-[#1f1b19] px-4 py-2 text-sm font-semibold text-white">
+                        {faviconBusy ? '處理中…' : faviconUrl ? '更換圖示' : '上傳圖示'}
+                        <input
+                          type="file"
+                          accept="image/png,image/jpeg,image/webp"
+                          className="hidden"
+                          disabled={faviconBusy}
+                          onChange={(e) => {
+                            const f = e.target.files?.[0];
+                            if (f) void uploadFavicon(f);
+                            e.target.value = '';
+                          }}
+                        />
+                      </label>
+                      {faviconUrl ? <button type="button" disabled={faviconBusy} onClick={() => void clearFavicon()} className="text-sm text-[#8a7f72] underline-offset-4 hover:underline">改回預設</button> : null}
+                    </div>
+                    <p className="mt-2 max-w-xs text-xs leading-5 text-[#8a7f72]">
+                      顯示在瀏覽器頁籤、書籤,以及加到手機主畫面的圖示。請上傳正方形圖片(建議 512×512 PNG、透明背景),會自動縮放成正方形。沒上傳時使用預設圖示。更換後瀏覽器可能要重新整理或過一段時間才會更新。
                     </p>
                   </div>
                 </div>

@@ -91,6 +91,8 @@ export type SiteSettings = {
   site_theme?: unknown;
   // 促銷管理 → 活動管理:商品頁促銷文字(lib/promo-notices)
   promo_notices?: unknown;
+  // 網頁頁籤圖示(512×512 PNG);空白 = 預設圖示
+  favicon_url?: string;
   updated_at?: string;
 };
 

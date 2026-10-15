@@ -85,6 +85,7 @@ export async function PATCH(request: Request) {
     'member_stamp_image',
     'site_theme',
     'promo_notices',
+    'favicon_url',
   ] as const;
 
   for (const key of keys) {

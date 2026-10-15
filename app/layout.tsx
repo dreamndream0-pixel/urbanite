@@ -4,7 +4,7 @@ import DialogHost from './components/DialogHost';
 import ToastHost from './components/ToastHost';
 import { unstable_cache } from 'next/cache';
 import { resolveSiteTheme, siteThemeCss } from '@/lib/site-theme';
-import { getCurrentShop, isPlatformShop, scopedClient, shopUrl, URBANITE_SHOP_ID } from '@/lib/shop';
+import { getCurrentShop, isPlatformShop, scopedClient, shopAdminClient, shopUrl, URBANITE_SHOP_ID } from '@/lib/shop';
 import ScrollLockGuard from '@/app/components/ScrollLockGuard';
 import PullToRefresh from '@/app/components/PullToRefresh';
 
@@ -58,9 +58,20 @@ const PLATFORM_METADATA: Metadata = {
   },
 };
 
+// 店家上傳的網頁頁籤圖示;沒上傳就用預設圖示
+async function shopIcons(): Promise<Metadata['icons']> {
+  try {
+    const { data } = await (await shopAdminClient()).from('site_settings').select('favicon_url').maybeSingle();
+    const url = String(data?.favicon_url ?? '');
+    if (/^https:\/\//.test(url)) return { icon: [{ url, type: 'image/png' }], apple: url };
+  } catch { /* 讀不到就用預設 */ }
+  return PLATFORM_METADATA.icons;
+}
+
 export async function generateMetadata(): Promise<Metadata> {
   const shop = await getCurrentShop();
-  if (!shop || isPlatformShop(shop)) return PLATFORM_METADATA;
+  if (!shop) return PLATFORM_METADATA;
+  if (isPlatformShop(shop)) return { ...PLATFORM_METADATA, icons: await shopIcons() };
   const name = shop.name || shop.slug;
   const url = shopUrl(shop.slug);
   const description = `${name} 線上商店`;
@@ -68,7 +79,7 @@ export async function generateMetadata(): Promise<Metadata> {
     metadataBase: new URL(url),
     title: { default: name, template: `%s | ${name}` },
     description,
-    icons: PLATFORM_METADATA.icons,
+    icons: await shopIcons(),
     openGraph: { title: name, description, url, siteName: name, locale: 'zh_TW', type: 'website', images: [{ ...SHARE_IMAGE, alt: name }] },
     twitter: { card: 'summary_large_image', title: name, description, images: [{ ...SHARE_IMAGE, alt: name }] },
   };
