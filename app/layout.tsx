@@ -73,6 +73,15 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
+// 瀏覽器判斷(用字串比對,不用正規表示式,內嵌在 <head> 裡最先執行):
+// ios-safari / ios-chrome / ios-other(Firefox、Edge、LINE、IG、FB、微信內建瀏覽器)/ android-chrome / android-other / other
+const BROWSER_DETECT = `(function(){try{
+var u=navigator.userAgent,d=document.documentElement,has=function(){for(var i=0;i<arguments.length;i++)if(u.indexOf(arguments[i])>=0)return true;return false;};
+var ios=has('iPhone','iPad','iPod')||(has('Macintosh')&&navigator.maxTouchPoints>1);var b='other';
+if(ios){b=has('CriOS/')?'ios-chrome':has('FxiOS/','EdgiOS/','Line/','Instagram','FBAN','FBAV','MicroMessenger')?'ios-other':has('Safari/')?'ios-safari':'ios-other';}
+else if(has('Android')){b=has('Chrome/')&&!has('; wv)','Line/','Instagram','FBAN','FBAV')?'android-chrome':'android-other';}
+d.setAttribute('data-browser',b);}catch(e){}})();`;
+
 export default async function RootLayout({
   children,
 }: Readonly<{
@@ -83,12 +92,16 @@ export default async function RootLayout({
   return (
     <html
       lang="zh-Hant"
+      // data-browser 由下方的內嵌腳本在畫面出現前設定(伺服器端不知道),避免 hydration 警告
+      suppressHydrationWarning
       data-card={theme.layout.card}
       data-columns={theme.layout.columns}
       data-radius={theme.layout.radius}
       data-heading={theme.layout.heading}
     >
       <head>
+        {/* 判斷瀏覽器(畫面出現前就設好,版面不會跳):iPhone 的 Safari 與其他瀏覽器(Chrome、Firefox、Edge、LINE / IG / FB 內建瀏覽器)分開處理 */}
+        <script dangerouslySetInnerHTML={{ __html: BROWSER_DETECT }} />
         <style id="site-theme" dangerouslySetInnerHTML={{ __html: siteThemeCss(theme) }} />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />

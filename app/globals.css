@@ -49,8 +49,12 @@ html {
 @media (max-width: 767px), (hover: none) and (pointer: coarse) {
   html { scroll-padding-top: 80px; }
 }
-/* iPhone Chrome 等:在頂部時頁首回到一般排版,避免網址列伸縮後 sticky 位置錯誤蓋住內容(見 ScrollLockGuard) */
-html.ios-alt-browser.at-top .page-header { position: relative; }
+/* iPhone 上 Safari 以外的瀏覽器(Chrome、Firefox、Edge、App 內建瀏覽器):網址列伸縮時 sticky 頁首位置會算錯、蓋住或切到內容,
+   改成一般排版的頁首(隨頁面捲動),Safari 維持固定頁首。data-browser 由 app/layout.tsx 的內嵌腳本設定。 */
+html[data-browser='ios-chrome'] .page-header,
+html[data-browser='ios-other'] .page-header { position: relative; top: auto; }
+html[data-browser='ios-chrome'],
+html[data-browser='ios-other'] { scroll-padding-top: 16px; }
 
 body {
   margin: 0;
