@@ -353,19 +353,19 @@ export default function ProductDetailClient({ product, homeHref = '/' }: { produ
         </div>
 
         <div className="px-1 py-6 sm:px-2 lg:py-0">
-          <p className="mb-2 text-xs font-semibold uppercase tracking-[0.15em] text-[var(--c-sale)]">
+          <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.15em] text-[var(--c-sale)]">
             {product.category || 'Urbanite'}
           </p>
-          <h1 className="store-title max-w-3xl text-3xl font-medium leading-[1.15] tracking-[0.015em] sm:text-4xl">
+          <h1 className="store-title max-w-3xl text-lg font-medium leading-[1.25] tracking-[0.015em] sm:text-[22px]">
             {product.name}
           </h1>
           {product.sale_mode && (
-            <span className="mt-3 inline-block rounded-full bg-[var(--c-text2)]/40 px-3 py-1 text-xs font-medium text-white">
+            <span className="mt-2 inline-block rounded-full bg-[var(--c-text2)]/40 px-2 py-0.5 text-[11px] font-medium text-white">
               {product.sale_mode}
             </span>
           )}
 
-          <div className="mt-5 border-l-4 border-[var(--c-sale)] pl-4 text-sm leading-[1.6] text-[var(--c-text)]">
+          <div className="mt-3 border-l-[3px] border-[var(--c-sale)] pl-2.5 text-xs leading-[1.6] text-[var(--c-text)]">
             {product.available_shipping_methods?.includes('免運') ? (
               <p>此商品免運費</p>
             ) : (
@@ -373,10 +373,10 @@ export default function ProductDetailClient({ product, homeHref = '/' }: { produ
             )}
           </div>
 
-          <div className="mt-5 flex items-baseline gap-4">
-            <span className="text-3xl font-bold text-[var(--c-sale)]">{formatter.format(product.price)}</span>
+          <div className="mt-3 flex items-baseline gap-2.5">
+            <span className="text-lg font-bold text-[var(--c-sale)]">{formatter.format(product.price)}</span>
             {product.original_price ? (
-              <span className="text-xl text-[var(--c-muted)] line-through">
+              <span className="text-sm text-[var(--c-muted)] line-through">
                 {formatter.format(product.original_price)}
               </span>
             ) : null}
@@ -385,11 +385,11 @@ export default function ProductDetailClient({ product, homeHref = '/' }: { produ
           {hasSpecs ? (
             <>
               {specs.map((dim, i) => (
-                <section key={dim.name} className="mt-4">
-                  <p className="mb-2 text-sm text-[var(--c-muted)]">
+                <section key={dim.name} className="mt-3">
+                  <p className="mb-1.5 text-xs text-[var(--c-muted)]">
                     {dim.name}：{specSel[i] || '請選擇'}
                   </p>
-                  <div className="flex flex-wrap gap-2">
+                  <div className="flex flex-wrap gap-1.5">
                     {dim.options.map((opt) => {
                       const selected = specSel[i] === opt;
                       const available = optionAvailable(i, opt);
@@ -405,7 +405,7 @@ export default function ProductDetailClient({ product, homeHref = '/' }: { produ
                               showImage(product.color_images[opt]);
                             }
                           }}
-                          className={`min-w-16 border px-5 py-3 text-sm font-semibold ${
+                          className={`min-w-10 border px-3 py-[7px] text-xs! font-semibold ${
                             grayed
                               ? 'cursor-not-allowed border-[var(--c-border)] bg-[var(--c-bg)] text-[var(--c-text)] line-through opacity-30'
                               : selected
@@ -420,7 +420,7 @@ export default function ProductDetailClient({ product, homeHref = '/' }: { produ
                   </div>
                 </section>
               ))}
-              <p className="mt-3 text-sm">
+              <p className="mt-2 text-xs">
                 {!allSpecsChosen ? (
                   <span className="text-[var(--c-muted)]">請選擇完整規格</span>
                 ) : soldOut ? (
@@ -434,13 +434,13 @@ export default function ProductDetailClient({ product, homeHref = '/' }: { produ
             <>
               {product.colors.length > 0 && (
                 <section className="mt-4">
-                  <p className="mb-2 text-sm text-[var(--c-muted)]">顏色: {selectedColor}</p>
-                  <div className="flex flex-wrap gap-2">
+                  <p className="mb-1.5 text-xs text-[var(--c-muted)]">顏色: {selectedColor}</p>
+                  <div className="flex flex-wrap gap-1.5">
                     {product.colors.map((color) => (
                       <button
                         key={color}
                         onClick={() => setSelectedColor(color)}
-                        className={`min-w-16 border px-5 py-3 text-sm font-semibold ${
+                        className={`min-w-10 border px-3 py-[7px] text-xs! font-semibold ${
                           selectedColor === color
                             ? 'border-[var(--c-sale)] text-[var(--c-sale)]'
                             : 'border-[var(--c-border)] bg-[var(--c-bg)] text-[var(--c-text)]'
@@ -455,13 +455,13 @@ export default function ProductDetailClient({ product, homeHref = '/' }: { produ
 
               {product.sizes.length > 0 && (
                 <section className="mt-4">
-                  <p className="mb-2 text-sm text-[var(--c-muted)]">尺寸: {selectedSize}</p>
-                  <div className="flex flex-wrap gap-2">
+                  <p className="mb-1.5 text-xs text-[var(--c-muted)]">尺寸: {selectedSize}</p>
+                  <div className="flex flex-wrap gap-1.5">
                     {product.sizes.map((size) => (
                       <button
                         key={size}
                         onClick={() => setSelectedSize(size)}
-                        className={`h-14 min-w-16 border text-sm font-semibold ${
+                        className={`h-8 min-w-10 border px-2 text-xs! font-semibold ${
                           selectedSize === size
                             ? 'border-2 border-[var(--c-sale)] bg-[var(--c-surface)] text-[var(--c-text)]'
                             : 'border-[#ece7e2] bg-[var(--c-bg)] text-[var(--c-text)]'
@@ -478,34 +478,34 @@ export default function ProductDetailClient({ product, homeHref = '/' }: { produ
 
 
           <section className="mt-4">
-            <p className="mb-2 text-sm text-[var(--c-muted)]">數量</p>
-            <div className="grid h-12 grid-cols-[48px_1fr_48px] border border-[var(--c-border)]">
-              <button onClick={() => setQuantity((q) => Math.max(1, q - 1))} className="text-2xl font-bold">
+            <p className="mb-1.5 text-xs text-[var(--c-muted)]">數量</p>
+            <div className="grid h-8 grid-cols-[32px_1fr_32px] border border-[var(--c-border)] text-sm">
+              <button onClick={() => setQuantity((q) => Math.max(1, q - 1))} className="text-lg! font-bold">
                 -
               </button>
               <div className="flex items-center justify-center border-x border-[var(--c-border)]">{quantity}</div>
               <button
                 onClick={() => setQuantity((q) => Math.min(q + 1, Math.max(1, maxQty)))}
                 disabled={quantity >= maxQty}
-                className="text-2xl font-bold disabled:cursor-not-allowed disabled:opacity-30"
+                className="text-lg! font-bold disabled:cursor-not-allowed disabled:opacity-30"
               >
                 +
               </button>
             </div>
           </section>
 
-          <div className="mt-4 grid grid-cols-2 gap-3">
+          <div className="mt-3 grid grid-cols-2 gap-2">
             <button
               onClick={() => addToCart('cart')}
               disabled={soldOut}
-              className="bg-[var(--c-sale)] px-4 py-3 font-semibold text-white disabled:opacity-50"
+              className="bg-[var(--c-sale)] px-3 py-2 text-sm! font-semibold text-white disabled:opacity-50"
             >
               {soldOut ? 'SOLD OUT' : '加入購物車'}
             </button>
             <button
               onClick={() => addToCart('buy')}
               disabled={soldOut}
-              className="bg-[#ff761a] px-4 py-3 font-semibold text-white disabled:opacity-50"
+              className="bg-[#ff761a] px-3 py-2 text-sm! font-semibold text-white disabled:opacity-50"
             >
               立即購買
             </button>
@@ -515,7 +515,7 @@ export default function ProductDetailClient({ product, homeHref = '/' }: { produ
             onClick={toggleFavorite}
             disabled={favoritePending}
             aria-pressed={favorite}
-            className={`mx-auto mt-6 flex items-center justify-center gap-2 text-sm font-semibold transition ${
+            className={`mx-auto mt-4 flex items-center justify-center gap-1.5 text-xs! font-semibold transition ${
               favorite ? 'text-[var(--c-sale)]' : 'text-[#5d5652]'
             }`}
           >
@@ -528,20 +528,20 @@ export default function ProductDetailClient({ product, homeHref = '/' }: { produ
           <div className="grid grid-cols-2 border-b border-[var(--c-border)] text-center">
             <button
               onClick={() => setTab('description')}
-              className={`py-4 ${tab === 'description' ? 'border-b-4 border-[var(--c-sale)] text-[var(--c-text)]' : 'text-[var(--c-muted)]'}`}
+              className={`py-2.5 text-sm! ${tab === 'description' ? 'border-b-4 border-[var(--c-sale)] text-[var(--c-text)]' : 'text-[var(--c-muted)]'}`}
             >
               商品描述
             </button>
             <button
               onClick={() => setTab('shipping')}
-              className={`py-4 ${tab === 'shipping' ? 'border-b-4 border-[var(--c-sale)] text-[var(--c-text)]' : 'text-[var(--c-muted)]'}`}
+              className={`py-2.5 text-sm! ${tab === 'shipping' ? 'border-b-4 border-[var(--c-sale)] text-[var(--c-text)]' : 'text-[var(--c-muted)]'}`}
             >
               送貨及付款方式
             </button>
           </div>
 
           {tab === 'description' ? (
-            <div className="mx-auto max-w-2xl py-6 text-center leading-[1.6] text-[#5d5652]">
+            <div className="mx-auto max-w-2xl py-4 text-center text-[13px] leading-[1.6] text-[#5d5652]">
               {product.tagline ? (
                 <div
                   className="mx-auto max-w-none text-left leading-[1.6] [&_a]:text-[var(--c-sale)] [&_img]:my-4 [&_img]:max-w-full [&_ol]:list-decimal [&_ol]:pl-6 [&_table]:my-4 [&_table]:w-full [&_table]:border-collapse [&_td]:border [&_td]:border-[var(--c-border)] [&_td]:p-2 [&_th]:border [&_th]:border-[var(--c-border)] [&_th]:bg-[var(--c-bg)] [&_th]:p-2 [&_ul]:list-disc [&_ul]:pl-6"
@@ -552,20 +552,20 @@ export default function ProductDetailClient({ product, homeHref = '/' }: { produ
               )}
             </div>
           ) : (
-            <div className="mx-auto max-w-2xl py-6 text-center leading-[1.6] text-[#5d5652]">
-              <h3 className="text-xl font-medium text-[var(--c-text)]">送貨方式</h3>
+            <div className="mx-auto max-w-2xl py-4 text-center text-[13px] leading-[1.6] text-[#5d5652]">
+              <h3 className="text-base font-medium text-[var(--c-text)]">送貨方式</h3>
               <p className="mt-4">
                 超商取貨、宅配到府。
                 <br />
                 實際運送方式以結帳頁顯示為準。
               </p>
-              <h3 className="mt-8 text-xl font-medium text-[var(--c-text)]">付款方式</h3>
+              <h3 className="mt-5 text-base font-medium text-[var(--c-text)]">付款方式</h3>
               <p className="mt-4">
                 信用卡、電子支付、銀行轉帳。
                 <br />
                 實際付款方式以結帳頁顯示為準。
               </p>
-              <h3 className="mt-8 text-xl font-medium text-[var(--c-text)]">退換貨方式</h3>
+              <h3 className="mt-5 text-base font-medium text-[var(--c-text)]">退換貨方式</h3>
               <p className="mt-4">請參考網站頁尾，退換貨政策說明資訊。</p>
             </div>
           )}

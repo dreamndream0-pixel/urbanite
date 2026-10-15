@@ -43,7 +43,8 @@ export default function CategoryNavigation({ categories, value, onSelect, imageS
       if (!anchor) return;
       const top = anchor.bottom + 8;
       setPosition({
-        left: Math.max(12, Math.min(anchor.left, window.innerWidth - 252)),
+        // 選單寬度跟著文字:用實際寬度避免超出畫面右邊
+        left: Math.max(12, Math.min(anchor.left, window.innerWidth - (menu.current?.offsetWidth ?? 240) - 12)),
         top,
         maxHeight: Math.max(80, window.innerHeight - top - 12),
       });
