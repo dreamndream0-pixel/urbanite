@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { resolvePromoNotices } from '@/lib/promo-notices';
 import { getAdminUser } from '@/lib/supabase/server';
 import type { SiteSettings } from '@/lib/types';
 import { revalidateTag } from 'next/cache';
@@ -83,6 +84,7 @@ export async function PATCH(request: Request) {
     'coupon_hero_image',
     'member_stamp_image',
     'site_theme',
+    'promo_notices',
   ] as const;
 
   for (const key of keys) {
@@ -90,6 +92,7 @@ export async function PATCH(request: Request) {
   }
   // 網站外觀:只保留合法的顏色與選項
   if ('site_theme' in body) update.site_theme = resolveSiteTheme(body.site_theme);
+  if ('promo_notices' in body) update.promo_notices = resolvePromoNotices(body.promo_notices);
   if ('category_image_style' in body) update.category_image_style = ['text', 'square', 'cutout'].includes(String(body.category_image_style)) ? String(body.category_image_style) : 'circle';
 
   const supabase = (await shopAdminClient());

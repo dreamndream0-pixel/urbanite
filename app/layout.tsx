@@ -99,6 +99,7 @@ export default async function RootLayout({
       data-columns={theme.layout.columns}
       data-radius={theme.layout.radius}
       data-heading={theme.layout.heading}
+      data-stock={theme.layout.stock ?? 'hide'}
     >
       <head>
         {/* 判斷瀏覽器(畫面出現前就設好,版面不會跳):iPhone 的 Safari 與其他瀏覽器(Chrome、Firefox、Edge、LINE / IG / FB 內建瀏覽器)分開處理 */}

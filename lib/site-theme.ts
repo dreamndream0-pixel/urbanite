@@ -4,7 +4,7 @@ import { resolveStorefront, type StorefrontDesign } from './storefront-template'
 
 export type ColorKey =
   | 'bg' | 'header' | 'surface' | 'card' | 'text' | 'text2' | 'muted' | 'border' | 'borderStrong'
-  | 'soft' | 'brand' | 'sale' | 'gold' | 'button' | 'buttonText';
+  | 'soft' | 'brand' | 'sale' | 'gold' | 'button' | 'buttonText' | 'cartButton' | 'buyButton';
 
 // 每個顏色對應一個 CSS 變數(前台元件用 bg-[var(--c-bg)] 等方式取用)
 export const COLOR_FIELDS: { key: ColorKey; label: string; hint: string }[] = [
@@ -23,6 +23,8 @@ export const COLOR_FIELDS: { key: ColorKey; label: string; hint: string }[] = [
   { key: 'gold', label: '點綴色', hint: '會員、優惠標示' },
   { key: 'button', label: '按鈕底色', hint: '加入購物車、結帳' },
   { key: 'buttonText', label: '按鈕文字', hint: '按鈕上的文字' },
+  { key: 'cartButton', label: '加入購物車按鈕', hint: '商品頁「加入購物車」' },
+  { key: 'buyButton', label: '立即購買按鈕', hint: '商品頁「立即購買」' },
 ];
 
 export const cssVar = (key: ColorKey) => `--c-${key.replace(/[A-Z]/g, (m) => `-${m.toLowerCase()}`)}`;
@@ -32,7 +34,8 @@ export type GridColumns = '2-4' | '2-3' | '1-3';
 export type RadiusStyle = 'square' | 'soft' | 'round';
 export type HeadingFont = 'sans' | 'serif';
 
-export type SiteLayout = { card: CardStyle; columns: GridColumns; radius: RadiusStyle; heading: HeadingFont };
+export type StockDisplay = 'hide' | 'show';
+export type SiteLayout = { card: CardStyle; columns: GridColumns; radius: RadiusStyle; heading: HeadingFont; stock?: StockDisplay };
 
 export const LAYOUT_OPTIONS = {
   card: [
@@ -55,6 +58,11 @@ export const LAYOUT_OPTIONS = {
     { key: 'sans', label: '黑體' },
     { key: 'serif', label: '明體' },
   ] as { key: HeadingFont; label: string }[],
+  // 商品頁是否顯示剩餘庫存數量(預設不顯示;售完一律顯示)
+  stock: [
+    { key: 'hide', label: '不顯示' },
+    { key: 'show', label: '顯示' },
+  ] as { key: StockDisplay; label: string }[],
 };
 
 export type SiteTheme = { template: string; colors: Record<ColorKey, string>; layout: SiteLayout; storefront?: StorefrontDesign };
@@ -75,11 +83,15 @@ export const DEFAULT_COLORS: Record<ColorKey, string> = {
   gold: '#ada265',
   button: '#1f1b19',
   buttonText: '#ffffff',
+  cartButton: '#c84767',
+  buyButton: '#ff761a',
 };
 
-export const DEFAULT_LAYOUT: SiteLayout = { card: 'soft', columns: '2-4', radius: 'soft', heading: 'sans' };
+export const DEFAULT_LAYOUT: SiteLayout = { card: 'soft', columns: '2-4', radius: 'soft', heading: 'sans', stock: 'hide' };
 
-export const SITE_TEMPLATES: { key: string; name: string; note: string; colors: Record<ColorKey, string>; layout: SiteLayout }[] = [
+// 購買按鈕顏色:模板沒指定時,加入購物車沿用強調色、立即購買用橘色
+type TemplateColors = Omit<Record<ColorKey, string>, 'cartButton' | 'buyButton'> & Partial<Record<'cartButton' | 'buyButton', string>>;
+const RAW_TEMPLATES: { key: string; name: string; note: string; colors: TemplateColors; layout: SiteLayout }[] = [
   { key: 'urbanite', name: '經典米白', note: '淡底卡片・4 欄・黑體', colors: DEFAULT_COLORS, layout: DEFAULT_LAYOUT },
   {
     key: 'mono',
@@ -117,6 +129,10 @@ export const SITE_TEMPLATES: { key: string; name: string; note: string; colors: 
     layout: { card: 'plain', columns: '1-3', radius: 'round', heading: 'sans' },
   },
 ];
+export const SITE_TEMPLATES = RAW_TEMPLATES.map((t) => ({
+  ...t,
+  colors: { cartButton: t.colors.sale, buyButton: '#ff761a', ...t.colors } as Record<ColorKey, string>,
+}));
 
 const HEX = /^#[0-9a-f]{6}$/i;
 
@@ -127,6 +143,8 @@ export function resolveSiteTheme(raw: unknown): SiteTheme {
     const v = t.colors?.[f.key];
     if (typeof v === 'string' && HEX.test(v)) colors[f.key] = v.toLowerCase();
   }
+  // 舊設定沒有購買按鈕顏色:加入購物車沿用原本的強調色
+  if (!(typeof t.colors?.cartButton === 'string' && HEX.test(t.colors.cartButton))) colors.cartButton = colors.sale;
   const l = (t.layout ?? {}) as Partial<SiteLayout>;
   const pick = <T extends string>(v: unknown, list: { key: T }[], fallback: T) => (list.some((o) => o.key === v) ? (v as T) : fallback);
   return {
@@ -138,6 +156,7 @@ export function resolveSiteTheme(raw: unknown): SiteTheme {
       columns: pick(l.columns, LAYOUT_OPTIONS.columns, DEFAULT_LAYOUT.columns),
       radius: pick(l.radius, LAYOUT_OPTIONS.radius, DEFAULT_LAYOUT.radius),
       heading: pick(l.heading, LAYOUT_OPTIONS.heading, DEFAULT_LAYOUT.heading),
+      stock: pick(l.stock, LAYOUT_OPTIONS.stock, 'hide'),
     },
   };
 }

@@ -56,6 +56,7 @@ import SiteThemeEditor from './SiteThemeEditor';
 import LineBotManager from './line-bot/LineBotManager';
 import LoyaltyManager from './LoyaltyManager';
 import StocktakeManager, { type StocktakeApplied } from './StocktakeManager';
+import PromoActivitiesManager from './PromoActivitiesManager';
 import { downloadCsv } from '@/lib/stocktake';
 import { isCollectOnDelivery } from '@/lib/payment';
 import { buildReturnSteps, historyKind, isReturnOrder } from '@/lib/return-progress';
@@ -138,7 +139,7 @@ type Draft = {
   unit: string;
   sale_mode: string;
   colorImages: Record<string, string>;
-  specs: { name: string; optionsText: string }[];
+  specs: { name: string; optionsText: string; display?: 'text' | 'image' }[];
   variantStock: Record<string, number>; // key = 各選項用 ' / ' 串起來
   variantCost: Record<string, number>; // 各規格單位成本
   variantSafety: Record<string, number>; // 各規格安全庫存
@@ -404,7 +405,7 @@ function blankDraft(campaignId: string | null = null, products: Pick<Product, 'i
 
 function toDraft(p: Product): Draft {
   const images = p.images?.length ? p.images : p.image ? [p.image] : [];
-  const specs = (p.specs ?? []).map((s) => ({ name: s.name, optionsText: s.options.join(', ') }));
+  const specs = (p.specs ?? []).map((s) => ({ name: s.name, optionsText: s.options.join(', '), display: s.display }));
   const variantStock: Record<string, number> = {};
   const variantCost: Record<string, number> = {};
   const variantSafety: Record<string, number> = {};
@@ -538,6 +539,7 @@ export default function AdminDashboard({
   const [newDiscount, setNewDiscount] = useState<DiscountDraft>(blankDiscountDraft());
   const [couponImgBusy, setCouponImgBusy] = useState(false);
   const [editingCouponId, setEditingCouponId] = useState<string | null>(null);
+  const [promoTab, setPromoTab] = useState<'coupons' | 'activities'>('coupons');
   const [couponMenuId, setCouponMenuId] = useState<string | null>(null);
   const [couponModalOpen, setCouponModalOpen] = useState(false);
   const [discountQuery, setDiscountQuery] = useState('');
@@ -811,7 +813,7 @@ export default function AdminDashboard({
 
     // 規格制:整理規格維度 + 各組合庫存
     const specs = editing.specs
-      .map((s) => ({ name: s.name.trim(), options: parseOptions(s.optionsText) }))
+      .map((s) => ({ name: s.name.trim(), options: parseOptions(s.optionsText), ...(s.display === 'image' ? { display: 'image' as const } : {}) }))
       .filter((s) => s.name && s.options.length > 0);
     const variants = specCombos(specs).map((opts) => {
       const k = opts.join(' / ');
@@ -2651,6 +2653,13 @@ export default function AdminDashboard({
                 </div>
               </div>
 
+              {/* 分頁:優惠券管理 / 活動管理 */}
+              <div className="flex gap-1 rounded-xl border border-[#e5ded4] bg-white p-1">
+                {([['coupons', '優惠券管理'], ['activities', '活動管理']] as const).map(([k, label]) => (
+                  <button key={k} type="button" onClick={() => setPromoTab(k)} className={`flex-1 rounded-lg px-4 py-2 text-sm ${promoTab === k ? 'bg-[#1f1b19] font-semibold text-white' : 'text-[#6b6156] hover:bg-[#f6f2ec]'}`}>{label}</button>
+                ))}
+              </div>
+              {promoTab === 'activities' ? <PromoActivitiesManager /> : (<>
               {/* 營收卡 */}
               <div className="rounded-2xl bg-[#414a33] p-5 text-white sm:p-6">
                 <p className="text-sm text-white/70">優惠券帶來營收</p>
@@ -2894,6 +2903,7 @@ export default function AdminDashboard({
               </div>
               </div>
               )}
+              </>)}
             </div>
           )}
 
@@ -6676,7 +6686,7 @@ function ProductModal({
 
   // 規格制:即時算出組合與各組合庫存
   const modalSpecs = draft.specs
-    .map((s) => ({ name: s.name.trim(), options: parseOptions(s.optionsText) }))
+    .map((s) => ({ name: s.name.trim(), options: parseOptions(s.optionsText), display: s.display }))
     .filter((s) => s.name && s.options.length > 0);
   const modalCombos = specCombos(modalSpecs);
   const hasSpecs = modalCombos.length > 0;
@@ -6685,7 +6695,7 @@ function ProductModal({
     0,
   );
 
-  function updateSpec(i: number, patch: Partial<{ name: string; optionsText: string }>) {
+  function updateSpec(i: number, patch: Partial<{ name: string; optionsText: string; display: 'text' | 'image' }>) {
     onChange({ ...draft, specs: draft.specs.map((s, idx) => (idx === i ? { ...s, ...patch } : s)) });
   }
   function addSpec() {
@@ -6992,6 +7002,13 @@ function ProductModal({
 	                        className="min-w-40 flex-1 border-0 px-2 py-1 text-sm outline-none"
 	                      />
 	                    </div>
+	                    <div className="flex items-center gap-1 text-xs md:col-span-3">
+	                      <span className="text-[#8a7f72]">前台按鈕顯示</span>
+	                      {(['text', 'image'] as const).map((mode) => (
+	                        <button key={mode} type="button" onClick={() => updateSpec(i, { display: mode })} className={`rounded-full px-3 py-1 font-semibold ${(s.display ?? 'text') === mode ? 'bg-[#1f1b19] text-white' : 'border border-[#d7c9bd] text-[#6b6156]'}`}>{mode === 'text' ? '文字' : '規格圖'}</button>
+	                      ))}
+	                      {s.display === 'image' && <span className="text-[#8a7f72]">(在下方上傳每個選項的圖片)</span>}
+	                    </div>
 	                    <button
 	                      type="button"
 	                      onClick={() => removeSpec(i)}
@@ -7009,13 +7026,13 @@ function ProductModal({
 	                >
 	                  為商品新增更多規格
 	                </button>
-                {colorDim && colorDim.options.length > 0 && (
-                  <div className="mt-3 rounded-xl border border-[#e5ded4] p-3">
+                {modalSpecs.filter((dim) => dim === colorDim || dim.display === 'image').map((dim) => (
+                  <div key={dim.name} className="mt-3 rounded-xl border border-[#e5ded4] p-3">
                     <p className="mb-2 text-sm font-semibold text-[#8a7f72]">
-                      顏色圖片(前台點該顏色會切換主圖)
+                      {dim.name}圖片{dim.display === 'image' ? '(前台規格按鈕顯示這張圖' : '('}{dim === colorDim ? `${dim.display === 'image' ? ',' : ''}點選會切換主圖)` : ')'}
                     </p>
                     <div className="grid gap-2 sm:grid-cols-2">
-                      {colorDim.options.map((color) => (
+                      {dim.options.map((color) => (
                         <div key={color} className="flex items-center gap-3 rounded-lg border border-[#e5ded4] p-2">
                           <div className="h-14 w-14 shrink-0 overflow-hidden rounded-md bg-[#f1e3dc]">
                             {draft.colorImages[color] && (
@@ -7053,7 +7070,7 @@ function ProductModal({
                       ))}
                     </div>
                   </div>
-                )}
+                ))}
 	              </div>
 	            </FieldGroup>
 	            {hasSpecs && (

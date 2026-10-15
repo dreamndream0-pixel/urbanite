@@ -220,6 +220,7 @@ export default function SiteThemeEditor({ initial, onSaved, categoryImageStyle =
             <OptionRow label="商品欄數" value={draft.layout.columns} options={LAYOUT_OPTIONS.columns} onChange={(v) => setLayout({ columns: v })} />
             <OptionRow label="圓角" value={draft.layout.radius} options={LAYOUT_OPTIONS.radius} onChange={(v) => setLayout({ radius: v })} />
             <OptionRow label="標題字體" value={draft.layout.heading} options={LAYOUT_OPTIONS.heading} onChange={(v) => setLayout({ heading: v })} />
+            <OptionRow label="商品頁剩餘庫存數量" value={draft.layout.stock ?? 'hide'} options={LAYOUT_OPTIONS.stock} onChange={(v) => setLayout({ stock: v })} />
           </div>
 
           {/* 顏色 */}

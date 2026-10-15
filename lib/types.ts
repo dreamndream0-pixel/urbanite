@@ -1,7 +1,8 @@
 // 前後端共用的資料型別
 
 // 規格維度(例:{name:'顏色', options:['紅','綠','藍']})
-export type SpecDim = { name: string; options: string[] };
+// display:前台規格按鈕顯示文字或圖片(圖片用 color_images[選項])
+export type SpecDim = { name: string; options: string[]; display?: 'text' | 'image' };
 // 每個規格組合的庫存(options 依 specs 順序,例:['紅','S'])
 export type Variant = {
   options: string[];
@@ -88,6 +89,8 @@ export type SiteSettings = {
   member_stamp_image?: string;
   // 網站外觀:配色與版面配置(lib/site-theme)
   site_theme?: unknown;
+  // 促銷管理 → 活動管理:商品頁促銷文字(lib/promo-notices)
+  promo_notices?: unknown;
   updated_at?: string;
 };
 

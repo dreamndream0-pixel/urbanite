@@ -64,6 +64,9 @@ html[data-browser='ios-other'] body {
   scroll-padding-top: 80px;
 }
 
+/* 商品頁剩餘庫存數量:預設不顯示(網站外觀 → 商品頁剩餘庫存數量) */
+html:not([data-stock='show']) .product-stock-count { display: none; }
+
 body {
   margin: 0;
   background: var(--background);

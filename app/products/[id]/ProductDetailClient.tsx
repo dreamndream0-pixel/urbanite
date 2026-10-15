@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import { cleanRichText } from '@/lib/rich-text';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Product } from '@/lib/types';
-import { FREE_SHIPPING_THRESHOLD } from '@/lib/shipping';
+import { resolvePromoNotices, type PromoNotice } from '@/lib/promo-notices';
 import StoreHeader from '@/app/components/StoreHeader';
 import { useLoopCarousel } from '@/app/components/useLoopCarousel';
 import { setShopHome } from '@/lib/shop-home';
@@ -20,15 +20,15 @@ type CartItem = {
   quantity: number;
 };
 
-const formatter = new Intl.NumberFormat('zh-TW', {
-  style: 'currency',
-  currency: 'TWD',
-  maximumFractionDigits: 0,
-});
+// 商品頁價格顯示成「NT $1,234」
+const ntd = (n: number) => `NT $${Math.round(Number(n) || 0).toLocaleString('en-US')}`;
+
 
 export default function ProductDetailClient({ product, homeHref = '/' }: { product: Product; homeHref?: string }) {
   const gallery = product.images?.length ? product.images : product.image ? [product.image] : [];
   const specs = product.specs ?? [];
+  // 促銷管理 → 活動管理的商品頁促銷文字
+  const [promoNotices, setPromoNotices] = useState<PromoNotice[]>([]);
   const hasSpecs = specs.length > 0;
   // 商品照片可左右滑動(與首頁輪播圖相同的無限循環)
   const carousel = useLoopCarousel(gallery);
@@ -89,6 +89,7 @@ export default function ProductDetailClient({ product, homeHref = '/' }: { produ
       .then((res) => (res.ok ? res.json() : null))
       .then((settings) => {
         if (settings?.logo_url) setLogoUrl(settings.logo_url);
+        setPromoNotices(resolvePromoNotices(settings?.promo_notices));
       })
       .catch(() => {});
 
@@ -278,7 +279,7 @@ export default function ProductDetailClient({ product, homeHref = '/' }: { produ
       />
 
       <section className="mx-auto max-w-6xl px-4 py-4 sm:px-6 lg:py-8">
-        <div className="grid gap-8 lg:grid-cols-[1.05fr_0.95fr] lg:items-start">
+        <div className="grid gap-3 lg:grid-cols-[1.05fr_0.95fr] lg:gap-8 lg:items-start">
         <div className="lg:sticky lg:top-24">
         <div
           className="relative mx-auto aspect-[4/5] w-full max-w-md overflow-hidden rounded-xl bg-[#eee8e1] sm:max-w-lg lg:max-w-none"
@@ -352,7 +353,7 @@ export default function ProductDetailClient({ product, homeHref = '/' }: { produ
         )}
         </div>
 
-        <div className="px-1 py-6 sm:px-2 lg:py-0">
+        <div className="px-1 pb-6 pt-1 sm:px-2 lg:py-0">
           <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.15em] text-[var(--c-sale)]">
             {product.category || 'Urbanite'}
           </p>
@@ -366,18 +367,15 @@ export default function ProductDetailClient({ product, homeHref = '/' }: { produ
           )}
 
           <div className="mt-3 border-l-[3px] border-[var(--c-sale)] pl-2.5 text-xs leading-[1.6] text-[var(--c-text)]">
-            {product.available_shipping_methods?.includes('免運') ? (
-              <p>此商品免運費</p>
-            ) : (
-              <p>全店消費滿 {formatter.format(FREE_SHIPPING_THRESHOLD)} 免運費</p>
-            )}
+            {product.available_shipping_methods?.includes('免運') && <p>此商品免運費</p>}
+            {promoNotices.filter((n) => n.active && !(product.available_shipping_methods?.includes('免運') && n.id === 'free-shipping')).map((n) => <p key={n.id}>{n.text}</p>)}
           </div>
 
           <div className="mt-3 flex items-baseline gap-2.5">
-            <span className="text-lg font-bold text-[var(--c-sale)]">{formatter.format(product.price)}</span>
+            <span className="text-lg font-bold text-[var(--c-sale)]">{ntd(product.price)}</span>
             {product.original_price ? (
               <span className="text-sm text-[var(--c-muted)] line-through">
-                {formatter.format(product.original_price)}
+                {ntd(product.original_price)}
               </span>
             ) : null}
           </div>
@@ -405,7 +403,9 @@ export default function ProductDetailClient({ product, homeHref = '/' }: { produ
                               showImage(product.color_images[opt]);
                             }
                           }}
-                          className={`min-w-10 border px-3 py-[7px] text-xs! font-semibold ${
+                          title={opt}
+                          aria-label={opt}
+                          className={`${dim.display === 'image' && product.color_images?.[opt] ? 'h-11 w-11 overflow-hidden border-2 p-0' : 'min-w-10 border px-3 py-[7px] text-xs! font-semibold'} ${
                             grayed
                               ? 'cursor-not-allowed border-[var(--c-border)] bg-[var(--c-bg)] text-[var(--c-text)] line-through opacity-30'
                               : selected
@@ -413,7 +413,7 @@ export default function ProductDetailClient({ product, homeHref = '/' }: { produ
                                 : 'border-[var(--c-border)] bg-[var(--c-bg)] text-[var(--c-text)]'
                           }`}
                         >
-                          {opt}
+                          {dim.display === 'image' && product.color_images?.[opt] ? <img src={product.color_images[opt]} alt="" className="h-full w-full object-cover" /> : opt}
                         </button>
                       );
                     })}
@@ -426,7 +426,7 @@ export default function ProductDetailClient({ product, homeHref = '/' }: { produ
                 ) : soldOut ? (
                   <span className="font-semibold text-[#c0392b]">此規格已售完</span>
                 ) : (
-                  <span className="text-[var(--c-muted)]">庫存：{variantInventory} 件</span>
+                  <span className="product-stock-count text-[var(--c-muted)]">庫存：{variantInventory} 件</span>
                 )}
               </p>
             </>
@@ -498,14 +498,14 @@ export default function ProductDetailClient({ product, homeHref = '/' }: { produ
             <button
               onClick={() => addToCart('cart')}
               disabled={soldOut}
-              className="bg-[var(--c-sale)] px-3 py-2 text-sm! font-semibold text-white disabled:opacity-50"
+              className="bg-[var(--c-cart-button)] px-3 py-2 text-sm! font-semibold text-white disabled:opacity-50"
             >
               {soldOut ? 'SOLD OUT' : '加入購物車'}
             </button>
             <button
               onClick={() => addToCart('buy')}
               disabled={soldOut}
-              className="bg-[#ff761a] px-3 py-2 text-sm! font-semibold text-white disabled:opacity-50"
+              className="bg-[var(--c-buy-button)] px-3 py-2 text-sm! font-semibold text-white disabled:opacity-50"
             >
               立即購買
             </button>
