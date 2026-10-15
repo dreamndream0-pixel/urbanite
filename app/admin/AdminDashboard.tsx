@@ -3141,15 +3141,6 @@ export default function AdminDashboard({
               {settingsTab === 'general' && (
               <Card title="網頁頁籤圖示">
                 <div className="flex flex-wrap items-center gap-5">
-                  {/* 預覽:瀏覽器頁籤的樣子 */}
-                  <div className="flex w-56 min-w-0 items-center gap-2 rounded-t-lg border border-b-0 border-[#e5ded4] bg-white px-3 py-2">
-                    {faviconUrl ? (
-                      <img src={faviconUrl} alt="" className="h-4 w-4 shrink-0 object-contain" />
-                    ) : (
-                      <img src="/favicon.png" alt="" className="h-4 w-4 shrink-0 object-contain" />
-                    )}
-                    <span className="truncate text-xs text-[#1f1b19]">{shopName || '我的商店'}</span>
-                  </div>
                   <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-xl border border-[#e5ded4] bg-white">
                     <img src={faviconUrl || '/favicon.png'} alt="頁籤圖示" className="h-12 w-12 object-contain" />
                   </div>
