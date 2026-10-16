@@ -76,6 +76,49 @@ html:not([data-stock='show']) .product-stock-count { display: none; }
   pointer-events: none;
 }
 
+/* 名片頁底部「3分鐘免費開店」:深藍底金字膠囊,金色光澤掃過 + 外圈光暈呼吸 */
+.shop-cta-pill {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  padding: 9px 22px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #0b1e46 0%, #13306b 55%, #0b1e46 100%);
+  border: 1px solid rgba(232, 197, 110, 0.55);
+  color: #e8c56e;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-shadow: 0 0 6px rgba(232, 197, 110, 0.35);
+  box-shadow: 0 4px 14px rgba(11, 30, 70, 0.35);
+  animation: shop-cta-glow 2.4s ease-in-out infinite;
+}
+.shop-cta-pill::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -60%;
+  width: 45%;
+  height: 100%;
+  background: linear-gradient(100deg, transparent 0%, rgba(255, 236, 170, 0.55) 50%, transparent 100%);
+  transform: skewX(-20deg);
+  animation: shop-cta-shine 2.4s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes shop-cta-shine {
+  0%, 35% { left: -60%; }
+  75%, 100% { left: 130%; }
+}
+@keyframes shop-cta-glow {
+  0%, 100% { box-shadow: 0 4px 14px rgba(11, 30, 70, 0.35), 0 0 0 0 rgba(232, 197, 110, 0); }
+  50% { box-shadow: 0 4px 18px rgba(11, 30, 70, 0.45), 0 0 0 5px rgba(232, 197, 110, 0.18); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .shop-cta-pill, .shop-cta-pill::after { animation: none; }
+}
+
 body {
   margin: 0;
   background: var(--background);
