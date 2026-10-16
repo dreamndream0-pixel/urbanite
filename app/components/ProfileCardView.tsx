@@ -870,7 +870,7 @@ export default function ProfileCardView({
           // 頁尾:URBANLINKS 文字 Logo + 免費建立名片(會員、店家名片都一樣)
           <Link href={card.slug && card.slug !== 'preview' ? `/card?ref=${encodeURIComponent(card.slug)}` : '/card'} className="mt-12 flex w-full flex-col items-center gap-1.5 opacity-85 transition hover:opacity-100">
             <img src="/brand/urbanlinks-logo.png" alt="URBANLINKS" className="h-4 w-auto object-contain" style={dark ? { filter: 'brightness(0) invert(1)' } : undefined} />
-            <span className="mt-1 text-xs font-medium" style={{ color: theme.textColor }}>立即免費建立個人名片</span>
+            <span className="mt-1 text-xs font-medium" style={{ color: theme.textColor }}>3分鐘免費開店</span>
             <span className="rounded-full border px-3 py-0.5 text-[10px] tracking-[0.18em]" style={{ color: theme.mutedColor, borderColor: tint(theme.mutedColor, 40) }}>TRY FOR FREE</span>
           </Link>
         ) : null}
