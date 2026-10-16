@@ -7,6 +7,8 @@ import HeroScene from "./HeroScene";
 import ProductShowcase from "./ProductShowcase";
 import PromoBar from "./PromoBar";
 import RefCapture from "./RefCapture";
+import CustomerCasePreview from "./CustomerCasePreview";
+import FloatingLineSupport from "./FloatingLineSupport";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
@@ -24,6 +26,8 @@ export default async function CardServicePage() {
       <HeroScene startHref={startHref} loggedIn={Boolean(user)} />
 
       <ProductShowcase startHref={startHref} />
+      <CustomerCasePreview />
+      <FloatingLineSupport />
 
       <section className={styles.finalCta}>
         <div className={styles.stone} aria-hidden="true">

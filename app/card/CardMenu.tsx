@@ -1,166 +1,142 @@
 'use client';
 
+import Image from 'next/image';
 import Link from 'next/link';
-import { useEffect, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { useEffect, useId, useRef, useState, type MouseEvent } from 'react';
+import { ArrowRight, ChevronRight, CreditCard, House, LayoutDashboard, LogOut, Menu, PanelsTopLeft, Store, UserRound, X } from 'lucide-react';
 import { createBrowserSupabase } from '@/lib/supabase/client';
+import { SERVICE_LOGO } from '@/lib/card-plan';
+import { useScrollLock } from '@/app/components/useScrollLock';
+import { customerCases } from './customer-cases';
+import styles from './card-menu.module.css';
 
 type Me = { email: string; name: string; isAdmin?: boolean; shops?: { slug: string; name: string; current: boolean; adminUrl: string }[] } | null;
 
-// 名片服務的漢堡選單:我的名片 / 方案 / 登入登出都收在這裡;links = 額外的導覽連結(介紹頁用)
-// variant="header":放在頁首;variant="floating":公開名片右上角的半透明圓鈕
-export default function CardMenu({
-  variant = 'header',
-  loggedIn,
-  current,
-  top = 12,
-  links = [],
-}: {
+export default function CardMenu({ variant = 'header', loggedIn, current, top = 12, links = [] }: {
   variant?: 'header' | 'floating';
-  loggedIn?: boolean; // 伺服器已知登入狀態就直接帶入,沒帶就自己查
+  loggedIn?: boolean;
   current?: 'mycard' | 'upgrade' | 'login';
   top?: number;
   links?: { href: string; label: string }[];
 }) {
   const [open, setOpen] = useState(false);
+  const [closing, setClosing] = useState(false);
   const [me, setMe] = useState<Me | undefined>(loggedIn === false ? null : undefined);
-  const box = useRef<HTMLDivElement>(null);
+  const dialog = useRef<HTMLDialogElement>(null);
+  const trigger = useRef<HTMLButtonElement>(null);
+  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const afterClose = useRef<(() => void) | null>(null);
+  const id = useId();
+  const router = useRouter();
+  useScrollLock(open);
 
   useEffect(() => {
     if (loggedIn === false) return;
-    fetch('/api/me', { cache: 'no-store' })
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => setMe(data?.email ? { email: data.email, name: data.name ?? '', isAdmin: Boolean(data.isAdmin), shops: Array.isArray(data.shops) ? data.shops : [] } : null))
-      .catch(() => setMe(null));
+    const controller = new AbortController();
+    fetch('/api/me', { cache: 'no-store', signal: controller.signal })
+      .then(res => res.ok ? res.json() : null)
+      .then(data => setMe(data?.email ? { email: data.email, name: data.name ?? '', isAdmin: Boolean(data.isAdmin), shops: Array.isArray(data.shops) ? data.shops : [] } : null))
+      .catch(() => { if (!controller.signal.aborted) setMe(null); });
+    return () => controller.abort();
   }, [loggedIn]);
 
-  // 點選單外面或按 Esc 關閉
-  useEffect(() => {
-    if (!open) return;
-    const onDown = (e: PointerEvent) => {
-      if (box.current && !box.current.contains(e.target as Node)) setOpen(false);
-    };
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false);
-    document.addEventListener('pointerdown', onDown);
-    document.addEventListener('keydown', onKey);
-    return () => {
-      document.removeEventListener('pointerdown', onDown);
-      document.removeEventListener('keydown', onKey);
-    };
-  }, [open]);
+  useEffect(() => () => { if (closeTimer.current) clearTimeout(closeTimer.current); }, []);
+
+  function closeMenu(callback?: () => void) {
+    if (!dialog.current?.open || closing) return;
+    afterClose.current = callback ?? null;
+    setClosing(true);
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) dialog.current.close();
+    else closeTimer.current = setTimeout(() => dialog.current?.close(), 220);
+  }
+
+  function navigate(event: MouseEvent<HTMLAnchorElement>, href: string) {
+    if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) return;
+    const target = new URL(href, window.location.href);
+    if (target.origin === location.origin && target.pathname === location.pathname && target.hash) {
+      event.preventDefault();
+      closeMenu(() => {
+        window.location.hash = target.hash;
+        document.getElementById(decodeURIComponent(target.hash.slice(1)))?.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+      });
+    } else closeMenu();
+  }
 
   async function signOut() {
-    setOpen(false);
+    closeMenu();
     await createBrowserSupabase().auth.signOut();
-    window.location.href = '/card';
+    setMe(null);
+    router.push('/card');
+    router.refresh();
   }
 
   const signedIn = me ? true : me === null ? false : Boolean(loggedIn);
-  const item = (active: boolean) =>
-    `flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition ${active ? 'bg-[#1f1b19] text-white' : 'text-[#3d3530] hover:bg-[#f6f2ec]'}`;
-  const floating = variant === 'floating';
+  const navigation = links.length ? [...links] : [
+    { href: '/card', label: 'URBANLINKS 首頁' },
+    { href: '/card/business', label: '品牌官網' },
+    { href: '/card/pricing', label: '方案價格' },
+  ];
+  if (!navigation.some(link => link.href === '/card/cases')) navigation.splice(Math.max(1, navigation.length - 1), 0, { href: '/card/cases', label: '客戶案例' });
+  const featured = customerCases.filter(item => item.kind === 'live').slice(0, 3);
 
   return (
-    <div
-      ref={box}
-      className={floating ? 'fixed right-3 z-[60]' : 'relative ml-auto'}
-      style={floating ? { top } : undefined}
-    >
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        aria-label={open ? '關閉選單' : '開啟選單'}
-        aria-expanded={open}
-        className={
-          floating
-            ? 'flex h-10 w-10 items-center justify-center rounded-full bg-white/70 text-[#1f1b19] shadow-[0_2px_10px_rgba(0,0,0,0.12)] backdrop-blur transition hover:bg-white/90'
-            : 'flex h-10 w-10 items-center justify-center rounded-full text-[#1f1b19] transition hover:bg-[#efe8dd]'
-        }
-      >
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" aria-hidden="true">
-          {open ? <path d="M6 6l12 12M18 6L6 18" /> : <path d="M4 7h16M4 12h16M4 17h16" />}
-        </svg>
-      </button>
-      {open ? (
-        <div className="absolute right-0 top-12 w-60 rounded-2xl border border-[#e5ded4] bg-white p-2 shadow-[0_12px_32px_rgba(31,27,25,0.16)]">
-          {links.length ? (
-            <>
-              {links.map((l) => (
-                <Link key={l.href + l.label} href={l.href} onClick={() => setOpen(false)} className={item(false)}>
-                  {l.label}
-                </Link>
-              ))}
-              <div className="my-1.5 border-t border-[#f0ebe3]" />
-            </>
-          ) : null}
-          {signedIn ? (
-            <>
-              {me ? (
-                <p className="truncate px-3 pb-2 pt-1.5 text-xs text-[#a99e8f]">{me.name || me.email}</p>
-              ) : null}
-              {/* 管理員:進入管理後台;開了官網的會員:我的官網後台 */}
-              {me?.isAdmin ? (
-                <a href="/admin" onClick={() => setOpen(false)} className={`${item(false)} bg-[#f6f2ec] font-semibold`}>
-                  <MenuIcon d="M4 4h7v7H4zM13 4h7v4h-7zM13 10h7v10h-7zM4 13h7v7H4z" />
-                  管理後台
-                </a>
-              ) : null}
-              {(me?.shops ?? []).filter((sh) => !sh.current).map((sh) => (
-                <a key={sh.slug} href={sh.adminUrl} onClick={() => setOpen(false)} className={`${item(false)} bg-[#f6f2ec] font-semibold`}>
-                  <MenuIcon d="M3 9l1.5-5h15L21 9M3 9h18M3 9v11h18V9M9 20v-6h6v6" />
-                  <span className="min-w-0">
-                    我的官網後台
-                    <span className="block truncate text-[11px] font-normal text-[#8a7f72]">{sh.name || sh.slug}</span>
-                  </span>
-                </a>
-              ))}
-              <Link href="/mycard" onClick={() => setOpen(false)} className={item(current === 'mycard')}>
-                <MenuIcon d="M4 6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2zM9 10a2 2 0 1 0 4 0 2 2 0 1 0-4 0M7.5 16.5c.8-1.5 2-2.3 3.5-2.3s2.7.8 3.5 2.3" />
-                我的名片
-              </Link>
-              {!links.some(link => link.href === '/card/pricing') && <Link href="/card/pricing" onClick={() => setOpen(false)} className={item(current === 'upgrade')}>
-                <MenuIcon d="M12 3l2.6 5.6 6 .7-4.5 4.1 1.2 6L12 16.4 6.7 19.4l1.2-6L3.4 9.3l6-.7z" />
-                方案價格
-              </Link>}
-              <Link href="/card" onClick={() => setOpen(false)} className={item(false)}>
-                <MenuIcon d="M3 11l9-7 9 7M5 10v10h14V10" />
-                URBANLINKS 首頁
-              </Link>
-              <div className="my-1.5 border-t border-[#f0ebe3]" />
-              <button type="button" onClick={signOut} className={`${item(false)} w-full text-left`}>
-                <MenuIcon d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 16l-4-4 4-4M6 12h10" />
-                登出
-              </button>
-            </>
-          ) : (
-            <>
-              <div className="grid grid-cols-2 gap-2 p-1">
-                <Link href="/card/login" onClick={() => setOpen(false)} className="rounded-full border border-[#121b33] py-2 text-center text-sm font-semibold text-[#121b33]">登入</Link>
-                <Link href="/card/register" onClick={() => setOpen(false)} className="rounded-full bg-[#121b33] py-2 text-center text-sm font-semibold text-[#dcbc84]">註冊</Link>
-              </div>
-              {links.length ? null : (
-              <>
-              <Link href="/card/pricing" onClick={() => setOpen(false)} className={item(false)}>
-                <MenuIcon d="M12 3l2.6 5.6 6 .7-4.5 4.1 1.2 6L12 16.4 6.7 19.4l1.2-6L3.4 9.3l6-.7z" />
-                方案介紹
-              </Link>
-              <Link href="/card" onClick={() => setOpen(false)} className={item(false)}>
-                <MenuIcon d="M3 11l9-7 9 7M5 10v10h14V10" />
-                URBANLINKS 首頁
-              </Link>
-              </>
-              )}
-            </>
-          )}
+    <div className={variant === 'floating' ? styles.floating : styles.wrapper} style={variant === 'floating' ? { top } : undefined}>
+      <button ref={trigger} className={styles.trigger} type="button" aria-label="開啟選單" aria-expanded={open} aria-controls={id} aria-haspopup="dialog"
+        onClick={() => { setClosing(false); setOpen(true); dialog.current?.showModal(); }}><Menu size={22} /></button>
+      <dialog ref={dialog} id={id} className={styles.drawer} aria-labelledby={`${id}-title`} data-closing={closing}
+        onCancel={event => { event.preventDefault(); closeMenu(); }}
+        onKeyDown={event => {
+          if (event.key !== 'Tab') return;
+          const items = [...event.currentTarget.querySelectorAll<HTMLElement>('a[href], button:not([disabled])')].filter(item => item.getClientRects().length > 0);
+          if (!items.length) return;
+          event.preventDefault();
+          const index = items.indexOf(document.activeElement as HTMLElement);
+          const next = index < 0 ? (event.shiftKey ? items.length - 1 : 0) : (index + (event.shiftKey ? -1 : 1) + items.length) % items.length;
+          items[next].focus();
+        }}
+        onClose={() => {
+          setOpen(false);
+          setClosing(false);
+          trigger.current?.focus({ preventScroll: true });
+          const callback = afterClose.current;
+          afterClose.current = null;
+          if (callback) requestAnimationFrame(() => requestAnimationFrame(callback));
+        }}
+        onClick={event => {
+          if (event.target !== event.currentTarget) return;
+          const box = event.currentTarget.getBoundingClientRect();
+          if (event.clientX < box.left || event.clientX > box.right || event.clientY < box.top || event.clientY > box.bottom) closeMenu();
+        }}>
+        <header className={styles.heading}>
+          <Link href="/card" onClick={event => navigate(event, '/card')} aria-label="URBANLINKS 首頁"><Image src={SERVICE_LOGO} alt="URBANLINKS" width={184} height={36} /></Link>
+          <button autoFocus type="button" aria-label="關閉選單" onClick={() => closeMenu()}><X size={22} /></button>
+        </header>
+        <div className={styles.content}>
+          <div className={styles.navigation}>
+            <h2 id={`${id}-title`}>探索 URBANLINKS</h2>
+            <nav aria-label="主要導覽">{navigation.map((link, index) => <Link key={link.href + link.label} href={link.href} onClick={event => navigate(event, link.href)} className={styles.navLink} aria-current={link.href === '/card/pricing' && current === 'upgrade' ? 'page' : undefined}>
+              <small>{String(index + 1).padStart(2, '0')}</small><span>{link.label}{link.href === '/card/cases' && <small>服飾・租屋・美業・LINE AI</small>}</span><ArrowRight size={19} />
+            </Link>)}</nav>
+            {signedIn && <div className={styles.account}>
+              <p>{me?.name || me?.email || '會員專區'}</p>
+              {me?.isAdmin && <a href="/admin" onClick={event => navigate(event, '/admin')}><LayoutDashboard />管理後台<ChevronRight /></a>}
+              {(me?.shops ?? []).filter(shop => !shop.current).map(shop => <a key={shop.slug} href={shop.adminUrl} onClick={event => navigate(event, shop.adminUrl)}><Store /><span>我的官網後台<small>{shop.name || shop.slug}</small></span><ChevronRight /></a>)}
+              <Link href="/mycard" aria-current={current === 'mycard' ? 'page' : undefined} onClick={event => navigate(event, '/mycard')}><UserRound />我的名片<ChevronRight /></Link>
+              {!navigation.some(link => link.href === '/card/pricing') && <Link href="/card/pricing" aria-current={current === 'upgrade' ? 'page' : undefined} onClick={event => navigate(event, '/card/pricing')}><CreditCard />方案價格<ChevronRight /></Link>}
+              {!navigation.some(link => link.href === '/card') && <Link href="/card" onClick={event => navigate(event, '/card')}><House />URBANLINKS 首頁<ChevronRight /></Link>}
+            </div>}
+          </div>
+          <aside className={styles.caseSpace} aria-label="精選客戶案例">
+            <div className={styles.caseHeading}><PanelsTopLeft size={18} /><h3>客戶案例</h3></div>
+            <div className={styles.caseLinks}>{featured.map(item => <Link href={`/card/cases#${item.id}`} key={item.id} onClick={event => navigate(event, `/card/cases#${item.id}`)}>
+              <Image src={item.image} alt="" width={220} height={140} sizes="(max-width: 760px) 56px, 200px" /><span><strong>{item.name}</strong><small>{item.categoryLabel}</small></span><ChevronRight size={16} />
+            </Link>)}</div>
+            <Link className={styles.allCases} href="/card/cases" onClick={event => navigate(event, '/card/cases')}>查看全部案例<ArrowRight size={16} /></Link>
+          </aside>
         </div>
-      ) : null}
+        <footer className={styles.footer}>{signedIn ? <button type="button" onClick={signOut}><LogOut size={17} />登出</button> : <><Link href="/card/login" onClick={event => navigate(event, '/card/login')}>登入</Link><Link href="/card/register" onClick={event => navigate(event, '/card/register')}>免費開始<ArrowRight size={17} /></Link></>}</footer>
+      </dialog>
     </div>
-  );
-}
-
-function MenuIcon({ d }: { d: string }) {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d={d} />
-    </svg>
   );
 }

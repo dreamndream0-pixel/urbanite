@@ -221,6 +221,7 @@
   .featureTabs button svg { width: 20px; height: 20px; }
   .featureTabs button + button::before { left: -15px; font-size: 16px; }
   .bottom a, .bottom button { font-size: 10px; }
+  .bottom .begin { display: none; }
   .bookingScreen { gap: 5px; }
   .bookingScreen > svg { margin-top: 2px; }
   .dialogContent { padding: 18px; }
