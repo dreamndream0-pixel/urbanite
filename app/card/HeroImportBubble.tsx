@@ -16,7 +16,7 @@ type Preview = { source: string; url: string; card: ProfileCard; blocks: Profile
 const PICKABLE = CARD_TEMPLATES.filter((t) => t.key !== 'blank');
 
 // 官網介紹頁的透明氣泡:貼上其他名片服務的網址 → 先預覽搬家效果 → 確定搬家 → 註冊後自動帶入
-export default function HeroImportBubble({ loggedIn }: { loggedIn: boolean }) {
+export default function HeroImportBubble({ loggedIn, className = '', embedded = false, onPreviewOpen }: { loggedIn: boolean; className?: string; embedded?: boolean; onPreviewOpen?: () => void }) {
   const [url, setUrl] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -93,6 +93,7 @@ export default function HeroImportBubble({ loggedIn }: { loggedIn: boolean }) {
       setTpl(PICKABLE.some((t) => t.key === presetTpl) ? presetTpl : d.template || '');
       setPicking(false);
       setData(d);
+      onPreviewOpen?.();
     } catch (err) {
       setError(err instanceof Error ? err.message : '讀取失敗');
     } finally {
@@ -267,7 +268,7 @@ export default function HeroImportBubble({ loggedIn }: { loggedIn: boolean }) {
 
   return (
     <>
-      <form className={styles.urlBubble} onSubmit={read}>
+      <form className={`${styles.urlBubble} ${className}`} style={embedded ? { translate: 'none' } : undefined} onSubmit={read}>
         <label className={styles.importField}>
           <small>一鍵搬家 · 貼上你現在的名片網址</small>
           <input

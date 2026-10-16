@@ -1,22 +1,12 @@
 import Image from "next/image";
 import Link from "next/link";
-import { Caveat, LXGW_WenKai_TC } from "next/font/google";
-import { ArrowRight, ChevronDown, Ellipsis, Link2, ShoppingBag } from "lucide-react";
-import SocialIcon from "@/app/components/SocialIcon";
+import { Caveat } from "next/font/google";
+import { ArrowRight } from "lucide-react";
 import { SERVICE_LOGO } from "@/lib/card-plan";
-import ScrollHero from "./ScrollHero";
-import HeroImportBubble from "./HeroImportBubble";
+import HeroExperience from "./HeroExperience";
 import CardMenu from "./CardMenu";
-import DemoPhoneContent from "./DemoPhoneContent";
 import styles from "./hero.module.css";
 
-const handwriting = LXGW_WenKai_TC({
-  weight: "400",
-  subsets: ["latin"],
-  display: "swap",
-  preload: false,
-  variable: "--hero-hand",
-});
 const script = Caveat({
   weight: "500",
   subsets: ["latin"],
@@ -32,7 +22,7 @@ export default function HeroScene({
   loggedIn: boolean;
 }) {
   return (
-    <div className={`${handwriting.variable} ${script.variable}`}>
+    <div className={script.variable}>
       {/* 表頭:獨立一條,跟下面的主視覺分開 */}
       <header className={styles.topbar}>
         <Link className={styles.topBrand} href="/card" aria-label="URBANLINKS 首頁">
@@ -54,86 +44,7 @@ export default function HeroScene({
           />
         </div>
       </header>
-      <ScrollHero>
-        <picture>
-          <source
-            media="(max-width: 760px)"
-            srcSet="/card/hero-studio-mobile.webp"
-          />
-          <Image
-            className={styles.background}
-            src="/card/hero-studio.webp"
-            alt=""
-            fill
-            loading="eager"
-            fetchPriority="high"
-            sizes="100vw"
-          />
-        </picture>
-        <div className={styles.scene}>
-          <div className={styles.copy}>
-            <h1>
-              <span>一個連結，</span>
-              <span>把你的世界串起來</span>
-            </h1>
-            <div className={styles.underline} aria-hidden="true" />
-            <ul className={styles.socials} aria-label="社群、商店與連結整合">
-              <li title="Instagram">
-                <SocialIcon type="instagram" />
-              </li>
-              <li title="LINE">
-                <SocialIcon type="line" />
-              </li>
-              <li title="商店">
-                <ShoppingBag />
-              </li>
-              <li title="連結">
-                <Link2 />
-              </li>
-              <li title="更多內容">
-                <Ellipsis />
-              </li>
-            </ul>
-          </div>
-          <p className={styles.note}>
-            All in one.
-            <br />
-            Just for you.
-            <span aria-hidden="true" />
-          </p>
-          <div
-            className={styles.phones}
-            role="img"
-            aria-label="個人名片與購物網站手機示意，隨頁面捲動展示內容"
-          >
-            <div
-              className={`${styles.phone} ${styles.backPhone}`}
-              aria-hidden="true"
-            >
-              <div className={styles.screen}>
-                <DemoPhoneContent shop />
-              </div>
-              <span className={styles.notch} />
-            </div>
-            <div
-              className={`${styles.phone} ${styles.frontPhone}`}
-              data-hero-phone
-              aria-hidden="true"
-            >
-              <div className={styles.screen}>
-                <DemoPhoneContent />
-              </div>
-              <span className={styles.notch} />
-            </div>
-          </div>
-          <HeroImportBubble loggedIn={loggedIn} />
-          <span className={styles.scrollHint} aria-hidden="true">
-            <small>往下滑</small>
-            <ChevronDown />
-          </span>
-          <span className={styles.flourish} aria-hidden="true" />
-        </div>
-      </ScrollHero>
+      <HeroExperience startHref={startHref} loggedIn={loggedIn} />
     </div>
   );
 }

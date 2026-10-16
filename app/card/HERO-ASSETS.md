@@ -1,5 +1,52 @@
 # URBANLINKS Hero Assets
 
+## Interactive commerce hero (2026-10-16)
+
+Only the top hero is replaced. The header, promotion, lower LINK / SHOP /
+BRAND scenes, carousels, pricing, and backend settings are unchanged.
+`HeroExperience.tsx` and `hero-experience.module.css` isolate the new layout.
+Phones, headings, feature tabs, booking slots, social selection, and the
+growth-period switch are live HTML. Analytics and bookings are explicitly
+demonstrations; no orders, bookings, or social bindings are written.
+The original import flow remains available through the one-click move action.
+Its preview callback closes the native dialog before the portal preview opens.
+
+Mode: built-in image generation, not the fallback CLI.
+Saved background: `public/card/hero-commerce-studio.webp` (1536 x 1024).
+The original generated PNG is kept outside the repository in the task's
+generated-images directory. Existing phone photography is reused.
+
+Final prompt: Photorealistic natural photography, a full-bleed premium
+beauty-business website background plate, landscape 3:2. A cream-white studio
+with sheer linen curtains, soft natural window light, and plaster-wall shadows.
+A travertine table occupies the bottom 22 percent. Small rough stones and dried
+flowers sit at the lower left; a rounded ivory ceramic vase and dry stems sit
+at the far right. Keep the central 75 percent and upper 65 percent quiet for
+editable HTML. Neutral daylight, no yellow cast. No phones, hands, people,
+interfaces, text, logos, borders, orbs, or bokeh.
+
+The shared `onPageScroll` helper supports the current iPhone Chrome body-scroll
+path. Motion affects transforms only; it does not change document height.
+Reduced motion disables reveal, floating, and scroll-parallax animations.
+
+Verification: production build and ESLint pass. `scripts/test-urbanlinks-hero.mjs`
+checks Chromium at 320x740, 390x844, 430x932, 768x1024, 1440x960, and 390x667,
+plus WebKit at 390x844. All hero images load, headings and phone contents fit,
+and the document has no horizontal overflow. Tests cover feature tabs and
+keyboard navigation, booking confirmation/reset, social selection, period
+selection, import errors, successful embedded and shared import previews,
+Escape/focus restoration, reduced motion, and the scroll-to-services action.
+Import API responses are mocked; no real user data is imported or saved.
+The iPhone Chrome body-scroll path is emulated, including scrolling after a
+dialog closes; physical iPhone testing is still required.
+
+Run with Playwright available locally, or set `PLAYWRIGHT_MODULE` to the bundled
+runtime's `playwright/index.mjs`. `HERO_URL` defaults to localhost:3013/card.
+Set `TEST_WEBKIT=1` to include the installed WebKit engine. Screenshots are
+written to the ignored `outputs/urbanlinks-hero/` directory.
+
+## Earlier hero assets (historical)
+
 The hero uses editable HTML for its logo placement, copy, phone screens, menu,
 and glass URL bubble. None of the demonstration phone content links to a store.
 The arrow in the URL bubble uses the existing page creation flow.
