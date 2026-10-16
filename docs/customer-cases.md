@@ -29,11 +29,13 @@ the screenshots rather than restyling them.
 | `public/card/cases/chue.webp` | <https://chue.urbanite.com.tw/promo/second-hand> |
 | `public/card/cases/snail-rental.webp` | <https://xiaowo-rental.vercel.app/> |
 
-The property-management entry is explicitly pending. Its current image is the
-public rental homepage and is labelled as such, not a management-dashboard
-screenshot. The user will supply approved backend screenshots; do not generate
-a fictitious property-management backend or capture private tenant data.
-Replace this entry's image and pending status only after those images arrive.
+The property-management entry now uses four user-supplied backend screenshots,
+processed to hide personal identifiers and financial values. It is labelled
+as redacted and offers four image views and downloads of the redacted assets.
+Original private attachments are not published or committed. See
+[the redaction record](rental-case-redaction.md) for scope, asset paths, editing
+prompts and review requirements. These processed feature-display images are not
+pixel-exact source screenshots or financial evidence.
 
 ## Generated examples
 
@@ -152,7 +154,8 @@ Use `scripts/test-card-cases.mjs` with Playwright available locally, or point
 defaults to localhost:3013. `TEST_WEBKIT=1` also runs the installed WebKit engine.
 Tests cover 320/390/768/1440 widths, right-to-left drawer geometry, focus cycling,
 Escape/backdrop close, hash navigation after unlocking, route changes, filtering,
-all image loads, preview navigation and focus restoration, fixed support position,
+all image loads, preview navigation and focus restoration, four-view redacted
+backend navigation and download targets, fixed support position,
 correct external URLs, reduced motion, and the emulated iPhone Chrome body-scroll
 path. No real messages, orders, sign-outs, or customer-data writes are submitted.
 Physical iPhone testing is still necessary.

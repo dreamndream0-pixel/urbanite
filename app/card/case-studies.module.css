@@ -32,6 +32,7 @@
 .caseBadge { position: absolute; top: 12px; left: 12px; padding: 5px 8px; border: 1px solid #d5e2d9; border-radius: 3px; background: #f9fffbee; color: #3f6550; font-size: 10px; }
 .caseBadge[data-kind=demo] { color: #6d526d; border-color: #dfd4de; background: #fffbffee; }
 .caseBadge[data-kind=pending] { color: #856742; border-color: #e6ddcf; background: #fffcf6ee; }
+.caseBadge[data-kind=redacted] { color: #456078; border-color: #d2dfe9; background: #f8fcffee; }
 .zoom { position: absolute; bottom: 12px; right: 12px; display: grid; place-items: center; width: 34px; height: 34px; background: #ffffffeb; border: 1px solid #dfe5e2; border-radius: 50%; color: #536168; }
 .caseInfo { padding-top: 16px; }
 .caseInfo > small { font-size: 11px; color: #7a898c; }
@@ -60,6 +61,10 @@
 .dialogControls svg { width: 18px; height: 18px; }
 .dialogImage { position: relative; min-height: 0; flex: 1; background: #edf1ee; }
 .dialogImage img { object-fit: contain; }
+.shotSelector { flex: 0 0 auto; display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 8px; padding: 10px 22px; border-top: 1px solid #e0e6e3; }
+.shotSelector button { min-width: 0; min-height: 48px; padding: 7px 4px; border: 1px solid #d8e1dc; border-radius: 4px; background: transparent; color: #65767b; font-size: 12px; cursor: pointer; }
+.shotSelector button[aria-pressed=true] { background: #e4eee8; border-color: #668a77; color: #294d3a; }
+.shotSelector span { display: block; margin-bottom: 3px; font: 9px Arial,sans-serif; }
 .previewFooter { flex: 0 0 auto; display: flex; align-items: center; gap: 18px; justify-content: space-between; padding: 16px 22px; border-top: 1px solid #e0e6e3; }
 .previewFooter p { font-size: 12px; line-height: 1.8; color: #6b7a7e; }
 .previewFooter small { display: block; font-size: 10px; color: #99839a; margin-top: 5px; }
@@ -98,6 +103,8 @@
   .dialogControls { gap: 4px; }
   .dialogControls button { width: 30px; height: 34px; }
   .dialogControls > span { font-size: 9px; margin-right: 2px; }
+  .shotSelector { gap: 5px; padding: 9px 13px; }
+  .shotSelector button { font-size: 11px; }
   .previewFooter { padding: 14px; gap: 10px; flex-wrap: wrap; }
   .previewFooter p { font-size: 11px; }
   .previewFooter > a { font-size: 11px; }

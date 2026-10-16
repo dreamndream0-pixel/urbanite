@@ -76,7 +76,36 @@ async function check(page, width, height, name) {
   }
   const liveLinks = await page.locator('article a[target="_blank"]').evaluateAll(links => links.map(link => link.href));
   assert.deepEqual(liveLinks, ['https://www.urbanite.com.tw/', 'https://chue.urbanite.com.tw/promo/second-hand', 'https://xiaowo-rental.vercel.app/']);
-  assert.match(await page.locator('#rental-management').innerText(), /非代管後台畫面/);
+  assert.match(await page.locator('#rental-management').innerText(), /已遮蔽截圖/);
+  assert.equal(await page.locator('#rental-management a').count(), 0);
+  const managementButton = page.getByRole('button', { name: '預覽 包租代管模組', exact: true });
+  await managementButton.click();
+  const management = page.getByRole('dialog', { name: '包租代管模組' });
+  const shots = ['overview', 'tenancies', 'finance', 'entrustments'];
+  const labels = ['營運總覽', '代管清單', '收支報表', '委託管理'];
+  for (let i = 0; i < shots.length; i++) {
+    const selector = management.getByRole('button', { name: new RegExp(labels[i]) });
+    await selector.click();
+    assert.equal(await selector.getAttribute('aria-pressed'), 'true');
+    assert.ok(await management.locator('img').evaluate(async image => { await image.decode(); return image.naturalWidth > 0; }));
+    assert.equal(await management.getByRole('link', { name: '下載已遮蔽圖片' }).getAttribute('href'), `/card/cases/rental-management-${shots[i]}-redacted.webp`);
+    const imageBox = await management.locator('img').boundingBox();
+    assert.ok(imageBox.height >= 100 && imageBox.width > 0, `${name}: backend image squeezed`);
+  }
+  await page.keyboard.press('ArrowRight');
+  assert.equal(await management.getByRole('button', { name: /營運總覽/ }).getAttribute('aria-pressed'), 'true');
+  await page.keyboard.press('ArrowLeft');
+  assert.equal(await management.getByRole('button', { name: /委託管理/ }).getAttribute('aria-pressed'), 'true');
+  await page.screenshot({ path: `${output}/${name}-redacted-backend.png` });
+  await management.getByRole('button', { name: '下一個案例' }).click();
+  const following = page.getByRole('dialog', { name: 'MORI NAIL' });
+  await following.waitFor();
+  assert.equal(await following.getByRole('group', { name: '選擇後台畫面' }).count(), 0);
+  await following.getByRole('button', { name: '上一個案例' }).click();
+  assert.equal(await management.getByRole('button', { name: /營運總覽/ }).getAttribute('aria-pressed'), 'true');
+  await page.keyboard.press('Escape');
+  await management.waitFor({ state: 'hidden' });
+  await page.waitForFunction(() => document.activeElement?.getAttribute('aria-label') === '預覽 包租代管模組');
   await page.getByRole('button', { name: /^美業預約/ }).click();
   for (const card of await page.locator('article').all()) assert.match(await card.innerText(), /示意設計/);
   const previewButton = page.getByRole('button', { name: '預覽 MORI NAIL', exact: true });
@@ -104,7 +133,7 @@ async function check(page, width, height, name) {
   await page.locator('#line-ai').scrollIntoViewIfNeeded();
   assert.ok(await page.evaluate(getY) > 0, `${name}: page stuck after preview`);
   assert.equal(errors.length, 0, errors.join('\n'));
-  console.log(`PASS ${name}: drawer, focus, scroll, filters, preview, support, images`);
+  console.log(`PASS ${name}: drawer, focus, scroll, filters, preview, redacted gallery, support, images`);
 }
 
 const browser = await chromium.launch({ channel: 'chrome', headless: true });
