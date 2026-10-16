@@ -22,7 +22,7 @@ async function check(page, width, height, name) {
     await Promise.all(images.map(image => image.decode().catch(() => {})));
   });
   await page.waitForTimeout(900);
-  assert.equal(await hero.getByRole('heading', { level: 1 }).innerText(), '3分鐘就開店\n打造質感網店');
+  assert.equal(await hero.getByRole('heading', { level: 1 }).getAttribute('aria-label'), '3分鐘就開店，打造質感網店');
   const geometry = await hero.evaluate(element => {
     const rectangle = element.getBoundingClientRect();
     return {
@@ -37,6 +37,36 @@ async function check(page, width, height, name) {
   assert.equal(geometry.broken, 0, `${name}: missing hero image`);
   assert.equal(geometry.headingFits, true, `${name}: heading clipped`);
   assert.ok(geometry.phoneScreens.every(screen => screen.content <= screen.height + 1), `${name}: profile screen content clipped`);
+  const headline = hero.getByRole('heading', { level: 1 });
+  const headlineBox = await headline.boundingBox();
+  const track = headline.locator('[class*="headlineTrack"]');
+  assert.ok(await headline.locator('b').evaluate(number => number.getAnimations().some(animation => animation.effect.getTiming().iterations === 1)), `${name}: number entrance must not loop`);
+  for (const [index, word] of ['質感網店', '品牌官網', '個人名片', '預約服務', '質感網店'].entries()) {
+    await track.evaluate((element, step) => {
+      for (const animation of element.getAnimations()) {
+        animation.pause();
+        animation.currentTime = 1200 + step * 4000 + 1000;
+      }
+    }, index);
+    const shown = await track.evaluate(element => {
+      const window = element.parentElement.getBoundingClientRect();
+      const center = (window.top + window.bottom) / 2;
+      const visible = [...element.children].find(word => {
+        const box = word.getBoundingClientRect();
+        return box.top <= center && box.bottom >= center;
+      });
+      return { word: visible?.textContent, opacity: Number(getComputedStyle(element).opacity) };
+    });
+    assert.equal(shown.word, word, `${name}: wrong headline word`);
+    assert.equal(shown.opacity, 1, `${name}: headline stays blurred between transitions`);
+    const box = await headline.boundingBox();
+    assert.ok(Math.abs(box.width - headlineBox.width) < 1 && Math.abs(box.height - headlineBox.height) < 1, `${name}: headline changes layout during rotation`);
+    if (index < 4) await page.screenshot({ path: `${output}/${name}-headline-${index}.png` });
+  }
+  await track.evaluate(element => element.getAnimations().forEach(animation => { animation.currentTime = 4880; }));
+  assert.ok(await track.evaluate(element => Number(getComputedStyle(element).opacity) < .9 && getComputedStyle(element).filter !== 'none'), `${name}: missing headline transition effect`);
+  if (width === 390 && height === 844) await page.screenshot({ path: `${output}/${name}-headline-transition.png` });
+  await track.evaluate(element => element.getAnimations().forEach(animation => { animation.currentTime = 2200; animation.play(); }));
   await page.screenshot({ path: `${output}/${name}.png` });
 
   await hero.getByRole('tab', { name: '預約系統' }).click();
@@ -60,6 +90,7 @@ async function check(page, width, height, name) {
   await hero.getByRole('button', { name: '一鍵搬家', exact: true }).click();
   const dialog = page.getByRole('dialog', { name: '把你的世界搬過來' });
   assert.equal(await dialog.isVisible(), true);
+  assert.match(await track.evaluate(element => getComputedStyle(element).animationPlayState), /^paused/, `${name}: headline must pause behind dialog`);
   const form = dialog.locator('form');
   const formBox = await form.boundingBox();
   const dialogBox = await dialog.boundingBox();
@@ -74,6 +105,7 @@ async function check(page, width, height, name) {
   await hero.getByRole('button', { name: '往下探索產品服務' }).click();
   await page.waitForTimeout(1200);
   assert.ok(await page.locator('#spaces').evaluate(element => element.getBoundingClientRect().top < window.innerHeight / 2), `${name}: scroll action failed`);
+  assert.match(await track.evaluate(element => getComputedStyle(element).animationPlayState), /^paused/, `${name}: offscreen headline must pause`);
   assert.equal(errors.length, 0, `${name}: ${errors.join('; ')}`);
   console.log(`PASS ${name} ${width}x${height}`, JSON.stringify(geometry));
 }
@@ -88,6 +120,8 @@ try {
   const reducedPage = await browser.newPage({ viewport: { width: 390, height: 844 }, reducedMotion: 'reduce' });
   await reducedPage.goto(url, { waitUntil: 'networkidle' });
   assert.equal(await reducedPage.locator('[aria-label="示範預約時段"]').evaluate(element => getComputedStyle(element.parentElement).animationName), 'none');
+  assert.equal(await reducedPage.locator('[class*="headlineTrack"]').evaluate(element => getComputedStyle(element).animationName), 'none');
+  assert.equal(await reducedPage.locator('h1 b').evaluate(element => getComputedStyle(element).animationName), 'none');
   await reducedPage.close();
 
   const importPage = await browser.newPage({ viewport: { width: 390, height: 844 } });
@@ -99,6 +133,16 @@ try {
   };
   await importPage.route('**/api/card-import/preview', route => route.fulfill({ contentType: 'application/json', body: JSON.stringify(mockPreview) }));
   await importPage.goto(url, { waitUntil: 'networkidle' });
+  await importPage.evaluate(() => {
+    Object.defineProperty(document, 'hidden', { value: true, configurable: true });
+    document.dispatchEvent(new Event('visibilitychange'));
+  });
+  assert.match(await importPage.locator('[class*="headlineTrack"]').evaluate(element => getComputedStyle(element).animationPlayState), /^paused/);
+  await importPage.evaluate(() => {
+    Reflect.deleteProperty(document, 'hidden');
+    document.dispatchEvent(new Event('visibilitychange'));
+  });
+  assert.match(await importPage.locator('[class*="headlineTrack"]').evaluate(element => getComputedStyle(element).animationPlayState), /^running/);
   await importPage.getByRole('button', { name: '一鍵搬家', exact: true }).click();
   await importPage.getByRole('dialog').getByRole('textbox').fill('https://example.com/demo');
   await importPage.getByRole('button', { name: '預覽搬家效果' }).click();

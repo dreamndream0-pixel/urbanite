@@ -18,6 +18,7 @@ const features = [
 ] as const;
 type Feature = typeof features[number]['key'];
 const times = ['10:00', '11:00', '14:00'];
+const headlineWords = ['質感網店', '品牌官網', '個人名片', '預約服務'];
 const socials: { key: SocialBrand; label: string }[] = [
   { key: 'instagram', label: 'Instagram' },
   { key: 'line', label: 'LINE' },
@@ -46,6 +47,9 @@ export default function HeroExperience({ startHref, loggedIn }: { startHref: str
     const updateMotion = () => { reduced.current = media.matches; };
     updateMotion();
     media.addEventListener('change', updateMotion);
+    const updatePageVisibility = () => { element.dataset.pageHidden = String(document.hidden); };
+    updatePageVisibility();
+    document.addEventListener('visibilitychange', updatePageVisibility);
     // Follow the shared body-scroll path used by iPhone Chrome, without changing layout on scroll.
     let frame = 0;
     const update = () => {
@@ -65,11 +69,19 @@ export default function HeroExperience({ startHref, loggedIn }: { startHref: str
     if (element.parentElement?.previousElementSibling) observer.observe(element.parentElement.previousElementSibling);
     measure();
     window.addEventListener('resize', measure);
-    const visibility = new IntersectionObserver(([entry]) => {
-      element.dataset.visible = String(entry.isIntersecting);
-      if (!entry.isIntersecting) element.dataset.interacting = 'false';
+    const visibility = new IntersectionObserver(entries => {
+      for (const entry of entries) {
+        if (entry.target !== element) {
+          element.dataset.headlineVisible = String(entry.isIntersecting);
+          continue;
+        }
+        element.dataset.visible = String(entry.isIntersecting);
+        if (!entry.isIntersecting) element.dataset.interacting = 'false';
+      }
     });
     visibility.observe(element);
+    const heading = element.querySelector('h1');
+    if (heading) visibility.observe(heading);
     return () => {
       offScroll();
       cancelAnimationFrame(frame);
@@ -77,6 +89,7 @@ export default function HeroExperience({ startHref, loggedIn }: { startHref: str
       visibility.disconnect();
       window.removeEventListener('resize', measure);
       media.removeEventListener('change', updateMotion);
+      document.removeEventListener('visibilitychange', updatePageVisibility);
     };
   }, []);
 
@@ -115,7 +128,17 @@ export default function HeroExperience({ startHref, loggedIn }: { startHref: str
         <span>BUILD YOUR STORE<br />IN 3 MINUTES</span><i /><span>FOR MODERN BRANDS</span>
       </div>
       <div className={styles.copy}>
-        <h1 id="urbanlinks-hero-title"><span><b>3</b>分鐘就開店</span><span>打造質感網店</span></h1>
+        <h1 id="urbanlinks-hero-title" className={styles.headline} aria-label="3分鐘就開店，打造質感網店">
+          <span className={styles.headlineIntro} aria-hidden="true">
+            <b className={styles.headlineNumber}>3</b>
+            {Array.from('分鐘就開店').map((letter, index) => <span className={styles.headlineLetter} style={{ animationDelay: `${200 + index * 70}ms` }} key={index}>{letter}</span>)}
+          </span>
+          <span className={styles.headlineSecond} aria-hidden="true">
+            打造<span className={styles.headlineWindow}><span className={styles.headlineTrack}>
+              {[...headlineWords, headlineWords[0]].map((word, index) => <span className={styles.headlineWord} key={index}>{word}</span>)}
+            </span></span>
+          </span>
+        </h1>
         <Link className={styles.integration} href={startHref}><Link2 />線上線下整合<ArrowRight /></Link>
         <p>專為品牌解放雙手</p>
       </div>

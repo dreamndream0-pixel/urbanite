@@ -2,6 +2,17 @@
 
 ## Interactive commerce hero (2026-10-16)
 
+Headline motion: the number 3 scales in with a single restrained bounce and
+the remaining first-line letters reveal in sequence. The second line keeps
+"打造" fixed and rotates four equal-width phrases every four seconds:
+質感網店 / 品牌官網 / 個人名片 / 預約服務. A duplicate first phrase makes the
+16-second loop seamless; the 4em by 1.12em viewport never changes dimensions.
+Only the transition briefly fades and blurs the text. Hover, an open import
+dialog, a hidden browser tab, and leaving the viewport pause the word rotation.
+Reduced motion keeps the initial headline static. A fixed accessible heading
+name avoids repeated screen-reader announcements. Regression tests seek each
+animation phase and check all words, the wraparound, and stable heading geometry.
+
 Only the top hero is replaced. The header, promotion, lower LINK / SHOP /
 BRAND scenes, carousels, pricing, and backend settings are unchanged.
 `HeroExperience.tsx` and `hero-experience.module.css` isolate the new layout.

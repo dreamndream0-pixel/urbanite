@@ -24,6 +24,13 @@
 .copy h1 { display: flex; flex-direction: column; width: fit-content; margin: 0 auto 14px; font-size: 64px; line-height: 1.12; font-weight: 900; font-family: Arial, 'PingFang TC', 'Microsoft JhengHei', sans-serif; -webkit-text-stroke: .5px currentColor; }
 .copy h1 > span { display: block; white-space: nowrap; }
 .copy h1 b { display: inline-block; font-size: 1.25em; line-height: .85; font-weight: 900; }
+.headlineIntro { position: relative; }
+.headlineNumber { transform-origin: center 80%; animation: headlinePop 950ms 100ms cubic-bezier(.2,.75,.25,1) both; }
+.headlineLetter { display: inline-block; animation: headlineLetterIn 560ms cubic-bezier(.2,.7,.3,1) both; }
+.copy h1 > .headlineSecond { display: flex; justify-content: center; align-items: baseline; }
+.headlineWindow { display: inline-block; width: 4em; height: 1.12em; overflow: hidden; vertical-align: bottom; }
+.headlineTrack { display: flex; flex-direction: column; animation: headlineRoll 16s 1.2s cubic-bezier(.76,0,.24,1) infinite, headlineFocus 4s 1.2s ease-in-out infinite; }
+.headlineWord { display: block; flex: 0 0 1.12em; height: 1.12em; line-height: 1.12; white-space: nowrap; }
 .integration { display: inline-flex; align-items: center; justify-content: center; gap: 15px; padding: 8px 26px; border-radius: 99px; background: linear-gradient(100deg, #eadcf7, #fae2d8); box-shadow: 0 0 30px #ffffffb3, inset 0 1px 0 #ffffff90; font-size: 22px; font-weight: 650; text-decoration: none; }
 .integration svg { width: 25px; height: 25px; stroke-width: 1.7; }
 .integration svg:last-child { width: 17px; }
@@ -120,6 +127,7 @@
 .scroll span { font: 8px Arial, sans-serif; }
 .hero[data-visible=false] .widget, .hero[data-visible=false] .scroll svg { animation-play-state: paused; }
 .hero:focus-within .widget, .hero[data-interacting=true] .widget { animation-play-state: paused; }
+.hero[data-headline-visible=false] .headlineTrack, .hero[data-page-hidden=true] .headlineTrack, .hero:has(dialog[open]) .headlineTrack { animation-play-state: paused; }
 .importDialog { position: fixed; inset: 0; margin: auto; border: 1px solid #e4dcd2; border-radius: 8px; width: min(90%, 530px); max-height: 85svh; padding: 0; background: #faf7f2; color: #252b40; box-shadow: 0 25px 100px #0003; overflow: auto; }
 .importDialog::backdrop { background: #10162966; backdrop-filter: blur(6px); }
 .dialogContent { padding: 26px; }
@@ -134,7 +142,29 @@
 @keyframes float { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-9px); } }
 @keyframes reveal { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes nudge { 0%,100% { transform: translateY(-2px); } 50% { transform: translateY(3px); } }
+@keyframes headlinePop {
+  0% { opacity: 0; transform: translateY(.12em) scale(.5) rotate(-8deg); }
+  65% { opacity: 1; transform: translateY(0) scale(1.1) rotate(2deg); }
+  82% { transform: scale(.97) rotate(-1deg); }
+  100% { opacity: 1; transform: scale(1) rotate(0); }
+}
+@keyframes headlineLetterIn {
+  from { opacity: 0; transform: translateY(.3em); filter: blur(4px); }
+  to { opacity: 1; transform: translateY(0); filter: blur(0); }
+}
+@keyframes headlineRoll {
+  0%,21% { transform: translateY(0); }
+  25%,46% { transform: translateY(-20%); }
+  50%,71% { transform: translateY(-40%); }
+  75%,96% { transform: translateY(-60%); }
+  100% { transform: translateY(-80%); }
+}
+@keyframes headlineFocus {
+  0%,84%,100% { opacity: 1; filter: blur(0); }
+  92% { opacity: .25; filter: blur(3px); }
+}
 @media (hover: hover) {
+  .headline:hover .headlineTrack { animation-play-state: paused; }
   .widget:hover { animation-play-state: paused; }
   .featureTabs button:hover { background: #fff; box-shadow: 0 6px 24px #4d413425; }
   .socialRail button:hover { transform: scale(1.12); }
