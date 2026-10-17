@@ -2,11 +2,13 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Check, LoaderCircle, Store } from 'lucide-react';
+import { Check, ImagePlus, LoaderCircle, Store, X } from 'lucide-react';
+import ContactLineButton from '@/app/card/ContactLineButton';
+import { CONTACT_LINE_URL } from '@/lib/card-plan';
 
 type Tpl = { key: string; name: string; note: string; colors: Record<string, string> };
 type Existing = { slug: string; name: string; url: string; adminUrl: string } | null;
-type Done = { url: string; adminUrl: string; slug: string };
+type Done = { url: string; adminUrl: string; slug: string; logo: boolean; logoFailed: boolean };
 
 const card = 'rounded-3xl border border-[#e5ded4] bg-white p-5 sm:p-7';
 const input = 'w-full rounded-xl border border-[#e5ded4] bg-white px-4 py-3 text-sm outline-none transition focus:border-[#121b33]';
@@ -18,6 +20,7 @@ export default function ShopWizard({ eligible, promo, existing, rootDomain, temp
   const [check, setCheck] = useState<{ state: 'idle' | 'checking' | 'ok' | 'bad'; message: string }>({ state: 'idle', message: '' });
   const [template, setTemplate] = useState(templates[0]?.key ?? 'urbanite');
   const [bank, setBank] = useState('');
+  const [logo, setLogo] = useState<{ file: File; url: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [done, setDone] = useState<Done | null>(null);
@@ -39,16 +42,29 @@ export default function ShopWizard({ eligible, promo, existing, rootDomain, temp
     return () => clearTimeout(timer);
   }, [slug]);
 
+  function pickLogo(file: File | undefined) {
+    if (!file) return;
+    if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type)) return setError('Logo 請用 PNG、JPG 或 WEBP');
+    if (file.size > 3 * 1024 * 1024) return setError('Logo 請小於 3MB');
+    setError('');
+    if (logo) URL.revokeObjectURL(logo.url);
+    setLogo({ file, url: URL.createObjectURL(file) });
+  }
+
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (busy || check.state !== 'ok' || !name.trim()) return;
     setBusy(true);
     setError('');
     try {
-      const res = await fetch('/api/shops', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, slug, template, bank }) });
+      // 有 Logo 時一起送(multipart);原圖上傳,PNG 保留透明背景
+      const form = new FormData();
+      form.set('data', JSON.stringify({ name, slug, template, bank }));
+      if (logo) form.set('logo', logo.file);
+      const res = await fetch('/api/shops', { method: 'POST', body: form });
       const d = await res.json();
       if (!res.ok) throw new Error(d.error ?? '開店失敗');
-      setDone({ url: d.url, adminUrl: d.adminUrl, slug });
+      setDone({ url: d.url, adminUrl: d.adminUrl, slug, logo: Boolean(d.logo), logoFailed: Boolean(d.logoFailed) });
     } catch (err) {
       setError(err instanceof Error ? err.message : '開店失敗');
     } finally {
@@ -88,10 +104,11 @@ export default function ShopWizard({ eligible, promo, existing, rootDomain, temp
         <h1 className="mt-4 text-xl font-semibold">你的官網開好了!</h1>
         <p className="mt-1 text-sm text-[#6b6156]">{done.slug}.{rootDomain}</p>
         <ol className="mx-auto mt-6 max-w-sm space-y-2 text-left text-sm leading-6 text-[#5f5852]">
-          <li>1. 進後台上傳 Logo、上架第一個商品</li>
+          <li>1. 進後台{done.logo ? '' : '上傳 Logo、'}上架第一個商品</li>
           <li>2. 到「系統設定 → 金流設定」確認收款帳號</li>
           <li>3. 把官網網址分享給客人</li>
         </ol>
+        {done.logoFailed ? <p className="mt-4 text-xs text-[#a33a2b]">Logo 這次沒有上傳成功,請到後台「系統設定」重新上傳。</p> : null}
         <p className="mt-4 text-xs text-[#a99e8f]">第一次進店家後台,需要用同一個帳號再登入一次。</p>
         <div className="mt-6 flex flex-wrap justify-center gap-3">
           <a href={done.adminUrl} className="rounded-full bg-[#121b33] px-6 py-3 text-sm font-semibold text-[#dcbc84]">前往後台</a>
@@ -113,7 +130,19 @@ export default function ShopWizard({ eligible, promo, existing, rootDomain, temp
       </div>
 
       <section className={card}>
-        <h2 className="text-sm font-semibold">1. 店名與網址</h2>
+        <h2 className="text-sm font-semibold">1. Logo、店名與網址</h2>
+        <div className="mt-4">
+          <span className="mb-1.5 block text-xs text-[#8a7f72]">Logo(選填,PNG 去背圖會保留透明背景)</span>
+          <div className="flex items-center gap-3">
+            <label className="flex h-20 w-20 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-2xl border border-dashed border-[#d7c9bd] bg-[repeating-conic-gradient(#f3eee7_0%_25%,#fff_0%_50%)] bg-[length:16px_16px] text-[#a99e8f] transition hover:border-[#121b33]">
+              {logo ? <img src={logo.url} alt="Logo 預覽" className="h-full w-full object-contain p-1.5" /> : <ImagePlus size={22} />}
+              <input type="file" accept="image/png,image/jpeg,image/webp" className="sr-only" aria-label="上傳 Logo" onChange={(e) => { pickLogo(e.target.files?.[0]); e.target.value = ''; }} />
+            </label>
+            <div className="min-w-0 flex-1 text-xs leading-5 text-[#8a7f72]">
+              {logo ? <><span className="block truncate text-[#1f1b19]">{logo.file.name}</span><button type="button" onClick={() => { URL.revokeObjectURL(logo.url); setLogo(null); }} className="mt-1 inline-flex items-center gap-1 text-[#a33a2b]"><X size={12} />移除</button></> : <>建議正方形或橫式,3MB 以內。<br />之後也可以在後台更換。</>}
+            </div>
+          </div>
+        </div>
         <label className="mt-4 block">
           <span className="mb-1.5 block text-xs text-[#8a7f72]">店名</span>
           <input value={name} onChange={(e) => setName(e.target.value)} maxLength={40} placeholder="例如:BON SUCRÉ 甜點" className={input} />
@@ -174,6 +203,11 @@ export default function ShopWizard({ eligible, promo, existing, rootDomain, temp
       <button type="submit" disabled={busy || check.state !== 'ok' || !name.trim()} className="w-full rounded-full bg-[#121b33] py-3.5 text-sm font-semibold text-[#dcbc84] transition hover:bg-[#1d2a4d] disabled:opacity-40">
         {busy ? '開店中…' : '建立我的官網'}
       </button>
+
+      <div className="rounded-2xl bg-[#faf7f2] px-5 py-4 text-center">
+        <p className="text-sm text-[#5f5852]">需要串接金流(信用卡)、超商物流,請洽客服</p>
+        <ContactLineButton href={CONTACT_LINE_URL} label="加入官方 LINE 詢問" className="mx-auto mt-3 max-w-xs py-2.5 text-sm" />
+      </div>
     </form>
   );
 }

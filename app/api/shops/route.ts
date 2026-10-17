@@ -5,6 +5,10 @@ import { getPlanInfo } from '@/lib/card-access';
 import { tierRank } from '@/lib/card-plan';
 import { RESERVED_SHOP_SLUGS, SHOP_SLUG_PATTERN, shopUrl } from '@/lib/shop';
 import { resolveSiteTheme, SITE_TEMPLATES } from '@/lib/site-theme';
+import { limitedFormData } from '@/lib/limited-form';
+import { sanitizeImage } from '@/lib/safe-image';
+
+const LOGO_FORMATS: Record<string, string> = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp' };
 
 export const dynamic = 'force-dynamic';
 
@@ -41,12 +45,30 @@ export async function GET(request: Request) {
 }
 
 // POST /api/shops { name, slug, template, bank } — 開店
+// 也接受 multipart:data = 上面的 JSON,logo = Logo 圖片(選填,PNG 保留透明背景)
 export async function POST(request: Request) {
   const { user, ok, reason } = await eligibility();
   if (!user) return NextResponse.json({ error: reason }, { status: 401 });
   if (!ok) return NextResponse.json({ error: reason, upgrade: true }, { status: 403 });
 
-  const body = await request.json().catch(() => ({}));
+  let body: Record<string, unknown> = {};
+  let logo: File | null = null;
+  if ((request.headers.get('content-type') ?? '').includes('multipart/form-data')) {
+    let form: FormData;
+    try { form = await limitedFormData(request, 4 * 1024 * 1024); }
+    catch { return NextResponse.json({ error: 'Logo 太大,請換小一點的圖片(3MB 以內)' }, { status: 400 }); }
+    try { body = JSON.parse(String(form.get('data') ?? '{}')); } catch { body = {}; }
+    const f = form.get('logo');
+    if (f instanceof File && f.size > 0) logo = f;
+  } else {
+    body = await request.json().catch(() => ({}));
+  }
+  if (logo && (!LOGO_FORMATS[logo.type] || logo.size > 3 * 1024 * 1024)) return NextResponse.json({ error: 'Logo 請用 PNG / JPG / WEBP,3MB 以內' }, { status: 400 });
+  let logoBytes: Buffer | null = null;
+  if (logo) {
+    try { logoBytes = await sanitizeImage(new Uint8Array(await logo.arrayBuffer()), logo.type); }
+    catch { return NextResponse.json({ error: 'Logo 圖片格式無效或內容損壞' }, { status: 400 }); }
+  }
   const name = String(body.name ?? '').trim().slice(0, 40);
   const slug = String(body.slug ?? '').trim().toLowerCase();
   const bank = String(body.bank ?? '').trim().slice(0, 300);
@@ -65,12 +87,19 @@ export async function POST(request: Request) {
   if (error || !shop) return NextResponse.json({ error: error?.message.includes('duplicate') ? '這個網址已經有人使用' : error?.message ?? '開店失敗' }, { status: 400 });
 
   const tpl = SITE_TEMPLATES.find((t) => t.key === body.template) ?? SITE_TEMPLATES[0];
+  // Logo:放公開的 assets(每家店自己的資料夾);上傳失敗不擋開店,之後可在後台再傳
+  let logoUrl = '';
+  if (logo && logoBytes) {
+    const path = `shops/${shop.id}/logo-${Date.now()}.${LOGO_FORMATS[logo.type]}`;
+    const { error: upErr } = await supabase.storage.from('assets').upload(path, logoBytes, { contentType: logo.type, upsert: true });
+    if (!upErr) logoUrl = supabase.storage.from('assets').getPublicUrl(path).data.publicUrl;
+  }
   const steps = await Promise.all([
     supabase.from('shop_members').insert({ shop_id: shop.id, user_id: user.id, role: 'owner' }),
     // 網站設定:U Pro 只開轉帳匯款、宅配(自行寄件)
     supabase.from('site_settings').insert({
       shop_id: shop.id,
-      logo_url: '',
+      logo_url: logoUrl,
       footer_company_name: name,
       footer_email: user.email ?? '',
       site_theme: resolveSiteTheme({ template: tpl.key, colors: tpl.colors, layout: tpl.layout }),
@@ -91,5 +120,5 @@ export async function POST(request: Request) {
     await supabase.from('shops').delete().eq('id', shop.id);
     return NextResponse.json({ error: `開店失敗:${failed.error.message}` }, { status: 400 });
   }
-  return NextResponse.json({ shop, url: shopUrl(slug), adminUrl: shopUrl(slug, '/admin') }, { status: 201 });
+  return NextResponse.json({ shop, url: shopUrl(slug), adminUrl: shopUrl(slug, '/admin'), logo: Boolean(logoUrl), logoFailed: Boolean(logo && !logoUrl) }, { status: 201 });
 }
