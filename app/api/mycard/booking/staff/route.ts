@@ -23,6 +23,7 @@ function clean(b: Record<string, unknown>) {
     active: b.active === undefined ? true : Boolean(b.active),
     use_business_hours: b.use_business_hours === undefined ? true : Boolean(b.use_business_hours),
     role: b.role === 'assistant' ? 'assistant' : 'stylist',
+    commission_rate: Math.min(100, Math.max(0, Math.round((Number(b.commission_rate) || 0) * 100) / 100)),
   };
 }
 

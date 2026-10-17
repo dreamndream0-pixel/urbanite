@@ -293,7 +293,7 @@ export function ServicesTab({ data, reload }: { data: Data; reload: () => Promis
 }
 
 // ---------- 人員與床位 ----------
-type StaffDraft = { id?: string; name: string; title: string; active: boolean; use_business_hours: boolean; role: 'stylist' | 'assistant'; week: Week };
+type StaffDraft = { id?: string; name: string; title: string; active: boolean; use_business_hours: boolean; role: 'stylist' | 'assistant'; week: Week; commission_rate: number };
 
 export function StaffTab({ data, reload }: { data: Data; reload: () => Promise<void> }) {
   const [editing, setEditing] = useState<StaffDraft | null>(null);
@@ -301,7 +301,7 @@ export function StaffTab({ data, reload }: { data: Data; reload: () => Promise<v
   const [resName, setResName] = useState('');
 
   function edit(s: BkStaff) {
-    setEditing({ id: s.id, name: s.name, title: s.title, active: s.active, use_business_hours: s.use_business_hours, role: s.role, week: toWeek(data.staffHours.filter((h) => h.staff_id === s.id)) });
+    setEditing({ id: s.id, name: s.name, title: s.title, active: s.active, use_business_hours: s.use_business_hours, role: s.role, commission_rate: Number(s.commission_rate ?? 0), week: toWeek(data.staffHours.filter((h) => h.staff_id === s.id)) });
   }
   async function save() {
     if (!editing) return;
@@ -346,7 +346,7 @@ export function StaffTab({ data, reload }: { data: Data; reload: () => Promise<v
             <p className="font-semibold">服務人員</p>
             <p className="text-xs text-[#8a7f72]">一人工作室保留一位即可;多位人員時,顧客可指定人員或選「不指定」。</p>
           </div>
-          <button type="button" onClick={() => setEditing({ name: '', title: '', active: true, use_business_hours: true, role: 'stylist', week: toWeek(data.hours) })} className={`${btnDark} shrink-0`}>+ 新增</button>
+          <button type="button" onClick={() => setEditing({ name: '', title: '', active: true, use_business_hours: true, role: 'stylist', commission_rate: 0, week: toWeek(data.hours) })} className={`${btnDark} shrink-0`}>+ 新增</button>
         </div>
         {editing && (
           <div className="space-y-3 rounded-xl bg-[#faf7f2] p-3">
@@ -366,6 +366,9 @@ export function StaffTab({ data, reload }: { data: Data; reload: () => Promise<v
                 </button>
               ))}
             </div>
+            <label className="block text-xs text-[#8a7f72]">抽成比例(%,服務營收的百分比;0 = 不計)
+              <input inputMode="decimal" value={editing.commission_rate || ''} onChange={(e) => setEditing({ ...editing, commission_rate: Math.min(100, Number(e.target.value.replace(/[^0-9.]/g, '')) || 0) })} placeholder="例:40" className={`${input} mt-1`} />
+            </label>
             <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={editing.use_business_hours} onChange={(e) => setEditing({ ...editing, use_business_hours: e.target.checked })} />班表跟營業時段相同</label>
             {!editing.use_business_hours ? <div className="rounded-lg bg-white p-2"><p className="text-xs font-semibold">這位人員的每週班表</p><WeekEditor week={editing.week} setWeek={(w) => setEditing({ ...editing, week: w })} /></div> : null}
             <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={editing.active} onChange={(e) => setEditing({ ...editing, active: e.target.checked })} />可接預約(離職或暫停請取消勾選,歷史紀錄會保留)</label>

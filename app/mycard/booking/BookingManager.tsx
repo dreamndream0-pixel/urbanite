@@ -11,8 +11,9 @@ import { api, btn, btnDark, btnSm, card, errMsg, input, isTeam, stylists, type D
 import { HoursTab, ServicesTab, SettingsTab, StaffTab } from './BookingSetup';
 import QuotesTab from './QuotesTab';
 import CustomersTab from './CustomersTab';
+import ReportsTab from './ReportsTab';
 
-type Tab = 'bookings' | 'calendar' | 'quotes' | 'customers' | 'services' | 'staff' | 'hours' | 'settings';
+type Tab = 'bookings' | 'calendar' | 'quotes' | 'customers' | 'reports' | 'services' | 'staff' | 'hours' | 'settings';
 const OPEN = ['pending', 'confirmed', 'checked_in'];
 
 // 名片主人:線上預約管理
@@ -49,7 +50,7 @@ export default function BookingManager() {
   const tabs: [Tab, string][] = [
     ['bookings', `預約${pending ? `(${pending})` : ''}`], ['calendar', '日曆'],
     ...(hasQuote ? [['quotes', `詢價${quoteWaiting ? `(${quoteWaiting})` : ''}`] as [Tab, string]] : []),
-    ['customers', '顧客'], ['services', '服務'], ['staff', '人員床位'], ['hours', '營業時段'], ['settings', '設定'],
+    ['customers', '顧客'], ['reports', '報表'], ['services', '服務'], ['staff', '人員床位'], ['hours', '營業時段'], ['settings', '設定'],
   ];
 
   return (
@@ -91,7 +92,7 @@ export default function BookingManager() {
         </div>
       </section>
 
-      <div className={`grid gap-1 rounded-2xl border border-[#e5ded4] bg-white p-1 ${tabs.length > 7 ? 'grid-cols-4 sm:grid-cols-8' : 'grid-cols-4 sm:grid-cols-7'}`}>
+      <div className={`grid gap-1 rounded-2xl border border-[#e5ded4] bg-white p-1 ${tabs.length > 8 ? 'grid-cols-5 sm:grid-cols-9' : 'grid-cols-4 sm:grid-cols-8'}`}>
         {tabs.map(([k, label]) => (
           <button key={k} type="button" onClick={() => setTab(k)} className={`rounded-xl px-1 py-2 text-sm ${tab === k ? 'bg-[#1f1b19] font-semibold text-white' : 'text-[#6b6156]'}`}>{label}</button>
         ))}
@@ -101,6 +102,7 @@ export default function BookingManager() {
       {tab === 'calendar' && <CalendarTab data={data} reload={load} />}
       {tab === 'quotes' && <QuotesTab data={data} reload={load} />}
       {tab === 'customers' && <CustomersTab data={data} />}
+      {tab === 'reports' && <ReportsTab data={data} />}
       {tab === 'services' && <ServicesTab data={data} reload={load} />}
       {tab === 'staff' && <StaffTab data={data} reload={load} />}
       {tab === 'hours' && <HoursTab data={data} reload={load} />}
