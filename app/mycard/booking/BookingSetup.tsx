@@ -9,6 +9,7 @@ import {
 } from '@/lib/booking/shared';
 import { api, btn, btnDark, btnSm, card, errMsg, input, isTeam, stylists, type Data } from './ui';
 import { PackageProducts } from './LoyaltyParts';
+import CalendarSync from './CalendarSync';
 
 // ---------- 每週時段編輯(營業時段、人員班表共用) ----------
 type DayRange = { start: string; end: string; branch?: string };
@@ -620,6 +621,7 @@ export function SettingsTab({ data, reload }: { data: Data; reload: () => Promis
         <p className="text-[11px] leading-5 text-[#a99e8f]">服務完成且付清後,依實收金額入帳(只付訂金不入帳;點數與套票折抵的部分不再回饋);退款會自動沖銷。購買套票時就入帳,用套票兌換不再重複回饋。完成服務時可用點數折抵。</p>
       </section>
       <BranchesSection data={data} reload={reload} travel={b.branch_travel_minutes} setTravel={(n) => setB({ ...b, branch_travel_minutes: n })} />
+      <CalendarSync data={data} />
       <PackageProducts data={data} reload={reload} />
       <section className={`${card} space-y-3`}>
         <p className="font-semibold">候補與回訪</p>

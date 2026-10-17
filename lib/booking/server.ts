@@ -134,10 +134,12 @@ type Occupancy = { booking_id: string; staff_id: string | null; resource_id: str
 
 // 範圍內的有效占用區段與休假(逾期的待成立預約不算;改期時排除自己)
 async function occupancy(businessId: string, fromIso: string, toIso: string, excludeId?: string) {
-  const [{ data: allocs }, { data: exceptions }] = await Promise.all([
+  const [{ data: allocs }, { data: exceptions }, { data: external }] = await Promise.all([
     db().from('bk_allocations').select('booking_id, staff_id, resource_id, role, start_at, end_at, bk_bookings!inner(status, expires_at, branch_id)')
       .eq('business_id', businessId).eq('active', true).lt('start_at', toIso).gt('end_at', fromIso),
     db().from('bk_exceptions').select('start_at, end_at, staff_id, branch_id').eq('business_id', businessId).lt('start_at', toIso).gt('end_at', fromIso),
+    // 外部行事曆匯入的忙碌時段(視同休假)
+    db().from('bk_external_busy').select('start_at, end_at, staff_id').eq('business_id', businessId).lt('start_at', toIso).gt('end_at', fromIso).limit(5000),
   ]);
   const now = Date.now();
   const live: Occupancy[] = (allocs ?? [])
@@ -149,7 +151,7 @@ async function occupancy(businessId: string, fromIso: string, toIso: string, exc
       const bk = (Array.isArray(a.bk_bookings) ? a.bk_bookings[0] : a.bk_bookings) as { branch_id: string | null } | null;
       return { booking_id: a.booking_id, staff_id: a.staff_id, resource_id: a.resource_id, role: a.role, start: new Date(a.start_at).getTime(), end: new Date(a.end_at).getTime(), branch_id: bk?.branch_id ?? null };
     });
-  const ex = (exceptions ?? []).map((x) => ({ staff_id: x.staff_id as string | null, branch_id: x.branch_id as string | null, start: new Date(x.start_at).getTime(), end: new Date(x.end_at).getTime() }));
+  const ex = [...(exceptions ?? []), ...(external ?? []).map((x) => ({ ...x, branch_id: null }))].map((x) => ({ staff_id: x.staff_id as string | null, branch_id: x.branch_id as string | null, start: new Date(x.start_at).getTime(), end: new Date(x.end_at).getTime() }));
   return { live, exceptions: ex };
 }
 
@@ -997,6 +999,7 @@ async function deliver(row: OutboxRow, token: string): Promise<{ state: 'api_acc
 export async function processBookingJobs(limit = 30) {
   const result = { expired: 0, sent: 0, skipped: 0, failed: 0, invited: 0 };
   // 候補邀請(放在通知前,讓剛產生的邀請這次就送出)
+  try { await (await import('./calendar')).syncDueCalendars(); } catch (e) { console.error('calendar sync', e); }
   try { result.invited = (await (await import('./engage')).processWaitlist()).invited; } catch (e) { console.error('waitlist', e); }
   const now = new Date().toISOString();
   const { data: overdue } = await db().from('bk_bookings').select('id, version').eq('status', 'pending').lt('expires_at', now).limit(50);
