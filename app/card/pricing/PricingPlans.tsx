@@ -60,8 +60,9 @@ export default function PricingPlans({ promo, initialNow, loggedIn }: {
           const covered = !free && active && tierRank(tier.key) <= tierRank(promo.tier);
           const price = tier.prices?.[period] ?? 0;
           const upgrade = `/mycard/upgrade?tier=${tier.key}&period=${period}`;
-          // U Pro / U Max 限時免費期間:登入後直接進開店精靈自己開通官網(沒登入先註冊,完成後回到開店精靈)
-          const selfServe = !tier.available && covered;
+          // U Pro / U Max(官網方案):限時免費期間直接進開店精靈;沒有活動時線上付款開通(沒登入先註冊,完成後回來)
+          const site = tierRank(tier.key) >= tierRank('pro');
+          const selfServe = site && covered;
           const contact = !tier.available && !covered;
           const shopHref = loggedIn ? '/shop/new' : `/card/register?next=${encodeURIComponent('/shop/new')}`;
           const href = selfServe ? shopHref : contact ? CONTACT_LINE_URL : free || covered ? startHref : loggedIn ? upgrade : `/card/register?next=${encodeURIComponent(upgrade)}`;
@@ -72,9 +73,9 @@ export default function PricingPlans({ promo, initialNow, loggedIn }: {
             <p className={styles.priceNote}>{covered ? <><s>NT${price.toLocaleString()} / {period === 'month' ? '月' : '年'}</s>　活動期間免費</> : period === 'year' && tier.prices ? `年繳省 NT$${(tier.prices.month * 12 - price).toLocaleString()}` : free ? '不需信用卡' : '預付制，不自動扣款'}</p>
             <p className={styles.audience}>{audiences[index]}</p>
             <Link className={styles.action} href={href} target={contact ? '_blank' : undefined} rel={contact ? 'noopener noreferrer' : undefined}>
-              {selfServe ? '免費開通官網' : contact ? '聯絡專員建立官網' : free || covered ? '免費使用' : '立即升級'}<ArrowRight size={16} />
+              {selfServe ? '免費開通官網' : contact ? '聯絡專員建立官網' : free || covered ? '免費使用' : site ? '立即開通官網' : '立即升級'}<ArrowRight size={16} />
             </Link>
-            {selfServe ? <a className={styles.assist} href={CONTACT_LINE_URL} target="_blank" rel="noopener noreferrer">想請專員協助建立?加入官方 LINE</a> : null}
+            {site && !contact ? <a className={styles.assist} href={CONTACT_LINE_URL} target="_blank" rel="noopener noreferrer">想請專員協助建立?加入官方 LINE</a> : null}
             <ul>{features.map(row => <li key={row.label} className={row.values[index] === '—' ? styles.unavailable : ''}>
               {row.values[index] === '—' ? <Minus size={16} /> : <Check size={16} />}
               <span>{row.label}{!['✓', '—'].includes(row.values[index]) && <small>{row.values[index]}</small>}</span>

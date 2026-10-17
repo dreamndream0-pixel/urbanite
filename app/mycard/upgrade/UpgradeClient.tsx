@@ -21,6 +21,8 @@ export default function UpgradeClient({ plan, payments, result, table, lineUrl, 
   const chosen = tierInfo(tier);
   const price = chosen.prices?.[period] ?? 0;
   const action = plan.tier === tier ? '續約' : tierRank(tier) > tierRank(plan.tier) ? '升級' : '改為';
+  // 已付費的較高方案還沒到期:不能買較低方案(限時免費不算)
+  const lowerBlocked = !plan.promo && plan.tier !== 'free' && Boolean(plan.expiresAt) && tierRank(tier) < tierRank(plan.tier);
 
   async function pay() {
     setBusy(true);
@@ -51,7 +53,9 @@ export default function UpgradeClient({ plan, payments, result, table, lineUrl, 
   return (
     <div className="mx-auto max-w-5xl px-4 py-10 sm:px-6">
       {result === 'success' ? (
-        <p className="mb-6 rounded-xl border border-[#cfe9d6] bg-[#f3fbf5] px-4 py-3 text-sm text-[#1f5a33]">付款完成,方案已經開通。回到「我的名片」就能使用新功能。</p>
+        <p className="mb-6 rounded-xl border border-[#cfe9d6] bg-[#f3fbf5] px-4 py-3 text-sm text-[#1f5a33]">
+          付款完成,方案已經開通。{tierRank(plan.tier) >= tierRank('pro') ? <>現在就能<a href="/shop/new" className="mx-1 font-semibold underline underline-offset-2">開設你的官網</a>。</> : '回到「我的名片」就能使用新功能。'}
+        </p>
       ) : result === 'pending' ? (
         <p className="mb-6 rounded-xl border border-[#e5ded4] bg-white px-4 py-3 text-sm text-[#6b6156]">付款結果仍在確認中，請勿重複付款。若已扣款但方案尚未開通，請保留交易紀錄並聯絡客服。</p>
       ) : result === 'fail' ? (
@@ -72,7 +76,7 @@ export default function UpgradeClient({ plan, payments, result, table, lineUrl, 
       {!plan.isAdmin ? (
         <section className="mt-6 rounded-2xl border border-[#e5ded4] bg-white p-5">
           <p className="text-base font-semibold">選擇方案</p>
-          <p className="mt-1 text-xs text-[#a99e8f]">預付制,不會自動扣款。同方案續約會接在目前到期日之後;換成更高等級從付款當天起算。</p>
+          <p className="mt-1 text-xs text-[#a99e8f]">預付制,不會自動扣款。同方案續約會接在目前到期日之後;升級時,原方案剩餘的天數會依月費比例折算成新方案的天數。</p>
           <div className="mt-4 grid gap-3 sm:grid-cols-3">
             {buyable.map((t) => {
               const on = tier === t.key;
@@ -125,10 +129,18 @@ export default function UpgradeClient({ plan, payments, result, table, lineUrl, 
           ) : null}
           {chosen.available ? (
             <>
-              <button type="button" onClick={pay} disabled={busy} className="mt-5 w-full rounded-full bg-[#1f1b19] py-3 text-sm font-semibold text-white transition hover:bg-[#3a322e] disabled:opacity-50">
+              {/* U Pro / U Max:已經有官網等級(含限時免費)可以先去開店,付款是讓活動結束後繼續使用 */}
+              {tierRank(tier) >= tierRank('pro') && tierRank(plan.tier) >= tierRank('pro') ? (
+                <a href="/shop/new" className="mt-5 block w-full rounded-full bg-[#121b33] py-3 text-center text-sm font-semibold text-[#dcbc84] transition hover:bg-[#1d2a4d]">
+                  前往開設 / 管理官網
+                </a>
+              ) : null}
+              {lowerBlocked ? <p className="mt-5 rounded-xl bg-[#faf7f2] px-4 py-3 text-center text-sm text-[#6b6156]">你目前是 {tierInfo(plan.tier).name},到期後才能改成 {chosen.name};可以選目前方案續約。</p> : null}
+              <button type="button" onClick={pay} disabled={busy || lowerBlocked} className={`${tierRank(tier) >= tierRank('pro') && tierRank(plan.tier) >= tierRank('pro') ? 'mt-3' : 'mt-5'} w-full rounded-full bg-[#1f1b19] py-3 text-sm font-semibold text-white transition hover:bg-[#3a322e] disabled:opacity-50`}>
                 {busy ? '前往付款頁…' : `${action} ${chosen.name}・付款 NT$${price.toLocaleString()}`}
               </button>
-              <p className="mt-2 text-center text-[11px] text-[#a99e8f]">付款由藍新金流處理,可用信用卡、ATM、超商代碼等方式</p>
+              <p className="mt-2 text-center text-[11px] text-[#a99e8f]">付款由藍新金流處理,可用信用卡、ATM、超商代碼等方式{tierRank(tier) >= tierRank('pro') ? ',付款完成就能自己開設官網' : ''}</p>
+              {tierRank(tier) >= tierRank('pro') ? <p className="mt-1 text-center text-[11px]"><a href={lineUrl} target="_blank" rel="noopener noreferrer" className="text-[#8a7f72] underline underline-offset-2">想請專員協助建立官網?加入官方 LINE</a></p> : null}
             </>
           ) : (
             <>

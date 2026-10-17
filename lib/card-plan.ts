@@ -15,12 +15,12 @@ export const TIERS: {
   name: string;
   tagline: string;
   prices: Record<CardPeriod, number> | null;
-  available: boolean; // 目前可購買(U Pro / U Max 開發中)
+  available: boolean; // 目前可線上購買
 }[] = [
   { key: 'free', name: 'U Free', tagline: '免費個人名片', prices: null, available: true },
   { key: 'plus', name: 'U Plus', tagline: '完整個人名片', prices: { month: 39, year: 390 }, available: true },
-  { key: 'pro', name: 'U Pro', tagline: '名片+基本官網', prices: { month: 399, year: 3990 }, available: false },
-  { key: 'max', name: 'U Max', tagline: '全功能品牌官網', prices: { month: 699, year: 6990 }, available: false },
+  { key: 'pro', name: 'U Pro', tagline: '名片+基本官網', prices: { month: 399, year: 3990 }, available: true },
+  { key: 'max', name: 'U Max', tagline: '全功能品牌官網', prices: { month: 699, year: 6990 }, available: true },
 ];
 
 // 名片服務品牌(與商店 URBANITE 分開)

@@ -3,7 +3,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { getSessionUser } from '@/lib/supabase/server';
 import { buildMPGParams, getNewebpayConfig } from '@/lib/newebpay';
 import { newCardOrderNo, cardSettlementReady } from '@/lib/card-payment';
-import { PERIODS, TIERS, type CardPeriod, type PaidTier } from '@/lib/card-plan';
+import { PERIODS, TIERS, tierInfo, tierRank, type CardPeriod, type PaidTier } from '@/lib/card-plan';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,6 +15,11 @@ export async function POST(request: Request) {
   const info = TIERS.find((t) => t.key === tier);
   if (!info?.prices || !period || !PERIODS[period]) return NextResponse.json({ error: '請選擇方案' }, { status: 400 });
   if (!info.available) return NextResponse.json({ error: `${info.name} 請聯繫專員開通` }, { status: 400 });
+  // 已付費的較高方案還沒到期時,不能買較低方案(付了也用不到)
+  const { data: current } = await createAdminClient().from('card_subscriptions').select('plan, expires_at').eq('user_id', user.id).maybeSingle();
+  if (current?.expires_at && new Date(current.expires_at).getTime() > Date.now() && tierRank(current.plan as PaidTier) > tierRank(tier)) {
+    return NextResponse.json({ error: `你目前是 ${tierInfo(current.plan as PaidTier).name},到期後才能改成 ${info.name};可以續約目前方案。` }, { status: 400 });
+  }
   const price = { amount: info.prices[period], label: `${info.name} ${PERIODS[period].label}` };
 
   const cfg = await getNewebpayConfig();
