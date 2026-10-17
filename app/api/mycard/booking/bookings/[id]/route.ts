@@ -1,6 +1,7 @@
 import { after, NextResponse } from 'next/server';
 import { getSessionUser } from '@/lib/supabase/server';
 import { BookingError, ownerCancelItem, ownerCommand, ownerPayment, ownerReschedule, processBookingJobs } from '@/lib/booking/server';
+import { redeemPoints, settleBookingPoints } from '@/lib/booking/loyalty';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,6 +22,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       booking = await ownerPayment(user.id, id, version, {
         kind: String(body?.kind ?? ''), amount: Math.round(Number(body?.amount) || 0), method: String(body?.method ?? 'transfer'), note: String(body?.note ?? ''),
       });
+    } else if (body?.command === 'redeem_points') {
+      booking = await redeemPoints(user.id, id, version, Number(body?.points) || 0);
     } else if (body?.command === 'cancel_item') {
       booking = await ownerCancelItem(user.id, id, version, Number(body?.seq), String(body?.reason ?? ''));
     } else if (body?.command === 'reschedule') {
@@ -29,6 +32,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       const balance = body?.balance && Number(body.balance.amount) > 0 ? { amount: Math.round(Number(body.balance.amount)), method: String(body.balance.method ?? 'cash') } : undefined;
       booking = await ownerCommand(user.id, id, body?.command, version, String(body?.reason ?? ''), balance);
     }
+    if (['complete', 'payment'].includes(body?.command)) await settleBookingPoints(id).catch((e) => console.error('reward', e));
     after(() => processBookingJobs().catch((e) => console.error('booking jobs', e)));
     return NextResponse.json(booking);
   } catch (e) {

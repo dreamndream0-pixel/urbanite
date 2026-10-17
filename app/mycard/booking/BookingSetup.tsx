@@ -8,6 +8,7 @@ import {
   type BkBooking, type BkBusiness, type BkException, type BkService, type BkStaff,
 } from '@/lib/booking/shared';
 import { api, btn, btnDark, btnSm, card, errMsg, input, isTeam, stylists, type Data } from './ui';
+import { PackageProducts } from './LoyaltyParts';
 
 // ---------- 每週時段編輯(營業時段、人員班表共用) ----------
 type DayRange = { start: string; end: string };
@@ -557,6 +558,20 @@ export function SettingsTab({ data, reload }: { data: Data; reload: () => Promis
           {num('deposit_hours', '轉帳期限', unit([1, 2, 6, 12, 24, 48, 72], ' 小時內'))}
         </div>
       </section>
+      <section className={`${card} space-y-3`}>
+        <div className="flex items-center justify-between gap-2">
+          <p className="font-semibold">回饋點數</p>
+          <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={b.reward_enabled} onChange={(e) => setB({ ...b, reward_enabled: e.target.checked })} />開啟</label>
+        </div>
+        {b.reward_enabled ? (
+          <div className="grid grid-cols-2 gap-3">
+            {num('reward_rate', '每消費多少元得 1 點', [50, 100, 200, 500, 1000].map((n) => [n, `${n} 元`]))}
+            {num('point_value', '1 點折抵', [1, 2, 5, 10].map((n) => [n, `${n} 元`]))}
+          </div>
+        ) : null}
+        <p className="text-[11px] leading-5 text-[#a99e8f]">服務完成且付清後,依實收金額入帳(只付訂金不入帳;點數與套票折抵的部分不再回饋);退款會自動沖銷。購買套票時就入帳,用套票兌換不再重複回饋。完成服務時可用點數折抵。</p>
+      </section>
+      <PackageProducts data={data} reload={reload} />
       <section className={`${card} space-y-3`}>
         <p className="font-semibold">外出服務</p>
         <div className="grid grid-cols-2 gap-3">

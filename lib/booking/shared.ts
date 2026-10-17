@@ -30,6 +30,9 @@ export type BkBusiness = {
   reschedule_limit: number;
   travel_minutes: number;
   service_area: string;
+  reward_enabled: boolean;
+  reward_rate: number;
+  point_value: number;
 };
 
 export type BkService = {
@@ -61,7 +64,7 @@ export type BkStaffHour = { staff_id: string; weekday: number; start_min: number
 export type BkStaffService = { staff_id: string; service_id: string; duration_minutes: number | null; price: number | null };
 export type BkResource = { id: string; name: string; active: boolean; sort_order: number };
 export type BkAddon = { id: string; service_id: string; name: string; price: number; extra_minutes: number; active: boolean; sort_order: number };
-export type BkPayment = { id: string; booking_id: string; kind: 'deposit' | 'balance' | 'refund'; amount: number; method: 'transfer' | 'cash' | 'card' | 'other'; note: string; created_at: string };
+export type BkPayment = { id: string; booking_id: string; kind: 'deposit' | 'balance' | 'refund'; amount: number; method: keyof typeof PAY_METHOD_LABEL; note: string; created_at: string };
 
 export type BkHour = { weekday: number; start_min: number; end_min: number };
 export type BkException = { id: string; start_at: string; end_at: string; reason: string; staff_id: string | null };
@@ -96,6 +99,7 @@ export type BkBooking = {
   created_by: 'customer' | 'owner';
   quote_id?: string | null;
   customer_id?: string | null;
+  package_id?: string | null;
 };
 
 // 顧客檔案(每間店各自一份)、服務紀錄、照片
@@ -142,6 +146,9 @@ export const DEFAULT_BUSINESS: Omit<BkBusiness, 'id' | 'owner_user_id' | 'card_i
   reschedule_limit: 1,
   travel_minutes: 60,
   service_area: '',
+  reward_enabled: false,
+  reward_rate: 100,
+  point_value: 1,
 };
 
 export const STATUS_LABEL: Record<BookingStatus, string> = {
@@ -182,7 +189,7 @@ export function statusText(b: Pick<BkBooking, 'status' | 'approval_status' | 'pa
   return STATUS_LABEL.pending;
 }
 
-export const PAY_METHOD_LABEL = { transfer: '轉帳', cash: '現金', card: '刷卡', other: '其他' } as const;
+export const PAY_METHOD_LABEL = { transfer: '轉帳', cash: '現金', card: '刷卡', other: '其他', points: '點數', package: '套票' } as const;
 
 export const WEEKDAYS = ['日', '一', '二', '三', '四', '五', '六'];
 

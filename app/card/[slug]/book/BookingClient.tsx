@@ -19,6 +19,7 @@ type Service = {
 };
 type Staff = { id: string; name: string; title: string; avatar: string };
 type Business = { name: string; address: string; notice: string; approval_mode: 'auto' | 'manual'; cancel_hours: number; allow_any_staff: boolean; payment_info: string; service_area: string; open: boolean };
+type MyPackage = { id: string; name: string; service_ids: string[]; available: number; used: number; reserved: number; sessions_total: number; expires_at: string; business: { slug: string } };
 type MyRecord = {
   id: string; service_name: string; performed_on: string; consent: 'none' | 'requested' | 'granted' | 'declined' | 'revoked'; delete_requested: boolean;
   business: { name: string; slug: string }; photos: { id: string; kind: 'before' | 'after' | 'other' }[];
@@ -61,7 +62,8 @@ export default function BookingClient({ slug, card, business, services, staff }:
   const [time, setTime] = useState('');
   const [days, setDays] = useState<Day[] | null>(null);
   const [loadingSlots, setLoadingSlots] = useState(false);
-  const [auth, setAuth] = useState<{ loggedIn: boolean; lineBound: boolean; bookings: MyBooking[]; quotes: MyQuote[]; records: MyRecord[] } | null>(null);
+  const [auth, setAuth] = useState<{ loggedIn: boolean; lineBound: boolean; bookings: MyBooking[]; quotes: MyQuote[]; records: MyRecord[]; packages: MyPackage[]; points: number } | null>(null);
+  const [usePackage, setUsePackage] = useState(true);
   const [contact, setContact] = useState({ name: '', phone: '', note: '' });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -69,6 +71,8 @@ export default function BookingClient({ slug, card, business, services, staff }:
   const idemKey = useRef('');
   const service = services.find((s) => s.id === serviceId) ?? null;
   const isQuote = service?.price_mode === 'quote';
+  const pkg = service ? auth?.packages.find((p) => p.available > 0 && (!p.service_ids.length || p.service_ids.includes(service.id))) ?? null : null;
+  const pkgOn = Boolean(pkg && usePackage);
   const here = `/@${slug}/book`;
 
   // 這個服務可選的人員;只有一位時不顯示人員步驟
@@ -91,18 +95,20 @@ export default function BookingClient({ slug, card, business, services, staff }:
       + extras.reduce((n, e) => n + baseMinutes(e), 0);
     const total = base + addons.reduce((n, a) => n + a.price, 0) + extras.reduce((n, e) => n + minPrice(e), 0);
     const wanted = service.deposit + extras.reduce((n, e) => n + e.deposit, 0);
-    return { duration, total, varies: varies || extras.some((e) => new Set(e.staff.map((x) => x.price)).size > 1), addons, extras, deposit: wanted ? (total > 0 ? Math.min(wanted, total) : wanted) : 0 };
+    return { base, duration, total, varies: varies || extras.some((e) => new Set(e.staff.map((x) => x.price)).size > 1), addons, extras, deposit: wanted ? (total > 0 ? Math.min(wanted, total) : wanted) : 0 };
   }, [service, serviceStaff, staffParam, addonIds, extraIds, services]);
 
   // 登入狀態與我的預約(也用來帶入上次填的聯絡資料)
   const loadMine = useCallback(async () => {
     const res = await fetch('/api/booking/my', { cache: 'no-store' });
-    if (res.status === 401) { setAuth({ loggedIn: false, lineBound: false, bookings: [], quotes: [], records: [] }); return; }
+    if (res.status === 401) { setAuth({ loggedIn: false, lineBound: false, bookings: [], quotes: [], records: [], packages: [], points: 0 }); return; }
     const data = await res.json().catch(() => null);
     const bookings = ((data?.bookings ?? []) as MyBooking[]).filter((b) => b.business.slug === slug);
     const quotes = ((data?.quotes ?? []) as MyQuote[]).filter((q) => q.business.slug === slug);
     const records = ((data?.records ?? []) as MyRecord[]).filter((r) => r.business.slug === slug);
-    setAuth({ loggedIn: true, lineBound: Boolean(data?.line_bound), bookings, quotes, records });
+    const packages = ((data?.packages ?? []) as MyPackage[]).filter((p) => p.business.slug === slug);
+    const points = ((data?.points ?? []) as { business: { slug: string }; points: number }[]).find((p) => p.business.slug === slug)?.points ?? 0;
+    setAuth({ loggedIn: true, lineBound: Boolean(data?.line_bound), bookings, quotes, records, packages, points });
     const last = (data?.bookings ?? [])[0] as MyBooking | undefined;
     if (last?.contact) setContact((c) => (c.name || c.phone ? c : { name: last.contact.name ?? '', phone: last.contact.phone ?? '', note: '' }));
   }, [slug]);
@@ -168,7 +174,7 @@ export default function BookingClient({ slug, card, business, services, staff }:
       const res = await fetch(`/api/booking/${encodeURIComponent(slug)}/bookings`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Idempotency-Key': idemKey.current },
-        body: JSON.stringify({ service_id: service.id, addon_ids: addonIds, extra_ids: extraIds, staff_id: staffParam || null, start_at: startAt, contact, channel: /Line\//.test(navigator.userAgent) ? 'line' : 'card' }),
+        body: JSON.stringify({ service_id: service.id, addon_ids: addonIds, extra_ids: extraIds, package_id: pkgOn ? pkg!.id : null, staff_id: staffParam || null, start_at: startAt, contact, channel: /Line\//.test(navigator.userAgent) ? 'line' : 'card' }),
       });
       const data = await res.json().catch(() => null);
       if (!res.ok) {
@@ -341,8 +347,11 @@ export default function BookingClient({ slug, card, business, services, staff }:
                   <p className="font-semibold text-[#1f1b19]">{service.name}{quote.addons.length ? `(+${quote.addons.map((a) => a.name).join('、')})` : ''}{quote.extras.map((e) => ` → ${e.name}`).join('')}</p>
                   <p>{formatDateLabel(date).md}(週{formatDateLabel(date).weekday}) {time} · 約 {quote.duration} 分鐘</p>
                   {pickStaff ? <p>人員:{staffParam ? serviceStaff.find((x) => x.id === staffParam)?.info?.name : '不指定(由店家安排)'}</p> : null}
-                  <p>{priceText(quote.total, quote.varies ? '起(依人員)' : service.price_note)}</p>
-                  {quote.deposit ? <p className="text-[#9a6412]">需付訂金 {money(quote.deposit)}(轉帳){business.approval_mode === 'manual' ? ',店家確認後再付' : ''},{quote.total ? `到店再付尾款 ${money(Math.max(0, quote.total - quote.deposit))}` : '其餘到店付'}</p> : null}
+                  {pkg ? (
+                    <label className="flex items-center gap-2 rounded-lg bg-[#eef6ef] px-2.5 py-2 text-[#2f5a3a]"><input type="checkbox" checked={usePackage} onChange={(e) => setUsePackage(e.target.checked)} />使用套票「{pkg.name}」(剩 {pkg.available} 次)</label>
+                  ) : null}
+                  <p>{pkgOn ? `主服務由套票支付${quote.total - (quote.base ?? 0) > 0 ? `,其他項目 ${money(quote.total - (quote.base ?? 0))}` : ''}` : priceText(quote.total, quote.varies ? '起(依人員)' : service.price_note)}</p>
+                  {quote.deposit && !pkgOn ? <p className="text-[#9a6412]">需付訂金 {money(quote.deposit)}(轉帳){business.approval_mode === 'manual' ? ',店家確認後再付' : ''},{quote.total ? `到店再付尾款 ${money(Math.max(0, quote.total - quote.deposit))}` : '其餘到店付'}</p> : null}
                   {business.address ? <p className="text-xs text-[#8a7f72]">地點:{business.address}</p> : null}
                 </div>
                 {auth && !auth.loggedIn ? (
@@ -509,7 +518,7 @@ function ResultView({ result, business, lineBound, here, onMore, onMine, onRepor
   );
 }
 
-function MyBookings({ auth, loginNext, onCancel, onBook, reload }: { auth: { loggedIn: boolean; bookings: MyBooking[]; quotes: MyQuote[]; records: MyRecord[] } | null; loginNext: string; onCancel: (b: MyBooking) => void; onBook: () => void; reload: () => Promise<void> }) {
+function MyBookings({ auth, loginNext, onCancel, onBook, reload }: { auth: { loggedIn: boolean; bookings: MyBooking[]; quotes: MyQuote[]; records: MyRecord[]; packages: MyPackage[]; points: number } | null; loginNext: string; onCancel: (b: MyBooking) => void; onBook: () => void; reload: () => Promise<void> }) {
   // 頁面打開時的時間(判斷可否取消);只在第一次取得,避免每次重畫都變
   const [now] = useState(() => Date.now());
   const [moving, setMoving] = useState('');
@@ -523,7 +532,7 @@ function MyBookings({ auth, loginNext, onCancel, onBook, reload }: { auth: { log
       </div>
     );
   }
-  if (!auth.bookings.length && !auth.quotes.length && !auth.records.length) {
+  if (!auth.bookings.length && !auth.quotes.length && !auth.records.length && !auth.packages.length && !auth.points) {
     return (
       <div className="rounded-2xl bg-white p-8 text-center">
         <p className="text-sm text-[#8a7f72]">還沒有預約紀錄</p>
@@ -533,6 +542,20 @@ function MyBookings({ auth, loginNext, onCancel, onBook, reload }: { auth: { log
   }
   return (
     <div className="space-y-2">
+      {auth.packages.length || auth.points ? (
+        <div className="space-y-2 rounded-2xl bg-white p-4">
+          {auth.points ? <p className="flex justify-between text-sm"><span className="font-semibold">回饋點數</span><span className="tabular-nums">{auth.points} 點</span></p> : null}
+          {auth.packages.map((p) => (
+            <div key={p.id}>
+              <p className="flex justify-between gap-2 text-sm"><span className="min-w-0 truncate font-semibold">{p.name}</span><span className="shrink-0 text-[#2f5a3a]">剩 {p.available} 次</span></p>
+              <div className="mt-1 flex h-1.5 gap-0.5 overflow-hidden rounded-full" aria-hidden="true">
+                <span className="bg-[#d5cbbd]" style={{ flex: p.used }} /><span className="bg-[#e7c98f]" style={{ flex: p.reserved }} /><span className="bg-[#9cc8a6]" style={{ flex: p.available }} />
+              </div>
+              <p className="mt-0.5 text-[11px] text-[#8a7f72]">已用 {p.used} · 預約保留 {p.reserved} · {formatDateTime(p.expires_at).split(' ')[0]} 到期</p>
+            </div>
+          ))}
+        </div>
+      ) : null}
       {auth.records.map((r) => <RecordConsent key={`${r.id}-${r.consent}-${r.delete_requested}`} record={r} onDone={() => void reload()} />)}
       {auth.quotes.filter((q) => q.status !== 'accepted').map((q) => <QuoteOffer key={`${q.id}-${q.current_version}-${q.status}`} quote={q} onDone={() => void reload()} />)}
       {auth.bookings.map((b) => {

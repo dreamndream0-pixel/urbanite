@@ -282,6 +282,8 @@ export function rpcError(message: string): BookingError {
   if (message.includes('VERSION_CONFLICT')) return new BookingError('VERSION_CONFLICT', '預約內容已經更新,請重新整理後再操作。', 409);
   if (message.includes('INVALID_STATE')) return new BookingError('INVALID_STATE', '目前的預約狀態不能執行這個操作。', 409);
   if (message.includes('VALIDATION_ERROR')) return new BookingError('VALIDATION_ERROR', '金額不正確。', 422);
+  if (message.includes('PACKAGE_EMPTY')) return new BookingError('PACKAGE_EMPTY', '套票次數已用完。', 409);
+  if (message.includes('PACKAGE_INVALID')) return new BookingError('PACKAGE_INVALID', '這張套票不能用在這項服務,或已過期。', 422);
   if (message.includes('QUOTE_EXPIRED')) return new BookingError('QUOTE_EXPIRED', '這份報價已過期,請聯絡店家重新報價。', 409);
   if (message.includes('NOT_FOUND')) return new BookingError('NOT_FOUND', '找不到這筆資料。', 404);
   return new BookingError('SERVER_ERROR', '預約處理失敗,請稍後再試。', 500);
@@ -354,7 +356,7 @@ const cleanContact = (c: { name: string; phone: string; note: string }) => ({
 
 // 顧客建立預約:伺服器重新核對服務、人員、時段、床位與金額(不採用前端的時長與金額)
 export async function createBooking(input: {
-  slug: string; userId: string; serviceId: string; addonIds: string[]; staffId: string | null; startAt: string; extras?: string[];
+  slug: string; userId: string; serviceId: string; addonIds: string[]; staffId: string | null; startAt: string; extras?: string[]; packageId?: string | null;
   contact: { name: string; phone: string; note: string }; idempotencyKey: string; channel: string;
 }) {
   // 重送(網路重試、連點):同一顧客同一個 key 直接回傳原本那筆
@@ -381,8 +383,11 @@ export async function createBooking(input: {
   const manual = business.approval_mode === 'manual';
   const contact = cleanContact(input.contact);
   return tryPlacements(() => placements(business, sched, req, start), async (p) => {
-    const wanted = service.deposit + p.extraDeposit;
-    const deposit = wanted > 0 ? (p.total > 0 ? Math.min(wanted, p.total) : wanted) : 0;
+    // 用套票:主服務的基本價格由套票支付,只收加購與其他項目
+    const covered = input.packageId ? p.q.total - p.q.addons.reduce((n, a) => n + a.price, 0) : 0;
+    const total = Math.max(0, p.total - covered);
+    const wanted = (input.packageId ? 0 : service.deposit) + p.extraDeposit;
+    const deposit = wanted > 0 ? (total > 0 ? Math.min(wanted, total) : 0) : 0;
     let expires: string | null = null;
     if (manual) {
       // 確認期限:不晚於服務開始前 30 分鐘
@@ -405,8 +410,8 @@ export async function createBooking(input: {
         service_snapshot: snapshotOf(service, p), start_at: start.toISOString(), end_at: p.end.toISOString(), occupy_end_at: p.occupyEnd.toISOString(),
         status: confirmed ? 'confirmed' : 'pending', approval_status: manual ? 'pending' : 'not_required', expires_at: expires,
         contact, source_card_id: card.id, source_channel: input.channel.slice(0, 20) || 'card', idempotency_key: idem || null,
-        staff_id: p.staff.id, staff_requested: Boolean(input.staffId), resource_id: p.resourceId, addons: p.q.addons, allocations: p.allocs, items: p.items.length > 1 ? p.items : [],
-        total_price: p.total, deposit_amount: deposit, payment_status: deposit ? 'awaiting' : 'none',
+        staff_id: p.staff.id, staff_requested: Boolean(input.staffId), resource_id: p.resourceId, addons: p.q.addons, allocations: p.allocs, items: p.items.length > 1 ? p.items : [], package_id: input.packageId || null,
+        total_price: total, deposit_amount: deposit, payment_status: deposit ? 'awaiting' : 'none',
         created_by: 'customer', actor_type: 'customer', actor_id: input.userId,
       },
       p_notices: notices,
@@ -512,7 +517,7 @@ export async function ownerCommand(ownerUserId: string, bookingId: string, comma
   }
 }
 
-const METHODS = ['transfer', 'cash', 'card', 'other'];
+const METHODS = ['transfer', 'cash', 'card', 'other', 'points', 'package'];
 
 async function recordPayment(business: BkBusiness, b: BkBooking, version: number, kind: string, amount: number, method: string, note: string, actorType: string, actor: string) {
   const { data, error } = await db().rpc('bk_record_payment', {

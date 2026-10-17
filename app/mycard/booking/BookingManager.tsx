@@ -226,6 +226,7 @@ function BookingCard({ booking: b, data, reload }: { booking: BkBooking; data: D
             {b.payment_status !== 'none' ? <span className="ml-1 text-[#8a7f72]">({PAYMENT_LABEL[b.payment_status]})</span> : null}
           </p>
         ) : null}
+        {b.package_id ? <p className="text-xs text-[#2f5a3a]">使用套票{b.status === 'completed' ? '(已扣次)' : ['cancelled', 'expired', 'no_show'].includes(b.status) ? '(已退回)' : '(保留 1 次)'}</p> : null}
         {b.payment_status === 'reported' ? <p className="text-xs text-[#1f6f8b]">顧客回報已轉帳,末 5 碼 {b.payment_report?.last5 ?? '—'},請核對後按「收到訂金」</p> : null}
         {b.status === 'pending' && b.expires_at ? <p className="text-xs text-[#9a6412]">{b.approval_status === 'pending' ? '請在' : '訂金期限'} {formatDateTime(b.expires_at)}{b.approval_status === 'pending' ? ' 前確認' : ''},逾時自動取消</p> : null}
         {b.cancel_reason && ['cancelled', 'expired'].includes(b.status) ? <p className="text-xs text-[#8a7f72]">原因:{b.cancel_reason}</p> : null}
@@ -252,6 +253,14 @@ function BookingCard({ booking: b, data, reload }: { booking: BkBooking; data: D
         {['pending', 'confirmed'].includes(b.status) && !started && <button type="button" disabled={busy} onClick={() => setPanel(panel === 'move' ? '' : 'move')} className={btn}>改期</button>}
         {(b.status === 'confirmed' || waitingPay) && !started && <button type="button" disabled={busy} onClick={() => void run('cancel', '取消')} className={`${btn} text-[#a03b3b]`}>取消</button>}
         {b.status !== 'expired' && <button type="button" disabled={busy} onClick={() => setPanel(panel === 'pay' ? '' : 'pay')} className={btn}>收款 / 退款</button>}
+        {data.business.reward_enabled && customer && customer.points > 0 && total > b.paid_amount && ['confirmed', 'checked_in', 'completed'].includes(b.status) ? (
+          <button type="button" disabled={busy} onClick={() => void (async () => {
+            const max = Math.min(customer.points, Math.ceil((total - b.paid_amount) / data.business.point_value));
+            const v = await uiPrompt(`用點數折抵(目前 ${customer.points} 點,1 點 = ${money(data.business.point_value)}),最多 ${max} 點:`, { defaultValue: String(max) });
+            if (v === null) return;
+            await post({ command: 'redeem_points', points: Number(v) || 0 }, '已用點數折抵');
+          })()} className={btn}>點數折抵</button>
+        ) : null}
       </div>
 
       {panel === 'complete' && (

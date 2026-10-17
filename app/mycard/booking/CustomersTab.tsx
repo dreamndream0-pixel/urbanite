@@ -9,6 +9,7 @@ import {
   type BkAttachment, type BkCustomer, type BkServiceRecord, type BookingStatus,
 } from '@/lib/booking/shared';
 import { api, btnDark, btnSm, card, errMsg, input, type Data } from './ui';
+import { LoyaltyPanel } from './LoyaltyParts';
 
 type Row = BkCustomer & { visits: number; last_visit: string | null; upcoming: number; paid_total: number };
 type Detail = {
@@ -129,6 +130,8 @@ function CustomerDetail({ id, data, onBack }: { id: string; data: Data; onBack: 
         <label className="block text-xs text-[#8a7f72]">標籤(用頓號分隔)<input value={form.tags} onChange={(e) => setForm({ ...form, tags: e.target.value })} maxLength={100} placeholder="例:VIP、過敏體質" className={`${input} mt-1`} /></label>
         <div className="flex justify-end"><button type="button" onClick={() => void save()} className={btnDark}>儲存</button></div>
       </section>
+
+      <LoyaltyPanel customerId={id} data={data} />
 
       <section className={`${card} space-y-3`}>
         <div className="flex items-center justify-between gap-2">
