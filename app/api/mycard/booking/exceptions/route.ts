@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic';
 
 const err = (status: number, code: string, message: string) => NextResponse.json({ error: { code, message } }, { status });
 
-// POST /api/mycard/booking/exceptions { start_at, end_at, reason } — 新增休假 / 不開放時段
+// POST /api/mycard/booking/exceptions { start_at, end_at, reason, staff_id } — 新增休假 / 不開放時段(staff_id 空白 = 全店)
 // 回傳與這段時間重疊的有效預約,提醒店家處理(不會自動取消)
 export async function POST(request: Request) {
   const user = await getSessionUser();
@@ -20,12 +20,19 @@ export async function POST(request: Request) {
   if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end <= start) return err(422, 'VALIDATION_ERROR', '請選擇正確的開始與結束時間。');
   if (end.getTime() - start.getTime() > 120 * 86400000) return err(422, 'VALIDATION_ERROR', '一次最多設定 120 天。');
   const db = createAdminClient();
+  let staffId: string | null = body?.staff_id ? String(body.staff_id) : null;
+  if (staffId) {
+    const { data: st } = await db.from('bk_staff').select('id').eq('id', staffId).eq('business_id', business.id).maybeSingle();
+    if (!st) staffId = null;
+  }
   const { data, error } = await db.from('bk_exceptions')
-    .insert({ business_id: business.id, start_at: start.toISOString(), end_at: end.toISOString(), reason: String(body?.reason ?? '').trim().slice(0, 60) })
-    .select('id, start_at, end_at, reason').single();
+    .insert({ business_id: business.id, start_at: start.toISOString(), end_at: end.toISOString(), reason: String(body?.reason ?? '').trim().slice(0, 60), staff_id: staffId })
+    .select('id, start_at, end_at, reason, staff_id').single();
   if (error) return err(400, 'SERVER_ERROR', error.message);
-  const { data: affected } = await db.from('bk_bookings').select('id, booking_no, start_at, end_at, status, contact, service_snapshot')
+  let q = db.from('bk_bookings').select('id, booking_no, start_at, end_at, status, contact, service_snapshot')
     .eq('business_id', business.id).in('status', ['pending', 'confirmed']).lt('start_at', end.toISOString()).gt('occupy_end_at', start.toISOString());
+  if (staffId) q = q.eq('staff_id', staffId);
+  const { data: affected } = await q;
   return NextResponse.json({ exception: data, affected: affected ?? [] }, { status: 201 });
 }
 

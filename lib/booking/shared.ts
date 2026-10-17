@@ -1,7 +1,9 @@
 // 預約系統:前後台共用的型別、顯示文字與時段計算(不含伺服器程式)
 // 時區:v1 只支援 Asia/Taipei(UTC+8,無日光節約),資料庫一律存 UTC timestamptz
 
-export type BookingStatus = 'pending' | 'confirmed' | 'completed' | 'cancelled' | 'no_show' | 'expired';
+export type BookingStatus = 'pending' | 'confirmed' | 'checked_in' | 'completed' | 'cancelled' | 'no_show' | 'expired';
+export type PaymentStatus = 'none' | 'awaiting' | 'reported' | 'deposit_paid' | 'paid' | 'refunded';
+export const ACTIVE_STATUSES: BookingStatus[] = ['pending', 'confirmed', 'checked_in'];
 export type ApprovalStatus = 'not_required' | 'pending' | 'approved' | 'rejected';
 
 export type BkBusiness = {
@@ -22,6 +24,10 @@ export type BkBusiness = {
   notice: string;
   reminder_24h: boolean;
   reminder_2h: boolean;
+  allow_any_staff: boolean;
+  deposit_hours: number;
+  payment_info: string;
+  reschedule_limit: number;
 };
 
 export type BkService = {
@@ -35,16 +41,25 @@ export type BkService = {
   image: string;
   active: boolean;
   sort_order: number;
+  needs_resource: boolean;
+  deposit: number;
 };
 
+export type BkStaff = { id: string; business_id: string; name: string; title: string; avatar: string; active: boolean; use_business_hours: boolean; sort_order: number };
+export type BkStaffHour = { staff_id: string; weekday: number; start_min: number; end_min: number };
+export type BkStaffService = { staff_id: string; service_id: string; duration_minutes: number | null; price: number | null };
+export type BkResource = { id: string; name: string; active: boolean; sort_order: number };
+export type BkAddon = { id: string; service_id: string; name: string; price: number; extra_minutes: number; active: boolean; sort_order: number };
+export type BkPayment = { id: string; booking_id: string; kind: 'deposit' | 'balance' | 'refund'; amount: number; method: 'transfer' | 'cash' | 'card' | 'other'; note: string; created_at: string };
+
 export type BkHour = { weekday: number; start_min: number; end_min: number };
-export type BkException = { id: string; start_at: string; end_at: string; reason: string };
+export type BkException = { id: string; start_at: string; end_at: string; reason: string; staff_id: string | null };
 
 export type BkBooking = {
   id: string;
   business_id: string;
   booking_no: string;
-  customer_user_id: string;
+  customer_user_id: string | null;
   service_id: string | null;
   service_snapshot: { name: string; duration_minutes: number; price: number; price_note?: string };
   start_at: string;
@@ -57,6 +72,17 @@ export type BkBooking = {
   cancel_reason: string;
   version: number;
   created_at: string;
+  staff_id: string | null;
+  staff_requested: boolean;
+  resource_id: string | null;
+  addons: { id: string; name: string; price: number; extra_minutes: number }[];
+  total_price: number;
+  deposit_amount: number;
+  paid_amount: number;
+  payment_status: PaymentStatus;
+  payment_report: { last5?: string; amount?: number; note?: string; at?: string };
+  reschedule_count: number;
+  created_by: 'customer' | 'owner';
 };
 
 export const DEFAULT_BUSINESS: Omit<BkBusiness, 'id' | 'owner_user_id' | 'card_id'> = {
@@ -74,11 +100,16 @@ export const DEFAULT_BUSINESS: Omit<BkBusiness, 'id' | 'owner_user_id' | 'card_i
   notice: '',
   reminder_24h: true,
   reminder_2h: true,
+  allow_any_staff: true,
+  deposit_hours: 24,
+  payment_info: '',
+  reschedule_limit: 1,
 };
 
 export const STATUS_LABEL: Record<BookingStatus, string> = {
   pending: '待確認',
   confirmed: '已確認',
+  checked_in: '已報到',
   completed: '已完成',
   cancelled: '已取消',
   no_show: '未到',
@@ -88,11 +119,32 @@ export const STATUS_LABEL: Record<BookingStatus, string> = {
 export const STATUS_COLOR: Record<BookingStatus, string> = {
   pending: 'bg-[#fff3df] text-[#9a6412]',
   confirmed: 'bg-[#e7f3ea] text-[#2f6b3f]',
+  checked_in: 'bg-[#e3eef6] text-[#1f5f7f]',
   completed: 'bg-[#eef0f5] text-[#4a5573]',
   cancelled: 'bg-[#f3ece9] text-[#8a5a50]',
   no_show: 'bg-[#f6e6e6] text-[#a03b3b]',
   expired: 'bg-[#f1efec] text-[#8a7f72]',
 };
+
+export const PAYMENT_LABEL: Record<PaymentStatus, string> = {
+  none: '',
+  awaiting: '待付訂金',
+  reported: '顧客已回報轉帳',
+  deposit_paid: '已收訂金',
+  paid: '已付清',
+  refunded: '已退款',
+};
+
+// 預約畫面上的狀態文字:主流程 + 審核 + 收款組合而成(規格 9 章)
+export function statusText(b: Pick<BkBooking, 'status' | 'approval_status' | 'payment_status'>) {
+  if (b.status !== 'pending') return STATUS_LABEL[b.status];
+  if (b.approval_status === 'pending') return '待店家確認';
+  if (b.payment_status === 'reported') return '待店家核對訂金';
+  if (b.payment_status === 'awaiting') return '待付訂金';
+  return STATUS_LABEL.pending;
+}
+
+export const PAY_METHOD_LABEL = { transfer: '轉帳', cash: '現金', card: '刷卡', other: '其他' } as const;
 
 export const WEEKDAYS = ['日', '一', '二', '三', '四', '五', '六'];
 
@@ -163,6 +215,8 @@ export function computeSlots(opts: {
   hours: BkHour[];
   exceptions: { start_at: string; end_at: string }[];
   busy: { start_at: string; occupy_end_at: string }[];
+  // 需要床位時:每張床位各自的占用;任一張有空就可約(空陣列 = 不檢查床位)
+  pools?: { start_at: string; occupy_end_at: string }[][];
   duration: number;
   fromDate: string;
   days: number;
@@ -176,6 +230,7 @@ export function computeSlots(opts: {
     ...opts.exceptions.map((x) => ({ start: new Date(x.start_at).getTime(), end: new Date(x.end_at).getTime() })),
     ...opts.busy.map((x) => ({ start: new Date(x.start_at).getTime(), end: new Date(x.occupy_end_at).getTime() })),
   ];
+  const pools: Range[][] = (opts.pools ?? []).map((p) => p.map((x) => ({ start: new Date(x.start_at).getTime(), end: new Date(x.occupy_end_at).getTime() })));
   const earliest = now + lead_minutes * 60000;
   const out: { date: string; slots: string[]; closed: boolean }[] = [];
   for (let i = 0; i < opts.days; i++) {
@@ -190,6 +245,7 @@ export function computeSlots(opts: {
         if (start < earliest) continue;
         const occupyEnd = start + (opts.duration + buffer_minutes) * 60000;
         if (blocked.some((b) => b.start < occupyEnd && start < b.end)) continue;
+        if (pools.length && !pools.some((p) => !p.some((b) => b.start < occupyEnd && start < b.end))) continue;
         const label = minutesToHHMM(t);
         if (!slots.includes(label)) slots.push(label);
       }

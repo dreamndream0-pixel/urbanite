@@ -23,6 +23,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
       slug: decodeURIComponent(slug),
       userId: user.id,
       serviceId: String(body?.service_id ?? ''),
+      addonIds: Array.isArray(body?.addon_ids) ? (body.addon_ids as unknown[]).map(String).slice(0, 20) : [],
+      staffId: body?.staff_id ? String(body.staff_id) : null,
       startAt: String(body?.start_at ?? ''),
       contact: { name, phone, note: String(body?.contact?.note ?? '') },
       idempotencyKey: request.headers.get('Idempotency-Key') ?? String(body?.idempotency_key ?? ''),
@@ -32,7 +34,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
     return NextResponse.json({
       booking_id: booking.id, booking_no: booking.booking_no, status: booking.status, approval_status: booking.approval_status,
       start_at: booking.start_at, end_at: booking.end_at, expires_at: booking.expires_at, version: booking.version,
-      next_action: booking.status === 'pending' ? 'wait_approval' : 'none', server_time: new Date().toISOString(),
+      deposit_amount: booking.deposit_amount, payment_status: booking.payment_status, total_price: booking.total_price,
+      next_action: booking.status !== 'pending' ? 'none' : booking.approval_status === 'pending' ? 'wait_approval' : 'pay_deposit', server_time: new Date().toISOString(),
     }, { status: 201 });
   } catch (e) {
     if (e instanceof BookingError) return fail(e);

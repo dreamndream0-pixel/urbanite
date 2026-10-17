@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getSessionUser } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { ownerBusiness } from '@/lib/booking/server';
+import { loadSchedule, ownerBusiness } from '@/lib/booking/server';
 import { DEFAULT_BUSINESS, localParts } from '@/lib/booking/shared';
 import { scopedClient, URBANITE_SHOP_ID } from '@/lib/shop';
 
@@ -9,24 +9,27 @@ export const dynamic = 'force-dynamic';
 
 const unauthorized = () => NextResponse.json({ error: { code: 'AUTH_REQUIRED', message: '請先登入。' } }, { status: 401 });
 
-// GET /api/mycard/booking — 名片主人的預約設定、服務、營業時段、休假、近期預約
+// GET /api/mycard/booking — 名片主人的預約設定、服務、加購、人員、班表、床位、營業時段、休假、近期預約與收款紀錄
 export async function GET() {
   const user = await getSessionUser();
   if (!user) return unauthorized();
   const db = createAdminClient();
   const business = await ownerBusiness(user.id, true);
   if (!business) return NextResponse.json({ error: { code: 'SERVER_ERROR', message: '無法建立預約設定。' } }, { status: 500 });
-  const since = new Date(Date.now() - 14 * 86400000).toISOString();
-  const [{ data: services }, { data: hours }, { data: exceptions }, { data: bookings }, { data: card }, { data: me }] = await Promise.all([
-    db.from('bk_services').select('*').eq('business_id', business.id).order('sort_order').order('created_at'),
-    db.from('bk_hours').select('weekday, start_min, end_min').eq('business_id', business.id).order('weekday').order('start_min'),
-    db.from('bk_exceptions').select('id, start_at, end_at, reason').eq('business_id', business.id).gte('end_at', new Date().toISOString()).order('start_at'),
-    db.from('bk_bookings').select('*').eq('business_id', business.id).gte('start_at', since).order('start_at').limit(300),
+  const since = new Date(Date.now() - 30 * 86400000).toISOString();
+  const [sched, { data: exceptions }, { data: bookings }, { data: card }, { data: me }] = await Promise.all([
+    loadSchedule(business.id, true),
+    db.from('bk_exceptions').select('id, start_at, end_at, reason, staff_id').eq('business_id', business.id).gte('end_at', new Date().toISOString()).order('start_at'),
+    db.from('bk_bookings').select('*').eq('business_id', business.id).gte('start_at', since).order('start_at').limit(500),
     db.from('profile_cards').select('slug, display_name').eq('owner_user_id', user.id).maybeSingle(),
     scopedClient(URBANITE_SHOP_ID).from('customers').select('line_user_id').eq('user_id', user.id).maybeSingle(),
   ]);
+  const ids = (bookings ?? []).map((b) => b.id);
+  const { data: payments } = ids.length
+    ? await db.from('bk_payments').select('id, booking_id, kind, amount, method, note, created_at').in('booking_id', ids).order('created_at')
+    : { data: [] };
   return NextResponse.json({
-    business, services: services ?? [], hours: hours ?? [], exceptions: exceptions ?? [], bookings: bookings ?? [],
+    business, ...sched, exceptions: exceptions ?? [], bookings: bookings ?? [], payments: payments ?? [],
     card: card ?? null, line_bound: Boolean(me?.line_user_id), today: localParts(new Date()).date,
   }, { headers: { 'Cache-Control': 'no-store' } });
 }
@@ -61,6 +64,10 @@ export async function PUT(request: Request) {
       notice: String(b.notice ?? '').trim().slice(0, 1000),
       reminder_24h: b.reminder_24h === undefined ? business.reminder_24h : Boolean(b.reminder_24h),
       reminder_2h: b.reminder_2h === undefined ? business.reminder_2h : Boolean(b.reminder_2h),
+      allow_any_staff: b.allow_any_staff === undefined ? business.allow_any_staff : Boolean(b.allow_any_staff),
+      deposit_hours: int(b.deposit_hours, 1, 168, business.deposit_hours),
+      payment_info: String(b.payment_info ?? business.payment_info ?? '').trim().slice(0, 300),
+      reschedule_limit: int(b.reschedule_limit, 0, 5, business.reschedule_limit),
       updated_at: new Date().toISOString(),
     };
     const { error } = await db.from('bk_businesses').update(patch).eq('id', business.id);

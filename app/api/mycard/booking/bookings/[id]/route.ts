@@ -1,17 +1,31 @@
 import { after, NextResponse } from 'next/server';
 import { getSessionUser } from '@/lib/supabase/server';
-import { BookingError, ownerCommand, processBookingJobs } from '@/lib/booking/server';
+import { BookingError, ownerCommand, ownerPayment, ownerReschedule, processBookingJobs } from '@/lib/booking/server';
 
 export const dynamic = 'force-dynamic';
 
-// POST /api/mycard/booking/bookings/[id] { command: approve|reject|cancel|complete|no_show, expected_version, reason }
+// POST /api/mycard/booking/bookings/[id]
+// { command: approve|reject|cancel|check_in|complete|no_show, expected_version, reason, balance?: { amount, method } }
+// { command: 'payment', expected_version, kind: deposit|balance|refund, amount, method, note }
+// { command: 'reschedule', expected_version, start_at, staff_id }
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const user = await getSessionUser();
   if (!user) return NextResponse.json({ error: { code: 'AUTH_REQUIRED', message: '請先登入。' } }, { status: 401 });
   const { id } = await params;
   const body = await request.json().catch(() => ({}));
+  const version = Number(body?.expected_version);
   try {
-    const booking = await ownerCommand(user.id, id, body?.command, Number(body?.expected_version), String(body?.reason ?? ''));
+    let booking;
+    if (body?.command === 'payment') {
+      booking = await ownerPayment(user.id, id, version, {
+        kind: String(body?.kind ?? ''), amount: Math.round(Number(body?.amount) || 0), method: String(body?.method ?? 'transfer'), note: String(body?.note ?? ''),
+      });
+    } else if (body?.command === 'reschedule') {
+      booking = await ownerReschedule(user.id, id, version, String(body?.start_at ?? ''), body?.staff_id ? String(body.staff_id) : null);
+    } else {
+      const balance = body?.balance && Number(body.balance.amount) > 0 ? { amount: Math.round(Number(body.balance.amount)), method: String(body.balance.method ?? 'cash') } : undefined;
+      booking = await ownerCommand(user.id, id, body?.command, version, String(body?.reason ?? ''), balance);
+    }
     after(() => processBookingJobs().catch((e) => console.error('booking jobs', e)));
     return NextResponse.json(booking);
   } catch (e) {
