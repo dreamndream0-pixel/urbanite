@@ -28,6 +28,8 @@ export type BkBusiness = {
   deposit_hours: number;
   payment_info: string;
   reschedule_limit: number;
+  travel_minutes: number;
+  service_area: string;
 };
 
 export type BkService = {
@@ -43,6 +45,8 @@ export type BkService = {
   sort_order: number;
   needs_resource: boolean;
   deposit: number;
+  price_mode: 'fixed' | 'quote';      // quote = 需報價(先詢價)
+  service_mode: 'in_store' | 'outcall'; // outcall = 外出服務(加交通時間)
 };
 
 export type BkStaff = { id: string; business_id: string; name: string; title: string; avatar: string; active: boolean; use_business_hours: boolean; sort_order: number; role: 'stylist' | 'assistant' };
@@ -90,7 +94,20 @@ export type BkBooking = {
   payment_report: { last5?: string; amount?: number; note?: string; at?: string };
   reschedule_count: number;
   created_by: 'customer' | 'owner';
+  quote_id?: string | null;
 };
+
+export type QuoteStatus = 'requested' | 'sent' | 'accepted' | 'declined' | 'cancelled';
+export type QuoteRequest = { event_date: string; time: string; event_type: string; address: string; people: string; note: string; images: string[] };
+export type BkQuote = {
+  id: string; business_id: string; quote_no: string; customer_user_id: string; service_id: string | null; service_name: string; staff_id: string | null;
+  status: QuoteStatus; request: QuoteRequest; contact: { name?: string; phone?: string }; current_version: number; booking_id: string | null; version: number; created_at: string;
+};
+export type BkQuoteVersion = {
+  id: string; quote_id: string; version: number; items: { name: string; amount: number }[]; total: number; deposit: number; staff_id: string | null;
+  start_at: string; minutes: number; travel_minutes: number; valid_until: string; hold_until: string | null; note: string; created_at: string;
+};
+export const QUOTE_STATUS_LABEL: Record<QuoteStatus, string> = { requested: '待報價', sent: '已報價', accepted: '已接受', declined: '已婉拒', cancelled: '已取消' };
 
 export const DEFAULT_BUSINESS: Omit<BkBusiness, 'id' | 'owner_user_id' | 'card_id'> = {
   name: '',
@@ -111,6 +128,8 @@ export const DEFAULT_BUSINESS: Omit<BkBusiness, 'id' | 'owner_user_id' | 'card_i
   deposit_hours: 24,
   payment_info: '',
   reschedule_limit: 1,
+  travel_minutes: 60,
+  service_area: '',
 };
 
 export const STATUS_LABEL: Record<BookingStatus, string> = {
@@ -143,9 +162,9 @@ export const PAYMENT_LABEL: Record<PaymentStatus, string> = {
 };
 
 // 預約畫面上的狀態文字:主流程 + 審核 + 收款組合而成(規格 9 章)
-export function statusText(b: Pick<BkBooking, 'status' | 'approval_status' | 'payment_status'>) {
+export function statusText(b: Pick<BkBooking, 'status' | 'approval_status' | 'payment_status'> & { quote_id?: string | null }) {
   if (b.status !== 'pending') return STATUS_LABEL[b.status];
-  if (b.approval_status === 'pending') return '待店家確認';
+  if (b.approval_status === 'pending') return b.quote_id ? '報價保留中' : '待店家確認';
   if (b.payment_status === 'reported') return '待店家核對訂金';
   if (b.payment_status === 'awaiting') return '待付訂金';
   return STATUS_LABEL.pending;

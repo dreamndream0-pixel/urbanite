@@ -25,13 +25,18 @@ export async function GET() {
     scopedClient(URBANITE_SHOP_ID).from('customers').select('line_user_id').eq('user_id', user.id).maybeSingle(),
   ]);
   const ids = (bookings ?? []).map((b) => b.id);
+  // 詢價單:未結案的全部 + 近 60 天結案的
+  const { data: quotes } = await db.from('bk_quotes').select('*').eq('business_id', business.id)
+    .or(`status.in.(requested,sent),created_at.gte.${new Date(Date.now() - 60 * 86400000).toISOString()}`).order('created_at', { ascending: false }).limit(100);
+  const qids = (quotes ?? []).map((q) => q.id);
+  const { data: quoteVersions } = qids.length ? await db.from('bk_quote_versions').select('*').in('quote_id', qids).order('version') : { data: [] };
   const [{ data: payments }, { data: allocations }, { data: items }] = ids.length ? await Promise.all([
     db.from('bk_payments').select('id, booking_id, kind, amount, method, note, created_at').in('booking_id', ids).order('created_at'),
     db.from('bk_allocations').select('id, booking_id, staff_id, resource_id, role, start_at, end_at, item_seq').eq('business_id', business.id).eq('active', true).gte('end_at', since).order('start_at'),
     db.from('bk_booking_items').select('id, booking_id, seq, service_id, service_snapshot, staff_id, start_at, end_at, amount, status').in('booking_id', ids).order('seq'),
   ]) : [{ data: [] }, { data: [] }, { data: [] }];
   return NextResponse.json({
-    business, ...sched, exceptions: exceptions ?? [], bookings: bookings ?? [], payments: payments ?? [], allocations: allocations ?? [], items: items ?? [],
+    business, ...sched, exceptions: exceptions ?? [], bookings: bookings ?? [], payments: payments ?? [], allocations: allocations ?? [], items: items ?? [], quotes: quotes ?? [], quoteVersions: quoteVersions ?? [],
     card: card ?? null, line_bound: Boolean(me?.line_user_id), today: localParts(new Date()).date,
   }, { headers: { 'Cache-Control': 'no-store' } });
 }
@@ -70,6 +75,8 @@ export async function PUT(request: Request) {
       deposit_hours: int(b.deposit_hours, 1, 168, business.deposit_hours),
       payment_info: String(b.payment_info ?? business.payment_info ?? '').trim().slice(0, 300),
       reschedule_limit: int(b.reschedule_limit, 0, 5, business.reschedule_limit),
+      travel_minutes: int(b.travel_minutes, 0, 240, business.travel_minutes),
+      service_area: String(b.service_area ?? business.service_area ?? '').trim().slice(0, 120),
       updated_at: new Date().toISOString(),
     };
     const { error } = await db.from('bk_businesses').update(patch).eq('id', business.id);

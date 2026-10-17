@@ -9,8 +9,9 @@ import {
 } from '@/lib/booking/shared';
 import { api, btn, btnDark, btnSm, card, errMsg, input, isTeam, stylists, type Data } from './ui';
 import { HoursTab, ServicesTab, SettingsTab, StaffTab } from './BookingSetup';
+import QuotesTab from './QuotesTab';
 
-type Tab = 'bookings' | 'calendar' | 'services' | 'staff' | 'hours' | 'settings';
+type Tab = 'bookings' | 'calendar' | 'quotes' | 'services' | 'staff' | 'hours' | 'settings';
 const OPEN = ['pending', 'confirmed', 'checked_in'];
 
 // 名片主人:線上預約管理
@@ -26,7 +27,9 @@ export default function BookingManager() {
   useEffect(() => { void Promise.resolve().then(load); }, [load]);
 
   if (!data) return <p className="py-16 text-center text-sm text-[#8a7f72]">{loadError || '讀取中…'}</p>;
-  const pending = data.bookings.filter((b) => b.status === 'pending').length;
+  const pending = data.bookings.filter((b) => b.status === 'pending' && !(b.quote_id && b.approval_status === 'pending')).length;
+  const quoteWaiting = data.quotes.filter((q) => q.status === 'requested').length;
+  const hasQuote = quoteWaiting > 0 || data.quotes.length > 0 || data.services.some((s) => s.price_mode === 'quote');
   const activeServices = data.services.filter((s) => s.active).length;
   const hasHours = data.hours.length > 0 || data.staffHours.length > 0;
   const ready = activeServices > 0 && hasHours;
@@ -43,8 +46,9 @@ export default function BookingManager() {
   }
 
   const tabs: [Tab, string][] = [
-    ['bookings', `預約${pending ? `(${pending})` : ''}`], ['calendar', '日曆'], ['services', '服務'],
-    ['staff', '人員床位'], ['hours', '營業時段'], ['settings', '設定'],
+    ['bookings', `預約${pending ? `(${pending})` : ''}`], ['calendar', '日曆'],
+    ...(hasQuote ? [['quotes', `詢價${quoteWaiting ? `(${quoteWaiting})` : ''}`] as [Tab, string]] : []),
+    ['services', '服務'], ['staff', '人員床位'], ['hours', '營業時段'], ['settings', '設定'],
   ];
 
   return (
@@ -86,7 +90,7 @@ export default function BookingManager() {
         </div>
       </section>
 
-      <div className="grid grid-cols-3 gap-1 rounded-2xl border border-[#e5ded4] bg-white p-1 sm:grid-cols-6">
+      <div className={`grid gap-1 rounded-2xl border border-[#e5ded4] bg-white p-1 ${tabs.length > 6 ? 'grid-cols-4 sm:grid-cols-7' : 'grid-cols-3 sm:grid-cols-6'}`}>
         {tabs.map(([k, label]) => (
           <button key={k} type="button" onClick={() => setTab(k)} className={`rounded-xl px-1 py-2 text-sm ${tab === k ? 'bg-[#1f1b19] font-semibold text-white' : 'text-[#6b6156]'}`}>{label}</button>
         ))}
@@ -94,6 +98,7 @@ export default function BookingManager() {
 
       {tab === 'bookings' && <BookingsTab data={data} reload={load} />}
       {tab === 'calendar' && <CalendarTab data={data} reload={load} />}
+      {tab === 'quotes' && <QuotesTab data={data} reload={load} />}
       {tab === 'services' && <ServicesTab data={data} reload={load} />}
       {tab === 'staff' && <StaffTab data={data} reload={load} />}
       {tab === 'hours' && <HoursTab data={data} reload={load} />}
@@ -229,7 +234,8 @@ function BookingCard({ booking: b, data, reload }: { booking: BkBooking; data: D
       </div>
 
       <div className="mt-3 flex flex-wrap gap-2">
-        {b.status === 'pending' && b.approval_status === 'pending' && <>
+        {b.quote_id && b.status === 'pending' && b.approval_status === 'pending' ? <p className="w-full text-xs text-[#1f5f7f]">報價暫保留中,等顧客接受(到「詢價」修改或取消)</p> : null}
+        {b.status === 'pending' && b.approval_status === 'pending' && !b.quote_id && <>
           <button type="button" disabled={busy} onClick={() => void run('approve', '確認')} className={btnDark}>確認預約</button>
           <button type="button" disabled={busy} onClick={() => void run('reject', '婉拒')} className={btn}>婉拒</button>
         </>}

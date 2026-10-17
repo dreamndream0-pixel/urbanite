@@ -254,14 +254,14 @@ export async function availability(business: BkBusiness, sched: Schedule, req: S
   return { days: merged, byStaff, service, occ, chains };
 }
 
-function bookingNo() {
+export function bookingNo(prefix = 'BK') {
   const { date } = localParts(new Date());
-  return `BK-${date.replace(/-/g, '')}-${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
+  return `${prefix}-${date.replace(/-/g, '')}-${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
 }
 
-type Notice = { event: string; audience: 'customer' | 'owner'; due_at?: string };
+export type Notice = { event: string; audience: 'customer' | 'owner'; due_at?: string };
 
-function reminderNotices(business: Pick<BkBusiness, 'reminder_24h' | 'reminder_2h'>, startIso: string): Notice[] {
+export function reminderNotices(business: Pick<BkBusiness, 'reminder_24h' | 'reminder_2h'>, startIso: string): Notice[] {
   const start = new Date(startIso).getTime();
   const soon = Date.now() + 5 * 60000;
   const list: Notice[] = [];
@@ -272,17 +272,18 @@ function reminderNotices(business: Pick<BkBusiness, 'reminder_24h' | 'reminder_2
 }
 
 // 訂金轉帳期限:店家設定的小時數內,且不晚於服務前 1 小時;至少給 30 分鐘
-function payDeadline(business: BkBusiness, startMs: number) {
+export function payDeadline(business: BkBusiness, startMs: number) {
   const latest = startMs - 60 * 60000;
   return Math.max(Date.now() + 30 * 60000, Math.min(Date.now() + business.deposit_hours * 3600000, latest));
 }
 
-function rpcError(message: string): BookingError {
+export function rpcError(message: string): BookingError {
   if (message.includes('SLOT_UNAVAILABLE')) return new BookingError('SLOT_UNAVAILABLE', '這個時段剛被預約,請重新選擇。', 409);
   if (message.includes('VERSION_CONFLICT')) return new BookingError('VERSION_CONFLICT', '預約內容已經更新,請重新整理後再操作。', 409);
   if (message.includes('INVALID_STATE')) return new BookingError('INVALID_STATE', '目前的預約狀態不能執行這個操作。', 409);
   if (message.includes('VALIDATION_ERROR')) return new BookingError('VALIDATION_ERROR', '金額不正確。', 422);
-  if (message.includes('NOT_FOUND')) return new BookingError('NOT_FOUND', '找不到這筆預約。', 404);
+  if (message.includes('QUOTE_EXPIRED')) return new BookingError('QUOTE_EXPIRED', '這份報價已過期,請聯絡店家重新報價。', 409);
+  if (message.includes('NOT_FOUND')) return new BookingError('NOT_FOUND', '找不到這筆資料。', 404);
   return new BookingError('SERVER_ERROR', '預約處理失敗,請稍後再試。', 500);
 }
 
@@ -369,6 +370,7 @@ export async function createBooking(input: {
   const sched = await loadSchedule(business.id);
   const service = sched.services.find((s) => s.id === input.serviceId);
   if (!service) throw new BookingError('VALIDATION_ERROR', '這個服務目前無法預約。', 422);
+  if (service.price_mode === 'quote') throw new BookingError('VALIDATION_ERROR', '這項服務需要先詢價。', 422);
   if (!input.staffId && !business.allow_any_staff && staffForService(sched, service.id).length > 1) throw new BookingError('VALIDATION_ERROR', '請選擇服務人員。', 422);
   const start = new Date(input.startAt);
   if (Number.isNaN(start.getTime())) throw new BookingError('VALIDATION_ERROR', '時間格式錯誤。', 422);
@@ -684,6 +686,7 @@ const TITLES: Record<string, { customer?: string; owner?: string; color: string 
   confirmed: { customer: '預約已確認', color: '#2f6b3f' },
   rejected: { customer: '預約未成立', color: '#8a5a50' },
   rescheduled: { customer: '預約時間已更改', owner: '顧客更改了預約時間', color: '#1f6f8b' },
+  quote_accepted: { owner: '顧客接受了報價', color: '#2f6b3f' },
   item_cancelled: { customer: '店家調整了預約的服務項目', color: '#8a5a50' },
   cancelled_by_owner: { customer: '店家已取消你的預約', color: '#8a5a50' },
   cancelled_by_customer: { owner: '顧客取消了預約', color: '#8a5a50' },
@@ -691,6 +694,71 @@ const TITLES: Record<string, { customer?: string; owner?: string; color: string 
   reminder_24h: { customer: '明天的預約提醒', color: '#1f6f8b' },
   reminder_2h: { customer: '預約即將開始', color: '#1f6f8b' },
 };
+
+// 詢價單的通知(還沒有預約時):新詢價、報價送達、婉拒 / 取消
+const QUOTE_TITLES: Record<string, { customer?: string; owner?: string; color: string }> = {
+  quote_requested: { owner: '你有一筆新的詢價', color: '#1f6f8b' },
+  quote_sent: { customer: '店家已回覆報價', color: '#b07a1f' },
+  quote_declined: { owner: '顧客婉拒了報價', color: '#8a5a50' },
+  quote_cancelled: { customer: '店家已取消這筆詢價', color: '#8a5a50' },
+};
+
+async function pushLine(token: string, retryKey: string, to: string, message: unknown): Promise<{ state: 'api_accepted' | 'retry' | 'failed'; error?: string }> {
+  try {
+    const res = await fetch('https://api.line.me/v2/bot/message/push', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', 'X-Line-Retry-Key': retryKey },
+      body: JSON.stringify({ to, messages: [message] }),
+    });
+    if (res.ok || res.status === 409) return { state: 'api_accepted' };
+    return { state: res.status === 429 || res.status >= 500 ? 'retry' : 'failed', error: `line_${res.status}` };
+  } catch {
+    return { state: 'retry', error: 'network' };
+  }
+}
+
+async function deliverQuote(row: OutboxRow, token: string): Promise<{ state: 'api_accepted' | 'skipped' | 'retry' | 'failed'; error?: string }> {
+  const { data: q } = await db().from('bk_quotes').select('*').eq('id', row.quote_id!).maybeSingle();
+  if (!q) return { state: 'skipped', error: 'quote_missing' };
+  const meta = QUOTE_TITLES[row.event];
+  const title = meta?.[row.audience];
+  if (!meta || !title) return { state: 'skipped', error: 'no_template' };
+  const { data: business } = await db().from('bk_businesses').select('owner_user_id, name, card_id').eq('id', q.business_id).single();
+  const recipient = row.audience === 'owner' ? business?.owner_user_id : q.customer_user_id;
+  const lineId = recipient ? await lineUserIdOf(recipient) : null;
+  if (!lineId) return { state: 'skipped', error: 'no_line' };
+  const { data: card } = business?.card_id ? await db().from('profile_cards').select('slug, display_name').eq('id', business.card_id).maybeSingle() : { data: null };
+  const { data: v } = q.current_version ? await db().from('bk_quote_versions').select('*').eq('quote_id', q.id).eq('version', q.current_version).maybeSingle() : { data: null };
+  const site = getConfiguredSiteUrl();
+  const businessName = business?.name || card?.display_name || '';
+  const req = (q.request ?? {}) as { event_date?: string; time?: string; event_type?: string };
+  const row2 = (k: string, val: string) => ({ type: 'box', layout: 'baseline', spacing: 'sm', contents: [
+    { type: 'text', text: k, size: 'sm', color: '#8a7f72', flex: 2 },
+    { type: 'text', text: val || '—', size: 'sm', color: '#1f1b19', flex: 5, wrap: true },
+  ] });
+  const body = [
+    row2('服務', q.service_name),
+    row2('活動日', [req.event_date, req.time].filter(Boolean).join(' ')),
+    ...(req.event_type ? [row2('類型', req.event_type)] : []),
+    ...(v && row.event === 'quote_sent' ? [row2('報價', money(v.total)), ...(v.deposit ? [row2('訂金', money(v.deposit))] : []), row2('有效至', formatDateTime(v.valid_until))] : []),
+    row2('編號', q.quote_no),
+  ];
+  const message = {
+    type: 'flex', altText: `【${businessName}】${title}`.slice(0, 300),
+    contents: {
+      type: 'bubble',
+      header: { type: 'box', layout: 'vertical', backgroundColor: meta.color, paddingAll: '16px', contents: [
+        { type: 'text', text: businessName || 'URBANLINKS 預約', size: 'xs', color: '#ffffffcc' },
+        { type: 'text', text: title, size: 'lg', weight: 'bold', color: '#ffffff', wrap: true, margin: 'sm' },
+      ] },
+      body: { type: 'box', layout: 'vertical', spacing: 'md', contents: body },
+      footer: { type: 'box', layout: 'vertical', contents: [
+        { type: 'button', style: 'primary', color: '#1f1b19', height: 'sm', action: { type: 'uri', label: row.audience === 'owner' ? '到後台處理' : '查看報價', uri: row.audience === 'owner' ? `${site}/mycard/booking` : `${site}/@${card?.slug ?? ''}/book?tab=my` } },
+      ] },
+    },
+  };
+  return pushLine(token, row.id, lineId, message);
+}
 
 async function lineUserIdOf(userId: string) {
   const { data } = await scopedClient(URBANITE_SHOP_ID).from('customers').select('line_user_id').eq('user_id', userId).maybeSingle();
@@ -732,9 +800,10 @@ function flexMessage(opts: { title: string; color: string; businessName: string;
   };
 }
 
-type OutboxRow = { id: string; booking_id: string; booking_version: number; event: string; audience: 'customer' | 'owner'; attempts: number; due_at: string };
+type OutboxRow = { id: string; booking_id: string | null; quote_id: string | null; booking_version: number; event: string; audience: 'customer' | 'owner'; attempts: number; due_at: string };
 
 async function deliver(row: OutboxRow, token: string): Promise<{ state: 'api_accepted' | 'skipped' | 'retry' | 'failed'; error?: string }> {
+  if (!row.booking_id) return row.quote_id ? deliverQuote(row, token) : { state: 'skipped', error: 'no_target' };
   const { data: booking } = await db().from('bk_bookings').select('*').eq('id', row.booking_id).maybeSingle();
   if (!booking) return { state: 'skipped', error: 'booking_missing' };
   const b = booking as BkBooking;
@@ -841,7 +910,7 @@ export function publicCatalog(sched: Schedule) {
   return {
     services: sched.services.map((s) => ({
       id: s.id, name: s.name, description: s.description, duration_minutes: s.duration_minutes, price: s.price, price_note: s.price_note,
-      image: s.image, deposit: s.deposit,
+      image: s.image, deposit: s.deposit, price_mode: s.price_mode, service_mode: s.service_mode,
       steps: stepsOf(sched, s.id).map((st) => ({ name: st.name, minutes: st.minutes, who: st.who })),
       addons: sched.addons.filter((a) => a.service_id === s.id).map((a) => ({ id: a.id, name: a.name, price: a.price, extra_minutes: a.extra_minutes })),
       staff: staffForService(sched, s.id).map((st) => {

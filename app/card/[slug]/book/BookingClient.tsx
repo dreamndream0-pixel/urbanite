@@ -14,9 +14,16 @@ type ServiceStaff = { id: string; duration_minutes: number; price: number };
 type Service = {
   id: string; name: string; description: string; duration_minutes: number; price: number; price_note: string; image: string;
   deposit: number; addons: Addon[]; staff: ServiceStaff[]; steps: { name: string; minutes: number; who: 'main' | 'assistant' | 'none' }[];
+  price_mode: 'fixed' | 'quote'; service_mode: 'in_store' | 'outcall';
 };
 type Staff = { id: string; name: string; title: string; avatar: string };
-type Business = { name: string; address: string; notice: string; approval_mode: 'auto' | 'manual'; cancel_hours: number; allow_any_staff: boolean; payment_info: string; open: boolean };
+type Business = { name: string; address: string; notice: string; approval_mode: 'auto' | 'manual'; cancel_hours: number; allow_any_staff: boolean; payment_info: string; service_area: string; open: boolean };
+type MyQuote = {
+  id: string; quote_no: string; service_name: string; status: 'requested' | 'sent' | 'accepted' | 'declined' | 'cancelled'; current_version: number; created_at: string;
+  request: { event_date: string; time: string; event_type: string; address: string };
+  business: { name: string; slug: string };
+  offer: { version: number; items: { name: string; amount: number }[]; total: number; deposit: number; start_at: string; minutes: number; valid_until: string; hold_until: string | null; note: string } | null;
+};
 type MyBooking = {
   id: string; booking_no: string; status: BookingStatus; approval_status: ApprovalStatus; payment_status: PaymentStatus;
   start_at: string; end_at: string; expires_at: string | null; version: number; staff_name: string;
@@ -49,13 +56,14 @@ export default function BookingClient({ slug, card, business, services, staff }:
   const [time, setTime] = useState('');
   const [days, setDays] = useState<Day[] | null>(null);
   const [loadingSlots, setLoadingSlots] = useState(false);
-  const [auth, setAuth] = useState<{ loggedIn: boolean; lineBound: boolean; bookings: MyBooking[] } | null>(null);
+  const [auth, setAuth] = useState<{ loggedIn: boolean; lineBound: boolean; bookings: MyBooking[]; quotes: MyQuote[] } | null>(null);
   const [contact, setContact] = useState({ name: '', phone: '', note: '' });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [result, setResult] = useState<Result | null>(null);
   const idemKey = useRef('');
   const service = services.find((s) => s.id === serviceId) ?? null;
+  const isQuote = service?.price_mode === 'quote';
   const here = `/@${slug}/book`;
 
   // 這個服務可選的人員;只有一位時不顯示人員步驟
@@ -84,10 +92,11 @@ export default function BookingClient({ slug, card, business, services, staff }:
   // 登入狀態與我的預約(也用來帶入上次填的聯絡資料)
   const loadMine = useCallback(async () => {
     const res = await fetch('/api/booking/my', { cache: 'no-store' });
-    if (res.status === 401) { setAuth({ loggedIn: false, lineBound: false, bookings: [] }); return; }
+    if (res.status === 401) { setAuth({ loggedIn: false, lineBound: false, bookings: [], quotes: [] }); return; }
     const data = await res.json().catch(() => null);
     const bookings = ((data?.bookings ?? []) as MyBooking[]).filter((b) => b.business.slug === slug);
-    setAuth({ loggedIn: true, lineBound: Boolean(data?.line_bound), bookings });
+    const quotes = ((data?.quotes ?? []) as MyQuote[]).filter((q) => q.business.slug === slug);
+    setAuth({ loggedIn: true, lineBound: Boolean(data?.line_bound), bookings, quotes });
     const last = (data?.bookings ?? [])[0] as MyBooking | undefined;
     if (last?.contact) setContact((c) => (c.name || c.phone ? c : { name: last.contact.name ?? '', phone: last.contact.phone ?? '', note: '' }));
   }, [slug]);
@@ -237,7 +246,7 @@ export default function BookingClient({ slug, card, business, services, staff }:
                       {s.image ? <img src={s.image} alt="" className="h-14 w-14 shrink-0 rounded-xl object-cover" /> : null}
                       <span className="min-w-0 flex-1">
                         <span className="block text-sm font-semibold">{s.name}</span>
-                        <span className="mt-0.5 block text-xs text-[#8a7f72]">約 {s.duration_minutes} 分鐘 · {priceText(min, varies ? '起' : s.price_note)}{s.deposit ? ` · 訂金 ${money(s.deposit)}` : ''}</span>
+                        <span className="mt-0.5 block text-xs text-[#8a7f72]">約 {s.duration_minutes} 分鐘 · {s.price_mode === 'quote' ? `需報價${s.price ? `(${priceText(min, '起')})` : ''}` : priceText(min, varies ? '起' : s.price_note)}{s.service_mode === 'outcall' ? ' · 外出服務' : ''}{s.deposit && s.price_mode !== 'quote' ? ` · 訂金 ${money(s.deposit)}` : ''}</span>
                         {s.description ? <span className="mt-1 line-clamp-2 block text-xs leading-5 text-[#6b6156]">{s.description}</span> : null}
                         {s.steps.length > 1 ? <StepBar steps={s.steps} /> : null}
                       </span>
@@ -248,8 +257,13 @@ export default function BookingClient({ slug, card, business, services, staff }:
               </div>
             </section>
 
+            {/* 需報價:填活動資訊詢價 */}
+            {service && isQuote && (
+              <InquiryForm key={service.id} slug={slug} service={service} staff={serviceStaff.map((x) => x.info!)} business={business} auth={auth} loginNext={encodeURIComponent(`${here}?s=${service.id}`)} onDone={() => { setServiceId(''); setTab('my'); void loadMine(); }} />
+            )}
+
             {/* 加購 */}
-            {service && service.addons.length > 0 && (
+            {service && !isQuote && service.addons.length > 0 && (
               <section>
                 <p className="mb-2 text-sm font-semibold">加購(可複選)</p>
                 <div className="space-y-1.5 rounded-2xl bg-white p-2">
@@ -268,12 +282,12 @@ export default function BookingClient({ slug, card, business, services, staff }:
             )}
 
             {/* 同一次再加一項 */}
-            {service && services.length > 1 && (
+            {service && !isQuote && services.filter((x) => x.price_mode !== 'quote').length > 1 && (
               <section>
                 <p className="mb-1 text-sm font-semibold">同一次再加一項(選填,最多 2 項)</p>
                 <p className="mb-2 text-xs text-[#8a7f72]">會接在後面依序進行,可能由其他人員接手。</p>
                 <div className="flex flex-wrap gap-2">
-                  {services.filter((x) => x.id !== service.id).map((x) => {
+                  {services.filter((x) => x.id !== service.id && x.price_mode !== 'quote').map((x) => {
                     const on = extraIds.includes(x.id);
                     const full = !on && extraIds.length >= 2;
                     return (
@@ -288,7 +302,7 @@ export default function BookingClient({ slug, card, business, services, staff }:
             )}
 
             {/* 2. 人員 */}
-            {service && pickStaff && (
+            {service && !isQuote && pickStaff && (
               <section>
                 <StepTitle n={2} title="選擇服務人員" />
                 <div className="grid grid-cols-2 gap-2">
@@ -304,7 +318,7 @@ export default function BookingClient({ slug, card, business, services, staff }:
             )}
 
             {/* 3. 日期時段 */}
-            {service && staffChosen && (
+            {service && !isQuote && staffChosen && (
               <section>
                 <StepTitle n={pickStaff ? 3 : 2} title="選擇日期與時段" />
                 {loadingSlots && !days ? <p className="py-6 text-center text-sm text-[#8a7f72]">讀取可預約時段…</p> : (
@@ -314,7 +328,7 @@ export default function BookingClient({ slug, card, business, services, staff }:
             )}
 
             {/* 4. 聯絡資料與送出 */}
-            {ready && service && quote && (
+            {ready && !isQuote && service && quote && (
               <section>
                 <StepTitle n={pickStaff ? 4 : 3} title="確認預約" />
                 <div className="space-y-1 rounded-2xl bg-white p-4 text-sm text-[#6b6156]">
@@ -357,7 +371,7 @@ export default function BookingClient({ slug, card, business, services, staff }:
       </div>
 
       {/* 置底送出按鈕 */}
-      {tab === 'book' && !result && ready && auth?.loggedIn ? (
+      {tab === 'book' && !result && ready && !isQuote && auth?.loggedIn ? (
         <div className="fixed inset-x-0 bottom-0 z-30 border-t border-[#e5ded4] bg-[#faf7f2]/95 px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] backdrop-blur">
           <div className="mx-auto flex max-w-xl items-center gap-3">
             <p className="min-w-0 flex-1 truncate text-xs text-[#6b6156]">{service?.name} · {formatDateLabel(date).md} {time}</p>
@@ -489,7 +503,7 @@ function ResultView({ result, business, lineBound, here, onMore, onMine, onRepor
   );
 }
 
-function MyBookings({ auth, loginNext, onCancel, onBook, reload }: { auth: { loggedIn: boolean; bookings: MyBooking[] } | null; loginNext: string; onCancel: (b: MyBooking) => void; onBook: () => void; reload: () => Promise<void> }) {
+function MyBookings({ auth, loginNext, onCancel, onBook, reload }: { auth: { loggedIn: boolean; bookings: MyBooking[]; quotes: MyQuote[] } | null; loginNext: string; onCancel: (b: MyBooking) => void; onBook: () => void; reload: () => Promise<void> }) {
   // 頁面打開時的時間(判斷可否取消);只在第一次取得,避免每次重畫都變
   const [now] = useState(() => Date.now());
   const [moving, setMoving] = useState('');
@@ -503,7 +517,7 @@ function MyBookings({ auth, loginNext, onCancel, onBook, reload }: { auth: { log
       </div>
     );
   }
-  if (!auth.bookings.length) {
+  if (!auth.bookings.length && !auth.quotes.length) {
     return (
       <div className="rounded-2xl bg-white p-8 text-center">
         <p className="text-sm text-[#8a7f72]">還沒有預約紀錄</p>
@@ -513,6 +527,7 @@ function MyBookings({ auth, loginNext, onCancel, onBook, reload }: { auth: { log
   }
   return (
     <div className="space-y-2">
+      {auth.quotes.filter((q) => q.status !== 'accepted').map((q) => <QuoteOffer key={`${q.id}-${q.current_version}-${q.status}`} quote={q} onDone={() => void reload()} />)}
       {auth.bookings.map((b) => {
         const active = ACTIVE.includes(b.status) && new Date(b.start_at).getTime() > now;
         const inWindow = b.status === 'pending' || new Date(b.start_at).getTime() - now >= b.business.cancel_hours * 3600000;
@@ -599,6 +614,169 @@ function Reschedule({ booking, onClose, onDone }: { booking: MyBooking; onClose:
         <button type="button" onClick={onClose} className="rounded-full border border-[#d7c9bd] px-4 py-2 text-sm">取消</button>
         <button type="button" disabled={!time || busy} onClick={() => void save()} className="rounded-full bg-[#1f1b19] px-4 py-2 text-sm font-semibold text-white disabled:opacity-40">{busy ? '處理中…' : time ? `改到 ${formatDateLabel(date).md} ${time}` : '確認改期'}</button>
       </div>
+    </div>
+  );
+}
+
+// 參考圖先在手機上縮小(長邊 1600px、JPEG),避免上傳太大
+async function shrinkImage(file: File): Promise<Blob> {
+  const bitmap = await createImageBitmap(file);
+  const scale = Math.min(1, 1600 / Math.max(bitmap.width, bitmap.height));
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.round(bitmap.width * scale);
+  canvas.height = Math.round(bitmap.height * scale);
+  canvas.getContext('2d')!.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  bitmap.close();
+  return new Promise((resolve, reject) => canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('shrink'))), 'image/jpeg', 0.85));
+}
+
+// 需報價服務的詢價表單:不占檔期,店家回覆報價後再決定
+function InquiryForm({ slug, service, staff, business, auth, loginNext, onDone }: {
+  slug: string; service: Service; staff: Staff[]; business: Business; auth: { loggedIn: boolean } | null; loginNext: string; onDone: () => void;
+}) {
+  const today = localParts(new Date()).date;
+  const outcall = service.service_mode === 'outcall';
+  const [f, setF] = useState({ event_date: '', time: '', event_type: '', address: '', people: '', note: '', name: '', phone: '', staff_id: '' });
+  const [images, setImages] = useState<{ blob: Blob; url: string }[]>([]);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const set = (k: keyof typeof f, v: string) => setF({ ...f, [k]: v });
+
+  async function addImages(files: FileList | null) {
+    if (!files) return;
+    setError('');
+    const next = [...images];
+    for (const file of Array.from(files).slice(0, 3 - images.length)) {
+      try { const blob = await shrinkImage(file); next.push({ blob, url: URL.createObjectURL(blob) }); }
+      catch { setError('有圖片無法讀取,請換一張(建議 JPG 或 PNG)'); }
+    }
+    setImages(next);
+  }
+  async function submit() {
+    setError('');
+    if (!f.event_date) return setError('請選擇活動日期');
+    if (outcall && !f.address.trim()) return setError('請填寫服務地點');
+    if (!f.name.trim()) return setError('請填寫姓名');
+    if (!/^[0-9+\-\s()]{8,20}$/.test(f.phone.trim())) return setError('請填寫正確的聯絡電話');
+    setBusy(true);
+    try {
+      const form = new FormData();
+      form.set('data', JSON.stringify({
+        service_id: service.id, staff_id: f.staff_id || null,
+        request: { event_date: f.event_date, time: f.time, event_type: f.event_type, address: f.address, people: f.people, note: f.note },
+        contact: { name: f.name, phone: f.phone },
+      }));
+      images.forEach((im, i) => form.append('images', im.blob, `ref-${i + 1}.jpg`));
+      const res = await fetch(`/api/booking/${encodeURIComponent(slug)}/quotes`, { method: 'POST', body: form });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) return setError(data?.error?.message ?? '詢價送出失敗,請稍後再試');
+      uiToast('已送出詢價,店家回覆後會用 LINE 通知你');
+      onDone();
+    } finally { setBusy(false); }
+  }
+
+  if (auth && !auth.loggedIn) {
+    return (
+      <section className="space-y-2 rounded-2xl bg-white p-4 text-center">
+        <p className="text-sm text-[#6b6156]">這項服務需要先詢價,登入後填寫活動資訊</p>
+        <a href={`/auth/line/start?next=${loginNext}`} className="flex w-full items-center justify-center rounded-full bg-[#06C755] py-3 text-sm font-semibold text-white">用 LINE 登入並繼續</a>
+        <a href={`/card/login?next=${loginNext}`} className="block w-full rounded-full border border-[#d7c9bd] py-3 text-sm">其他方式登入</a>
+      </section>
+    );
+  }
+  const field = 'mt-1 w-full rounded-xl border border-[#e5ded4] bg-white px-3 py-2.5 text-base text-[#1f1b19]';
+  return (
+    <section>
+      <StepTitle n={2} title="填寫活動資訊" />
+      <div className="space-y-3 rounded-2xl bg-white p-4">
+        <p className="text-xs leading-5 text-[#8a7f72]">送出後由店家依需求報價,報價前不會保留檔期。{outcall && business.service_area ? ` 服務範圍:${business.service_area}` : ''}</p>
+        <div className="grid grid-cols-2 gap-3">
+          <label className="block text-xs text-[#8a7f72]">活動日期<input type="date" min={today} value={f.event_date} onChange={(e) => set('event_date', e.target.value)} className={field} /></label>
+          <label className="block text-xs text-[#8a7f72]">需完成 / 開始時間<input type="time" step={900} value={f.time} onChange={(e) => set('time', e.target.value)} className={field} /></label>
+        </div>
+        <label className="block text-xs text-[#8a7f72]">活動類型<input value={f.event_type} onChange={(e) => set('event_type', e.target.value)} maxLength={40} placeholder="例:結婚宴客、訂婚、拍攝…" className={field} /></label>
+        {outcall ? <label className="block text-xs text-[#8a7f72]">服務地點<input value={f.address} onChange={(e) => set('address', e.target.value)} maxLength={120} autoComplete="street-address" placeholder="例:台中市西屯區 ○○飯店" className={field} /></label> : null}
+        <label className="block text-xs text-[#8a7f72]">人數與造型需求<input value={f.people} onChange={(e) => set('people', e.target.value)} maxLength={40} placeholder="例:新娘 1、伴娘 2,新娘 3 個造型" className={field} /></label>
+        {staff.length > 1 ? (
+          <label className="block text-xs text-[#8a7f72]">希望的人員
+            <select value={f.staff_id} onChange={(e) => set('staff_id', e.target.value)} className={field}>
+              <option value="">不指定</option>
+              {staff.map((st) => <option key={st.id} value={st.id}>{st.name}</option>)}
+            </select>
+          </label>
+        ) : null}
+        <label className="block text-xs text-[#8a7f72]">其他需求(選填)<textarea value={f.note} onChange={(e) => set('note', e.target.value)} rows={3} maxLength={1000} placeholder="例:想要韓系清透妝感,需要試妝…" className={`${field} resize-none`} /></label>
+        <div>
+          <p className="text-xs text-[#8a7f72]">參考圖(選填,最多 3 張)</p>
+          <div className="mt-1 flex flex-wrap gap-2">
+            {images.map((im, i) => (
+              <span key={im.url} className="relative h-16 w-16 overflow-hidden rounded-lg bg-[#efe8dd]">
+                <img src={im.url} alt={`參考圖 ${i + 1}`} className="h-full w-full object-cover" />
+                <button type="button" onClick={() => setImages(images.filter((_, j) => j !== i))} aria-label="移除參考圖" className="absolute right-0.5 top-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-[#1f1b19]/70 text-xs text-white">×</button>
+              </span>
+            ))}
+            {images.length < 3 ? (
+              <label className="flex h-16 w-16 cursor-pointer items-center justify-center rounded-lg border border-dashed border-[#d7c9bd] text-xl text-[#8a7f72]">
+                +<input type="file" accept="image/*" multiple className="sr-only" aria-label="上傳參考圖" onChange={(e) => { void addImages(e.target.files); e.target.value = ''; }} />
+              </label>
+            ) : null}
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <label className="block text-xs text-[#8a7f72]">姓名<input value={f.name} onChange={(e) => set('name', e.target.value)} maxLength={40} autoComplete="name" className={field} /></label>
+          <label className="block text-xs text-[#8a7f72]">聯絡電話<input value={f.phone} onChange={(e) => set('phone', e.target.value)} inputMode="tel" autoComplete="tel" maxLength={20} className={field} /></label>
+        </div>
+        {error ? <p role="alert" className="rounded-xl bg-[#fdecea] px-3 py-2 text-sm text-[#a03b3b]">{error}</p> : null}
+        <button type="button" disabled={busy} onClick={() => void submit()} className="w-full rounded-full bg-[#1f1b19] py-3 text-sm font-semibold text-white disabled:opacity-50">{busy ? '送出中…' : '送出詢價'}</button>
+      </div>
+    </section>
+  );
+}
+
+// 我的詢價:等待報價 / 報價內容(接受、婉拒)
+function QuoteOffer({ quote: q, onDone }: { quote: MyQuote; onDone: () => void }) {
+  const [busy, setBusy] = useState(false);
+  const [now] = useState(() => Date.now());
+  const o = q.offer;
+  const expired = Boolean(o && new Date(o.valid_until).getTime() < now);
+  async function act(action: 'accept' | 'decline') {
+    if (action === 'decline' && !(await uiConfirm('婉拒這份報價?', { danger: true }))) return;
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/booking/my/quotes/${q.id}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action, version: q.current_version }) });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) return void uiAlert(data?.error?.message ?? '操作失敗');
+      uiToast(action === 'accept' ? (data?.payment_status === 'awaiting' ? '已接受,請在期限內轉帳訂金' : '已接受,預約成立') : '已婉拒');
+      onDone();
+    } finally { setBusy(false); }
+  }
+  const label = q.status === 'requested' ? '等待店家報價' : q.status === 'sent' ? (expired ? '報價已過期' : '店家已報價') : q.status === 'declined' ? '已婉拒' : '已取消';
+  return (
+    <div className="rounded-2xl bg-white p-4">
+      <div className="flex items-start gap-2">
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-semibold">{q.service_name} 詢價</p>
+          <p className="mt-0.5 text-sm text-[#6b6156]">活動日 {q.request.event_date}{q.request.time ? ` ${q.request.time}` : ''}{q.request.event_type ? ` · ${q.request.event_type}` : ''}</p>
+          <p className="mt-0.5 text-[11px] text-[#a99e8f]">{q.quote_no}</p>
+        </div>
+        <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-semibold ${q.status === 'sent' && !expired ? 'bg-[#e3eef6] text-[#1f5f7f]' : q.status === 'requested' ? 'bg-[#fff3df] text-[#9a6412]' : 'bg-[#f1efec] text-[#8a7f72]'}`}>{label}</span>
+      </div>
+      {o && q.status === 'sent' ? (
+        <div className="mt-3 space-y-1 rounded-xl bg-[#faf7f2] p-3 text-xs text-[#3d3631]">
+          {o.items.map((it, i) => <p key={i} className="flex justify-between gap-2"><span className="min-w-0">{it.name}</span><span className="shrink-0 tabular-nums">{money(it.amount)}</span></p>)}
+          <p className="flex justify-between gap-2 text-sm font-semibold text-[#1f1b19]"><span>合計</span><span className="tabular-nums">{money(o.total)}</span></p>
+          <p>服務時間 {formatRange(o.start_at, new Date(new Date(o.start_at).getTime() + o.minutes * 60000).toISOString())}</p>
+          {o.deposit ? <p>訂金 {money(o.deposit)}(接受後轉帳,店家核對後成立)</p> : null}
+          <p className="text-[#8a7f72]">報價有效至 {formatDateTime(o.valid_until)}{o.hold_until && new Date(o.hold_until).getTime() > now ? ` · 檔期為你保留到 ${formatDateTime(o.hold_until)}` : ''}</p>
+          {o.note ? <p className="whitespace-pre-line text-[#6b6156]">{o.note}</p> : null}
+          {!expired ? (
+            <div className="flex gap-2 pt-2">
+              <button type="button" disabled={busy} onClick={() => void act('accept')} className="flex-1 rounded-full bg-[#1f1b19] py-2.5 text-sm font-semibold text-white disabled:opacity-50">接受報價</button>
+              <button type="button" disabled={busy} onClick={() => void act('decline')} className="rounded-full border border-[#d7c9bd] px-4 py-2.5 text-sm">婉拒</button>
+            </div>
+          ) : <p className="pt-1 text-[#a03b3b]">報價已過期,請聯絡店家重新報價。</p>}
+        </div>
+      ) : null}
     </div>
   );
 }

@@ -68,8 +68,9 @@ const STEP_MINUTES = [5, 10, 15, 20, 25, 30, 40, 45, 50, 60, 75, 90, 120, 150, 1
 type ServiceDraft = {
   id?: string; name: string; description: string; duration_minutes: number; price: number; price_note: string; active: boolean;
   deposit: number; needs_resource: boolean; addons: AddonDraft[]; staff: StaffLink[]; steps: StepDraft[];
+  price_mode: 'fixed' | 'quote'; service_mode: 'in_store' | 'outcall';
 };
-const blankService: ServiceDraft = { name: '', description: '', duration_minutes: 60, price: 0, price_note: '', active: true, deposit: 0, needs_resource: false, addons: [], staff: [], steps: [] };
+const blankService: ServiceDraft = { name: '', description: '', duration_minutes: 60, price: 0, price_note: '', active: true, deposit: 0, needs_resource: false, addons: [], staff: [], steps: [], price_mode: 'fixed', service_mode: 'in_store' };
 const digits = (v: string) => Number(v.replace(/\D/g, '')) || 0;
 
 export function ServicesTab({ data, reload }: { data: Data; reload: () => Promise<void> }) {
@@ -82,7 +83,7 @@ export function ServicesTab({ data, reload }: { data: Data; reload: () => Promis
   function edit(s: BkService) {
     setEditing({
       id: s.id, name: s.name, description: s.description, duration_minutes: s.duration_minutes, price: s.price, price_note: s.price_note, active: s.active,
-      deposit: s.deposit, needs_resource: s.needs_resource,
+      deposit: s.deposit, needs_resource: s.needs_resource, price_mode: s.price_mode, service_mode: s.service_mode,
       addons: data.addons.filter((a) => a.service_id === s.id).map((a) => ({ id: a.id, name: a.name, price: a.price, extra_minutes: a.extra_minutes, active: a.active })),
       staff: data.staffServices.filter((x) => x.service_id === s.id).map((x) => ({ staff_id: x.staff_id, duration_minutes: x.duration_minutes, price: x.price })),
       steps: data.steps.filter((x) => x.service_id === s.id).sort((a, b) => a.seq - b.seq).map((x) => ({ name: x.name, minutes: x.minutes, who: x.who, seat: x.seat })),
@@ -133,6 +134,14 @@ export function ServicesTab({ data, reload }: { data: Data; reload: () => Promis
       {editing && (
         <div className={`${card} space-y-3`}>
           <p className="font-semibold">{editing.id ? '編輯服務' : '新增服務'}</p>
+          <div className="grid grid-cols-2 gap-2">
+            {([['fixed', '固定價格', '顧客直接選時段預約'], ['quote', '需報價', '新秘、客製:先詢價再報價']] as const).map(([k, title, sub]) => (
+              <button key={k} type="button" onClick={() => setEditing({ ...editing, price_mode: k })} className={`rounded-xl border p-2.5 text-left ${editing.price_mode === k ? 'border-[#1f1b19] ring-2 ring-[#1f1b19]/10' : 'border-[#e5ded4]'}`}>
+                <span className="block text-sm font-semibold">{title}</span><span className="block text-[11px] text-[#8a7f72]">{sub}</span>
+              </button>
+            ))}
+          </div>
+          <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={editing.service_mode === 'outcall'} onChange={(e) => setEditing({ ...editing, service_mode: e.target.checked ? 'outcall' : 'in_store' })} />外出服務(到府、到場,前後加交通時間)</label>
           <label className="block text-xs text-[#8a7f72]">服務名稱
             <input value={editing.name} onChange={(e) => setEditing({ ...editing, name: e.target.value })} maxLength={60} placeholder="例:單色凝膠美甲" className={`${input} mt-1`} />
           </label>
@@ -263,7 +272,7 @@ export function ServicesTab({ data, reload }: { data: Data; reload: () => Promis
           <div key={s.id} className={`${card} flex items-center gap-3 ${s.active ? '' : 'opacity-60'}`}>
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-semibold">{s.name}{s.active ? '' : '(未開放)'}</p>
-              <p className="text-xs text-[#8a7f72]">{s.duration_minutes} 分鐘 · {s.price ? money(s.price) : '現場報價'}{s.price_note ? ` ${s.price_note}` : ''}{s.deposit ? ` · 訂金 ${money(s.deposit)}` : ''}</p>
+              <p className="text-xs text-[#8a7f72]">{s.price_mode === 'quote' ? '需報價 · ' : ''}{s.service_mode === 'outcall' ? '外出 · ' : ''}{s.duration_minutes} 分鐘 · {s.price ? money(s.price) : '現場報價'}{s.price_note ? ` ${s.price_note}` : ''}{s.deposit ? ` · 訂金 ${money(s.deposit)}` : ''}</p>
               {addons.length || (team && staffNames.length) || s.needs_resource ? (
                 <p className="truncate text-[11px] text-[#a99e8f]">{[addons.length ? `加購 ${addons.length} 項` : '', team && staffNames.length ? `限 ${staffNames.join('、')}` : '', s.needs_resource ? '需床位' : ''].filter(Boolean).join(' · ')}</p>
               ) : null}
@@ -547,6 +556,16 @@ export function SettingsTab({ data, reload }: { data: Data; reload: () => Promis
         <div className="grid grid-cols-2 gap-3">
           {num('deposit_hours', '轉帳期限', unit([1, 2, 6, 12, 24, 48, 72], ' 小時內'))}
         </div>
+      </section>
+      <section className={`${card} space-y-3`}>
+        <p className="font-semibold">外出服務</p>
+        <div className="grid grid-cols-2 gap-3">
+          {num('travel_minutes', '前後交通時間(預設)', [0, 15, 30, 45, 60, 90, 120].map((n) => [n, n ? `各 ${n} 分鐘` : '不需要']))}
+        </div>
+        <label className="block text-xs text-[#8a7f72]">服務範圍(顯示在詢價表單)
+          <input value={b.service_area} onChange={(e) => setB({ ...b, service_area: e.target.value })} maxLength={120} placeholder="例:雙北、桃園;其他地區另計車馬費" className={`${input} mt-1`} />
+        </label>
+        <p className="text-[11px] text-[#a99e8f]">外出服務的報價會預先帶入交通時間,可在每份報價調整;交通時間內不會排其他預約。</p>
       </section>
       <section className={`${card} space-y-2`}>
         <p className="font-semibold">LINE 提醒顧客</p>

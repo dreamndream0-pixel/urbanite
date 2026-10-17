@@ -1,11 +1,11 @@
 // 預約管理頁共用:資料型別、樣式、API 呼叫
 import type {
-  BkAddon, BkAllocation, BkBooking, BkBookingItem, BkBusiness, BkException, BkHour, BkPayment, BkResource, BkService, BkServiceStep, BkStaff, BkStaffHour, BkStaffService,
+  BkAddon, BkAllocation, BkBooking, BkBookingItem, BkQuote, BkQuoteVersion, BkBusiness, BkException, BkHour, BkPayment, BkResource, BkService, BkServiceStep, BkStaff, BkStaffHour, BkStaffService,
 } from '@/lib/booking/shared';
 
 export type Data = {
   business: BkBusiness; services: BkService[]; addons: BkAddon[]; hours: BkHour[]; staff: BkStaff[];
-  staffHours: BkStaffHour[]; staffServices: BkStaffService[]; resources: BkResource[]; steps: BkServiceStep[]; allocations: BkAllocation[]; items: BkBookingItem[];
+  staffHours: BkStaffHour[]; staffServices: BkStaffService[]; resources: BkResource[]; steps: BkServiceStep[]; allocations: BkAllocation[]; items: BkBookingItem[]; quotes: BkQuote[]; quoteVersions: BkQuoteVersion[];
   exceptions: BkException[]; bookings: BkBooking[]; payments: BkPayment[];
   card: { slug: string; display_name: string } | null; line_bound: boolean; today: string;
 };

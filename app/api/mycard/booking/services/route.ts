@@ -20,6 +20,8 @@ function clean(b: Record<string, unknown>) {
     active: b.active === undefined ? true : Boolean(b.active),
     needs_resource: Boolean(b.needs_resource),
     deposit: int(b.deposit, 0, 100000),
+    price_mode: b.price_mode === 'quote' ? 'quote' : 'fixed',
+    service_mode: b.service_mode === 'outcall' ? 'outcall' : 'in_store',
   };
 }
 
