@@ -12,6 +12,7 @@ import type { ProfileCard, ProfileCardBlock } from '@/lib/profile-card';
 import type { SiteSettings } from '@/lib/types';
 import { getCheckoutLine, lineAddFriendUrl } from '@/lib/checkout-line';
 import { scopedClient, URBANITE_SHOP_ID } from '@/lib/shop';
+import { getPublicBusiness, loadSchedule } from '@/lib/booking/server';
 
 export const dynamic = 'force-dynamic';
 
@@ -78,6 +79,10 @@ export default async function CardPage({ params }: { params: Promise<{ slug: str
       </main>
     );
   }
+  // 名片主人開放線上預約(有服務、有營業時段)才顯示預約按鈕
+  const booking = await getPublicBusiness(data.card.slug);
+  const schedule = booking ? await loadSchedule(booking.business.id) : null;
+  const bookingHref = schedule && schedule.services.length && schedule.hours.length ? `/@${data.card.slug}/book` : '';
   // 社群追蹤卡片:追蹤數超過一天就在背景更新(不影響這次的載入速度)
   after(() => refreshStaleSocialBlocks(data.blocks));
   return (
@@ -91,7 +96,7 @@ export default async function CardPage({ params }: { params: Promise<{ slug: str
       ) : null}
       {/* 右上角漢堡選單:登入登出、我的名片 */}
       <CardMenu variant="floating" top={data.free ? 52 : 12} />
-      <ProfileCardView card={data.card} blocks={data.blocks} products={data.products} logoUrl={data.logoUrl} lineUrl={data.lineUrl} serviceFooter={!data.isStore} fullScreen />
+      <ProfileCardView card={data.card} blocks={data.blocks} products={data.products} logoUrl={data.logoUrl} lineUrl={data.lineUrl} serviceFooter={!data.isStore} bookingHref={bookingHref} fullScreen />
     </main>
   );
 }

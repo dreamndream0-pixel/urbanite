@@ -40,6 +40,7 @@ export default function ProfileCardView({
   lineUrl = '',
   preview = false,
   fullScreen = false,
+  bookingHref = '',
 }: {
   card: ProfileCard;
   blocks: ProfileCardBlock[];
@@ -49,6 +50,7 @@ export default function ProfileCardView({
   preview?: boolean;
   fullScreen?: boolean;
   serviceFooter?: boolean; // 會員的名片:頁尾改為「用 URBANITE 建立你的名片」
+  bookingHref?: string; // 名片主人開放線上預約時,區塊最上方顯示「線上預約」按鈕
 }) {
   const theme = resolveTheme(card.theme);
   const left = theme.align === 'left';
@@ -724,6 +726,12 @@ export default function ProfileCardView({
 
         {/* 區塊 */}
         <div className={`${theme.imageOnly ? '' : 'mt-8 '}w-full space-y-3`}>
+          {bookingHref ? (
+            <Link href={bookingHref} className="flex w-full items-center justify-center gap-2 px-4 py-3.5 text-[15px] font-semibold shadow-sm transition hover:opacity-90" style={{ borderRadius: radius, background: theme.accentColor, color: isDarkColor(theme.accentColor) ? '#ffffff' : '#1f1b19' }}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2" /><path d="M16 2v4M8 2v4M3 10h18M9 16l2 2 4-4" /></svg>
+              線上預約
+            </Link>
+          ) : null}
           {visible.map((b, i) => {
             if (b.type === 'hotspot') {
               // 熱區圖片:滿版顯示;連續的熱區圖片之間沒有間距,看起來像同一張圖

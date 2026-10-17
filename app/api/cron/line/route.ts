@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { loadBotConfig, processOrderNotifications, sendBroadcast } from '@/lib/line-bot';
 import { processOrderNotificationQueue } from '@/lib/order-notifications';
 import { processLoyalty } from '@/lib/loyalty';
+import { processBookingJobs } from '@/lib/booking/server';
 import { lineBotSchemaReady, runAsShop } from '@/lib/line-channel';
 import { URBANITE_SHOP_ID } from '@/lib/shop';
 
@@ -52,6 +53,12 @@ export async function GET(request: Request) {
     Object.assign(result, { loyalty: await processLoyalty() });
   } catch (e) {
     result.errors.push(e instanceof Error ? e.message : 'loyalty failed');
+  }
+  // 名片預約:回收逾期未確認的預約、送出通知與服務前提醒
+  try {
+    Object.assign(result, { booking: await processBookingJobs(50) });
+  } catch (e) {
+    result.errors.push(e instanceof Error ? e.message : 'booking failed');
   }
   return NextResponse.json(result);
 }

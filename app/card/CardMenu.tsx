@@ -4,7 +4,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useId, useRef, useState, type MouseEvent } from 'react';
-import { ArrowRight, ChevronRight, CreditCard, House, LayoutDashboard, LogOut, Menu, PanelsTopLeft, Store, UserRound, X } from 'lucide-react';
+import { ArrowRight, CalendarCheck, ChevronRight, CreditCard, House, LayoutDashboard, LogOut, Menu, PanelsTopLeft, Store, UserRound, X } from 'lucide-react';
 import { createBrowserSupabase } from '@/lib/supabase/client';
 import { SERVICE_LOGO } from '@/lib/card-plan';
 import { useScrollLock } from '@/app/components/useScrollLock';
@@ -16,7 +16,7 @@ type Me = { email: string; name: string; isAdmin?: boolean; shops?: { slug: stri
 export default function CardMenu({ variant = 'header', loggedIn, current, top = 12, links = [] }: {
   variant?: 'header' | 'floating';
   loggedIn?: boolean;
-  current?: 'mycard' | 'upgrade' | 'login';
+  current?: 'mycard' | 'upgrade' | 'login' | 'booking';
   top?: number;
   links?: { href: string; label: string }[];
 }) {
@@ -123,6 +123,7 @@ export default function CardMenu({ variant = 'header', loggedIn, current, top = 
               {me?.isAdmin && <a href="/admin" onClick={event => navigate(event, '/admin')}><LayoutDashboard />管理後台<ChevronRight /></a>}
               {(me?.shops ?? []).filter(shop => !shop.current).map(shop => <a key={shop.slug} href={shop.adminUrl} onClick={event => navigate(event, shop.adminUrl)}><Store /><span>我的官網後台<small>{shop.name || shop.slug}</small></span><ChevronRight /></a>)}
               <Link href="/mycard" aria-current={current === 'mycard' ? 'page' : undefined} onClick={event => navigate(event, '/mycard')}><UserRound />我的名片<ChevronRight /></Link>
+              <Link href="/mycard/booking" aria-current={current === 'booking' ? 'page' : undefined} onClick={event => navigate(event, '/mycard/booking')}><CalendarCheck />線上預約管理<ChevronRight /></Link>
               {!navigation.some(link => link.href === '/card/pricing') && <Link href="/card/pricing" aria-current={current === 'upgrade' ? 'page' : undefined} onClick={event => navigate(event, '/card/pricing')}><CreditCard />方案價格<ChevronRight /></Link>}
               {!navigation.some(link => link.href === '/card') && <Link href="/card" onClick={event => navigate(event, '/card')}><House />URBANLINKS 首頁<ChevronRight /></Link>}
             </div>}
