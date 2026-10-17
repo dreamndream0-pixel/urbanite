@@ -25,6 +25,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
       serviceId: String(body?.service_id ?? ''),
       addonIds: Array.isArray(body?.addon_ids) ? (body.addon_ids as unknown[]).map(String).slice(0, 20) : [],
       staffId: body?.staff_id ? String(body.staff_id) : null,
+      extras: Array.isArray(body?.extra_ids) ? (body.extra_ids as unknown[]).map(String).slice(0, 3) : [],
       startAt: String(body?.start_at ?? ''),
       contact: { name, phone, note: String(body?.contact?.note ?? '') },
       idempotencyKey: request.headers.get('Idempotency-Key') ?? String(body?.idempotency_key ?? ''),

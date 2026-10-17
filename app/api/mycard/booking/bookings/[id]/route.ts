@@ -1,6 +1,6 @@
 import { after, NextResponse } from 'next/server';
 import { getSessionUser } from '@/lib/supabase/server';
-import { BookingError, ownerCommand, ownerPayment, ownerReschedule, processBookingJobs } from '@/lib/booking/server';
+import { BookingError, ownerCancelItem, ownerCommand, ownerPayment, ownerReschedule, processBookingJobs } from '@/lib/booking/server';
 
 export const dynamic = 'force-dynamic';
 
@@ -8,6 +8,7 @@ export const dynamic = 'force-dynamic';
 // { command: approve|reject|cancel|check_in|complete|no_show, expected_version, reason, balance?: { amount, method } }
 // { command: 'payment', expected_version, kind: deposit|balance|refund, amount, method, note }
 // { command: 'reschedule', expected_version, start_at, staff_id }
+// { command: 'cancel_item', expected_version, seq, reason } — 多項服務只取消其中一項
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const user = await getSessionUser();
   if (!user) return NextResponse.json({ error: { code: 'AUTH_REQUIRED', message: '請先登入。' } }, { status: 401 });
@@ -20,6 +21,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       booking = await ownerPayment(user.id, id, version, {
         kind: String(body?.kind ?? ''), amount: Math.round(Number(body?.amount) || 0), method: String(body?.method ?? 'transfer'), note: String(body?.note ?? ''),
       });
+    } else if (body?.command === 'cancel_item') {
+      booking = await ownerCancelItem(user.id, id, version, Number(body?.seq), String(body?.reason ?? ''));
     } else if (body?.command === 'reschedule') {
       booking = await ownerReschedule(user.id, id, version, String(body?.start_at ?? ''), body?.staff_id ? String(body.staff_id) : null);
     } else {

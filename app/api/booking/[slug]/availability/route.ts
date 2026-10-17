@@ -4,7 +4,7 @@ import { localParts } from '@/lib/booking/shared';
 
 export const dynamic = 'force-dynamic';
 
-// GET /api/booking/[slug]/availability?service=&addons=id,id&staff=&from=YYYY-MM-DD&days=7
+// GET /api/booking/[slug]/availability?service=&addons=id,id&extra=id,id&staff=&from=YYYY-MM-DD&days=7
 // 可選的開始時間(不公開任何人的預約資料);staff 空白 = 不指定人員
 export async function GET(request: Request, { params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
@@ -20,6 +20,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ slug
       serviceId: url.searchParams.get('service') ?? '',
       addonIds: (url.searchParams.get('addons') ?? '').split(',').filter(Boolean).slice(0, 20),
       staffId: url.searchParams.get('staff') || null,
+      extras: (url.searchParams.get('extra') ?? '').split(',').filter(Boolean).slice(0, 2),
     }, from < today ? today : from, days);
     return NextResponse.json({ days: result.days, server_time: new Date().toISOString() }, { headers: { 'Cache-Control': 'no-store' } });
   } catch (e) {

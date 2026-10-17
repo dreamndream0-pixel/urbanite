@@ -34,12 +34,16 @@ type Day = { date: string; slots: string[]; closed?: boolean };
 const DAYS = 14;
 const priceText = (price: number, note?: string) => (price ? `${money(price)}${note ? ` ${note}` : ''}` : note || '現場報價');
 const ACTIVE = ['pending', 'confirmed'];
+// 服務的基本時長(分段服務以步驟加總)與最低價格(不同人員價格不同時)
+const baseMinutes = (x: Service) => (x.steps.length > 1 ? x.steps.reduce((n, st) => n + st.minutes, 0) : x.duration_minutes);
+const minPrice = (x: Service) => (x.staff.length ? Math.min(...x.staff.map((st) => st.price)) : x.price);
 
 // 名片線上預約:選服務 → 加購 → 人員 → 日期時段 → 登入 → 聯絡資料 → 送出;另有「我的預約」(付訂金回報、改期、取消、加入行事曆)
 export default function BookingClient({ slug, card, business, services, staff }: { slug: string; card: { display_name: string; avatar_url: string }; business: Business; services: Service[]; staff: Staff[] }) {
   const [tab, setTab] = useState<'book' | 'my'>('book');
   const [serviceId, setServiceId] = useState('');
   const [addonIds, setAddonIds] = useState<string[]>([]);
+  const [extraIds, setExtraIds] = useState<string[]>([]); // 同一次再加的服務(最多 2 項,依序進行)
   const [staffId, setStaffId] = useState<string | null>(null); // null = 還沒選;'' = 不指定
   const [date, setDate] = useState('');
   const [time, setTime] = useState('');
@@ -68,10 +72,14 @@ export default function BookingClient({ slug, card, business, services, staff }:
     const prices = serviceStaff.map((x) => x.price);
     const varies = !chosen && new Set(prices).size > 1;
     const base = chosen?.price ?? (prices.length ? Math.min(...prices) : service.price);
-    const duration = (chosen?.duration_minutes ?? service.duration_minutes) + addons.reduce((n, a) => n + a.extra_minutes, 0);
-    const total = base + addons.reduce((n, a) => n + a.price, 0);
-    return { duration, total, varies, addons, deposit: service.deposit ? (total > 0 ? Math.min(service.deposit, total) : service.deposit) : 0 };
-  }, [service, serviceStaff, staffParam, addonIds]);
+    const stepSum = service.steps.length > 1 ? service.steps.reduce((n, x) => n + x.minutes, 0) : 0;
+    const extras = extraIds.map((id) => services.find((x) => x.id === id)).filter((x): x is Service => Boolean(x));
+    const duration = (stepSum || (chosen?.duration_minutes ?? service.duration_minutes)) + addons.reduce((n, a) => n + a.extra_minutes, 0)
+      + extras.reduce((n, e) => n + baseMinutes(e), 0);
+    const total = base + addons.reduce((n, a) => n + a.price, 0) + extras.reduce((n, e) => n + minPrice(e), 0);
+    const wanted = service.deposit + extras.reduce((n, e) => n + e.deposit, 0);
+    return { duration, total, varies: varies || extras.some((e) => new Set(e.staff.map((x) => x.price)).size > 1), addons, extras, deposit: wanted ? (total > 0 ? Math.min(wanted, total) : wanted) : 0 };
+  }, [service, serviceStaff, staffParam, addonIds, extraIds, services]);
 
   // 登入狀態與我的預約(也用來帶入上次填的聯絡資料)
   const loadMine = useCallback(async () => {
@@ -93,6 +101,7 @@ export default function BookingClient({ slug, card, business, services, staff }:
       if (s && services.some((x) => x.id === s)) {
         setServiceId(s);
         setAddonIds((q.get('a') ?? '').split(',').filter(Boolean));
+        setExtraIds((q.get('x') ?? '').split(',').filter((id) => id && id !== s && services.some((x) => x.id === id)).slice(0, 2));
         if (q.has('p')) setStaffId(q.get('p') ?? '');
         setDate(q.get('d') ?? '');
         setTime(q.get('t') ?? '');
@@ -103,8 +112,8 @@ export default function BookingClient({ slug, card, business, services, staff }:
 
   const slotsUrl = useCallback(() => {
     const today = localParts(new Date()).date;
-    return `/api/booking/${encodeURIComponent(slug)}/availability?service=${serviceId}&addons=${addonIds.join(',')}&staff=${staffParam}&from=${today}&days=${DAYS}`;
-  }, [slug, serviceId, addonIds, staffParam]);
+    return `/api/booking/${encodeURIComponent(slug)}/availability?service=${serviceId}&addons=${addonIds.join(',')}&extra=${extraIds.join(',')}&staff=${staffParam}&from=${today}&days=${DAYS}`;
+  }, [slug, serviceId, addonIds, extraIds, staffParam]);
 
   // 選好服務 / 加購 / 人員 → 讀 14 天的可約時段
   useEffect(() => {
@@ -128,7 +137,7 @@ export default function BookingClient({ slug, card, business, services, staff }:
 
   const slots = useMemo(() => days?.find((d) => d.date === date)?.slots ?? [], [days, date]);
   const ready = Boolean(service && staffChosen && date && time && slots.includes(time));
-  const nextParams = `s=${serviceId}&a=${addonIds.join(',')}${pickStaff && staffId !== null ? `&p=${staffId}` : ''}&d=${date}&t=${encodeURIComponent(time)}`;
+  const nextParams = `s=${serviceId}&a=${addonIds.join(',')}&x=${extraIds.join(',')}${pickStaff && staffId !== null ? `&p=${staffId}` : ''}&d=${date}&t=${encodeURIComponent(time)}`;
   const loginNext = encodeURIComponent(`${here}?${nextParams}`);
   const resetSlot = () => { setTime(''); idemKey.current = ''; };
 
@@ -144,7 +153,7 @@ export default function BookingClient({ slug, card, business, services, staff }:
       const res = await fetch(`/api/booking/${encodeURIComponent(slug)}/bookings`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Idempotency-Key': idemKey.current },
-        body: JSON.stringify({ service_id: service.id, addon_ids: addonIds, staff_id: staffParam || null, start_at: startAt, contact, channel: /Line\//.test(navigator.userAgent) ? 'line' : 'card' }),
+        body: JSON.stringify({ service_id: service.id, addon_ids: addonIds, extra_ids: extraIds, staff_id: staffParam || null, start_at: startAt, contact, channel: /Line\//.test(navigator.userAgent) ? 'line' : 'card' }),
       });
       const data = await res.json().catch(() => null);
       if (!res.ok) {
@@ -182,7 +191,7 @@ export default function BookingClient({ slug, card, business, services, staff }:
     void loadMine();
   }
 
-  const reset = () => { setResult(null); setTime(''); setServiceId(''); setAddonIds([]); setStaffId(null); setDays(null); setTab('book'); };
+  const reset = () => { setResult(null); setTime(''); setServiceId(''); setAddonIds([]); setExtraIds([]); setStaffId(null); setDays(null); setTab('book'); };
   const activeCount = auth?.bookings.filter((b) => ACTIVE.includes(b.status)).length ?? 0;
 
   return (
@@ -224,7 +233,7 @@ export default function BookingClient({ slug, card, business, services, staff }:
                   const min = prices.length ? Math.min(...prices) : s.price;
                   const varies = new Set(prices).size > 1;
                   return (
-                    <button key={s.id} type="button" onClick={() => { setServiceId(s.id); setAddonIds([]); setStaffId(null); setDays(null); resetSlot(); }} className={`flex w-full items-center gap-3 rounded-2xl border bg-white p-3 text-left transition ${on ? 'border-[#1f1b19] ring-2 ring-[#1f1b19]/10' : 'border-[#e5ded4]'}`}>
+                    <button key={s.id} type="button" onClick={() => { setServiceId(s.id); setAddonIds([]); setExtraIds((x) => x.filter((id) => id !== s.id)); setStaffId(null); setDays(null); resetSlot(); }} className={`flex w-full items-center gap-3 rounded-2xl border bg-white p-3 text-left transition ${on ? 'border-[#1f1b19] ring-2 ring-[#1f1b19]/10' : 'border-[#e5ded4]'}`}>
                       {s.image ? <img src={s.image} alt="" className="h-14 w-14 shrink-0 rounded-xl object-cover" /> : null}
                       <span className="min-w-0 flex-1">
                         <span className="block text-sm font-semibold">{s.name}</span>
@@ -252,6 +261,26 @@ export default function BookingClient({ slug, card, business, services, staff }:
                         <span className="min-w-0 flex-1 text-sm">{a.name}</span>
                         <span className="shrink-0 text-xs text-[#8a7f72]">{a.price ? `+${money(a.price)}` : '免費'}{a.extra_minutes ? ` · +${a.extra_minutes} 分` : ''}</span>
                       </label>
+                    );
+                  })}
+                </div>
+              </section>
+            )}
+
+            {/* 同一次再加一項 */}
+            {service && services.length > 1 && (
+              <section>
+                <p className="mb-1 text-sm font-semibold">同一次再加一項(選填,最多 2 項)</p>
+                <p className="mb-2 text-xs text-[#8a7f72]">會接在後面依序進行,可能由其他人員接手。</p>
+                <div className="flex flex-wrap gap-2">
+                  {services.filter((x) => x.id !== service.id).map((x) => {
+                    const on = extraIds.includes(x.id);
+                    const full = !on && extraIds.length >= 2;
+                    return (
+                      <button key={x.id} type="button" disabled={full} aria-pressed={on} onClick={() => { setExtraIds(on ? extraIds.filter((id) => id !== x.id) : [...extraIds, x.id]); resetSlot(); }}
+                        className={`rounded-full border px-3 py-1.5 text-left text-sm transition disabled:opacity-40 ${on ? 'border-[#1f1b19] bg-[#1f1b19] text-white' : 'border-[#e5ded4] bg-white'}`}>
+                        {on ? '✓ ' : '+ '}{x.name}<span className={`ml-1 text-xs ${on ? 'text-white/70' : 'text-[#8a7f72]'}`}>{baseMinutes(x)} 分 · {priceText(minPrice(x))}</span>
+                      </button>
                     );
                   })}
                 </div>
@@ -289,7 +318,7 @@ export default function BookingClient({ slug, card, business, services, staff }:
               <section>
                 <StepTitle n={pickStaff ? 4 : 3} title="確認預約" />
                 <div className="space-y-1 rounded-2xl bg-white p-4 text-sm text-[#6b6156]">
-                  <p className="font-semibold text-[#1f1b19]">{service.name}{quote.addons.length ? ` + ${quote.addons.map((a) => a.name).join('、')}` : ''}</p>
+                  <p className="font-semibold text-[#1f1b19]">{service.name}{quote.addons.length ? `(+${quote.addons.map((a) => a.name).join('、')})` : ''}{quote.extras.map((e) => ` → ${e.name}`).join('')}</p>
                   <p>{formatDateLabel(date).md}(週{formatDateLabel(date).weekday}) {time} · 約 {quote.duration} 分鐘</p>
                   {pickStaff ? <p>人員:{staffParam ? serviceStaff.find((x) => x.id === staffParam)?.info?.name : '不指定(由店家安排)'}</p> : null}
                   <p>{priceText(quote.total, quote.varies ? '起(依人員)' : service.price_note)}</p>

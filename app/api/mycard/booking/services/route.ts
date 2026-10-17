@@ -56,8 +56,11 @@ async function syncChildren(businessId: string, serviceId: string, body: Record<
       }))
       .filter((x) => x.name);
     await db.from('bk_service_steps').delete().eq('service_id', serviceId).eq('business_id', businessId);
-    // 只有一個步驟等於不分段
-    if (rows.length > 1) await db.from('bk_service_steps').insert(rows);
+    // 只有一個步驟等於不分段;分段時服務時長 = 步驟加總
+    if (rows.length > 1) {
+      await db.from('bk_service_steps').insert(rows);
+      await db.from('bk_services').update({ duration_minutes: Math.min(720, rows.reduce((n, x) => n + x.minutes, 0)) }).eq('id', serviceId).eq('business_id', businessId);
+    }
   }
   if (Array.isArray(body.staff)) {
     const { data: staff } = await db.from('bk_staff').select('id').eq('business_id', businessId);

@@ -142,12 +142,13 @@ async function occupancy(businessId: string, fromIso: string, toIso: string, exc
   return { live, exceptions: ex };
 }
 
-type SlotRequest = { serviceId: string; addonIds: string[]; staffId: string | null; excludeBookingId?: string; ignoreLimits?: boolean };
-export type AllocInput = { staff_id: string | null; resource_id: string | null; role: 'main' | 'assistant' | 'seat'; start_at: string; end_at: string };
+// extras:同一次再加的服務(依序進行);seqs:各項在預約裡的編號(改期時沿用原編號)
+type SlotRequest = { serviceId: string; addonIds: string[]; staffId: string | null; extras?: string[]; seqs?: number[]; excludeBookingId?: string; ignoreLimits?: boolean };
+export type AllocInput = { staff_id: string | null; resource_id: string | null; role: 'main' | 'assistant' | 'seat'; start_at: string; end_at: string; item_seq?: number };
 
-// 一位主要人員在某個開始時間的完整分派:主要人員各段、助理各段、座位(同一張)
-function makeAssigner(business: BkBusiness, sched: Schedule, service: BkService, staff: BkStaff, addonIds: string[], occ: Awaited<ReturnType<typeof occupancy>>) {
-  const plan = planOf(sched, service, staff.id, addonIds, business.buffer_minutes);
+// 一位主要人員做一項服務,在某個開始時間的完整分派:主要人員各段、助理各段、座位(同一張)
+function makeAssigner(business: BkBusiness, sched: Schedule, service: BkService, staff: BkStaff, addonIds: string[], occ: Awaited<ReturnType<typeof occupancy>>, buffer: number) {
+  const plan = planOf(sched, service, staff.id, addonIds, buffer);
   const assistants = sched.staff.filter((s) => s.active && s.role === 'assistant');
   const shopOff = occ.exceptions.filter((x) => !x.staff_id);
   const busyOf = (id: string) => [
@@ -164,31 +165,70 @@ function makeAssigner(business: BkBusiness, sched: Schedule, service: BkService,
   const seatSegs = merge(plan.segs.filter((s) => s.seat).map((s) => ({ start: s.from, end: s.to })));
   const mainRanges = merge(mainSegs.map((s) => ({ start: s.from, end: s.to })));
 
-  function assign(t: number): { allocs: AllocInput[]; resourceId: string | null } | null {
+  function assign(t: number, seq = 0): { allocs: AllocInput[]; resourceId: string | null } | null {
     const at = (m: number) => t + m * 60000;
     if (overlaps(shopOff, t, at(plan.occupy))) return null;
     if (mainRanges.some((r) => overlaps(staffBusy, at(r.start), at(r.end)))) return null;
-    const allocs: AllocInput[] = mainRanges.map((r) => ({ staff_id: staff.id, resource_id: null, role: 'main', start_at: new Date(at(r.start)).toISOString(), end_at: new Date(at(r.end)).toISOString() }));
+    const allocs: AllocInput[] = mainRanges.map((r) => ({ staff_id: staff.id, resource_id: null, role: 'main', start_at: new Date(at(r.start)).toISOString(), end_at: new Date(at(r.end)).toISOString(), item_seq: seq }));
     for (const seg of asstSegs) {
       const s = at(seg.from);
       const e = at(seg.to);
       const who = assistants.find((a) => !overlaps(assistantBusy.get(a.id)!, s, e) && inHours(sched, a, s, e));
       if (!who) return null;
-      allocs.push({ staff_id: who.id, resource_id: null, role: 'assistant', start_at: new Date(s).toISOString(), end_at: new Date(e).toISOString() });
+      allocs.push({ staff_id: who.id, resource_id: null, role: 'assistant', start_at: new Date(s).toISOString(), end_at: new Date(e).toISOString(), item_seq: seq });
     }
     let resourceId: string | null = null;
     if (seats.length) {
       const seat = seats.find((r) => seatSegs.every((g) => !overlaps(seatBusy.get(r.id)!, at(g.start), at(g.end))));
       if (!seat) return null;
       resourceId = seat.id;
-      for (const g of seatSegs) allocs.push({ staff_id: null, resource_id: seat.id, role: 'seat', start_at: new Date(at(g.start)).toISOString(), end_at: new Date(at(g.end)).toISOString() });
+      for (const g of seatSegs) allocs.push({ staff_id: null, resource_id: seat.id, role: 'seat', start_at: new Date(at(g.start)).toISOString(), end_at: new Date(at(g.end)).toISOString(), item_seq: seq });
     }
     return { allocs, resourceId };
   }
   return { plan, assign };
 }
 
-// 可約時段:每位候選人員各自算(班表、休假、自己的占用、助理、座位),再合併;staffId = 指定人員
+type ItemPlan = { seq: number; service: BkService; staff: BkStaff; start: number; end: number; plan: ReturnType<typeof planOf> };
+
+// 一位主要人員起頭的整組服務:第一項給這位人員,之後每一項優先同一位、不行再換其他可做的人員(要在班內)
+function makeChain(business: BkBusiness, sched: Schedule, service: BkService, staff: BkStaff, req: SlotRequest, occ: Awaited<ReturnType<typeof occupancy>>) {
+  const extras = (req.extras ?? []).map((id) => sched.services.find((s) => s.id === id)).filter((s): s is BkService => Boolean(s));
+  const seqs = req.seqs ?? [0, 1, 2, 3];
+  const lastBuffer = (i: number) => (i === extras.length ? business.buffer_minutes : 0);
+  const head = makeAssigner(business, sched, service, staff, req.addonIds, occ, lastBuffer(0));
+  const tails = extras.map((svc, i) => {
+    const cands = staffForService(sched, svc.id).sort((a, b) => (a.id === staff.id ? -1 : b.id === staff.id ? 1 : a.sort_order - b.sort_order));
+    return { svc, options: cands.map((st) => ({ st, a: makeAssigner(business, sched, svc, st, [], occ, lastBuffer(i + 1)) })) };
+  });
+
+  function assign(t: number) {
+    const first = head.assign(t, seqs[0]);
+    if (!first) return null;
+    const allocs = [...first.allocs];
+    const items: ItemPlan[] = [{ seq: seqs[0], service, staff, start: t, end: t + head.plan.total * 60000, plan: head.plan }];
+    let cursor = t + head.plan.total * 60000;
+    for (let i = 0; i < tails.length; i++) {
+      let picked: ItemPlan | null = null;
+      for (const { st, a } of tails[i].options) {
+        if (!inHours(sched, st, cursor, cursor + a.plan.total * 60000)) continue;
+        const got = a.assign(cursor, seqs[i + 1]);
+        if (!got) continue;
+        allocs.push(...got.allocs);
+        picked = { seq: seqs[i + 1], service: tails[i].svc, staff: st, start: cursor, end: cursor + a.plan.total * 60000, plan: a.plan };
+        break;
+      }
+      if (!picked) return null;
+      items.push(picked);
+      cursor = picked.end;
+    }
+    const last = items[items.length - 1];
+    return { allocs, resourceId: first.resourceId, items, end: cursor, occupyEnd: last.start + last.plan.occupy * 60000 };
+  }
+  return { head, assign };
+}
+
+// 可約時段:每位候選人員各自算(班表、休假、自己的占用、助理、座位、後續服務),再合併;staffId = 指定人員
 export async function availability(business: BkBusiness, sched: Schedule, req: SlotRequest, fromDate: string, days: number) {
   const service = sched.services.find((s) => s.id === req.serviceId);
   if (!service) throw new BookingError('VALIDATION_ERROR', '這個服務目前無法預約。', 422);
@@ -199,11 +239,11 @@ export async function availability(business: BkBusiness, sched: Schedule, req: S
   const occ = await occupancy(business.id, fromIso, toIso, req.excludeBookingId);
   const rules = req.ignoreLimits ? { ...business, lead_minutes: 0, advance_days: 365 } : business;
   const byStaff = new Map<string, { date: string; slots: string[]; closed: boolean }[]>();
-  const assigners = new Map<string, ReturnType<typeof makeAssigner>>();
+  const chains = new Map<string, ReturnType<typeof makeChain>>();
   for (const staff of candidates) {
-    const a = makeAssigner(business, sched, service, staff, req.addonIds, occ);
-    assigners.set(staff.id, a);
-    byStaff.set(staff.id, computeSlotsWith({ business: rules, hours: hoursOf(sched, staff), duration: a.plan.total, fromDate, days, ok: (t) => a.assign(t) !== null }));
+    const c = makeChain(business, sched, service, staff, req, occ);
+    chains.set(staff.id, c);
+    byStaff.set(staff.id, computeSlotsWith({ business: rules, hours: hoursOf(sched, staff), duration: c.head.plan.total, fromDate, days, ok: (t) => c.assign(t) !== null }));
   }
   const merged: { date: string; slots: string[]; closed: boolean }[] = [];
   for (let i = 0; i < days; i++) {
@@ -211,7 +251,7 @@ export async function availability(business: BkBusiness, sched: Schedule, req: S
     const slots = [...new Set(per.flatMap((d) => d.slots))].sort();
     merged.push({ date: addDays(fromDate, i), slots, closed: !per.length || per.every((d) => d.closed) });
   }
-  return { days: merged, byStaff, service, occ, assigners };
+  return { days: merged, byStaff, service, occ, chains };
 }
 
 function bookingNo() {
@@ -246,27 +286,42 @@ function rpcError(message: string): BookingError {
   return new BookingError('SERVER_ERROR', '預約處理失敗,請稍後再試。', 500);
 }
 
-type Placement = { staff: BkStaff; q: ReturnType<typeof quote>; steps: { name: string; minutes: number; who: string }[]; end: Date; occupyEnd: Date; resourceId: string | null; allocs: AllocInput[] };
+type ItemOut = { seq: number; service_id: string; service_snapshot: Record<string, unknown>; staff_id: string; start_at: string; end_at: string; amount: number };
+type Placement = {
+  staff: BkStaff; q: ReturnType<typeof quote>; steps: { name: string; minutes: number; who: string }[]; end: Date; occupyEnd: Date;
+  resourceId: string | null; allocs: AllocInput[]; items: ItemOut[]; total: number; extraDeposit: number; names: string[]; minutes: number;
+};
 
-// 這個開始時間可以給哪些人員(含助理、座位分派);不限人員時當天預約較少的人優先
+const stepsOut = (plan: ReturnType<typeof planOf>) => plan.segs.filter((s) => s.name !== '整理').map((s) => ({ name: s.name, minutes: s.to - s.from, who: s.who }));
+
+// 這個開始時間可以給哪些人員(含助理、座位、後續服務分派);不限人員時當天預約較少的人優先
 async function placements(business: BkBusiness, sched: Schedule, req: SlotRequest, start: Date): Promise<Placement[]> {
   const local = localParts(start);
   const label = minutesToHHMM(local.minutes);
-  const { byStaff, occ, assigners } = await availability(business, sched, req, local.date, 1);
+  const { byStaff, occ, chains } = await availability(business, sched, req, local.date, 1);
   const free = [...byStaff.entries()].filter(([, d]) => d[0]?.slots.includes(label)).map(([id]) => sched.staff.find((s) => s.id === id)!);
   const load = (id: string) => new Set(occ.live.filter((a) => a.staff_id === id && a.role === 'main' && localParts(new Date(a.start)).date === local.date).map((a) => a.booking_id)).size;
   free.sort((a, b) => load(a.id) - load(b.id) || a.sort_order - b.sort_order);
   const out: Placement[] = [];
   for (const staff of free) {
-    const asg = assigners.get(staff.id)!;
-    const got = asg.assign(start.getTime());
+    const got = chains.get(staff.id)!.assign(start.getTime());
     if (!got) continue;
-    const { plan } = asg;
+    const head = got.items[0];
+    const items: ItemOut[] = got.items.map((it) => {
+      const amount = it.plan.q.total;
+      return {
+        seq: it.seq, service_id: it.service.id, staff_id: it.staff.id, amount,
+        service_snapshot: { name: it.service.name, duration_minutes: it.plan.total, price: amount, price_note: it.service.price_note, ...(it.plan.segs.length > 1 ? { steps: stepsOut(it.plan) } : {}) },
+        start_at: new Date(it.start).toISOString(), end_at: new Date(it.end).toISOString(),
+      };
+    });
     out.push({
-      staff, q: plan.q, resourceId: got.resourceId, allocs: got.allocs,
-      steps: plan.segs.filter((s) => s.name !== '整理').map((s) => ({ name: s.name, minutes: s.to - s.from, who: s.who })),
-      end: new Date(start.getTime() + plan.total * 60000),
-      occupyEnd: new Date(start.getTime() + plan.occupy * 60000),
+      staff, q: head.plan.q, resourceId: got.resourceId, allocs: got.allocs, steps: stepsOut(head.plan),
+      end: new Date(got.end), occupyEnd: new Date(got.occupyEnd), items,
+      total: items.reduce((n, it) => n + it.amount, 0),
+      extraDeposit: got.items.slice(1).reduce((n, it) => n + it.service.deposit, 0),
+      names: got.items.map((it) => it.service.name),
+      minutes: Math.round((got.end - start.getTime()) / 60000),
     });
   }
   return out;
@@ -285,9 +340,11 @@ async function tryPlacements<T>(compute: () => Promise<Placement[]>, run: (p: Pl
   throw new BookingError('SLOT_UNAVAILABLE', '這個時段已無法預約,請重新選擇。', 409);
 }
 
+// 預約快照:多項服務時名稱合併(通知、行事曆用),明細在 bk_booking_items
 const snapshotOf = (service: BkService, p: Placement) => ({
-  name: service.name, duration_minutes: p.steps.reduce((n, s) => n + s.minutes, 0),
-  price: p.q.total, price_note: service.price_note, ...(p.steps.length > 1 ? { steps: p.steps } : {}),
+  name: p.names.join(' + '),
+  duration_minutes: p.minutes,
+  price: p.total, price_note: p.items.length > 1 ? '' : service.price_note, ...(p.steps.length > 1 && p.items.length <= 1 ? { steps: p.steps } : {}),
 });
 
 const cleanContact = (c: { name: string; phone: string; note: string }) => ({
@@ -296,7 +353,7 @@ const cleanContact = (c: { name: string; phone: string; note: string }) => ({
 
 // 顧客建立預約:伺服器重新核對服務、人員、時段、床位與金額(不採用前端的時長與金額)
 export async function createBooking(input: {
-  slug: string; userId: string; serviceId: string; addonIds: string[]; staffId: string | null; startAt: string;
+  slug: string; userId: string; serviceId: string; addonIds: string[]; staffId: string | null; startAt: string; extras?: string[];
   contact: { name: string; phone: string; note: string }; idempotencyKey: string; channel: string;
 }) {
   // 重送(網路重試、連點):同一顧客同一個 key 直接回傳原本那筆
@@ -316,12 +373,14 @@ export async function createBooking(input: {
   const start = new Date(input.startAt);
   if (Number.isNaN(start.getTime())) throw new BookingError('VALIDATION_ERROR', '時間格式錯誤。', 422);
 
-  const req: SlotRequest = { serviceId: service.id, addonIds: input.addonIds, staffId: input.staffId };
+  const extras = cleanExtras(sched, service.id, input.extras);
+  const req: SlotRequest = { serviceId: service.id, addonIds: input.addonIds, staffId: input.staffId, extras };
 
   const manual = business.approval_mode === 'manual';
   const contact = cleanContact(input.contact);
   return tryPlacements(() => placements(business, sched, req, start), async (p) => {
-    const deposit = service.deposit > 0 ? (p.q.total > 0 ? Math.min(service.deposit, p.q.total) : service.deposit) : 0;
+    const wanted = service.deposit + p.extraDeposit;
+    const deposit = wanted > 0 ? (p.total > 0 ? Math.min(wanted, p.total) : wanted) : 0;
     let expires: string | null = null;
     if (manual) {
       // 確認期限:不晚於服務開始前 30 分鐘
@@ -344,8 +403,8 @@ export async function createBooking(input: {
         service_snapshot: snapshotOf(service, p), start_at: start.toISOString(), end_at: p.end.toISOString(), occupy_end_at: p.occupyEnd.toISOString(),
         status: confirmed ? 'confirmed' : 'pending', approval_status: manual ? 'pending' : 'not_required', expires_at: expires,
         contact, source_card_id: card.id, source_channel: input.channel.slice(0, 20) || 'card', idempotency_key: idem || null,
-        staff_id: p.staff.id, staff_requested: Boolean(input.staffId), resource_id: p.resourceId, addons: p.q.addons, allocations: p.allocs,
-        total_price: p.q.total, deposit_amount: deposit, payment_status: deposit ? 'awaiting' : 'none',
+        staff_id: p.staff.id, staff_requested: Boolean(input.staffId), resource_id: p.resourceId, addons: p.q.addons, allocations: p.allocs, items: p.items.length > 1 ? p.items : [],
+        total_price: p.total, deposit_amount: deposit, payment_status: deposit ? 'awaiting' : 'none',
         created_by: 'customer', actor_type: 'customer', actor_id: input.userId,
       },
       p_notices: notices,
@@ -357,7 +416,7 @@ export async function createBooking(input: {
 
 // 店家人工加單(電話、現場客):一樣經過人員 / 床位衝突檢查,不受最短提前與可約天數限制
 export async function ownerCreateBooking(ownerUserId: string, input: {
-  serviceId: string; addonIds: string[]; staffId: string | null; startAt: string; contact: { name: string; phone: string; note: string };
+  serviceId: string; addonIds: string[]; staffId: string | null; startAt: string; contact: { name: string; phone: string; note: string }; extras?: string[];
 }) {
   const business = await ownerBusiness(ownerUserId);
   if (!business) throw new BookingError('NOT_FOUND', '請先完成預約設定。', 404);
@@ -368,7 +427,7 @@ export async function ownerCreateBooking(ownerUserId: string, input: {
   if (Number.isNaN(start.getTime())) throw new BookingError('VALIDATION_ERROR', '時間格式錯誤。', 422);
   if (start.getTime() < Date.now() - 12 * 3600000) throw new BookingError('VALIDATION_ERROR', '不能新增已經過去的預約。', 422);
   if (!input.contact.name.trim()) throw new BookingError('VALIDATION_ERROR', '請填寫顧客姓名。', 422);
-  const req: SlotRequest = { serviceId: service.id, addonIds: input.addonIds, staffId: input.staffId, ignoreLimits: true };
+  const req: SlotRequest = { serviceId: service.id, addonIds: input.addonIds, staffId: input.staffId, extras: cleanExtras(sched, service.id, input.extras), ignoreLimits: true };
   return tryPlacements(() => placements(business, sched, req, start), async (p) => {
     const { data, error } = await db().rpc('bk_create_booking2', {
       p: {
@@ -376,7 +435,7 @@ export async function ownerCreateBooking(ownerUserId: string, input: {
         service_snapshot: snapshotOf(service, p), start_at: start.toISOString(), end_at: p.end.toISOString(), occupy_end_at: p.occupyEnd.toISOString(),
         status: 'confirmed', approval_status: 'not_required', expires_at: null, contact: cleanContact(input.contact),
         source_card_id: business.card_id, source_channel: 'owner', staff_id: p.staff.id, staff_requested: Boolean(input.staffId),
-        resource_id: p.resourceId, addons: p.q.addons, allocations: p.allocs, total_price: p.q.total, deposit_amount: 0, payment_status: 'none',
+        resource_id: p.resourceId, addons: p.q.addons, allocations: p.allocs, items: p.items.length > 1 ? p.items : [], total_price: p.total, deposit_amount: 0, payment_status: 'none',
         created_by: 'owner', actor_type: 'owner', actor_id: ownerUserId,
       },
       p_notices: [],
@@ -467,13 +526,47 @@ export async function ownerPayment(ownerUserId: string, bookingId: string, expec
   return recordPayment(business, b, expectedVersion, input.kind, input.amount, input.method, input.note, 'owner', ownerUserId);
 }
 
+// 同一次再加的服務:最多 2 項,不能和主服務重複,須是開放中的服務
+function cleanExtras(sched: Schedule, mainId: string, extras?: string[]) {
+  const ids = [...new Set((extras ?? []).filter((id) => id !== mainId && sched.services.some((s) => s.id === id)))];
+  if ((extras ?? []).length > 2) throw new BookingError('VALIDATION_ERROR', '同一次最多再加 2 項服務。', 422);
+  return ids.slice(0, 2);
+}
+
+// 改期用:這筆預約目前仍有效的服務組合(取消過的項目不再排入,沿用原本的項目編號)
+async function chainOf(sched: Schedule, b: BkBooking): Promise<Pick<SlotRequest, 'serviceId' | 'addonIds' | 'extras' | 'seqs'>> {
+  const { data: items } = await db().from('bk_booking_items').select('seq, service_id').eq('booking_id', b.id).eq('status', 'active').order('seq');
+  const fromItems = Boolean(items?.length);
+  const list = fromItems ? items! : [{ seq: 0, service_id: b.service_id }];
+  if (list.some((it) => !it.service_id || !sched.services.some((s) => s.id === it.service_id))) {
+    throw new BookingError('POLICY_BLOCKED', '預約裡有服務已下架,無法改期,請聯絡店家。', 422);
+  }
+  return {
+    serviceId: list[0].service_id as string,
+    addonIds: list[0].seq === 0 ? (b.addons ?? []).map((a) => a.id) : [],
+    extras: list.slice(1).map((it) => it.service_id as string),
+    // 只有原本就有項目明細的預約才帶 seqs(改期時會一併更新明細)
+    seqs: fromItems ? list.map((it) => it.seq) : undefined,
+  };
+}
+
+// 店家取消多項服務中的一項(只釋放那一項的時段並重算金額;已收款不自動退)
+export async function ownerCancelItem(ownerUserId: string, bookingId: string, expectedVersion: number, seq: number, reason = '') {
+  const { b } = await ownerBooking(ownerUserId, bookingId);
+  const { data, error } = await db().rpc('bk_cancel_item', {
+    p_booking_id: b.id, p_expected_version: expectedVersion, p_seq: seq, p_reason: reason.slice(0, 200),
+    p_actor_type: 'owner', p_actor: ownerUserId, p_notices: [{ event: 'item_cancelled', audience: 'customer' }],
+  });
+  if (error) throw rpcError(error.message);
+  return data as BkBooking;
+}
+
 // 改期:新時段搶不到時舊預約不變;成功後舊提醒失效、寫入新提醒
 async function reschedule(business: BkBusiness, b: BkBooking, expectedVersion: number, startAt: string, staffId: string | null, actor: { type: 'owner' | 'customer'; id: string }, ignoreLimits: boolean) {
   const start = new Date(startAt);
   if (Number.isNaN(start.getTime())) throw new BookingError('VALIDATION_ERROR', '時間格式錯誤。', 422);
   const sched = await loadSchedule(business.id);
-  if (!b.service_id || !sched.services.some((s) => s.id === b.service_id)) throw new BookingError('POLICY_BLOCKED', '這個服務已下架,無法改期,請聯絡店家。', 422);
-  const req: SlotRequest = { serviceId: b.service_id, addonIds: (b.addons ?? []).map((a) => a.id), staffId, excludeBookingId: b.id, ignoreLimits };
+  const req: SlotRequest = { ...(await chainOf(sched, b)), staffId, excludeBookingId: b.id, ignoreLimits };
   const notices: Notice[] = [
     { event: 'rescheduled', audience: actor.type === 'owner' ? 'customer' : 'owner' },
     ...(actor.type === 'customer' ? [{ event: 'rescheduled', audience: 'customer' as const }] : []),
@@ -481,7 +574,7 @@ async function reschedule(business: BkBusiness, b: BkBooking, expectedVersion: n
   ];
   return tryPlacements(() => placements(business, sched, req, start), async (p) => {
     const { data, error } = await db().rpc('bk_reschedule', {
-      p_booking_id: b.id, p_expected_version: expectedVersion, p_staff: p.staff.id, p_resource: p.resourceId, p_allocations: p.allocs,
+      p_booking_id: b.id, p_expected_version: expectedVersion, p_staff: p.staff.id, p_resource: p.resourceId, p_allocations: p.allocs, p_items: req.seqs ? p.items : null,
       p_start: start.toISOString(), p_end: p.end.toISOString(), p_occupy_end: p.occupyEnd.toISOString(),
       p_actor_type: actor.type, p_actor: actor.id, p_count: actor.type === 'customer', p_notices: notices,
     });
@@ -496,15 +589,14 @@ export async function ownerReschedule(ownerUserId: string, bookingId: string, ex
 }
 
 // 店家改期 / 人工加單用的可約時段(不受最短提前限制)
-export async function ownerSlots(ownerUserId: string, input: { serviceId: string; addonIds: string[]; staffId: string | null; bookingId?: string; date: string }) {
+export async function ownerSlots(ownerUserId: string, input: { serviceId: string; addonIds: string[]; staffId: string | null; bookingId?: string; date: string; extras?: string[] }) {
   const business = await ownerBusiness(ownerUserId);
   if (!business) throw new BookingError('NOT_FOUND', '請先完成預約設定。', 404);
   const sched = await loadSchedule(business.id);
-  let req: SlotRequest = { serviceId: input.serviceId, addonIds: input.addonIds, staffId: input.staffId, ignoreLimits: true };
+  let req: SlotRequest = { serviceId: input.serviceId, addonIds: input.addonIds, staffId: input.staffId, extras: input.bookingId ? [] : cleanExtras(sched, input.serviceId, input.extras), ignoreLimits: true };
   if (input.bookingId) {
     const { b } = await ownerBooking(ownerUserId, input.bookingId);
-    if (!b.service_id) throw new BookingError('POLICY_BLOCKED', '這個服務已下架,無法改期。', 422);
-    req = { ...req, serviceId: b.service_id, addonIds: (b.addons ?? []).map((a) => a.id), excludeBookingId: b.id };
+    req = { ...req, ...(await chainOf(sched, b)), excludeBookingId: b.id };
   }
   const { days } = await availability(business, sched, req, input.date, 1);
   return days[0];
@@ -537,9 +629,8 @@ export async function customerRescheduleSlots(userId: string, bookingId: string,
   const { b, business } = await customerBooking(userId, bookingId);
   customerChangeAllowed(business, b, '改期');
   if (b.reschedule_count >= business.reschedule_limit) throw new BookingError('POLICY_BLOCKED', '已達線上改期次數上限,請直接聯絡店家。', 422);
-  if (!b.service_id) throw new BookingError('POLICY_BLOCKED', '這個服務已下架,無法改期,請聯絡店家。', 422);
   const sched = await loadSchedule(business.id);
-  const req: SlotRequest = { serviceId: b.service_id, addonIds: (b.addons ?? []).map((a) => a.id), staffId: b.staff_requested ? b.staff_id : null, excludeBookingId: b.id };
+  const req: SlotRequest = { ...(await chainOf(sched, b)), staffId: b.staff_requested ? b.staff_id : null, excludeBookingId: b.id };
   return (await availability(business, sched, req, fromDate, days)).days;
 }
 
@@ -593,6 +684,7 @@ const TITLES: Record<string, { customer?: string; owner?: string; color: string 
   confirmed: { customer: '預約已確認', color: '#2f6b3f' },
   rejected: { customer: '預約未成立', color: '#8a5a50' },
   rescheduled: { customer: '預約時間已更改', owner: '顧客更改了預約時間', color: '#1f6f8b' },
+  item_cancelled: { customer: '店家調整了預約的服務項目', color: '#8a5a50' },
   cancelled_by_owner: { customer: '店家已取消你的預約', color: '#8a5a50' },
   cancelled_by_customer: { owner: '顧客取消了預約', color: '#8a5a50' },
   expired: { customer: '預約已逾期取消', owner: '一筆預約已逾期取消', color: '#8a7f72' },
@@ -754,7 +846,8 @@ export function publicCatalog(sched: Schedule) {
       addons: sched.addons.filter((a) => a.service_id === s.id).map((a) => ({ id: a.id, name: a.name, price: a.price, extra_minutes: a.extra_minutes })),
       staff: staffForService(sched, s.id).map((st) => {
         const link = sched.staffServices.find((x) => x.service_id === s.id && x.staff_id === st.id);
-        return { id: st.id, duration_minutes: link?.duration_minutes ?? s.duration_minutes, price: link?.price ?? s.price };
+        const stepSum = stepsOf(sched, s.id).reduce((n, x) => n + x.minutes, 0);
+        return { id: st.id, duration_minutes: stepSum || (link?.duration_minutes ?? s.duration_minutes), price: link?.price ?? s.price };
       }),
     })),
     staff: sched.staff.map((st) => ({ id: st.id, name: st.name, title: st.title, avatar: st.avatar })),

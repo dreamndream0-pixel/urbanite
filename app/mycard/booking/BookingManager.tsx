@@ -150,6 +150,8 @@ function BookingCard({ booking: b, data, reload }: { booking: BkBooking; data: D
   const staff = data.staff.find((s) => s.id === b.staff_id);
   const resource = data.resources.find((r) => r.id === b.resource_id);
   const payments = data.payments.filter((p) => p.booking_id === b.id);
+  const items = data.items.filter((it) => it.booking_id === b.id).sort((x, y) => x.seq - y.seq);
+  const activeItems = items.filter((it) => it.status === 'active').length;
   const total = b.total_price || b.service_snapshot.price;
   const started = new Date(b.start_at).getTime() <= now;
   const soon = new Date(b.start_at).getTime() - now <= 3 * 3600000;
@@ -163,6 +165,11 @@ function BookingCard({ booking: b, data, reload }: { booking: BkBooking; data: D
       setPanel('');
     } catch (e) { void uiAlert(errMsg(e)); }
     finally { setBusy(false); void reload(); }
+  }
+  async function cancelItem(seq: number, name: string) {
+    const r = await uiPrompt(`只取消「${name}」這一項?其他項目照常,總額會重算;已收的款項請另外處理退款。\n原因(選填,顧客看得到):`, { danger: true });
+    if (r === null) return;
+    await post({ command: 'cancel_item', seq, reason: r }, `已取消「${name}」`);
   }
   async function run(command: string, label: string) {
     let reason = '';
@@ -181,6 +188,18 @@ function BookingCard({ booking: b, data, reload }: { booking: BkBooking; data: D
           <p className="text-base font-semibold">{formatRange(b.start_at, b.end_at).split(' ')[1]}{team && staff ? <span className="ml-2 text-sm font-normal text-[#6b6156]">· {staff.name}</span> : null}</p>
           <p className="text-sm">{b.service_snapshot.name}{b.addons?.length ? ` + ${b.addons.map((a) => a.name).join('、')}` : ''}</p>
           {resource ? <p className="text-xs text-[#8a7f72]">{resource.name}</p> : null}
+          {items.length > 1 ? (
+            <ul className="mt-1 space-y-1">
+              {items.map((it) => (
+                <li key={it.id} className={`flex items-center gap-2 rounded-lg bg-[#faf7f2] px-2 py-1 text-xs ${it.status === 'cancelled' ? 'text-[#a99e8f] line-through' : 'text-[#3d3631]'}`}>
+                  <span className="min-w-0 flex-1 truncate">{formatRange(it.start_at, it.end_at).split(' ')[1]} {it.service_snapshot.name}{team ? ` · ${data.staff.find((s) => s.id === it.staff_id)?.name ?? ''}` : ''}{it.amount ? ` · ${money(it.amount)}` : ''}</span>
+                  {it.status === 'active' && activeItems > 1 && ['pending', 'confirmed', 'checked_in'].includes(b.status)
+                    ? <button type="button" disabled={busy} onClick={() => void cancelItem(it.seq, it.service_snapshot.name)} className="shrink-0 text-[#a03b3b] no-underline">取消此項</button>
+                    : null}
+                </li>
+              ))}
+            </ul>
+          ) : null}
           {data.allocations.filter((a) => a.booking_id === b.id && a.role === 'assistant').map((a) => (
             <p key={a.id} className="text-xs text-[#1f4f6e]">助理 {data.staff.find((s) => s.id === a.staff_id)?.name ?? ''} {formatRange(a.start_at, a.end_at).split(' ')[1]}</p>
           ))}
@@ -272,10 +291,10 @@ function PaymentForm({ title, kinds, defaultAmount, busy, allowSkip, onCancel, o
 }
 
 // 店家選時段(改期 / 加單共用):日期 + 人員 → 可選時間(不受最短提前限制)
-function useOwnerSlots(params: { date: string; service: string; addons: string[]; staff: string; booking?: string }) {
+function useOwnerSlots(params: { date: string; service: string; addons: string[]; staff: string; booking?: string; extra?: string[] }) {
   const [slots, setSlots] = useState<string[] | null>(null);
   const [error, setError] = useState('');
-  const key = `${params.date}|${params.service}|${params.addons.join(',')}|${params.staff}|${params.booking ?? ''}`;
+  const key = `${params.date}|${params.service}|${params.addons.join(',')}|${params.staff}|${params.booking ?? ''}|${(params.extra ?? []).join(',')}`;
   useEffect(() => {
     if (!params.date || (!params.service && !params.booking)) return;
     let alive = true;
@@ -283,7 +302,7 @@ function useOwnerSlots(params: { date: string; service: string; addons: string[]
       setSlots(null);
       setError('');
       try {
-        const q = new URLSearchParams({ date: params.date, service: params.service, addons: params.addons.join(','), staff: params.staff, booking: params.booking ?? '' });
+        const q = new URLSearchParams({ date: params.date, service: params.service, addons: params.addons.join(','), staff: params.staff, booking: params.booking ?? '', extra: (params.extra ?? []).join(',') });
         const day = await api<{ slots: string[] }>(`/api/mycard/booking/bookings?${q}`);
         if (alive) setSlots(day?.slots ?? []);
       } catch (e) { if (alive) { setError(errMsg(e)); setSlots([]); } }
@@ -338,6 +357,7 @@ function NewBooking({ data, onClose, onDone, initialDate }: { data: Data; onClos
   const services = data.services.filter((s) => s.active);
   const [serviceId, setServiceId] = useState(services[0]?.id ?? '');
   const [addonIds, setAddonIds] = useState<string[]>([]);
+  const [extraIds, setExtraIds] = useState<string[]>([]);
   const [staff, setStaff] = useState('');
   const [date, setDate] = useState(initialDate ?? data.today);
   const [time, setTime] = useState('');
@@ -345,7 +365,7 @@ function NewBooking({ data, onClose, onDone, initialDate }: { data: Data; onClos
   const [busy, setBusy] = useState(false);
   const team = isTeam(data);
   const addons = data.addons.filter((a) => a.service_id === serviceId && a.active);
-  const { slots, error } = useOwnerSlots({ date, service: serviceId, addons: addonIds, staff });
+  const { slots, error } = useOwnerSlots({ date, service: serviceId, addons: addonIds, staff, extra: extraIds });
 
   async function save() {
     if (!contact.name.trim()) return void uiAlert('請填寫顧客姓名');
@@ -353,7 +373,7 @@ function NewBooking({ data, onClose, onDone, initialDate }: { data: Data; onClos
     try {
       await api('/api/mycard/booking/bookings', {
         method: 'POST',
-        body: JSON.stringify({ service_id: serviceId, addon_ids: addonIds, staff_id: staff || null, start_at: new Date(`${date}T${time}:00+08:00`).toISOString(), contact }),
+        body: JSON.stringify({ service_id: serviceId, addon_ids: addonIds, extra_ids: extraIds, staff_id: staff || null, start_at: new Date(`${date}T${time}:00+08:00`).toISOString(), contact }),
       });
       uiToast('已新增預約');
       onDone();
@@ -368,7 +388,7 @@ function NewBooking({ data, onClose, onDone, initialDate }: { data: Data; onClos
         <p className="font-semibold">新增預約(電話、現場客)</p>
         <button type="button" onClick={onClose} aria-label="關閉" className="px-2 text-lg text-[#8a7f72]">×</button>
       </div>
-      <select value={serviceId} onChange={(e) => { setServiceId(e.target.value); setAddonIds([]); setTime(''); }} aria-label="服務" className={input}>
+      <select value={serviceId} onChange={(e) => { setServiceId(e.target.value); setAddonIds([]); setExtraIds((x) => x.filter((id) => id !== e.target.value)); setTime(''); }} aria-label="服務" className={input}>
         {services.map((s) => <option key={s.id} value={s.id}>{s.name}({s.duration_minutes} 分{s.price ? ` · ${money(s.price)}` : ''})</option>)}
       </select>
       {addons.length ? (
@@ -379,6 +399,15 @@ function NewBooking({ data, onClose, onDone, initialDate }: { data: Data; onClos
               {a.name}{a.price ? ` +${money(a.price)}` : ''}
             </label>
           ))}
+        </div>
+      ) : null}
+      {services.length > 1 ? (
+        <div className="flex flex-wrap items-center gap-1.5 text-xs">
+          <span className="text-[#8a7f72]">接著做:</span>
+          {services.filter((s) => s.id !== serviceId).map((s) => {
+            const on = extraIds.includes(s.id);
+            return <button key={s.id} type="button" aria-pressed={on} disabled={!on && extraIds.length >= 2} onClick={() => { setExtraIds(on ? extraIds.filter((id) => id !== s.id) : [...extraIds, s.id]); setTime(''); }} className={`rounded-full px-2.5 py-1 disabled:opacity-40 ${on ? 'bg-[#1f1b19] text-white' : 'border border-[#d7c9bd] bg-white'}`}>{on ? '✓ ' : '+ '}{s.name}</button>;
+          })}
         </div>
       ) : null}
       <div className={`grid gap-2 ${team ? 'grid-cols-2' : 'grid-cols-1'}`}>

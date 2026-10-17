@@ -19,7 +19,7 @@ export async function GET(request: Request) {
   try {
     const day = await ownerSlots(user.id, {
       date, serviceId: q.get('service') ?? '', addonIds: (q.get('addons') ?? '').split(',').filter(Boolean),
-      staffId: q.get('staff') || null, bookingId: q.get('booking') || undefined,
+      staffId: q.get('staff') || null, bookingId: q.get('booking') || undefined, extras: (q.get('extra') ?? '').split(',').filter(Boolean).slice(0, 2),
     });
     return NextResponse.json(day, { headers: { 'Cache-Control': 'no-store' } });
   } catch (e) { return fail(e, '讀取時段失敗。'); }
@@ -35,6 +35,7 @@ export async function POST(request: Request) {
       serviceId: String(body?.service_id ?? ''),
       addonIds: Array.isArray(body?.addon_ids) ? (body.addon_ids as unknown[]).map(String).slice(0, 20) : [],
       staffId: body?.staff_id ? String(body.staff_id) : null,
+      extras: Array.isArray(body?.extra_ids) ? (body.extra_ids as unknown[]).map(String).slice(0, 3) : [],
       startAt: String(body?.start_at ?? ''),
       contact: { name: String(body?.contact?.name ?? ''), phone: String(body?.contact?.phone ?? ''), note: String(body?.contact?.note ?? '') },
     });
