@@ -24,7 +24,12 @@ export async function GET() {
   const { data: myCustomers } = await db.from('bk_customers').select('id, business_id').eq('user_id', user.id);
   const cids = (myCustomers ?? []).map((c) => c.id);
   const [pkgs, pts] = await Promise.all([packagesOf(cids), pointsOf(cids)]);
-  const ids = [...new Set([...(bookings ?? []).map((b) => b.business_id), ...(quotes ?? []).map((q) => q.business_id), ...records.map((r) => r.business_id), ...(myCustomers ?? []).map((c) => c.business_id)])];
+  const { data: waitlist } = await db.from('bk_waitlist').select('id, business_id, service_id, date, from_min, to_min, status, invited_slot, invite_expires_at, staff_id')
+    .eq('customer_user_id', user.id).in('status', ['waiting', 'invited']).order('date');
+  const { data: optRows } = await db.from('bk_customers').select('business_id, marketing_opt_out').eq('user_id', user.id);
+  const wsids = [...new Set((waitlist ?? []).map((w) => w.service_id))];
+  const { data: wsvc } = wsids.length ? await db.from('bk_services').select('id, name').in('id', wsids) : { data: [] };
+  const ids = [...new Set([...(bookings ?? []).map((b) => b.business_id), ...(quotes ?? []).map((q) => q.business_id), ...records.map((r) => r.business_id), ...(myCustomers ?? []).map((c) => c.business_id), ...(waitlist ?? []).map((w) => w.business_id)])];
   const [{ data: businesses }, { data: staff }] = await Promise.all([
     ids.length ? db.from('bk_businesses').select('id, name, card_id, address, cancel_hours, payment_info, reschedule_limit').in('id', ids) : Promise.resolve({ data: [] }),
     ids.length ? db.from('bk_staff').select('id, name, business_id, active').in('business_id', ids) : Promise.resolve({ data: [] }),
@@ -40,6 +45,8 @@ export async function GET() {
   return NextResponse.json({
     line_bound: Boolean(customer?.line_user_id),
     records: records.map((r) => ({ ...r, business: bizInfo(r.business_id) })),
+    waitlist: (waitlist ?? []).map((w) => ({ ...w, service_name: (wsvc ?? []).find((s) => s.id === w.service_id)?.name ?? '', business: bizInfo(w.business_id) })),
+    prefs: (optRows ?? []).map((o) => ({ business: bizInfo(o.business_id), marketing_opt_out: o.marketing_opt_out })),
     packages: pkgs.filter((p) => p.status === 'active').map((p) => ({ id: p.id, name: p.name, service_ids: p.service_ids, available: p.available, used: p.used, reserved: p.reserved, sessions_total: p.sessions_total, expires_at: p.expires_at, business: bizInfo((myCustomers ?? []).find((c) => c.id === p.customer_id)?.business_id ?? '') })),
     points: (myCustomers ?? []).map((c) => ({ business: bizInfo(c.business_id), points: pts.get(c.id) ?? 0 })).filter((x) => x.points > 0),
     quotes: (quotes ?? []).map((q) => ({

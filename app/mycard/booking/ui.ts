@@ -8,6 +8,7 @@ export type Data = {
   staffHours: BkStaffHour[]; staffServices: BkStaffService[]; resources: BkResource[]; steps: BkServiceStep[]; allocations: BkAllocation[]; items: BkBookingItem[]; quotes: BkQuote[]; quoteVersions: BkQuoteVersion[];
   customers: { id: string; name: string; note: string; tags: string[]; user_id: string | null; points: number }[];
   products: import('@/lib/booking/loyalty').PackageProduct[];
+  waitlist: import('@/lib/booking/engage').WaitlistEntry[];
   exceptions: BkException[]; bookings: BkBooking[]; payments: BkPayment[];
   card: { slug: string; display_name: string } | null; line_bound: boolean; today: string;
 };

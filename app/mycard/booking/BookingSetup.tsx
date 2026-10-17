@@ -69,9 +69,9 @@ const STEP_MINUTES = [5, 10, 15, 20, 25, 30, 40, 45, 50, 60, 75, 90, 120, 150, 1
 type ServiceDraft = {
   id?: string; name: string; description: string; duration_minutes: number; price: number; price_note: string; active: boolean;
   deposit: number; needs_resource: boolean; addons: AddonDraft[]; staff: StaffLink[]; steps: StepDraft[];
-  price_mode: 'fixed' | 'quote'; service_mode: 'in_store' | 'outcall';
+  price_mode: 'fixed' | 'quote'; service_mode: 'in_store' | 'outcall'; revisit_days: number;
 };
-const blankService: ServiceDraft = { name: '', description: '', duration_minutes: 60, price: 0, price_note: '', active: true, deposit: 0, needs_resource: false, addons: [], staff: [], steps: [], price_mode: 'fixed', service_mode: 'in_store' };
+const blankService: ServiceDraft = { name: '', description: '', duration_minutes: 60, price: 0, price_note: '', active: true, deposit: 0, needs_resource: false, addons: [], staff: [], steps: [], price_mode: 'fixed', service_mode: 'in_store', revisit_days: 0 };
 const digits = (v: string) => Number(v.replace(/\D/g, '')) || 0;
 
 export function ServicesTab({ data, reload }: { data: Data; reload: () => Promise<void> }) {
@@ -84,7 +84,7 @@ export function ServicesTab({ data, reload }: { data: Data; reload: () => Promis
   function edit(s: BkService) {
     setEditing({
       id: s.id, name: s.name, description: s.description, duration_minutes: s.duration_minutes, price: s.price, price_note: s.price_note, active: s.active,
-      deposit: s.deposit, needs_resource: s.needs_resource, price_mode: s.price_mode, service_mode: s.service_mode,
+      deposit: s.deposit, needs_resource: s.needs_resource, price_mode: s.price_mode, service_mode: s.service_mode, revisit_days: s.revisit_days ?? 0,
       addons: data.addons.filter((a) => a.service_id === s.id).map((a) => ({ id: a.id, name: a.name, price: a.price, extra_minutes: a.extra_minutes, active: a.active })),
       staff: data.staffServices.filter((x) => x.service_id === s.id).map((x) => ({ staff_id: x.staff_id, duration_minutes: x.duration_minutes, price: x.price })),
       steps: data.steps.filter((x) => x.service_id === s.id).sort((a, b) => a.seq - b.seq).map((x) => ({ name: x.name, minutes: x.minutes, who: x.who, seat: x.seat })),
@@ -163,6 +163,11 @@ export function ServicesTab({ data, reload }: { data: Data; reload: () => Promis
               <input inputMode="numeric" value={editing.deposit || ''} onChange={(e) => setEditing({ ...editing, deposit: digits(e.target.value) })} placeholder="0 = 不收訂金" className={`${input} mt-1`} />
             </label>
           </div>
+          <label className="block text-xs text-[#8a7f72]">回訪提醒(完成後幾天提醒顧客再預約)
+            <select value={editing.revisit_days} onChange={(e) => setEditing({ ...editing, revisit_days: Number(e.target.value) })} className={`${input} mt-1`}>
+              {[0, 14, 21, 28, 30, 42, 60, 90, 120, 180].map((n) => <option key={n} value={n}>{n ? `${n} 天後` : '不提醒'}</option>)}
+            </select>
+          </label>
           <label className="block text-xs text-[#8a7f72]">說明(選填)
             <textarea value={editing.description} onChange={(e) => setEditing({ ...editing, description: e.target.value })} rows={3} maxLength={500} className={`${input} mt-1 resize-none`} />
           </label>
@@ -572,6 +577,14 @@ export function SettingsTab({ data, reload }: { data: Data; reload: () => Promis
         <p className="text-[11px] leading-5 text-[#a99e8f]">服務完成且付清後,依實收金額入帳(只付訂金不入帳;點數與套票折抵的部分不再回饋);退款會自動沖銷。購買套票時就入帳,用套票兌換不再重複回饋。完成服務時可用點數折抵。</p>
       </section>
       <PackageProducts data={data} reload={reload} />
+      <section className={`${card} space-y-3`}>
+        <p className="font-semibold">候補與回訪</p>
+        <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={b.waitlist_enabled} onChange={(e) => setB({ ...b, waitlist_enabled: e.target.checked })} />額滿時讓顧客登記候補</label>
+        {b.waitlist_enabled ? <div className="grid grid-cols-2 gap-3">{num('waitlist_invite_minutes', '候補邀請有效', [15, 30, 60, 120, 240].map((n) => [n, n < 60 ? `${n} 分鐘` : `${n / 60} 小時`]))}</div> : null}
+        <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={b.thanks_enabled} onChange={(e) => setB({ ...b, thanks_enabled: e.target.checked })} />服務完成 3 小時後傳感謝訊息</label>
+        {b.thanks_enabled ? <textarea value={b.thanks_message} onChange={(e) => setB({ ...b, thanks_message: e.target.value })} rows={2} maxLength={200} placeholder="例:謝謝你今天的光臨!有任何問題歡迎直接傳訊息給我們。" aria-label="感謝訊息" className={`${input} resize-none`} /> : null}
+        <p className="text-[11px] leading-5 text-[#a99e8f]">回訪提醒在「服務」裡設定天數。感謝與回訪屬於行銷訊息,顧客可在預約頁關閉;顧客已再預約就不會收到回訪提醒。</p>
+      </section>
       <section className={`${card} space-y-3`}>
         <p className="font-semibold">外出服務</p>
         <div className="grid grid-cols-2 gap-3">

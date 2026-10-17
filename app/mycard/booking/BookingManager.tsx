@@ -111,7 +111,7 @@ export default function BookingManager() {
 
 // ---------- 預約清單 ----------
 function BookingsTab({ data, reload }: { data: Data; reload: () => Promise<void> }) {
-  const [filter, setFilter] = useState<'pending' | 'upcoming' | 'past' | 'all'>(() => (data.bookings.some((b) => b.status === 'pending') ? 'pending' : 'upcoming'));
+  const [filter, setFilter] = useState<'pending' | 'upcoming' | 'past' | 'all' | 'waitlist'>(() => (data.bookings.some((b) => b.status === 'pending') ? 'pending' : 'upcoming'));
   const [adding, setAdding] = useState(false);
   const [now] = useState(() => Date.now());
   const list = useMemo(() => data.bookings.filter((b) => {
@@ -127,14 +127,14 @@ function BookingsTab({ data, reload }: { data: Data; reload: () => Promise<void>
     <div className="space-y-3">
       <div className="flex items-center gap-2">
         <div className="flex min-w-0 flex-1 gap-1.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          {([['pending', '待處理'], ['upcoming', '即將到來'], ['past', '已結束'], ['all', '全部']] as const).map(([k, label]) => (
+          {([['pending', '待處理'], ['upcoming', '即將到來'], ['past', '已結束'], ['all', '全部'], ...(data.waitlist.length ? [['waitlist', `候補(${data.waitlist.length})`]] : [])] as [typeof filter, string][]).map(([k, label]) => (
             <button key={k} type="button" onClick={() => setFilter(k)} className={`shrink-0 rounded-full px-3.5 py-1.5 text-sm ${filter === k ? 'bg-[#1f1b19] text-white' : 'border border-[#e5ded4] bg-white text-[#6b6156]'}`}>{label}</button>
           ))}
         </div>
         <button type="button" onClick={() => setAdding(true)} className={`${btnDark} shrink-0 px-3`}>+ 加單</button>
       </div>
       {adding ? <NewBooking data={data} onClose={() => setAdding(false)} onDone={() => { setAdding(false); void reload(); }} /> : null}
-      {!list.length ? <p className="rounded-2xl bg-white p-8 text-center text-sm text-[#a99e8f]">沒有預約</p> : list.map((b) => {
+      {filter === 'waitlist' ? <WaitlistList data={data} reload={reload} /> : !list.length ? <p className="rounded-2xl bg-white p-8 text-center text-sm text-[#a99e8f]">沒有預約</p> : list.map((b) => {
         const d = localParts(b.start_at).date;
         const header = d !== lastDate ? (lastDate = d) : '';
         return (
@@ -144,6 +144,31 @@ function BookingsTab({ data, reload }: { data: Data; reload: () => Promise<void>
           </div>
         );
       })}
+    </div>
+  );
+}
+
+// ---------- 候補名單 ----------
+function WaitlistList({ data, reload }: { data: Data; reload: () => Promise<void> }) {
+  async function remove(id: string) {
+    if (!(await uiConfirm('移除這筆候補?'))) return;
+    try { await api(`/api/mycard/booking/waitlist/${id}`, { method: 'DELETE' }); uiToast('已移除'); void reload(); }
+    catch (e) { void uiAlert(errMsg(e)); }
+  }
+  return (
+    <div className="space-y-2">
+      <p className="text-xs leading-5 text-[#8a7f72]">有人取消或改期空出時段時,系統依登記順序一次邀請一位(LINE 通知),邀請 {data.business.waitlist_invite_minutes} 分鐘內有效;名額不保留,先完成預約的人取得。</p>
+      {data.waitlist.map((w) => (
+        <div key={w.id} className={`${card} flex items-start gap-3`}>
+          <div className="min-w-0 flex-1 text-sm">
+            <p className="font-semibold">{formatDateLabel(w.date).md}(週{formatDateLabel(w.date).weekday}) {w.from_min === 0 && w.to_min === 1440 ? '整天' : `${minutesToHHMM(w.from_min)}–${w.to_min === 1440 ? '24:00' : minutesToHHMM(w.to_min)}`}</p>
+            <p className="text-[#6b6156]">{data.services.find((s) => s.id === w.service_id)?.name ?? ''}{w.staff_id ? ` · ${data.staff.find((s) => s.id === w.staff_id)?.name ?? ''}` : ''}</p>
+            <p className="text-xs text-[#8a7f72]">{w.contact?.name ?? ''}{w.contact?.phone ? ` · ${w.contact.phone}` : ''}</p>
+            {w.status === 'invited' ? <p className="text-xs text-[#2f6b3f]">已邀請 {w.invited_slot},{formatDateTime(w.invite_expires_at!)} 前有效</p> : <p className="text-xs text-[#9a6412]">等待空位</p>}
+          </div>
+          <button type="button" onClick={() => void remove(w.id)} className="shrink-0 text-xs text-[#a03b3b]">移除</button>
+        </div>
+      ))}
     </div>
   );
 }

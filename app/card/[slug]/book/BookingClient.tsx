@@ -18,7 +18,8 @@ type Service = {
   price_mode: 'fixed' | 'quote'; service_mode: 'in_store' | 'outcall';
 };
 type Staff = { id: string; name: string; title: string; avatar: string };
-type Business = { name: string; address: string; notice: string; approval_mode: 'auto' | 'manual'; cancel_hours: number; allow_any_staff: boolean; payment_info: string; service_area: string; open: boolean };
+type Business = { name: string; address: string; notice: string; approval_mode: 'auto' | 'manual'; cancel_hours: number; allow_any_staff: boolean; payment_info: string; service_area: string; waitlist: boolean; open: boolean };
+type MyWait = { id: string; service_name: string; date: string; from_min: number; to_min: number; status: 'waiting' | 'invited'; invited_slot: string | null; invite_expires_at: string | null; service_id: string; staff_id: string | null; business: { slug: string } };
 type MyPackage = { id: string; name: string; service_ids: string[]; available: number; used: number; reserved: number; sessions_total: number; expires_at: string; business: { slug: string } };
 type MyRecord = {
   id: string; service_name: string; performed_on: string; consent: 'none' | 'requested' | 'granted' | 'declined' | 'revoked'; delete_requested: boolean;
@@ -62,7 +63,7 @@ export default function BookingClient({ slug, card, business, services, staff }:
   const [time, setTime] = useState('');
   const [days, setDays] = useState<Day[] | null>(null);
   const [loadingSlots, setLoadingSlots] = useState(false);
-  const [auth, setAuth] = useState<{ loggedIn: boolean; lineBound: boolean; bookings: MyBooking[]; quotes: MyQuote[]; records: MyRecord[]; packages: MyPackage[]; points: number } | null>(null);
+  const [auth, setAuth] = useState<{ loggedIn: boolean; lineBound: boolean; bookings: MyBooking[]; quotes: MyQuote[]; records: MyRecord[]; packages: MyPackage[]; points: number; waitlist: MyWait[]; optOut: boolean | null } | null>(null);
   const [usePackage, setUsePackage] = useState(true);
   const [contact, setContact] = useState({ name: '', phone: '', note: '' });
   const [submitting, setSubmitting] = useState(false);
@@ -101,14 +102,16 @@ export default function BookingClient({ slug, card, business, services, staff }:
   // 登入狀態與我的預約(也用來帶入上次填的聯絡資料)
   const loadMine = useCallback(async () => {
     const res = await fetch('/api/booking/my', { cache: 'no-store' });
-    if (res.status === 401) { setAuth({ loggedIn: false, lineBound: false, bookings: [], quotes: [], records: [], packages: [], points: 0 }); return; }
+    if (res.status === 401) { setAuth({ loggedIn: false, lineBound: false, bookings: [], quotes: [], records: [], packages: [], points: 0, waitlist: [], optOut: null }); return; }
     const data = await res.json().catch(() => null);
     const bookings = ((data?.bookings ?? []) as MyBooking[]).filter((b) => b.business.slug === slug);
     const quotes = ((data?.quotes ?? []) as MyQuote[]).filter((q) => q.business.slug === slug);
     const records = ((data?.records ?? []) as MyRecord[]).filter((r) => r.business.slug === slug);
     const packages = ((data?.packages ?? []) as MyPackage[]).filter((p) => p.business.slug === slug);
     const points = ((data?.points ?? []) as { business: { slug: string }; points: number }[]).find((p) => p.business.slug === slug)?.points ?? 0;
-    setAuth({ loggedIn: true, lineBound: Boolean(data?.line_bound), bookings, quotes, records, packages, points });
+    const waitlist = ((data?.waitlist ?? []) as MyWait[]).filter((w) => w.business.slug === slug);
+    const pref = ((data?.prefs ?? []) as { business: { slug: string }; marketing_opt_out: boolean }[]).find((p) => p.business.slug === slug);
+    setAuth({ loggedIn: true, lineBound: Boolean(data?.line_bound), bookings, quotes, records, packages, points, waitlist, optOut: pref ? pref.marketing_opt_out : null });
     const last = (data?.bookings ?? [])[0] as MyBooking | undefined;
     if (last?.contact) setContact((c) => (c.name || c.phone ? c : { name: last.contact.name ?? '', phone: last.contact.phone ?? '', note: '' }));
   }, [slug]);
@@ -237,7 +240,7 @@ export default function BookingClient({ slug, card, business, services, staff }:
 
       <div className="mx-auto max-w-xl px-4 pb-32 pt-4">
         {tab === 'my' ? (
-          <MyBookings auth={auth} loginNext={encodeURIComponent(`${here}?tab=my`)} onCancel={cancel} onBook={() => setTab('book')} reload={loadMine} />
+          <MyBookings auth={auth} slug={slug} loginNext={encodeURIComponent(`${here}?tab=my`)} onCancel={cancel} onBook={() => setTab('book')} reload={loadMine} />
         ) : result ? (
           <ResultView result={result} business={business} lineBound={auth?.lineBound ?? false} here={here} onMore={reset} onMine={() => { setResult(null); setTab('my'); }} onReported={loadMine} />
         ) : !business.open || !services.length ? (
@@ -334,7 +337,12 @@ export default function BookingClient({ slug, card, business, services, staff }:
               <section>
                 <StepTitle n={pickStaff ? 3 : 2} title="選擇日期與時段" />
                 {loadingSlots && !days ? <p className="py-6 text-center text-sm text-[#8a7f72]">讀取可預約時段…</p> : (
-                  <SlotPicker days={days ?? []} date={date} time={time} onDate={(d) => { setDate(d); resetSlot(); }} onTime={(t) => { setTime(t); idemKey.current = ''; }} />
+                  <>
+                    <SlotPicker allowFull={business.waitlist} days={days ?? []} date={date} time={time} onDate={(d) => { setDate(d); resetSlot(); }} onTime={(t) => { setTime(t); idemKey.current = ''; }} />
+                    {business.waitlist && date && !slots.length && !days?.find((d) => d.date === date)?.closed ? (
+                      <WaitlistJoin key={`${serviceId}-${date}`} slug={slug} serviceId={serviceId} staffId={staffParam || null} date={date} auth={auth} contact={contact} loginNext={encodeURIComponent(`${here}?${nextParams}`)} onDone={() => { setTab('my'); void loadMine(); }} />
+                    ) : null}
+                  </>
                 )}
               </section>
             )}
@@ -432,7 +440,8 @@ function StaffCard({ on, onClick, name, sub, avatar }: { on: boolean; onClick: (
   );
 }
 
-function SlotPicker({ days, date, time, onDate, onTime }: { days: Day[]; date: string; time: string; onDate: (d: string) => void; onTime: (t: string) => void }) {
+// allowFull:開放候補時,額滿的日期也能點選(顯示候補登記)
+function SlotPicker({ days, date, time, onDate, onTime, allowFull = false }: { days: Day[]; date: string; time: string; onDate: (d: string) => void; onTime: (t: string) => void; allowFull?: boolean }) {
   const today = localParts(new Date()).date;
   const slots = days.find((d) => d.date === date)?.slots ?? [];
   return (
@@ -443,7 +452,7 @@ function SlotPicker({ days, date, time, onDate, onTime }: { days: Day[]; date: s
           const on = d.date === date;
           const none = !d.slots.length;
           return (
-            <button key={d.date} type="button" disabled={none} onClick={() => onDate(d.date)} className={`flex w-14 shrink-0 flex-col items-center rounded-2xl border py-2 text-xs transition ${on ? 'border-[#1f1b19] bg-[#1f1b19] text-white' : none ? 'border-transparent bg-white/50 text-[#c4bab0]' : 'border-[#e5ded4] bg-white'}`}>
+            <button key={d.date} type="button" disabled={none && (d.closed || !allowFull)} onClick={() => onDate(d.date)} className={`flex w-14 shrink-0 flex-col items-center rounded-2xl border py-2 text-xs transition ${on ? 'border-[#1f1b19] bg-[#1f1b19] text-white' : none ? 'border-transparent bg-white/50 text-[#c4bab0]' : 'border-[#e5ded4] bg-white'}`}>
               <span>{d.date === today ? '今天' : `週${weekday}`}</span>
               <span className="mt-0.5 text-sm font-semibold">{md}</span>
               <span className={`mt-0.5 text-[10px] ${on ? 'text-white/70' : 'text-[#a99e8f]'}`}>{none ? (d.closed ? '休息' : '額滿') : `${d.slots.length} 個`}</span>
@@ -518,7 +527,7 @@ function ResultView({ result, business, lineBound, here, onMore, onMine, onRepor
   );
 }
 
-function MyBookings({ auth, loginNext, onCancel, onBook, reload }: { auth: { loggedIn: boolean; bookings: MyBooking[]; quotes: MyQuote[]; records: MyRecord[]; packages: MyPackage[]; points: number } | null; loginNext: string; onCancel: (b: MyBooking) => void; onBook: () => void; reload: () => Promise<void> }) {
+function MyBookings({ auth, slug, loginNext, onCancel, onBook, reload }: { auth: { loggedIn: boolean; bookings: MyBooking[]; quotes: MyQuote[]; records: MyRecord[]; packages: MyPackage[]; points: number; waitlist: MyWait[]; optOut: boolean | null } | null; slug: string; loginNext: string; onCancel: (b: MyBooking) => void; onBook: () => void; reload: () => Promise<void> }) {
   // 頁面打開時的時間(判斷可否取消);只在第一次取得,避免每次重畫都變
   const [now] = useState(() => Date.now());
   const [moving, setMoving] = useState('');
@@ -532,13 +541,17 @@ function MyBookings({ auth, loginNext, onCancel, onBook, reload }: { auth: { log
       </div>
     );
   }
-  if (!auth.bookings.length && !auth.quotes.length && !auth.records.length && !auth.packages.length && !auth.points) {
+  if (!auth.bookings.length && !auth.quotes.length && !auth.records.length && !auth.packages.length && !auth.points && !auth.waitlist.length) {
     return (
       <div className="rounded-2xl bg-white p-8 text-center">
         <p className="text-sm text-[#8a7f72]">還沒有預約紀錄</p>
         <button type="button" onClick={onBook} className="mt-3 rounded-full bg-[#1f1b19] px-6 py-2.5 text-sm font-semibold text-white">我要預約</button>
       </div>
     );
+  }
+  async function setOptOut(v: boolean) {
+    const res = await fetch('/api/booking/my/prefs', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ slug, marketing_opt_out: v }) });
+    if (res.ok) { uiToast(v ? '已關閉回訪訊息' : '已開啟回訪訊息'); void reload(); }
   }
   return (
     <div className="space-y-2">
@@ -556,6 +569,21 @@ function MyBookings({ auth, loginNext, onCancel, onBook, reload }: { auth: { log
           ))}
         </div>
       ) : null}
+      {auth.waitlist.map((w) => (
+        <div key={w.id} className="rounded-2xl bg-white p-4">
+          <div className="flex items-start gap-2">
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-semibold">候補 · {w.service_name}</p>
+              <p className="mt-0.5 text-sm text-[#6b6156]">{formatDateLabel(w.date).md}(週{formatDateLabel(w.date).weekday}) {w.from_min === 0 && w.to_min === 1440 ? '整天' : `${String(Math.floor(w.from_min / 60)).padStart(2, '0')}:${String(w.from_min % 60).padStart(2, '0')} 之後`}</p>
+            </div>
+            <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-semibold ${w.status === 'invited' ? 'bg-[#e7f3ea] text-[#2f6b3f]' : 'bg-[#fff3df] text-[#9a6412]'}`}>{w.status === 'invited' ? '有空位了' : '等待空位'}</span>
+          </div>
+          {w.status === 'invited' ? (
+            <a href={`/@${slug}/book?s=${w.service_id}&d=${w.date}&t=${encodeURIComponent(w.invited_slot ?? '')}${w.staff_id ? `&p=${w.staff_id}` : ''}`} className="mt-3 block rounded-full bg-[#1f1b19] py-2.5 text-center text-sm font-semibold text-white">預約 {w.invited_slot}({formatDateTime(w.invite_expires_at!)} 前)</a>
+          ) : null}
+          <button type="button" onClick={() => void (async () => { await fetch(`/api/booking/my/waitlist/${w.id}`, { method: 'DELETE' }); uiToast('已取消候補'); void reload(); })()} className="mt-2 text-xs text-[#a03b3b]">取消候補</button>
+        </div>
+      ))}
       {auth.records.map((r) => <RecordConsent key={`${r.id}-${r.consent}-${r.delete_requested}`} record={r} onDone={() => void reload()} />)}
       {auth.quotes.filter((q) => q.status !== 'accepted').map((q) => <QuoteOffer key={`${q.id}-${q.current_version}-${q.status}`} quote={q} onDone={() => void reload()} />)}
       {auth.bookings.map((b) => {
@@ -595,6 +623,9 @@ function MyBookings({ auth, loginNext, onCancel, onBook, reload }: { auth: { log
           </div>
         );
       })}
+      {auth.optOut !== null ? (
+        <label className="flex items-center gap-2 px-1 pt-2 text-xs text-[#8a7f72]"><input type="checkbox" checked={!auth.optOut} onChange={(e) => void setOptOut(!e.target.checked)} />接收這家店的感謝與回訪提醒(預約通知不受影響)</label>
+      ) : null}
     </div>
   );
 }
@@ -834,6 +865,49 @@ function RecordConsent({ record: r, onDone }: { record: MyRecord; onDone: () => 
         {r.consent === 'granted' ? <button type="button" disabled={busy} onClick={() => void act('revoke')} className="rounded-full border border-[#d7c9bd] px-4 py-2 text-sm">撤回同意</button> : null}
         {!r.delete_requested ? <button type="button" disabled={busy} onClick={() => void act('request_delete')} className="ml-auto text-xs text-[#a03b3b]">要求刪除照片</button> : null}
       </div>
+    </div>
+  );
+}
+
+// 額滿時登記候補:選時段範圍,有空位時 LINE 通知(不保留名額)
+function WaitlistJoin({ slug, serviceId, staffId, date, auth, contact, loginNext, onDone }: {
+  slug: string; serviceId: string; staffId: string | null; date: string; auth: { loggedIn: boolean } | null;
+  contact: { name: string; phone: string }; loginNext: string; onDone: () => void;
+}) {
+  const [range, setRange] = useState('0-1440');
+  const [busy, setBusy] = useState(false);
+  const [name, setName] = useState(contact.name);
+  const [phone, setPhone] = useState(contact.phone);
+  async function join() {
+    if (!name.trim()) return void uiAlert('請填寫姓名');
+    setBusy(true);
+    try {
+      const [from_min, to_min] = range.split('-').map(Number);
+      const res = await fetch(`/api/booking/${encodeURIComponent(slug)}/waitlist`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ service_id: serviceId, staff_id: staffId, date, from_min, to_min, contact: { name, phone } }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) return void uiAlert(data?.error?.message ?? '候補登記失敗');
+      uiToast('已加入候補,有空位會用 LINE 通知你');
+      onDone();
+    } finally { setBusy(false); }
+  }
+  if (auth && !auth.loggedIn) {
+    return <a href={`/auth/line/start?next=${loginNext}`} className="mt-2 block rounded-full border border-[#d7c9bd] bg-white py-2.5 text-center text-sm">登入後加入候補</a>;
+  }
+  return (
+    <div className="mt-2 space-y-2 rounded-2xl bg-white p-4">
+      <p className="text-sm font-semibold">這天額滿了,要加入候補嗎?</p>
+      <p className="text-xs leading-5 text-[#8a7f72]">有人取消時,依登記順序用 LINE 通知你;名額不保留,收到通知後要在期限內完成預約。</p>
+      <select value={range} onChange={(e) => setRange(e.target.value)} aria-label="可以的時段" className="w-full rounded-xl border border-[#e5ded4] bg-white px-3 py-2.5 text-base">
+        <option value="0-1440">整天都可以</option><option value="0-720">中午以前</option><option value="720-1080">12:00–18:00</option><option value="1080-1440">18:00 以後</option>
+      </select>
+      <div className="grid grid-cols-2 gap-2">
+        <input value={name} onChange={(e) => setName(e.target.value)} maxLength={40} placeholder="姓名" aria-label="姓名" autoComplete="name" className="min-w-0 rounded-xl border border-[#e5ded4] px-3 py-2.5 text-base" />
+        <input value={phone} onChange={(e) => setPhone(e.target.value)} inputMode="tel" maxLength={20} placeholder="電話" aria-label="電話" autoComplete="tel" className="min-w-0 rounded-xl border border-[#e5ded4] px-3 py-2.5 text-base" />
+      </div>
+      <button type="button" disabled={busy} onClick={() => void join()} className="w-full rounded-full bg-[#1f1b19] py-2.5 text-sm font-semibold text-white disabled:opacity-50">{busy ? '登記中…' : '加入候補'}</button>
     </div>
   );
 }

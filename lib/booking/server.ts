@@ -417,6 +417,7 @@ export async function createBooking(input: {
       p_notices: notices,
     });
     if (error) throw rpcError(error.message);
+    await (await import('./engage')).markWaitlistBooked(business.id, input.userId, service.id, start.toISOString()).catch(() => {});
     return data as BkBooking;
   });
 }
@@ -507,7 +508,7 @@ export async function ownerCommand(ownerUserId: string, bookingId: string, comma
         const paid = await recordPayment(business, b, version, 'balance', balance.amount, balance.method, '完成服務時收取', 'owner', ownerUserId);
         version = paid.version;
       }
-      return call({ from: ['confirmed', 'checked_in'], status: 'completed', approval: null, notices: [] });
+      return call({ from: ['confirmed', 'checked_in'], status: 'completed', approval: null, notices: await followUpNotices(business, b) });
     }
     case 'no_show':
       if (new Date(b.start_at).getTime() > Date.now()) throw new BookingError('POLICY_BLOCKED', '服務時間開始後才能標記未到。', 422);
@@ -515,6 +516,21 @@ export async function ownerCommand(ownerUserId: string, bookingId: string, comma
     default:
       throw new BookingError('VALIDATION_ERROR', '不支援的操作。', 422);
   }
+}
+
+// 服務完成後的感謝訊息(3 小時後)與回訪提醒(服務設定的天數後早上 10 點)
+async function followUpNotices(business: BkBusiness, b: BkBooking): Promise<Notice[]> {
+  if (!b.customer_user_id) return [];
+  const list: Notice[] = [];
+  if (business.thanks_enabled) list.push({ event: 'thanks', audience: 'customer', due_at: new Date(Date.now() + 3 * 3600000).toISOString() });
+  if (b.service_id) {
+    const { data: svc } = await db().from('bk_services').select('revisit_days').eq('id', b.service_id).maybeSingle();
+    if (svc?.revisit_days) {
+      const date = addDays(localParts(b.start_at).date, svc.revisit_days);
+      list.push({ event: 'revisit', audience: 'customer', due_at: new Date(`${date}T10:00:00+08:00`).toISOString() });
+    }
+  }
+  return list;
 }
 
 const METHODS = ['transfer', 'cash', 'card', 'other', 'points', 'package'];
@@ -697,6 +713,8 @@ const TITLES: Record<string, { customer?: string; owner?: string; color: string 
   rejected: { customer: '預約未成立', color: '#8a5a50' },
   rescheduled: { customer: '預約時間已更改', owner: '顧客更改了預約時間', color: '#1f6f8b' },
   quote_accepted: { owner: '顧客接受了報價', color: '#2f6b3f' },
+  thanks: { customer: '謝謝你今天的光臨', color: '#2f6b3f' },
+  revisit: { customer: '回訪提醒', color: '#1f6f8b' },
   item_cancelled: { customer: '店家調整了預約的服務項目', color: '#8a5a50' },
   cancelled_by_owner: { customer: '店家已取消你的預約', color: '#8a5a50' },
   cancelled_by_customer: { owner: '顧客取消了預約', color: '#8a5a50' },
@@ -804,6 +822,37 @@ async function deliverRecord(row: OutboxRow, token: string): Promise<{ state: 'a
   });
 }
 
+// 候補邀請:有空位了,請在期限內預約(先完成預約的人取得名額)
+async function deliverWaitlist(row: OutboxRow, token: string): Promise<{ state: 'api_accepted' | 'skipped' | 'retry' | 'failed'; error?: string }> {
+  const { data: w } = await db().from('bk_waitlist').select('*').eq('id', row.waitlist_id!).maybeSingle();
+  if (!w || w.status !== 'invited') return { state: 'skipped', error: 'stale' };
+  const lineId = await lineUserIdOf(w.customer_user_id);
+  if (!lineId) return { state: 'skipped', error: 'no_line' };
+  const { data: business } = await db().from('bk_businesses').select('name, card_id').eq('id', w.business_id).single();
+  const { data: card } = business?.card_id ? await db().from('profile_cards').select('slug, display_name').eq('id', business.card_id).maybeSingle() : { data: null };
+  const { data: svc } = await db().from('bk_services').select('name').eq('id', w.service_id).maybeSingle();
+  const businessName = business?.name || card?.display_name || '';
+  const link = `${getConfiguredSiteUrl()}/@${card?.slug ?? ''}/book?s=${w.service_id}&d=${w.date}&t=${encodeURIComponent(w.invited_slot ?? '')}${w.staff_id ? `&p=${w.staff_id}` : ''}`;
+  const [, mo, da] = String(w.date).split('-');
+  return pushLine(token, row.id, lineId, {
+    type: 'flex', altText: `【${businessName}】候補的時段有空位了`.slice(0, 300),
+    contents: {
+      type: 'bubble',
+      header: { type: 'box', layout: 'vertical', backgroundColor: '#2f6b3f', paddingAll: '16px', contents: [
+        { type: 'text', text: businessName || 'URBANLINKS 預約', size: 'xs', color: '#ffffffcc' },
+        { type: 'text', text: '候補的時段有空位了', size: 'lg', weight: 'bold', color: '#ffffff', wrap: true, margin: 'sm' },
+      ] },
+      body: { type: 'box', layout: 'vertical', spacing: 'sm', contents: [
+        { type: 'text', text: `${svc?.name ?? ''} · ${Number(mo)}/${Number(da)} ${w.invited_slot}`, size: 'md', weight: 'bold', color: '#1f1b19', wrap: true },
+        { type: 'text', text: `請在 ${formatDateTime(w.invite_expires_at)} 前完成預約;名額沒有保留,先完成預約的人取得。`, size: 'xs', color: '#8a7f72', wrap: true },
+      ] },
+      footer: { type: 'box', layout: 'vertical', contents: [
+        { type: 'button', style: 'primary', color: '#1f1b19', height: 'sm', action: { type: 'uri', label: '立即預約', uri: link } },
+      ] },
+    },
+  });
+}
+
 async function lineUserIdOf(userId: string) {
   const { data } = await scopedClient(URBANITE_SHOP_ID).from('customers').select('line_user_id').eq('user_id', userId).maybeSingle();
   return (data?.line_user_id as string | null) || null;
@@ -844,10 +893,15 @@ function flexMessage(opts: { title: string; color: string; businessName: string;
   };
 }
 
-type OutboxRow = { id: string; booking_id: string | null; quote_id: string | null; record_id: string | null; booking_version: number; event: string; audience: 'customer' | 'owner'; attempts: number; due_at: string };
+type OutboxRow = { id: string; booking_id: string | null; quote_id: string | null; record_id: string | null; waitlist_id: string | null; booking_version: number; event: string; audience: 'customer' | 'owner'; attempts: number; due_at: string };
 
 async function deliver(row: OutboxRow, token: string): Promise<{ state: 'api_accepted' | 'skipped' | 'retry' | 'failed'; error?: string }> {
-  if (!row.booking_id) return row.quote_id ? deliverQuote(row, token) : row.record_id ? deliverRecord(row, token) : { state: 'skipped', error: 'no_target' };
+  if (!row.booking_id) {
+    if (row.quote_id) return deliverQuote(row, token);
+    if (row.record_id) return deliverRecord(row, token);
+    if (row.waitlist_id) return deliverWaitlist(row, token);
+    return { state: 'skipped', error: 'no_target' };
+  }
   const { data: booking } = await db().from('bk_bookings').select('*').eq('id', row.booking_id).maybeSingle();
   if (!booking) return { state: 'skipped', error: 'booking_missing' };
   const b = booking as BkBooking;
@@ -864,8 +918,18 @@ async function deliver(row: OutboxRow, token: string): Promise<{ state: 'api_acc
     b.staff_id ? db().from('bk_staff').select('name').eq('id', b.staff_id).maybeSingle() : Promise.resolve({ data: null }),
     db().from('bk_staff').select('id', { count: 'exact', head: true }).eq('business_id', b.business_id).eq('active', true),
   ]);
+  // 回訪 / 感謝:顧客關閉提醒就不發;回訪時已經再預約過就不發
+  if (['thanks', 'revisit'].includes(row.event)) {
+    const { data: cust } = b.customer_id ? await db().from('bk_customers').select('marketing_opt_out').eq('id', b.customer_id).maybeSingle() : { data: null };
+    if (cust?.marketing_opt_out) return { state: 'skipped', error: 'opt_out' };
+    if (row.event === 'revisit') {
+      const { count } = await db().from('bk_bookings').select('id', { count: 'exact', head: true }).eq('business_id', b.business_id)
+        .eq('customer_user_id', b.customer_user_id ?? '').gt('start_at', b.start_at).in('status', ['pending', 'confirmed', 'checked_in', 'completed']);
+      if (count) return { state: 'skipped', error: 'returned' };
+    }
+  }
   const meta = TITLES[row.event];
-  const title = meta?.[row.audience];
+  const title = row.event === 'revisit' ? `該預約下一次「${b.service_snapshot.name}」了` : meta?.[row.audience];
   if (!meta || !title) return { state: 'skipped', error: 'no_template' };
   const recipient = row.audience === 'owner' ? business?.owner_user_id : b.customer_user_id;
   const lineId = recipient ? await lineUserIdOf(recipient) : null;
@@ -878,12 +942,18 @@ async function deliver(row: OutboxRow, token: string): Promise<{ state: 'api_acc
     extra = `請在 ${b.expires_at ? formatDateTime(b.expires_at) : '期限'} 前轉帳訂金 ${money(b.deposit_amount - b.paid_amount)},完成後到「查看預約」回報末 5 碼,逾時會自動取消。${business?.payment_info ? `\n${business.payment_info}` : ''}`;
   } else if (row.audience === 'owner' && row.event === 'payment_reported') {
     extra = `回報末 5 碼:${b.payment_report?.last5 ?? '—'}${b.payment_report?.amount ? `,金額 ${money(b.payment_report.amount)}` : ''}`;
+  } else if (row.event === 'thanks') {
+    const { data: biz2 } = await db().from('bk_businesses').select('thanks_message').eq('id', b.business_id).single();
+    extra = biz2?.thanks_message || '期待下次再為你服務。';
+  } else if (row.event === 'revisit') {
+    extra = `距離上次服務(${formatDateTime(b.start_at).split(' ')[0]})已經一段時間,需要的話可以直接預約下一次。`;
   } else if (row.audience === 'customer' && business?.address && ['confirmed', 'rescheduled', 'reminder_24h', 'reminder_2h'].includes(row.event)) {
     extra = `地點:${business.address}`;
   }
   const message = flexMessage({
     title, color: meta.color, businessName, booking: b, staffName: (staffCount ?? 0) > 1 ? staff?.name ?? '' : '',
-    link, button: row.audience === 'owner' ? '到後台處理' : '查看預約', extra,
+    link: row.event === 'revisit' ? `${site}/@${card?.slug ?? ''}/book?s=${b.service_id ?? ''}` : link,
+    button: row.audience === 'owner' ? '到後台處理' : row.event === 'revisit' ? '立即預約' : '查看預約', extra,
   });
   try {
     const res = await fetch('https://api.line.me/v2/bot/message/push', {
@@ -901,7 +971,9 @@ async function deliver(row: OutboxRow, token: string): Promise<{ state: 'api_acc
 
 // 背景工作:回收逾期待成立(未確認、未付訂金)、送出到期的通知(cron 每 5 分鐘,建立 / 操作預約後也會立刻跑一次)
 export async function processBookingJobs(limit = 30) {
-  const result = { expired: 0, sent: 0, skipped: 0, failed: 0 };
+  const result = { expired: 0, sent: 0, skipped: 0, failed: 0, invited: 0 };
+  // 候補邀請(放在通知前,讓剛產生的邀請這次就送出)
+  try { result.invited = (await (await import('./engage')).processWaitlist()).invited; } catch (e) { console.error('waitlist', e); }
   const now = new Date().toISOString();
   const { data: overdue } = await db().from('bk_bookings').select('id, version').eq('status', 'pending').lt('expires_at', now).limit(50);
   for (const o of overdue ?? []) {

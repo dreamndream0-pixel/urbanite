@@ -34,6 +34,7 @@ export async function GET() {
   const { data: customers } = cids.length ? await db.from('bk_customers').select('id, name, note, tags, user_id').in('id', cids) : { data: [] };
   const points = await pointsOf(cids as string[]);
   const { data: products } = await db.from('bk_package_products').select('*').eq('business_id', business.id).order('created_at');
+  const { data: waitlist } = await db.from('bk_waitlist').select('*').eq('business_id', business.id).in('status', ['waiting', 'invited']).order('date').order('created_at').limit(200);
   const { data: quoteVersions } = qids.length ? await db.from('bk_quote_versions').select('*').in('quote_id', qids).order('version') : { data: [] };
   const [{ data: payments }, { data: allocations }, { data: items }] = ids.length ? await Promise.all([
     db.from('bk_payments').select('id, booking_id, kind, amount, method, note, created_at').in('booking_id', ids).order('created_at'),
@@ -41,7 +42,7 @@ export async function GET() {
     db.from('bk_booking_items').select('id, booking_id, seq, service_id, service_snapshot, staff_id, start_at, end_at, amount, status').in('booking_id', ids).order('seq'),
   ]) : [{ data: [] }, { data: [] }, { data: [] }];
   return NextResponse.json({
-    business, ...sched, exceptions: exceptions ?? [], bookings: bookings ?? [], payments: payments ?? [], allocations: allocations ?? [], items: items ?? [], quotes: quotes ?? [], quoteVersions: quoteVersions ?? [], customers: (customers ?? []).map((c) => ({ ...c, points: points.get(c.id) ?? 0 })), products: products ?? [],
+    business, ...sched, exceptions: exceptions ?? [], bookings: bookings ?? [], payments: payments ?? [], allocations: allocations ?? [], items: items ?? [], quotes: quotes ?? [], quoteVersions: quoteVersions ?? [], customers: (customers ?? []).map((c) => ({ ...c, points: points.get(c.id) ?? 0 })), products: products ?? [], waitlist: waitlist ?? [],
     card: card ?? null, line_bound: Boolean(me?.line_user_id), today: localParts(new Date()).date,
   }, { headers: { 'Cache-Control': 'no-store' } });
 }
@@ -85,6 +86,10 @@ export async function PUT(request: Request) {
       reward_enabled: b.reward_enabled === undefined ? business.reward_enabled : Boolean(b.reward_enabled),
       reward_rate: int(b.reward_rate, 1, 100000, business.reward_rate),
       point_value: int(b.point_value, 1, 1000, business.point_value),
+      waitlist_enabled: b.waitlist_enabled === undefined ? business.waitlist_enabled : Boolean(b.waitlist_enabled),
+      waitlist_invite_minutes: int(b.waitlist_invite_minutes, 15, 1440, business.waitlist_invite_minutes),
+      thanks_enabled: b.thanks_enabled === undefined ? business.thanks_enabled : Boolean(b.thanks_enabled),
+      thanks_message: String(b.thanks_message ?? business.thanks_message ?? '').trim().slice(0, 200),
       updated_at: new Date().toISOString(),
     };
     const { error } = await db.from('bk_businesses').update(patch).eq('id', business.id);

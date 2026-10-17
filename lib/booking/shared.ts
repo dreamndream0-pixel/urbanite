@@ -33,6 +33,10 @@ export type BkBusiness = {
   reward_enabled: boolean;
   reward_rate: number;
   point_value: number;
+  waitlist_enabled: boolean;
+  waitlist_invite_minutes: number;
+  thanks_enabled: boolean;
+  thanks_message: string;
 };
 
 export type BkService = {
@@ -50,6 +54,7 @@ export type BkService = {
   deposit: number;
   price_mode: 'fixed' | 'quote';      // quote = 需報價(先詢價)
   service_mode: 'in_store' | 'outcall'; // outcall = 外出服務(加交通時間)
+  revisit_days: number;                 // 完成後幾天提醒回訪(0 = 不提醒)
 };
 
 export type BkStaff = { id: string; business_id: string; name: string; title: string; avatar: string; active: boolean; use_business_hours: boolean; sort_order: number; role: 'stylist' | 'assistant' };
@@ -149,6 +154,10 @@ export const DEFAULT_BUSINESS: Omit<BkBusiness, 'id' | 'owner_user_id' | 'card_i
   reward_enabled: false,
   reward_rate: 100,
   point_value: 1,
+  waitlist_enabled: true,
+  waitlist_invite_minutes: 60,
+  thanks_enabled: false,
+  thanks_message: '',
 };
 
 export const STATUS_LABEL: Record<BookingStatus, string> = {
