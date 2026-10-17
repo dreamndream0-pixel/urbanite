@@ -7,7 +7,7 @@ import {
   addDays, formatDateLabel, formatDateTime, formatRange, localParts, minutesToHHMM, money, PAY_METHOD_LABEL, PAYMENT_LABEL,
   statusText, STATUS_COLOR, type BkBooking,
 } from '@/lib/booking/shared';
-import { api, btn, btnDark, btnSm, card, errMsg, input, isTeam, type Data } from './ui';
+import { api, btn, btnDark, btnSm, card, errMsg, input, isTeam, stylists, type Data } from './ui';
 import { HoursTab, ServicesTab, SettingsTab, StaffTab } from './BookingSetup';
 
 type Tab = 'bookings' | 'calendar' | 'services' | 'staff' | 'hours' | 'settings';
@@ -181,6 +181,10 @@ function BookingCard({ booking: b, data, reload }: { booking: BkBooking; data: D
           <p className="text-base font-semibold">{formatRange(b.start_at, b.end_at).split(' ')[1]}{team && staff ? <span className="ml-2 text-sm font-normal text-[#6b6156]">· {staff.name}</span> : null}</p>
           <p className="text-sm">{b.service_snapshot.name}{b.addons?.length ? ` + ${b.addons.map((a) => a.name).join('、')}` : ''}</p>
           {resource ? <p className="text-xs text-[#8a7f72]">{resource.name}</p> : null}
+          {data.allocations.filter((a) => a.booking_id === b.id && a.role === 'assistant').map((a) => (
+            <p key={a.id} className="text-xs text-[#1f4f6e]">助理 {data.staff.find((s) => s.id === a.staff_id)?.name ?? ''} {formatRange(a.start_at, a.end_at).split(' ')[1]}</p>
+          ))}
+          {b.service_snapshot.steps?.length ? <p className="text-[11px] text-[#a99e8f]">{b.service_snapshot.steps.map((s) => `${s.name} ${s.minutes}`).join(' → ')} 分</p> : null}
         </div>
         <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-semibold ${STATUS_COLOR[b.status]}`}>{statusText(b)}</span>
       </div>
@@ -315,7 +319,7 @@ function MovePanel({ booking, data, busy, onCancel, onSubmit }: { booking: BkBoo
         {team ? (
           <select value={staff} onChange={(e) => { setStaff(e.target.value); setTime(''); }} aria-label="人員" className={`${input} min-w-0`}>
             <option value="">不指定</option>
-            {data.staff.filter((s) => s.active).map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+            {stylists(data).map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
           </select>
         ) : null}
       </div>
@@ -382,7 +386,7 @@ function NewBooking({ data, onClose, onDone, initialDate }: { data: Data; onClos
         {team ? (
           <select value={staff} onChange={(e) => { setStaff(e.target.value); setTime(''); }} aria-label="人員" className={`${input} min-w-0`}>
             <option value="">不指定</option>
-            {data.staff.filter((s) => s.active).map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+            {stylists(data).map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
           </select>
         ) : null}
       </div>
@@ -403,31 +407,68 @@ function NewBooking({ data, onClose, onDone, initialDate }: { data: Data; onClos
   );
 }
 
-// ---------- 日曆(日視圖,多人時每位人員一欄) ----------
-const HOUR_PX = 56;
+
+// ---------- 日曆(日視圖;人員視圖每位人員一欄、座位視圖每個座位一欄;分段預約畫出每一段與等待空檔) ----------
+const HOUR_PX = 72;
+type Block = { key: string; booking: BkBooking; start: number; end: number; kind: 'main' | 'assistant' | 'seat' | 'wait' };
 
 function CalendarTab({ data, reload }: { data: Data; reload: () => Promise<void> }) {
   const [date, setDate] = useState(data.today);
   const [selected, setSelected] = useState('');
   const [adding, setAdding] = useState(false);
+  const [view, setView] = useState<'staff' | 'seat'>('staff');
   const { weekday } = formatDateLabel(date);
   const day = data.bookings.filter((b) => localParts(b.start_at).date === date && b.status !== 'expired');
   const shown = day.filter((b) => b.status !== 'cancelled');
   const team = isTeam(data);
-  const columns = team
-    ? data.staff.filter((s) => s.active || shown.some((b) => b.staff_id === s.id)).map((s) => ({ id: s.id, name: s.name }))
-    : [{ id: '', name: '' }];
+  const seatView = view === 'seat' && data.resources.length > 0;
+  const columns = seatView
+    ? data.resources.filter((r) => r.active || shown.some((b) => b.resource_id === r.id)).map((r) => ({ id: r.id, name: r.name }))
+    : team
+      ? data.staff.filter((s) => s.active || shown.some((b) => b.staff_id === s.id)).map((s) => ({ id: s.id, name: s.name }))
+      : [{ id: '', name: '' }];
+  const toMin = (iso: string) => localParts(iso).minutes + (localParts(iso).date > date ? 1440 : 0);
+
+  // 每欄的區塊:有占用區段的用區段(含助理段);已完成等沒有有效區段的用整筆時間
+  function blocksFor(colId: string): Block[] {
+    const out: Block[] = [];
+    for (const b of shown) {
+      const allocs = data.allocations.filter((a) => a.booking_id === b.id);
+      if (seatView) {
+        const mine = allocs.filter((a) => a.resource_id === colId);
+        if (mine.length) mine.forEach((a) => out.push({ key: a.id, booking: b, start: toMin(a.start_at), end: toMin(a.end_at), kind: 'seat' }));
+        else if (!allocs.length && b.resource_id === colId) out.push({ key: b.id, booking: b, start: toMin(b.start_at), end: toMin(b.end_at), kind: 'seat' });
+        continue;
+      }
+      const mine = allocs.filter((a) => a.staff_id && (!team || a.staff_id === colId));
+      if (!mine.length) {
+        if (!allocs.length && (!team || b.staff_id === colId)) out.push({ key: b.id, booking: b, start: toMin(b.start_at), end: toMin(b.end_at), kind: 'main' });
+        continue;
+      }
+      const sorted = [...mine].sort((x, y) => x.start_at.localeCompare(y.start_at));
+      sorted.forEach((a) => out.push({ key: a.id, booking: b, start: toMin(a.start_at), end: toMin(a.end_at), kind: a.role === 'assistant' ? 'assistant' : 'main' }));
+      // 主要人員兩段之間的等待:這段時間可以接其他客人
+      const mains = sorted.filter((a) => a.role === 'main');
+      for (let i = 1; i < mains.length; i++) {
+        const gapStart = toMin(mains[i - 1].end_at);
+        const gapEnd = toMin(mains[i].start_at);
+        if (gapEnd > gapStart) out.push({ key: `${b.id}-w${i}`, booking: b, start: gapStart, end: gapEnd, kind: 'wait' });
+      }
+    }
+    return out;
+  }
 
   // 顯示範圍:當天營業 / 班表時段與預約時間的聯集,至少 10:00–19:00
   const wd = localParts(new Date(`${date}T12:00:00+08:00`)).weekday;
   const ranges = [...data.hours.filter((h) => h.weekday === wd), ...data.staffHours.filter((h) => h.weekday === wd)];
-  const mins = shown.map((b) => localParts(b.start_at).minutes);
-  const ends = shown.map((b) => { const s = localParts(b.start_at).minutes; return s + (new Date(b.end_at).getTime() - new Date(b.start_at).getTime()) / 60000; });
+  const mins = shown.map((b) => toMin(b.start_at));
+  const ends = shown.map((b) => toMin(b.occupy_end_at));
   const startH = Math.floor(Math.min(10 * 60, ...ranges.map((r) => r.start_min), ...mins) / 60);
-  const endH = Math.min(24, Math.ceil(Math.max(19 * 60, ...ranges.map((r) => r.end_min), ...ends) / 60));
+  const endH = Math.min(26, Math.ceil(Math.max(19 * 60, ...ranges.map((r) => r.end_min), ...ends) / 60));
   const hours = Array.from({ length: endH - startH }, (_, i) => startH + i);
   const sel = data.bookings.find((b) => b.id === selected);
   const closedAll = data.exceptions.filter((x) => !x.staff_id && new Date(x.start_at) < new Date(`${date}T23:59:59+08:00`) && new Date(x.end_at) > new Date(`${date}T00:00:00+08:00`));
+  const wide = columns.length > 1;
 
   return (
     <div className="space-y-3">
@@ -436,32 +477,52 @@ function CalendarTab({ data, reload }: { data: Data; reload: () => Promise<void>
         <input type="date" value={date} onChange={(e) => { if (e.target.value) { setDate(e.target.value); setSelected(''); } }} aria-label="日期" className="min-w-0 flex-1 rounded-lg border border-[#e5ded4] px-2 py-1.5 text-base" />
         <button type="button" onClick={() => { setDate(addDays(date, 1)); setSelected(''); }} aria-label="後一天" className={btnSm}>›</button>
         <button type="button" onClick={() => { setDate(data.today); setSelected(''); }} className={btnSm}>今天</button>
-        <p className="w-full text-xs text-[#8a7f72]">週{weekday} · {shown.length} 筆預約{closedAll.length ? ' · 有休假設定' : ''}{day.length > shown.length ? ` · 已取消 ${day.length - shown.length} 筆` : ''}</p>
+        <div className="flex w-full flex-wrap items-center gap-2">
+          <p className="min-w-0 flex-1 text-xs text-[#8a7f72]">週{weekday} · {shown.length} 筆預約{closedAll.length ? ' · 有休假設定' : ''}{day.length > shown.length ? ` · 已取消 ${day.length - shown.length} 筆` : ''}</p>
+          {data.resources.length ? (
+            <div className="flex shrink-0 gap-1 rounded-full bg-[#f3ede4] p-1" role="group" aria-label="日曆視圖">
+              {([['staff', '人員'], ['seat', '座位']] as const).map(([k, label]) => (
+                <button key={k} type="button" aria-pressed={view === k} onClick={() => setView(k)} className={`rounded-full px-3 py-1 text-xs ${view === k ? 'bg-white font-semibold text-[#1f1b19]' : 'text-[#6b6156]'}`}>{label}</button>
+              ))}
+            </div>
+          ) : null}
+        </div>
       </div>
 
       <div className={`${card} overflow-hidden p-0 sm:p-0`}>
         <div className="overflow-x-auto">
-          <div className="flex" style={{ minWidth: team ? `${44 + columns.length * 110}px` : undefined }}>
+          <div className="flex" style={{ minWidth: wide ? `${44 + columns.length * 110}px` : undefined }}>
             <div className="w-11 shrink-0 border-r border-[#f0ebe2]">
-              {team ? <div className="h-8 border-b border-[#f0ebe2]" /> : null}
-              {hours.map((h) => <div key={h} style={{ height: HOUR_PX }} className="pr-1 pt-0.5 text-right text-[10px] text-[#a99e8f]">{String(h).padStart(2, '0')}:00</div>)}
+              {wide ? <div className="h-8 border-b border-[#f0ebe2]" /> : null}
+              {hours.map((h) => <div key={h} style={{ height: HOUR_PX }} className="pr-1 pt-0.5 text-right text-[10px] text-[#a99e8f]">{String(h % 24).padStart(2, '0')}:00</div>)}
             </div>
             {columns.map((col) => (
               <div key={col.id || 'solo'} className="min-w-0 flex-1 border-r border-[#f0ebe2] last:border-r-0">
-                {team ? <div className="flex h-8 items-center justify-center truncate border-b border-[#f0ebe2] px-1 text-xs font-semibold">{col.name}</div> : null}
+                {wide ? <div className="flex h-8 items-center justify-center truncate border-b border-[#f0ebe2] px-1 text-xs font-semibold">{col.name}</div> : null}
                 <div className="relative" style={{ height: hours.length * HOUR_PX }}>
                   {hours.map((h, i) => <div key={h} className="absolute inset-x-0 border-t border-[#f5f1ea]" style={{ top: i * HOUR_PX }} />)}
-                  {shown.filter((b) => !team || b.staff_id === col.id).map((b) => {
-                    const s = localParts(b.start_at).minutes;
-                    const len = (new Date(b.end_at).getTime() - new Date(b.start_at).getTime()) / 60000;
-                    const top = ((s - startH * 60) / 60) * HOUR_PX;
-                    const height = Math.max(22, (len / 60) * HOUR_PX - 2);
-                    const tone = b.status === 'pending' ? 'border-[#e7c98f] bg-[#fff6e6]' : b.status === 'completed' ? 'border-[#d5d9e3] bg-[#f1f3f7]' : b.status === 'no_show' ? 'border-[#e8c4c4] bg-[#fbeeee]' : 'border-[#b9d8c1] bg-[#eef7f0]';
+                  {blocksFor(col.id).sort((x, y) => (x.kind === 'wait' ? -1 : 0) - (y.kind === 'wait' ? -1 : 0)).map((blk) => {
+                    const b = blk.booking;
+                    const top = ((blk.start - startH * 60) / 60) * HOUR_PX;
+                    const height = Math.max(blk.kind === 'wait' ? 14 : 22, ((blk.end - blk.start) / 60) * HOUR_PX - 2);
+                    const tone = blk.kind === 'wait'
+                      ? 'border-transparent bg-[#e3efe5] text-[#2f5a3a]'
+                      : blk.kind === 'assistant'
+                        ? 'border-[#bcd3e3] bg-[#e6f0f7]'
+                        : b.status === 'pending' ? 'border-[#e7c98f] bg-[#fff6e6]' : b.status === 'completed' ? 'border-[#d5d9e3] bg-[#f1f3f7]' : b.status === 'no_show' ? 'border-[#e8c4c4] bg-[#fbeeee]' : 'border-[#b9d8c1] bg-[#eef7f0]';
                     return (
-                      <button key={b.id} type="button" onClick={() => setSelected(b.id === selected ? '' : b.id)} style={{ top, height }}
-                        className={`absolute inset-x-1 overflow-hidden rounded-lg border px-1.5 py-1 text-left text-[11px] leading-4 ${tone} ${b.id === selected ? 'ring-2 ring-[#1f1b19]' : ''}`}>
-                        <span className="block truncate font-semibold">{minutesToHHMM(s)} {b.contact?.name || '—'}</span>
-                        <span className="block truncate text-[#6b6156]">{b.service_snapshot.name}</span>
+                      <button key={blk.key} type="button" onClick={() => setSelected(b.id === selected ? '' : b.id)} style={{ top, height }}
+                        className={`absolute inset-x-1 overflow-hidden rounded-lg border px-1.5 ${height < 40 ? 'py-px' : 'py-1'} text-left text-[11px]! leading-4! ${tone} ${b.id === selected ? 'ring-2 ring-[#1f1b19]' : ''}`}>
+                        {blk.kind === 'wait' ? (
+                          <span className="block truncate">等待 · 可接其他客人</span>
+                        ) : height < 40 ? (
+                          <span className="block truncate font-semibold">{minutesToHHMM(blk.start % 1440)} {b.contact?.name || '—'}<span className="font-normal text-[#6b6156]"> · {blk.kind === 'assistant' ? '助理' : b.service_snapshot.name}</span></span>
+                        ) : (
+                          <>
+                            <span className="block truncate font-semibold">{minutesToHHMM(blk.start % 1440)} {b.contact?.name || '—'}</span>
+                            <span className="block truncate text-[#6b6156]">{blk.kind === 'assistant' ? '助理 · ' : ''}{b.service_snapshot.name}</span>
+                          </>
+                        )}
                       </button>
                     );
                   })}

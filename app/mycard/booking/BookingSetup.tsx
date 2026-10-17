@@ -4,10 +4,10 @@ import { useState } from 'react';
 import { uiAlert, uiConfirm } from '@/lib/ui-dialog';
 import { uiToast } from '@/lib/ui-toast';
 import {
-  fromLocal, formatRange, hhmmToMinutes, localParts, minutesToHHMM, money, WEEKDAYS,
+  fromLocal, formatRange, hhmmToMinutes, localParts, minutesToHHMM, money, STEP_WHO_LABEL, WEEKDAYS,
   type BkBooking, type BkBusiness, type BkException, type BkService, type BkStaff,
 } from '@/lib/booking/shared';
-import { api, btn, btnDark, btnSm, card, errMsg, input, isTeam, type Data } from './ui';
+import { api, btn, btnDark, btnSm, card, errMsg, input, isTeam, stylists, type Data } from './ui';
 
 // ---------- 每週時段編輯(營業時段、人員班表共用) ----------
 type DayRange = { start: string; end: string };
@@ -63,18 +63,21 @@ const DURATIONS = [15, 30, 45, 60, 75, 90, 105, 120, 150, 180, 240, 300, 360, 48
 const durationLabel = (m: number) => (m >= 60 ? `${Math.floor(m / 60)} 小時${m % 60 ? ` ${m % 60} 分` : ''}` : `${m} 分鐘`);
 type AddonDraft = { id?: string; name: string; price: number; extra_minutes: number; active: boolean };
 type StaffLink = { staff_id: string; duration_minutes: number | null; price: number | null };
+type StepDraft = { name: string; minutes: number; who: 'main' | 'assistant' | 'none'; seat: 'keep' | 'release' };
+const STEP_MINUTES = [5, 10, 15, 20, 25, 30, 40, 45, 50, 60, 75, 90, 120, 150, 180];
 type ServiceDraft = {
   id?: string; name: string; description: string; duration_minutes: number; price: number; price_note: string; active: boolean;
-  deposit: number; needs_resource: boolean; addons: AddonDraft[]; staff: StaffLink[];
+  deposit: number; needs_resource: boolean; addons: AddonDraft[]; staff: StaffLink[]; steps: StepDraft[];
 };
-const blankService: ServiceDraft = { name: '', description: '', duration_minutes: 60, price: 0, price_note: '', active: true, deposit: 0, needs_resource: false, addons: [], staff: [] };
+const blankService: ServiceDraft = { name: '', description: '', duration_minutes: 60, price: 0, price_note: '', active: true, deposit: 0, needs_resource: false, addons: [], staff: [], steps: [] };
 const digits = (v: string) => Number(v.replace(/\D/g, '')) || 0;
 
 export function ServicesTab({ data, reload }: { data: Data; reload: () => Promise<void> }) {
   const [editing, setEditing] = useState<ServiceDraft | null>(null);
   const [saving, setSaving] = useState(false);
   const team = isTeam(data);
-  const activeStaff = data.staff.filter((s) => s.active);
+  const activeStaff = stylists(data);
+  const hasAssistant = data.staff.some((s) => s.active && s.role === 'assistant');
 
   function edit(s: BkService) {
     setEditing({
@@ -82,12 +85,15 @@ export function ServicesTab({ data, reload }: { data: Data; reload: () => Promis
       deposit: s.deposit, needs_resource: s.needs_resource,
       addons: data.addons.filter((a) => a.service_id === s.id).map((a) => ({ id: a.id, name: a.name, price: a.price, extra_minutes: a.extra_minutes, active: a.active })),
       staff: data.staffServices.filter((x) => x.service_id === s.id).map((x) => ({ staff_id: x.staff_id, duration_minutes: x.duration_minutes, price: x.price })),
+      steps: data.steps.filter((x) => x.service_id === s.id).sort((a, b) => a.seq - b.seq).map((x) => ({ name: x.name, minutes: x.minutes, who: x.who, seat: x.seat })),
     });
   }
   async function save() {
     if (!editing) return;
     if (!editing.name.trim()) return void uiAlert('請填寫服務名稱');
     if (editing.addons.some((a) => !a.name.trim())) return void uiAlert('請填寫加購名稱,或移除空白的加購');
+    if (editing.steps.some((x) => !x.name.trim())) return void uiAlert('請填寫步驟名稱,或移除空白的步驟');
+    if (editing.steps.length > 1 && !editing.steps.some((x) => x.who === 'main')) return void uiAlert('至少要有一個步驟由主要人員負責');
     setSaving(true);
     try {
       await api('/api/mycard/booking/services', { method: editing.id ? 'PATCH' : 'POST', body: JSON.stringify(editing) });
@@ -102,6 +108,14 @@ export function ServicesTab({ data, reload }: { data: Data; reload: () => Promis
     try { await api(`/api/mycard/booking/services?id=${s.id}`, { method: 'DELETE' }); void reload(); }
     catch (e) { void uiAlert(errMsg(e, '刪除失敗')); }
   }
+  const setStep = (i: number, patch: Partial<StepDraft>) => editing && setEditing({ ...editing, steps: editing.steps.map((x, j) => (j === i ? { ...x, ...patch } : x)) });
+  const moveStep = (i: number, d: number) => {
+    if (!editing || i + d < 0 || i + d >= editing.steps.length) return;
+    const next = [...editing.steps];
+    [next[i], next[i + d]] = [next[i + d], next[i]];
+    setEditing({ ...editing, steps: next });
+  };
+  const stepTotal = editing?.steps.reduce((n, x) => n + x.minutes, 0) ?? 0;
   const setAddon = (i: number, patch: Partial<AddonDraft>) => editing && setEditing({ ...editing, addons: editing.addons.map((a, j) => (j === i ? { ...a, ...patch } : a)) });
   const link = (id: string) => editing?.staff.find((x) => x.staff_id === id);
   const setLink = (id: string, patch: Partial<StaffLink> | null) => {
@@ -123,8 +137,9 @@ export function ServicesTab({ data, reload }: { data: Data; reload: () => Promis
             <input value={editing.name} onChange={(e) => setEditing({ ...editing, name: e.target.value })} maxLength={60} placeholder="例:單色凝膠美甲" className={`${input} mt-1`} />
           </label>
           <div className="grid grid-cols-2 gap-3">
-            <label className="block text-xs text-[#8a7f72]">服務時間
-              <select value={editing.duration_minutes} onChange={(e) => setEditing({ ...editing, duration_minutes: Number(e.target.value) })} className={`${input} mt-1`}>
+            <label className="block text-xs text-[#8a7f72]">服務時間{editing.steps.length > 1 ? '(依步驟)' : ''}
+              <select value={editing.steps.length > 1 ? stepTotal : editing.duration_minutes} disabled={editing.steps.length > 1} onChange={(e) => setEditing({ ...editing, duration_minutes: Number(e.target.value) })} className={`${input} mt-1 disabled:opacity-60`}>
+                {editing.steps.length > 1 && !DURATIONS.includes(stepTotal) ? <option value={stepTotal}>{durationLabel(stepTotal)}</option> : null}
                 {DURATIONS.map((m) => <option key={m} value={m}>{durationLabel(m)}</option>)}
               </select>
             </label>
@@ -141,6 +156,47 @@ export function ServicesTab({ data, reload }: { data: Data; reload: () => Promis
           <label className="block text-xs text-[#8a7f72]">說明(選填)
             <textarea value={editing.description} onChange={(e) => setEditing({ ...editing, description: e.target.value })} rows={3} maxLength={500} className={`${input} mt-1 resize-none`} />
           </label>
+
+          {/* 分段步驟 */}
+          <div className="rounded-xl bg-[#faf7f2] p-3">
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="text-sm font-semibold">分段步驟{editing.steps.length > 1 ? `(共 ${durationLabel(stepTotal)})` : ''}</p>
+                <p className="text-[11px] text-[#8a7f72]">例:染髮 = 上藥(主要人員)→ 等待上色(不需人員)→ 沖洗(助理)→ 吹整(主要人員)。等待時段主要人員可以接其他客人。</p>
+              </div>
+              {editing.steps.length === 0 ? (
+                <button type="button" onClick={() => setEditing({ ...editing, steps: [{ name: '施作', minutes: 30, who: 'main', seat: 'keep' }, { name: '等待', minutes: 30, who: 'none', seat: 'keep' }, { name: '完成', minutes: 30, who: 'main', seat: 'keep' }] })} className={`${btnSm} shrink-0`}>改成分段</button>
+              ) : (
+                <button type="button" onClick={() => setEditing({ ...editing, steps: [] })} className={`${btnSm} shrink-0`}>不分段</button>
+              )}
+            </div>
+            {editing.steps.length ? (
+              <div className="mt-2 space-y-2">
+                {editing.steps.map((x, i) => (
+                  <div key={i} className="grid grid-cols-[1fr_auto] gap-2 rounded-lg bg-white p-2">
+                    <input value={x.name} onChange={(e) => setStep(i, { name: e.target.value })} maxLength={30} placeholder="步驟名稱" aria-label="步驟名稱" className="min-w-0 rounded-lg border border-[#e5ded4] px-2 py-1.5 text-base" />
+                    <div className="flex shrink-0 items-center">
+                      <button type="button" onClick={() => moveStep(i, -1)} disabled={i === 0} aria-label="上移" className="px-1.5 text-[#6b6156] disabled:opacity-30">↑</button>
+                      <button type="button" onClick={() => moveStep(i, 1)} disabled={i === editing.steps.length - 1} aria-label="下移" className="px-1.5 text-[#6b6156] disabled:opacity-30">↓</button>
+                      <button type="button" onClick={() => setEditing({ ...editing, steps: editing.steps.filter((_, j) => j !== i) })} aria-label="移除步驟" className="px-1.5 text-lg leading-none text-[#a03b3b]">×</button>
+                    </div>
+                    <div className="col-span-2 flex flex-wrap items-center gap-2">
+                      <select value={x.minutes} onChange={(e) => setStep(i, { minutes: Number(e.target.value) })} aria-label="分鐘" className="rounded-lg border border-[#e5ded4] px-1 py-1 text-sm">
+                        {(STEP_MINUTES.includes(x.minutes) ? STEP_MINUTES : [...STEP_MINUTES, x.minutes].sort((a, b) => a - b)).map((m) => <option key={m} value={m}>{m} 分</option>)}
+                      </select>
+                      <select value={x.who} onChange={(e) => setStep(i, { who: e.target.value as StepDraft['who'] })} aria-label="負責" className="rounded-lg border border-[#e5ded4] px-1 py-1 text-sm">
+                        {(Object.keys(STEP_WHO_LABEL) as StepDraft['who'][]).map((k) => <option key={k} value={k}>{STEP_WHO_LABEL[k]}</option>)}
+                      </select>
+                      {editing.needs_resource ? <label className="flex items-center gap-1 text-xs"><input type="checkbox" checked={x.seat === 'keep'} onChange={(e) => setStep(i, { seat: e.target.checked ? 'keep' : 'release' })} />占座位</label> : null}
+                    </div>
+                  </div>
+                ))}
+                {editing.steps.length < 12 ? <button type="button" onClick={() => setEditing({ ...editing, steps: [...editing.steps, { name: '', minutes: 15, who: 'main', seat: 'keep' }] })} className="text-xs text-[#1f6f8b]">+ 新增步驟</button> : null}
+                {editing.steps.some((x) => x.who === 'assistant') && !hasAssistant ? <p className="text-[11px] text-[#9a6412]">目前沒有助理,助理步驟會由主要人員自己做。可到「人員床位」新增角色為助理的人員。</p> : null}
+                {editing.steps.length === 1 ? <p className="text-[11px] text-[#9a6412]">只有一個步驟等於不分段。</p> : null}
+              </div>
+            ) : null}
+          </div>
 
           {/* 加購 */}
           <div className="rounded-xl bg-[#faf7f2] p-3">
@@ -222,7 +278,7 @@ export function ServicesTab({ data, reload }: { data: Data; reload: () => Promis
 }
 
 // ---------- 人員與床位 ----------
-type StaffDraft = { id?: string; name: string; title: string; active: boolean; use_business_hours: boolean; week: Week };
+type StaffDraft = { id?: string; name: string; title: string; active: boolean; use_business_hours: boolean; role: 'stylist' | 'assistant'; week: Week };
 
 export function StaffTab({ data, reload }: { data: Data; reload: () => Promise<void> }) {
   const [editing, setEditing] = useState<StaffDraft | null>(null);
@@ -230,7 +286,7 @@ export function StaffTab({ data, reload }: { data: Data; reload: () => Promise<v
   const [resName, setResName] = useState('');
 
   function edit(s: BkStaff) {
-    setEditing({ id: s.id, name: s.name, title: s.title, active: s.active, use_business_hours: s.use_business_hours, week: toWeek(data.staffHours.filter((h) => h.staff_id === s.id)) });
+    setEditing({ id: s.id, name: s.name, title: s.title, active: s.active, use_business_hours: s.use_business_hours, role: s.role, week: toWeek(data.staffHours.filter((h) => h.staff_id === s.id)) });
   }
   async function save() {
     if (!editing) return;
@@ -275,7 +331,7 @@ export function StaffTab({ data, reload }: { data: Data; reload: () => Promise<v
             <p className="font-semibold">服務人員</p>
             <p className="text-xs text-[#8a7f72]">一人工作室保留一位即可;多位人員時,顧客可指定人員或選「不指定」。</p>
           </div>
-          <button type="button" onClick={() => setEditing({ name: '', title: '', active: true, use_business_hours: true, week: toWeek(data.hours) })} className={`${btnDark} shrink-0`}>+ 新增</button>
+          <button type="button" onClick={() => setEditing({ name: '', title: '', active: true, use_business_hours: true, role: 'stylist', week: toWeek(data.hours) })} className={`${btnDark} shrink-0`}>+ 新增</button>
         </div>
         {editing && (
           <div className="space-y-3 rounded-xl bg-[#faf7f2] p-3">
@@ -286,6 +342,14 @@ export function StaffTab({ data, reload }: { data: Data; reload: () => Promise<v
               <label className="block text-xs text-[#8a7f72]">職稱(選填)
                 <input value={editing.title} onChange={(e) => setEditing({ ...editing, title: e.target.value })} maxLength={30} placeholder="例:資深美甲師" className={`${input} mt-1`} />
               </label>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              {(['stylist', 'assistant'] as const).map((r) => (
+                <button key={r} type="button" onClick={() => setEditing({ ...editing, role: r })} className={`rounded-xl border bg-white p-2.5 text-left ${editing.role === r ? 'border-[#1f1b19] ring-2 ring-[#1f1b19]/10' : 'border-[#e5ded4]'}`}>
+                  <span className="block text-sm font-semibold">{r === 'stylist' ? '設計師 / 主要人員' : '助理'}</span>
+                  <span className="block text-[11px] text-[#8a7f72]">{r === 'stylist' ? '顧客可以指定,接主要服務' : '只接分段服務的助理步驟'}</span>
+                </button>
+              ))}
             </div>
             <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={editing.use_business_hours} onChange={(e) => setEditing({ ...editing, use_business_hours: e.target.checked })} />班表跟營業時段相同</label>
             {!editing.use_business_hours ? <div className="rounded-lg bg-white p-2"><p className="text-xs font-semibold">這位人員的每週班表</p><WeekEditor week={editing.week} setWeek={(w) => setEditing({ ...editing, week: w })} /></div> : null}
@@ -302,7 +366,7 @@ export function StaffTab({ data, reload }: { data: Data; reload: () => Promise<v
               <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#efe8dd] text-sm font-semibold text-[#6b6156]">{s.name.slice(0, 1)}</span>
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-semibold">{s.name}{s.active ? '' : '(停用)'}</p>
-                <p className="truncate text-xs text-[#8a7f72]">{[s.title, s.use_business_hours ? '班表同營業時段' : '自訂班表'].filter(Boolean).join(' · ')}</p>
+                <p className="truncate text-xs text-[#8a7f72]">{[s.role === 'assistant' ? '助理' : '', s.title, s.use_business_hours ? '班表同營業時段' : '自訂班表'].filter(Boolean).join(' · ')}</p>
               </div>
               <button type="button" onClick={() => edit(s)} className={btnSm}>編輯</button>
               {data.staff.length > 1 ? <button type="button" onClick={() => void remove(s)} className="shrink-0 px-1 text-xs text-[#a03b3b]">刪除</button> : null}

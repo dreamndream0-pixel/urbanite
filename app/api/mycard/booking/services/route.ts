@@ -46,6 +46,19 @@ async function syncChildren(businessId: string, serviceId: string, body: Record<
       else await db.from('bk_addons').insert({ ...row, business_id: businessId, service_id: serviceId });
     }
   }
+  // 服務步驟:整份取代(既有預約的占用已寫入,不受影響)
+  if (Array.isArray(body.steps)) {
+    const rows = (body.steps as Record<string, unknown>[]).slice(0, 12)
+      .map((x, i) => ({
+        business_id: businessId, service_id: serviceId, seq: i, name: String(x.name ?? '').trim().slice(0, 30),
+        minutes: int(x.minutes, 5, 480), who: ['main', 'assistant', 'none'].includes(String(x.who)) ? String(x.who) : 'main',
+        seat: x.seat === 'release' ? 'release' : 'keep',
+      }))
+      .filter((x) => x.name);
+    await db.from('bk_service_steps').delete().eq('service_id', serviceId).eq('business_id', businessId);
+    // 只有一個步驟等於不分段
+    if (rows.length > 1) await db.from('bk_service_steps').insert(rows);
+  }
   if (Array.isArray(body.staff)) {
     const { data: staff } = await db.from('bk_staff').select('id').eq('business_id', businessId);
     const valid = new Set((staff ?? []).map((s) => s.id));

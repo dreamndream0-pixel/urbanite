@@ -45,7 +45,12 @@ export type BkService = {
   deposit: number;
 };
 
-export type BkStaff = { id: string; business_id: string; name: string; title: string; avatar: string; active: boolean; use_business_hours: boolean; sort_order: number };
+export type BkStaff = { id: string; business_id: string; name: string; title: string; avatar: string; active: boolean; use_business_hours: boolean; sort_order: number; role: 'stylist' | 'assistant' };
+// 服務步驟:who = 主要人員 / 助理 / 不需人員(等待);seat = 這段是否占用座位
+export type BkServiceStep = { id?: string; service_id: string; seq: number; name: string; minutes: number; who: 'main' | 'assistant' | 'none'; seat: 'keep' | 'release' };
+export type BkAllocation = { id: string; booking_id: string; staff_id: string | null; resource_id: string | null; role: 'main' | 'assistant' | 'seat'; start_at: string; end_at: string };
+
+export const STEP_WHO_LABEL = { main: '主要人員', assistant: '助理', none: '不需人員' } as const;
 export type BkStaffHour = { staff_id: string; weekday: number; start_min: number; end_min: number };
 export type BkStaffService = { staff_id: string; service_id: string; duration_minutes: number | null; price: number | null };
 export type BkResource = { id: string; name: string; active: boolean; sort_order: number };
@@ -61,7 +66,7 @@ export type BkBooking = {
   booking_no: string;
   customer_user_id: string | null;
   service_id: string | null;
-  service_snapshot: { name: string; duration_minutes: number; price: number; price_note?: string };
+  service_snapshot: { name: string; duration_minutes: number; price: number; price_note?: string; steps?: { name: string; minutes: number; who: string }[] };
   start_at: string;
   end_at: string;
   occupy_end_at: string;
@@ -207,6 +212,41 @@ export function formatDateLabel(dateStr: string) {
 export const money = (n: number) => `NT $${Math.round(n).toLocaleString('en-US')}`;
 
 // ---------- 可約時段 ----------
+// 通用版:營業時段內每個間隔的開始時間,符合 ok(開始時間) 才算可約(分段占用、助理、座位由呼叫端判斷)
+export function computeSlotsWith(opts: {
+  business: Pick<BkBusiness, 'slot_interval' | 'lead_minutes' | 'advance_days'>;
+  hours: BkHour[];
+  duration: number;
+  fromDate: string;
+  days: number;
+  ok: (startMs: number) => boolean;
+  now?: Date;
+}): { date: string; slots: string[]; closed: boolean }[] {
+  const now = (opts.now ?? new Date()).getTime();
+  const { slot_interval, lead_minutes, advance_days } = opts.business;
+  const today = localParts(new Date(now)).date;
+  const lastDate = addDays(today, advance_days);
+  const earliest = now + lead_minutes * 60000;
+  const out: { date: string; slots: string[]; closed: boolean }[] = [];
+  for (let i = 0; i < opts.days; i++) {
+    const date = addDays(opts.fromDate, i);
+    if (date < today || date > lastDate) { out.push({ date, slots: [], closed: true }); continue; }
+    const { weekday } = localParts(fromLocal(date, 12 * 60));
+    const ranges = opts.hours.filter((h) => h.weekday === weekday).sort((a, b) => a.start_min - b.start_min);
+    const slots: string[] = [];
+    for (const r of ranges) {
+      for (let t = r.start_min; t + opts.duration <= r.end_min; t += slot_interval) {
+        const start = fromLocal(date, t).getTime();
+        if (start < earliest || !opts.ok(start)) continue;
+        const label = minutesToHHMM(t);
+        if (!slots.includes(label)) slots.push(label);
+      }
+    }
+    out.push({ date, slots, closed: ranges.length === 0 });
+  }
+  return out;
+}
+
 // 可約 = 營業時段 ∩ 不在休假 ∩ 不與既有有效預約(含整理時間)重疊 ∩ 最短提前 ∩ 可約天數
 type Range = { start: number; end: number }; // epoch ms
 

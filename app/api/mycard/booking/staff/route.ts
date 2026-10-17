@@ -22,6 +22,7 @@ function clean(b: Record<string, unknown>) {
     avatar: /^https:\/\//.test(String(b.avatar ?? '')) ? String(b.avatar) : '',
     active: b.active === undefined ? true : Boolean(b.active),
     use_business_hours: b.use_business_hours === undefined ? true : Boolean(b.use_business_hours),
+    role: b.role === 'assistant' ? 'assistant' : 'stylist',
   };
 }
 
@@ -66,9 +67,9 @@ export async function PATCH(request: Request) {
   const id = String(body?.id ?? '');
   const row = clean(body);
   if (!row.name) return err(422, 'VALIDATION_ERROR', '請填寫人員名稱。');
-  if (!row.active) {
-    const { count } = await db.from('bk_staff').select('id', { count: 'exact', head: true }).eq('business_id', c.business.id).eq('active', true).neq('id', id);
-    if (!count) return err(422, 'POLICY_BLOCKED', '至少要有一位可接預約的人員。');
+  if (!row.active || row.role === 'assistant') {
+    const { count } = await db.from('bk_staff').select('id', { count: 'exact', head: true }).eq('business_id', c.business.id).eq('active', true).neq('role', 'assistant').neq('id', id);
+    if (!count) return err(422, 'POLICY_BLOCKED', '至少要有一位可接預約的設計師(不是助理)。');
   }
   const { data, error } = await db.from('bk_staff').update(row).eq('id', id).eq('business_id', c.business.id).select('*').single();
   if (error) return err(400, 'SERVER_ERROR', error.message);
@@ -85,7 +86,7 @@ export async function DELETE(request: Request) {
   if (!c) return err(401, 'AUTH_REQUIRED', '請先登入。');
   const id = new URL(request.url).searchParams.get('id') ?? '';
   const db = createAdminClient();
-  const { count: others } = await db.from('bk_staff').select('id', { count: 'exact', head: true }).eq('business_id', c.business.id).eq('active', true).neq('id', id);
+  const { count: others } = await db.from('bk_staff').select('id', { count: 'exact', head: true }).eq('business_id', c.business.id).eq('active', true).neq('role', 'assistant').neq('id', id);
   if (!others) return err(422, 'POLICY_BLOCKED', '至少要有一位可接預約的人員。');
   const { count } = await db.from('bk_bookings').select('id', { count: 'exact', head: true }).eq('staff_id', id);
   if (count) return err(422, 'POLICY_BLOCKED', '這位人員有預約紀錄,不能刪除;請改為「停用」,歷史紀錄會保留。');

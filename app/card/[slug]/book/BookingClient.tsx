@@ -13,7 +13,7 @@ type Addon = { id: string; name: string; price: number; extra_minutes: number };
 type ServiceStaff = { id: string; duration_minutes: number; price: number };
 type Service = {
   id: string; name: string; description: string; duration_minutes: number; price: number; price_note: string; image: string;
-  deposit: number; addons: Addon[]; staff: ServiceStaff[];
+  deposit: number; addons: Addon[]; staff: ServiceStaff[]; steps: { name: string; minutes: number; who: 'main' | 'assistant' | 'none' }[];
 };
 type Staff = { id: string; name: string; title: string; avatar: string };
 type Business = { name: string; address: string; notice: string; approval_mode: 'auto' | 'manual'; cancel_hours: number; allow_any_staff: boolean; payment_info: string; open: boolean };
@@ -230,6 +230,7 @@ export default function BookingClient({ slug, card, business, services, staff }:
                         <span className="block text-sm font-semibold">{s.name}</span>
                         <span className="mt-0.5 block text-xs text-[#8a7f72]">約 {s.duration_minutes} 分鐘 · {priceText(min, varies ? '起' : s.price_note)}{s.deposit ? ` · 訂金 ${money(s.deposit)}` : ''}</span>
                         {s.description ? <span className="mt-1 line-clamp-2 block text-xs leading-5 text-[#6b6156]">{s.description}</span> : null}
+                        {s.steps.length > 1 ? <StepBar steps={s.steps} /> : null}
                       </span>
                       <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border ${on ? 'border-[#1f1b19] bg-[#1f1b19] text-white' : 'border-[#d7c9bd]'}`}>{on ? '✓' : ''}</span>
                     </button>
@@ -344,6 +345,20 @@ function StepTitle({ n, title }: { n: number; title: string }) {
     <p className="mb-2 flex items-center gap-2 text-sm font-semibold">
       <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#1f1b19] text-[11px] text-white">{n}</span>{title}
     </p>
+  );
+}
+
+// 分段服務的流程條:主要人員(深)、助理(藍)、等待(綠)
+function StepBar({ steps }: { steps: Service['steps'] }) {
+  const tone = { main: 'bg-[#1f1b19]', assistant: 'bg-[#9cc0d8]', none: 'bg-[#b9d8c1]' };
+  return (
+    <span className="mt-2 block">
+      <span className="flex h-1.5 gap-0.5 overflow-hidden rounded-full" aria-hidden="true">
+        {steps.map((s, i) => <span key={i} className={tone[s.who]} style={{ flex: s.minutes }} />)}
+      </span>
+      <span className="mt-1 block text-[11px] leading-4 text-[#8a7f72]">{steps.map((s) => `${s.name} ${s.minutes} 分`).join(' → ')}</span>
+      {steps.some((s) => s.who === 'none') ? <span className="block text-[11px] leading-4 text-[#8a7f72]">等待時人員會照顧其他客人,座位為你保留。</span> : null}
+    </span>
   );
 }
 

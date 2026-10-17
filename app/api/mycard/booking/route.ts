@@ -25,11 +25,12 @@ export async function GET() {
     scopedClient(URBANITE_SHOP_ID).from('customers').select('line_user_id').eq('user_id', user.id).maybeSingle(),
   ]);
   const ids = (bookings ?? []).map((b) => b.id);
-  const { data: payments } = ids.length
-    ? await db.from('bk_payments').select('id, booking_id, kind, amount, method, note, created_at').in('booking_id', ids).order('created_at')
-    : { data: [] };
+  const [{ data: payments }, { data: allocations }] = ids.length ? await Promise.all([
+    db.from('bk_payments').select('id, booking_id, kind, amount, method, note, created_at').in('booking_id', ids).order('created_at'),
+    db.from('bk_allocations').select('id, booking_id, staff_id, resource_id, role, start_at, end_at').eq('business_id', business.id).eq('active', true).gte('end_at', since).order('start_at'),
+  ]) : [{ data: [] }, { data: [] }];
   return NextResponse.json({
-    business, ...sched, exceptions: exceptions ?? [], bookings: bookings ?? [], payments: payments ?? [],
+    business, ...sched, exceptions: exceptions ?? [], bookings: bookings ?? [], payments: payments ?? [], allocations: allocations ?? [],
     card: card ?? null, line_bound: Boolean(me?.line_user_id), today: localParts(new Date()).date,
   }, { headers: { 'Cache-Control': 'no-store' } });
 }

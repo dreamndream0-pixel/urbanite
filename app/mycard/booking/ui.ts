@@ -1,11 +1,11 @@
 // 預約管理頁共用:資料型別、樣式、API 呼叫
 import type {
-  BkAddon, BkBooking, BkBusiness, BkException, BkHour, BkPayment, BkResource, BkService, BkStaff, BkStaffHour, BkStaffService,
+  BkAddon, BkAllocation, BkBooking, BkBusiness, BkException, BkHour, BkPayment, BkResource, BkService, BkServiceStep, BkStaff, BkStaffHour, BkStaffService,
 } from '@/lib/booking/shared';
 
 export type Data = {
   business: BkBusiness; services: BkService[]; addons: BkAddon[]; hours: BkHour[]; staff: BkStaff[];
-  staffHours: BkStaffHour[]; staffServices: BkStaffService[]; resources: BkResource[];
+  staffHours: BkStaffHour[]; staffServices: BkStaffService[]; resources: BkResource[]; steps: BkServiceStep[]; allocations: BkAllocation[];
   exceptions: BkException[]; bookings: BkBooking[]; payments: BkPayment[];
   card: { slug: string; display_name: string } | null; line_bound: boolean; today: string;
 };
@@ -27,3 +27,6 @@ export const errMsg = (e: unknown, fallback = '操作失敗') => (e instanceof E
 
 // 人員是否多於一位(一人工作室介面簡化,不顯示人員欄位)
 export const isTeam = (data: Pick<Data, 'staff'>) => data.staff.filter((s) => s.active).length > 1;
+
+// 可接主要服務的人員(助理只做助理步驟)
+export const stylists = (data: Pick<Data, 'staff'>) => data.staff.filter((s) => s.active && s.role !== 'assistant');
