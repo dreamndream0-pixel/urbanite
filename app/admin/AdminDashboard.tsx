@@ -7118,7 +7118,7 @@ function ProductModal({
                 {modalSpecs.filter((dim) => dim === colorDim || dim.display === 'image').map((dim) => (
                   <div key={dim.name} className="mt-3 rounded-xl border border-[#e5ded4] p-3">
                     <p className="mb-2 text-sm font-semibold text-[#8a7f72]">
-                      {dim.name}圖片{dim.display === 'image' ? '(前台規格按鈕顯示這張圖' : '('}{dim === colorDim ? `${dim.display === 'image' ? ',' : ''}點選會切換主圖)` : ')'}
+                      {dim.name}圖片({dim.display === 'image' ? '前台規格按鈕顯示這張圖,' : ''}點選會在上方顯示大圖)
                     </p>
                     <div className="grid gap-2 sm:grid-cols-2">
                       {dim.options.map((color) => (

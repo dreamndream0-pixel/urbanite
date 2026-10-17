@@ -399,7 +399,8 @@ export default function ProductDetailClient({ product, homeHref = '/', categoryN
                           disabled={!selected && !available}
                           onClick={() => {
                             setSpecSel((prev) => prev.map((v, idx) => (idx === i ? opt : v)));
-                            if (dim.name.includes('色') && product.color_images?.[opt]) {
+                            // 任何規格(顏色、款式…)有上傳規格圖,點選就在上方顯示大圖
+                            if (product.color_images?.[opt]) {
                               showImage(product.color_images[opt]);
                             }
                           }}
