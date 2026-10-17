@@ -222,6 +222,7 @@ function BookingCard({ booking: b, data, reload }: { booking: BkBooking; data: D
         <div className="min-w-0 flex-1">
           <p className="text-base font-semibold">{formatRange(b.start_at, b.end_at).split(' ')[1]}{team && staff ? <span className="ml-2 text-sm font-normal text-[#6b6156]">· {staff.name}</span> : null}</p>
           <p className="text-sm">{b.service_snapshot.name}{b.addons?.length ? ` + ${b.addons.map((a) => a.name).join('、')}` : ''}</p>
+          {b.branch_id ? <p className="text-xs text-[#8a7f72]">{data.branches.find((x) => x.id === b.branch_id)?.name ?? ''}</p> : null}
           {resource ? <p className="text-xs text-[#8a7f72]">{resource.name}</p> : null}
           {items.length > 1 ? (
             <ul className="mt-1 space-y-1">
@@ -337,10 +338,10 @@ function PaymentForm({ title, kinds, defaultAmount, busy, allowSkip, onCancel, o
 }
 
 // 店家選時段(改期 / 加單共用):日期 + 人員 → 可選時間(不受最短提前限制)
-function useOwnerSlots(params: { date: string; service: string; addons: string[]; staff: string; booking?: string; extra?: string[] }) {
+function useOwnerSlots(params: { date: string; service: string; addons: string[]; staff: string; booking?: string; extra?: string[]; branch?: string }) {
   const [slots, setSlots] = useState<string[] | null>(null);
   const [error, setError] = useState('');
-  const key = `${params.date}|${params.service}|${params.addons.join(',')}|${params.staff}|${params.booking ?? ''}|${(params.extra ?? []).join(',')}`;
+  const key = `${params.date}|${params.service}|${params.addons.join(',')}|${params.staff}|${params.booking ?? ''}|${(params.extra ?? []).join(',')}|${params.branch ?? ''}`;
   useEffect(() => {
     if (!params.date || (!params.service && !params.booking)) return;
     let alive = true;
@@ -348,7 +349,7 @@ function useOwnerSlots(params: { date: string; service: string; addons: string[]
       setSlots(null);
       setError('');
       try {
-        const q = new URLSearchParams({ date: params.date, service: params.service, addons: params.addons.join(','), staff: params.staff, booking: params.booking ?? '', extra: (params.extra ?? []).join(',') });
+        const q = new URLSearchParams({ date: params.date, service: params.service, addons: params.addons.join(','), staff: params.staff, booking: params.booking ?? '', extra: (params.extra ?? []).join(','), branch: params.branch ?? '' });
         const day = await api<{ slots: string[] }>(`/api/mycard/booking/bookings?${q}`);
         if (alive) setSlots(day?.slots ?? []);
       } catch (e) { if (alive) { setError(errMsg(e)); setSlots([]); } }
@@ -405,6 +406,7 @@ function NewBooking({ data, onClose, onDone, initialDate }: { data: Data; onClos
   const [addonIds, setAddonIds] = useState<string[]>([]);
   const [extraIds, setExtraIds] = useState<string[]>([]);
   const [staff, setStaff] = useState('');
+  const [branch, setBranch] = useState(data.branches.find((b) => b.active)?.id ?? '');
   const [date, setDate] = useState(initialDate ?? data.today);
   const [time, setTime] = useState('');
   const [contact, setContact] = useState({ name: '', phone: '', note: '' });
@@ -424,7 +426,7 @@ function NewBooking({ data, onClose, onDone, initialDate }: { data: Data; onClos
     return () => { alive = false; clearTimeout(t); };
   }, [contact.name, contact.phone, customerId]);
   const addons = data.addons.filter((a) => a.service_id === serviceId && a.active);
-  const { slots, error } = useOwnerSlots({ date, service: serviceId, addons: addonIds, staff, extra: extraIds });
+  const { slots, error } = useOwnerSlots({ date, service: serviceId, addons: addonIds, staff, extra: extraIds, branch });
 
   async function save() {
     if (!contact.name.trim()) return void uiAlert('請填寫顧客姓名');
@@ -432,7 +434,7 @@ function NewBooking({ data, onClose, onDone, initialDate }: { data: Data; onClos
     try {
       await api('/api/mycard/booking/bookings', {
         method: 'POST',
-        body: JSON.stringify({ service_id: serviceId, addon_ids: addonIds, extra_ids: extraIds, customer_id: customerId || null, staff_id: staff || null, start_at: new Date(`${date}T${time}:00+08:00`).toISOString(), contact }),
+        body: JSON.stringify({ service_id: serviceId, addon_ids: addonIds, extra_ids: extraIds, branch_id: branch || null, customer_id: customerId || null, staff_id: staff || null, start_at: new Date(`${date}T${time}:00+08:00`).toISOString(), contact }),
       });
       uiToast('已新增預約');
       onDone();
@@ -447,6 +449,11 @@ function NewBooking({ data, onClose, onDone, initialDate }: { data: Data; onClos
         <p className="font-semibold">新增預約(電話、現場客)</p>
         <button type="button" onClick={onClose} aria-label="關閉" className="px-2 text-lg text-[#8a7f72]">×</button>
       </div>
+      {data.branches.length ? (
+        <select value={branch} onChange={(e) => { setBranch(e.target.value); setTime(''); }} aria-label="分店" className={input}>
+          {data.branches.filter((b) => b.active).map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+        </select>
+      ) : null}
       <select value={serviceId} onChange={(e) => { setServiceId(e.target.value); setAddonIds([]); setExtraIds((x) => x.filter((id) => id !== e.target.value)); setTime(''); }} aria-label="服務" className={input}>
         {services.map((s) => <option key={s.id} value={s.id}>{s.name}({s.duration_minutes} 分{s.price ? ` · ${money(s.price)}` : ''})</option>)}
       </select>
@@ -513,13 +520,14 @@ function CalendarTab({ data, reload }: { data: Data; reload: () => Promise<void>
   const [selected, setSelected] = useState('');
   const [adding, setAdding] = useState(false);
   const [view, setView] = useState<'staff' | 'seat'>('staff');
+  const [branch, setBranch] = useState('');
   const { weekday } = formatDateLabel(date);
-  const day = data.bookings.filter((b) => localParts(b.start_at).date === date && b.status !== 'expired');
+  const day = data.bookings.filter((b) => localParts(b.start_at).date === date && b.status !== 'expired' && (!branch || b.branch_id === branch));
   const shown = day.filter((b) => b.status !== 'cancelled');
   const team = isTeam(data);
   const seatView = view === 'seat' && data.resources.length > 0;
   const columns = seatView
-    ? data.resources.filter((r) => r.active || shown.some((b) => b.resource_id === r.id)).map((r) => ({ id: r.id, name: r.name }))
+    ? data.resources.filter((r) => (!branch || !r.branch_id || r.branch_id === branch) && (r.active || shown.some((b) => b.resource_id === r.id))).map((r) => ({ id: r.id, name: r.name }))
     : team
       ? data.staff.filter((s) => s.active || shown.some((b) => b.staff_id === s.id)).map((s) => ({ id: s.id, name: s.name }))
       : [{ id: '', name: '' }];
@@ -573,6 +581,12 @@ function CalendarTab({ data, reload }: { data: Data; reload: () => Promise<void>
         <input type="date" value={date} onChange={(e) => { if (e.target.value) { setDate(e.target.value); setSelected(''); } }} aria-label="日期" className="min-w-0 flex-1 rounded-lg border border-[#e5ded4] px-2 py-1.5 text-base" />
         <button type="button" onClick={() => { setDate(addDays(date, 1)); setSelected(''); }} aria-label="後一天" className={btnSm}>›</button>
         <button type="button" onClick={() => { setDate(data.today); setSelected(''); }} className={btnSm}>今天</button>
+        {data.branches.length ? (
+          <select value={branch} onChange={(e) => { setBranch(e.target.value); setSelected(''); }} aria-label="分店" className="w-full rounded-lg border border-[#e5ded4] bg-white px-2 py-1.5 text-sm">
+            <option value="">所有分店</option>
+            {data.branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+          </select>
+        ) : null}
         <div className="flex w-full flex-wrap items-center gap-2">
           <p className="min-w-0 flex-1 text-xs text-[#8a7f72]">週{weekday} · {shown.length} 筆預約{closedAll.length ? ' · 有休假設定' : ''}{day.length > shown.length ? ` · 已取消 ${day.length - shown.length} 筆` : ''}</p>
           {data.resources.length ? (

@@ -23,6 +23,7 @@ function clean(b: Record<string, unknown>) {
     price_mode: b.price_mode === 'quote' ? 'quote' : 'fixed',
     service_mode: b.service_mode === 'outcall' ? 'outcall' : 'in_store',
     revisit_days: int(b.revisit_days, 0, 365),
+    branch_ids: Array.isArray(b.branch_ids) ? (b.branch_ids as unknown[]).map(String).filter((x) => /^[0-9a-f-]{36}$/.test(x)).slice(0, 20) : [],
   };
 }
 

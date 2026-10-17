@@ -37,6 +37,7 @@ export type BkBusiness = {
   waitlist_invite_minutes: number;
   thanks_enabled: boolean;
   thanks_message: string;
+  branch_travel_minutes: number;
 };
 
 export type BkService = {
@@ -55,7 +56,10 @@ export type BkService = {
   price_mode: 'fixed' | 'quote';      // quote = 需報價(先詢價)
   service_mode: 'in_store' | 'outcall'; // outcall = 外出服務(加交通時間)
   revisit_days: number;                 // 完成後幾天提醒回訪(0 = 不提醒)
+  branch_ids?: string[];                // 限定分店(空 = 所有分店)
 };
+
+export type BkBranch = { id: string; name: string; address: string; active: boolean; sort_order: number };
 
 export type BkStaff = { id: string; business_id: string; name: string; title: string; avatar: string; active: boolean; use_business_hours: boolean; sort_order: number; role: 'stylist' | 'assistant'; commission_rate?: number };
 // 服務步驟:who = 主要人員 / 助理 / 不需人員(等待);seat = 這段是否占用座位
@@ -65,14 +69,14 @@ export type BkAllocation = { id: string; booking_id: string; staff_id: string | 
 export type BkBookingItem = { id: string; booking_id: string; seq: number; service_id: string | null; service_snapshot: { name: string; duration_minutes: number; price: number }; staff_id: string | null; start_at: string; end_at: string; amount: number; status: 'active' | 'cancelled' };
 
 export const STEP_WHO_LABEL = { main: '主要人員', assistant: '助理', none: '不需人員' } as const;
-export type BkStaffHour = { staff_id: string; weekday: number; start_min: number; end_min: number };
+export type BkStaffHour = { staff_id: string; weekday: number; start_min: number; end_min: number; branch_id?: string | null };
 export type BkStaffService = { staff_id: string; service_id: string; duration_minutes: number | null; price: number | null };
-export type BkResource = { id: string; name: string; active: boolean; sort_order: number };
+export type BkResource = { id: string; name: string; active: boolean; sort_order: number; branch_id?: string | null };
 export type BkAddon = { id: string; service_id: string; name: string; price: number; extra_minutes: number; active: boolean; sort_order: number };
 export type BkPayment = { id: string; booking_id: string; kind: 'deposit' | 'balance' | 'refund'; amount: number; method: keyof typeof PAY_METHOD_LABEL; note: string; created_at: string };
 
-export type BkHour = { weekday: number; start_min: number; end_min: number };
-export type BkException = { id: string; start_at: string; end_at: string; reason: string; staff_id: string | null };
+export type BkHour = { weekday: number; start_min: number; end_min: number; branch_id?: string | null };
+export type BkException = { id: string; start_at: string; end_at: string; reason: string; staff_id: string | null; branch_id?: string | null };
 
 export type BkBooking = {
   id: string;
@@ -105,6 +109,7 @@ export type BkBooking = {
   quote_id?: string | null;
   customer_id?: string | null;
   package_id?: string | null;
+  branch_id?: string | null;
 };
 
 // 顧客檔案(每間店各自一份)、服務紀錄、照片
@@ -158,6 +163,7 @@ export const DEFAULT_BUSINESS: Omit<BkBusiness, 'id' | 'owner_user_id' | 'card_i
   waitlist_invite_minutes: 60,
   thanks_enabled: false,
   thanks_message: '',
+  branch_travel_minutes: 30,
 };
 
 export const STATUS_LABEL: Record<BookingStatus, string> = {

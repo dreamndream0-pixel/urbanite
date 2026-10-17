@@ -1,6 +1,6 @@
 // 預約管理頁共用:資料型別、樣式、API 呼叫
 import type {
-  BkAddon, BkAllocation, BkBooking, BkBookingItem, BkQuote, BkQuoteVersion, BkBusiness, BkException, BkHour, BkPayment, BkResource, BkService, BkServiceStep, BkStaff, BkStaffHour, BkStaffService,
+  BkAddon, BkAllocation, BkBooking, BkBookingItem, BkQuote, BkQuoteVersion, BkBusiness, BkException, BkHour, BkPayment, BkBranch, BkResource, BkService, BkServiceStep, BkStaff, BkStaffHour, BkStaffService,
 } from '@/lib/booking/shared';
 
 export type Data = {
@@ -9,6 +9,7 @@ export type Data = {
   customers: { id: string; name: string; note: string; tags: string[]; user_id: string | null; points: number }[];
   products: import('@/lib/booking/loyalty').PackageProduct[];
   waitlist: import('@/lib/booking/engage').WaitlistEntry[];
+  branches: BkBranch[];
   exceptions: BkException[]; bookings: BkBooking[]; payments: BkPayment[];
   card: { slug: string; display_name: string } | null; line_bound: boolean; today: string;
 };

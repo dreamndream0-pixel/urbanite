@@ -26,8 +26,8 @@ export async function POST(request: Request) {
     if (!st) staffId = null;
   }
   const { data, error } = await db.from('bk_exceptions')
-    .insert({ business_id: business.id, start_at: start.toISOString(), end_at: end.toISOString(), reason: String(body?.reason ?? '').trim().slice(0, 60), staff_id: staffId })
-    .select('id, start_at, end_at, reason, staff_id').single();
+    .insert({ business_id: business.id, start_at: start.toISOString(), end_at: end.toISOString(), reason: String(body?.reason ?? '').trim().slice(0, 60), staff_id: staffId, branch_id: typeof body?.branch_id === 'string' && /^[0-9a-f-]{36}$/.test(body.branch_id) ? body.branch_id : null })
+    .select('id, start_at, end_at, reason, staff_id, branch_id').single();
   if (error) return err(400, 'SERVER_ERROR', error.message);
   let q = db.from('bk_bookings').select('id, booking_no, start_at, end_at, status, contact, service_snapshot')
     .eq('business_id', business.id).in('status', ['pending', 'confirmed']).lt('start_at', end.toISOString()).gt('occupy_end_at', start.toISOString());

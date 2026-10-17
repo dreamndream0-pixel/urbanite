@@ -19,7 +19,7 @@ export async function GET(request: Request) {
   try {
     const day = await ownerSlots(user.id, {
       date, serviceId: q.get('service') ?? '', addonIds: (q.get('addons') ?? '').split(',').filter(Boolean),
-      staffId: q.get('staff') || null, bookingId: q.get('booking') || undefined, extras: (q.get('extra') ?? '').split(',').filter(Boolean).slice(0, 2),
+      staffId: q.get('staff') || null, branchId: q.get('branch') || null, bookingId: q.get('booking') || undefined, extras: (q.get('extra') ?? '').split(',').filter(Boolean).slice(0, 2),
     });
     return NextResponse.json(day, { headers: { 'Cache-Control': 'no-store' } });
   } catch (e) { return fail(e, '讀取時段失敗。'); }
@@ -37,6 +37,7 @@ export async function POST(request: Request) {
       staffId: body?.staff_id ? String(body.staff_id) : null,
       extras: Array.isArray(body?.extra_ids) ? (body.extra_ids as unknown[]).map(String).slice(0, 3) : [],
       customerId: body?.customer_id ? String(body.customer_id) : null,
+      branchId: body?.branch_id ? String(body.branch_id) : null,
       startAt: String(body?.start_at ?? ''),
       contact: { name: String(body?.contact?.name ?? ''), phone: String(body?.contact?.phone ?? ''), note: String(body?.contact?.note ?? '') },
     });

@@ -20,7 +20,7 @@ export async function GET() {
   const since = new Date(Date.now() - 30 * 86400000).toISOString();
   const [sched, { data: exceptions }, { data: bookings }, { data: card }, { data: me }] = await Promise.all([
     loadSchedule(business.id, true),
-    db.from('bk_exceptions').select('id, start_at, end_at, reason, staff_id').eq('business_id', business.id).gte('end_at', new Date().toISOString()).order('start_at'),
+    db.from('bk_exceptions').select('id, start_at, end_at, reason, staff_id, branch_id').eq('business_id', business.id).gte('end_at', new Date().toISOString()).order('start_at'),
     db.from('bk_bookings').select('*').eq('business_id', business.id).gte('start_at', since).order('start_at').limit(500),
     db.from('profile_cards').select('slug, display_name').eq('owner_user_id', user.id).maybeSingle(),
     scopedClient(URBANITE_SHOP_ID).from('customers').select('line_user_id').eq('user_id', user.id).maybeSingle(),
@@ -90,6 +90,7 @@ export async function PUT(request: Request) {
       waitlist_invite_minutes: int(b.waitlist_invite_minutes, 15, 1440, business.waitlist_invite_minutes),
       thanks_enabled: b.thanks_enabled === undefined ? business.thanks_enabled : Boolean(b.thanks_enabled),
       thanks_message: String(b.thanks_message ?? business.thanks_message ?? '').trim().slice(0, 200),
+      branch_travel_minutes: int(b.branch_travel_minutes, 0, 240, business.branch_travel_minutes),
       updated_at: new Date().toISOString(),
     };
     const { error } = await db.from('bk_businesses').update(patch).eq('id', business.id);
@@ -97,11 +98,18 @@ export async function PUT(request: Request) {
   }
 
   if (Array.isArray(body?.hours)) {
+    // 有分店時每間分店各自一份營業時段(branch_id 空 = 沒有分店 / 共用)
+    let branchId: string | null = body?.branch_id ? String(body.branch_id) : null;
+    if (branchId) {
+      const { data: br } = await db.from('bk_branches').select('id').eq('id', branchId).eq('business_id', business.id).maybeSingle();
+      if (!br) branchId = null;
+    }
     const rows = (body.hours as Record<string, unknown>[])
-      .map((h) => ({ business_id: business.id, weekday: int(h.weekday, 0, 6, 0), start_min: int(h.start_min, 0, 1439, 0), end_min: int(h.end_min, 1, 1440, 0) }))
+      .map((h) => ({ business_id: business.id, branch_id: branchId, weekday: int(h.weekday, 0, 6, 0), start_min: int(h.start_min, 0, 1439, 0), end_min: int(h.end_min, 1, 1440, 0) }))
       .filter((h) => h.end_min > h.start_min)
       .slice(0, 50);
-    await db.from('bk_hours').delete().eq('business_id', business.id);
+    const del = db.from('bk_hours').delete().eq('business_id', business.id);
+    await (branchId ? del.eq('branch_id', branchId) : del.is('branch_id', null));
     if (rows.length) {
       const { error } = await db.from('bk_hours').insert(rows);
       if (error) return NextResponse.json({ error: { code: 'SERVER_ERROR', message: error.message } }, { status: 400 });

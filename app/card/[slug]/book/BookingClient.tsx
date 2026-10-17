@@ -15,8 +15,9 @@ type ServiceStaff = { id: string; duration_minutes: number; price: number };
 type Service = {
   id: string; name: string; description: string; duration_minutes: number; price: number; price_note: string; image: string;
   deposit: number; addons: Addon[]; staff: ServiceStaff[]; steps: { name: string; minutes: number; who: 'main' | 'assistant' | 'none' }[];
-  price_mode: 'fixed' | 'quote'; service_mode: 'in_store' | 'outcall';
+  price_mode: 'fixed' | 'quote'; service_mode: 'in_store' | 'outcall'; branch_ids?: string[];
 };
+type Branch = { id: string; name: string; address: string };
 type Staff = { id: string; name: string; title: string; avatar: string };
 type Business = { name: string; address: string; notice: string; approval_mode: 'auto' | 'manual'; cancel_hours: number; allow_any_staff: boolean; payment_info: string; service_area: string; waitlist: boolean; open: boolean };
 type MyWait = { id: string; service_name: string; date: string; from_min: number; to_min: number; status: 'waiting' | 'invited'; invited_slot: string | null; invite_expires_at: string | null; service_id: string; staff_id: string | null; business: { slug: string } };
@@ -53,7 +54,11 @@ const baseMinutes = (x: Service) => (x.steps.length > 1 ? x.steps.reduce((n, st)
 const minPrice = (x: Service) => (x.staff.length ? Math.min(...x.staff.map((st) => st.price)) : x.price);
 
 // 名片線上預約:選服務 → 加購 → 人員 → 日期時段 → 登入 → 聯絡資料 → 送出;另有「我的預約」(付訂金回報、改期、取消、加入行事曆)
-export default function BookingClient({ slug, card, business, services, staff }: { slug: string; card: { display_name: string; avatar_url: string }; business: Business; services: Service[]; staff: Staff[] }) {
+export default function BookingClient({ slug, card, business, services: allServices, staff, branches = [] }: { slug: string; card: { display_name: string; avatar_url: string }; business: Business; services: Service[]; staff: Staff[]; branches?: Branch[] }) {
+  const [branchId, setBranchId] = useState(branches.length === 1 ? branches[0].id : '');
+  const branch = branches.find((b) => b.id === branchId) ?? null;
+  // 有分店時只顯示這間分店提供的服務
+  const services = useMemo(() => (branchId ? allServices.filter((s) => !s.branch_ids?.length || s.branch_ids.includes(branchId)) : allServices), [allServices, branchId]);
   const [tab, setTab] = useState<'book' | 'my'>('book');
   const [serviceId, setServiceId] = useState('');
   const [addonIds, setAddonIds] = useState<string[]>([]);
@@ -122,22 +127,23 @@ export default function BookingClient({ slug, card, business, services, staff }:
     Promise.resolve().then(() => {
       if (q.get('tab') === 'my') setTab('my');
       const s = q.get('s');
-      if (s && services.some((x) => x.id === s)) {
+      if (q.get('b') && branches.some((x) => x.id === q.get('b'))) setBranchId(q.get('b')!);
+      if (s && allServices.some((x) => x.id === s)) {
         setServiceId(s);
         setAddonIds((q.get('a') ?? '').split(',').filter(Boolean));
-        setExtraIds((q.get('x') ?? '').split(',').filter((id) => id && id !== s && services.some((x) => x.id === id)).slice(0, 2));
+        setExtraIds((q.get('x') ?? '').split(',').filter((id) => id && id !== s && allServices.some((x) => x.id === id)).slice(0, 2));
         if (q.has('p')) setStaffId(q.get('p') ?? '');
         setDate(q.get('d') ?? '');
         setTime(q.get('t') ?? '');
       }
       void loadMine();
     });
-  }, [services, loadMine]);
+  }, [allServices, branches, loadMine]);
 
   const slotsUrl = useCallback(() => {
     const today = localParts(new Date()).date;
-    return `/api/booking/${encodeURIComponent(slug)}/availability?service=${serviceId}&addons=${addonIds.join(',')}&extra=${extraIds.join(',')}&staff=${staffParam}&from=${today}&days=${DAYS}`;
-  }, [slug, serviceId, addonIds, extraIds, staffParam]);
+    return `/api/booking/${encodeURIComponent(slug)}/availability?service=${serviceId}&addons=${addonIds.join(',')}&extra=${extraIds.join(',')}&staff=${staffParam}&branch=${branchId}&from=${today}&days=${DAYS}`;
+  }, [slug, serviceId, addonIds, extraIds, staffParam, branchId]);
 
   // 選好服務 / 加購 / 人員 → 讀 14 天的可約時段
   useEffect(() => {
@@ -161,7 +167,7 @@ export default function BookingClient({ slug, card, business, services, staff }:
 
   const slots = useMemo(() => days?.find((d) => d.date === date)?.slots ?? [], [days, date]);
   const ready = Boolean(service && staffChosen && date && time && slots.includes(time));
-  const nextParams = `s=${serviceId}&a=${addonIds.join(',')}&x=${extraIds.join(',')}${pickStaff && staffId !== null ? `&p=${staffId}` : ''}&d=${date}&t=${encodeURIComponent(time)}`;
+  const nextParams = `${branchId ? `b=${branchId}&` : ''}s=${serviceId}&a=${addonIds.join(',')}&x=${extraIds.join(',')}${pickStaff && staffId !== null ? `&p=${staffId}` : ''}&d=${date}&t=${encodeURIComponent(time)}`;
   const loginNext = encodeURIComponent(`${here}?${nextParams}`);
   const resetSlot = () => { setTime(''); idemKey.current = ''; };
 
@@ -177,7 +183,7 @@ export default function BookingClient({ slug, card, business, services, staff }:
       const res = await fetch(`/api/booking/${encodeURIComponent(slug)}/bookings`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Idempotency-Key': idemKey.current },
-        body: JSON.stringify({ service_id: service.id, addon_ids: addonIds, extra_ids: extraIds, package_id: pkgOn ? pkg!.id : null, staff_id: staffParam || null, start_at: startAt, contact, channel: /Line\//.test(navigator.userAgent) ? 'line' : 'card' }),
+        body: JSON.stringify({ service_id: service.id, addon_ids: addonIds, extra_ids: extraIds, package_id: pkgOn ? pkg!.id : null, branch_id: branchId || null, staff_id: staffParam || null, start_at: startAt, contact, channel: /Line\//.test(navigator.userAgent) ? 'line' : 'card' }),
       });
       const data = await res.json().catch(() => null);
       if (!res.ok) {
@@ -247,8 +253,23 @@ export default function BookingClient({ slug, card, business, services, staff }:
           <p className="rounded-2xl bg-white p-8 text-center text-sm text-[#8a7f72]">目前還沒有開放可預約的時段,請稍後再來或直接聯絡。</p>
         ) : (
           <div className="space-y-5">
+            {/* 分店 */}
+            {branches.length > 1 ? (
+              <section>
+                <p className="mb-2 text-sm font-semibold">選擇分店</p>
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  {branches.map((b) => (
+                    <button key={b.id} type="button" onClick={() => { setBranchId(b.id); setServiceId(''); setDays(null); resetSlot(); }} className={`rounded-2xl border bg-white p-3 text-left ${b.id === branchId ? 'border-[#1f1b19] ring-2 ring-[#1f1b19]/10' : 'border-[#e5ded4]'}`}>
+                      <span className="block text-sm font-semibold">{b.name}</span>
+                      {b.address ? <span className="mt-0.5 block text-xs text-[#8a7f72]">{b.address}</span> : null}
+                    </button>
+                  ))}
+                </div>
+              </section>
+            ) : null}
+
             {/* 1. 服務 */}
-            <section>
+            {!branches.length || branchId ? <section>
               <StepTitle n={1} title="選擇服務" />
               <div className="space-y-2">
                 {services.map((s) => {
@@ -270,7 +291,7 @@ export default function BookingClient({ slug, card, business, services, staff }:
                   );
                 })}
               </div>
-            </section>
+            </section> : null}
 
             {/* 需報價:填活動資訊詢價 */}
             {service && isQuote && (
@@ -360,7 +381,7 @@ export default function BookingClient({ slug, card, business, services, staff }:
                   ) : null}
                   <p>{pkgOn ? `主服務由套票支付${quote.total - (quote.base ?? 0) > 0 ? `,其他項目 ${money(quote.total - (quote.base ?? 0))}` : ''}` : priceText(quote.total, quote.varies ? '起(依人員)' : service.price_note)}</p>
                   {quote.deposit && !pkgOn ? <p className="text-[#9a6412]">需付訂金 {money(quote.deposit)}(轉帳){business.approval_mode === 'manual' ? ',店家確認後再付' : ''},{quote.total ? `到店再付尾款 ${money(Math.max(0, quote.total - quote.deposit))}` : '其餘到店付'}</p> : null}
-                  {business.address ? <p className="text-xs text-[#8a7f72]">地點:{business.address}</p> : null}
+                  {branch ? <p className="text-xs text-[#8a7f72]">分店:{branch.name}{branch.address ? ` · ${branch.address}` : ''}</p> : business.address ? <p className="text-xs text-[#8a7f72]">地點:{business.address}</p> : null}
                 </div>
                 {auth && !auth.loggedIn ? (
                   <div className="mt-3 space-y-2 rounded-2xl bg-white p-4 text-center">

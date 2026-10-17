@@ -31,6 +31,7 @@ export default async function BookPage({ params }: { params: Promise<{ slug: str
       }}
       services={catalog.services}
       staff={catalog.staff}
+      branches={catalog.branches}
     />
   );
 }

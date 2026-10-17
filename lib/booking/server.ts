@@ -8,7 +8,7 @@ import { scopedClient, URBANITE_SHOP_ID } from '@/lib/shop';
 import {
   addDays, computeSlotsWith, formatDateTime, formatRange, localParts, minutesToHHMM, money,
   type BkAddon, type BkBooking, type BkBusiness, type BkHour, type BkResource, type BkService, type BkStaff,
-  type BkServiceStep, type BkStaffHour, type BkStaffService, type BookingStatus,
+  type BkBranch, type BkServiceStep, type BkStaffHour, type BkStaffService, type BookingStatus,
 } from './shared';
 
 export class BookingError extends Error {
@@ -28,20 +28,21 @@ export async function getPublicBusiness(slug: string) {
 
 export type Schedule = {
   services: BkService[]; addons: BkAddon[]; hours: BkHour[]; staff: BkStaff[];
-  staffHours: BkStaffHour[]; staffServices: BkStaffService[]; resources: BkResource[]; steps: BkServiceStep[];
+  staffHours: BkStaffHour[]; staffServices: BkStaffService[]; resources: BkResource[]; steps: BkServiceStep[]; branches: BkBranch[];
 };
 
 // 商家的服務、加購、步驟、營業時段、人員、班表、床位(all = 後台用,含未開放)
 export async function loadSchedule(businessId: string, all = false): Promise<Schedule> {
-  const [services, addons, hours, staff, staffHours, staffServices, resources, steps] = await Promise.all([
+  const [services, addons, hours, staff, staffHours, staffServices, resources, steps, branches] = await Promise.all([
     db().from('bk_services').select('*').eq('business_id', businessId).in('active', all ? [true, false] : [true]).order('sort_order').order('created_at'),
     db().from('bk_addons').select('*').eq('business_id', businessId).in('active', all ? [true, false] : [true]).order('sort_order'),
-    db().from('bk_hours').select('weekday, start_min, end_min').eq('business_id', businessId).order('weekday').order('start_min'),
+    db().from('bk_hours').select('weekday, start_min, end_min, branch_id').eq('business_id', businessId).order('weekday').order('start_min'),
     db().from('bk_staff').select('*').eq('business_id', businessId).in('active', all ? [true, false] : [true]).order('sort_order').order('created_at'),
-    db().from('bk_staff_hours').select('staff_id, weekday, start_min, end_min').eq('business_id', businessId).order('weekday').order('start_min'),
+    db().from('bk_staff_hours').select('staff_id, weekday, start_min, end_min, branch_id').eq('business_id', businessId).order('weekday').order('start_min'),
     db().from('bk_staff_services').select('staff_id, service_id, duration_minutes, price').eq('business_id', businessId),
-    db().from('bk_resources').select('id, name, active, sort_order').eq('business_id', businessId).in('active', all ? [true, false] : [true]).order('sort_order').order('created_at'),
+    db().from('bk_resources').select('id, name, active, sort_order, branch_id').eq('business_id', businessId).in('active', all ? [true, false] : [true]).order('sort_order').order('created_at'),
     db().from('bk_service_steps').select('id, service_id, seq, name, minutes, who, seat').eq('business_id', businessId).order('seq'),
+    db().from('bk_branches').select('id, name, address, active, sort_order').eq('business_id', businessId).in('active', all ? [true, false] : [true]).order('sort_order').order('created_at'),
   ]);
   return {
     services: (services.data ?? []) as BkService[],
@@ -52,6 +53,7 @@ export async function loadSchedule(businessId: string, all = false): Promise<Sch
     staffServices: (staffServices.data ?? []) as BkStaffService[],
     resources: (resources.data ?? []) as BkResource[],
     steps: (steps.data ?? []) as BkServiceStep[],
+    branches: (branches.data ?? []) as BkBranch[],
   };
 }
 
@@ -110,54 +112,64 @@ function merge(list: Range[]) {
   return out;
 }
 
-function hoursOf(sched: Schedule, staff: BkStaff): BkHour[] {
-  if (staff.use_business_hours) return sched.hours;
-  return sched.staffHours.filter((h) => h.staff_id === staff.id);
+// 分店:營業時段以該分店自己的為準,沒設定就用共用時段;人員班表沒指定分店的那段 = 任一分店
+function hoursOf(sched: Schedule, staff: BkStaff, branchId: string | null = null): BkHour[] {
+  if (staff.use_business_hours) {
+    if (!branchId) return sched.hours;
+    const own = sched.hours.filter((h) => h.branch_id === branchId);
+    return own.length ? own : sched.hours.filter((h) => !h.branch_id);
+  }
+  const base = sched.staffHours.filter((h) => h.staff_id === staff.id);
+  return branchId ? base.filter((h) => !h.branch_id || h.branch_id === branchId) : base;
 }
 
 // 這段時間是否在這位人員的上班時段內(助理分派用)
-function inHours(sched: Schedule, staff: BkStaff, s: number, e: number) {
+function inHours(sched: Schedule, staff: BkStaff, s: number, e: number, branchId: string | null = null) {
   const a = localParts(new Date(s));
   const len = (e - s) / 60000;
-  return hoursOf(sched, staff).some((h) => h.weekday === a.weekday && h.start_min <= a.minutes && a.minutes + len <= h.end_min);
+  return hoursOf(sched, staff, branchId).some((h) => h.weekday === a.weekday && h.start_min <= a.minutes && a.minutes + len <= h.end_min);
 }
 
-type Occupancy = { booking_id: string; staff_id: string | null; resource_id: string | null; role: string; start: number; end: number };
+type Occupancy = { booking_id: string; staff_id: string | null; resource_id: string | null; role: string; start: number; end: number; branch_id: string | null };
 
 // 範圍內的有效占用區段與休假(逾期的待成立預約不算;改期時排除自己)
 async function occupancy(businessId: string, fromIso: string, toIso: string, excludeId?: string) {
   const [{ data: allocs }, { data: exceptions }] = await Promise.all([
-    db().from('bk_allocations').select('booking_id, staff_id, resource_id, role, start_at, end_at, bk_bookings!inner(status, expires_at)')
+    db().from('bk_allocations').select('booking_id, staff_id, resource_id, role, start_at, end_at, bk_bookings!inner(status, expires_at, branch_id)')
       .eq('business_id', businessId).eq('active', true).lt('start_at', toIso).gt('end_at', fromIso),
-    db().from('bk_exceptions').select('start_at, end_at, staff_id').eq('business_id', businessId).lt('start_at', toIso).gt('end_at', fromIso),
+    db().from('bk_exceptions').select('start_at, end_at, staff_id, branch_id').eq('business_id', businessId).lt('start_at', toIso).gt('end_at', fromIso),
   ]);
   const now = Date.now();
   const live: Occupancy[] = (allocs ?? [])
     .filter((a) => {
-      const bk = (Array.isArray(a.bk_bookings) ? a.bk_bookings[0] : a.bk_bookings) as { status: string; expires_at: string | null } | null;
+      const bk = (Array.isArray(a.bk_bookings) ? a.bk_bookings[0] : a.bk_bookings) as { status: string; expires_at: string | null; branch_id: string | null } | null;
       return a.booking_id !== excludeId && !(bk?.status === 'pending' && bk.expires_at && new Date(bk.expires_at).getTime() < now);
     })
-    .map((a) => ({ booking_id: a.booking_id, staff_id: a.staff_id, resource_id: a.resource_id, role: a.role, start: new Date(a.start_at).getTime(), end: new Date(a.end_at).getTime() }));
-  const ex = (exceptions ?? []).map((x) => ({ staff_id: x.staff_id as string | null, start: new Date(x.start_at).getTime(), end: new Date(x.end_at).getTime() }));
+    .map((a) => {
+      const bk = (Array.isArray(a.bk_bookings) ? a.bk_bookings[0] : a.bk_bookings) as { branch_id: string | null } | null;
+      return { booking_id: a.booking_id, staff_id: a.staff_id, resource_id: a.resource_id, role: a.role, start: new Date(a.start_at).getTime(), end: new Date(a.end_at).getTime(), branch_id: bk?.branch_id ?? null };
+    });
+  const ex = (exceptions ?? []).map((x) => ({ staff_id: x.staff_id as string | null, branch_id: x.branch_id as string | null, start: new Date(x.start_at).getTime(), end: new Date(x.end_at).getTime() }));
   return { live, exceptions: ex };
 }
 
 // extras:同一次再加的服務(依序進行);seqs:各項在預約裡的編號(改期時沿用原編號)
-type SlotRequest = { serviceId: string; addonIds: string[]; staffId: string | null; extras?: string[]; seqs?: number[]; excludeBookingId?: string; ignoreLimits?: boolean };
+type SlotRequest = { serviceId: string; addonIds: string[]; staffId: string | null; extras?: string[]; seqs?: number[]; excludeBookingId?: string; ignoreLimits?: boolean; branchId?: string | null };
 export type AllocInput = { staff_id: string | null; resource_id: string | null; role: 'main' | 'assistant' | 'seat'; start_at: string; end_at: string; item_seq?: number };
 
 // 一位主要人員做一項服務,在某個開始時間的完整分派:主要人員各段、助理各段、座位(同一張)
-function makeAssigner(business: BkBusiness, sched: Schedule, service: BkService, staff: BkStaff, addonIds: string[], occ: Awaited<ReturnType<typeof occupancy>>, buffer: number) {
+function makeAssigner(business: BkBusiness, sched: Schedule, service: BkService, staff: BkStaff, addonIds: string[], occ: Awaited<ReturnType<typeof occupancy>>, buffer: number, branchId: string | null = null) {
   const plan = planOf(sched, service, staff.id, addonIds, buffer);
   const assistants = sched.staff.filter((s) => s.active && s.role === 'assistant');
-  const shopOff = occ.exceptions.filter((x) => !x.staff_id);
+  const shopOff = occ.exceptions.filter((x) => !x.staff_id && (!x.branch_id || x.branch_id === branchId));
+  const travel = business.branch_travel_minutes * 60000;
   const busyOf = (id: string) => [
-    ...occ.live.filter((a) => a.staff_id === id),
-    ...occ.exceptions.filter((x) => !x.staff_id || x.staff_id === id),
+    ...occ.live.filter((a) => a.staff_id === id).map((a) => (branchId && a.branch_id && a.branch_id !== branchId ? { ...a, start: a.start - travel, end: a.end + travel } : a)),
+    ...occ.exceptions.filter((x) => x.staff_id === id || (!x.staff_id && (!x.branch_id || x.branch_id === branchId))),
   ];
   const staffBusy = busyOf(staff.id);
   const assistantBusy = new Map(assistants.map((a) => [a.id, busyOf(a.id)]));
-  const seats = service.needs_resource ? sched.resources.filter((r) => r.active) : [];
+  const seats = service.needs_resource ? sched.resources.filter((r) => r.active && (!branchId || !r.branch_id || r.branch_id === branchId)) : [];
   const seatBusy = new Map(seats.map((r) => [r.id, occ.live.filter((a) => a.resource_id === r.id)]));
   // 沒有助理時,助理步驟由主要人員自己做
   const mainSegs = plan.segs.filter((s) => s.who === 'main' || (s.who === 'assistant' && !assistants.length));
@@ -173,7 +185,7 @@ function makeAssigner(business: BkBusiness, sched: Schedule, service: BkService,
     for (const seg of asstSegs) {
       const s = at(seg.from);
       const e = at(seg.to);
-      const who = assistants.find((a) => !overlaps(assistantBusy.get(a.id)!, s, e) && inHours(sched, a, s, e));
+      const who = assistants.find((a) => !overlaps(assistantBusy.get(a.id)!, s, e) && inHours(sched, a, s, e, branchId));
       if (!who) return null;
       allocs.push({ staff_id: who.id, resource_id: null, role: 'assistant', start_at: new Date(s).toISOString(), end_at: new Date(e).toISOString(), item_seq: seq });
     }
@@ -196,10 +208,11 @@ function makeChain(business: BkBusiness, sched: Schedule, service: BkService, st
   const extras = (req.extras ?? []).map((id) => sched.services.find((s) => s.id === id)).filter((s): s is BkService => Boolean(s));
   const seqs = req.seqs ?? [0, 1, 2, 3];
   const lastBuffer = (i: number) => (i === extras.length ? business.buffer_minutes : 0);
-  const head = makeAssigner(business, sched, service, staff, req.addonIds, occ, lastBuffer(0));
+  const branch = req.branchId ?? null;
+  const head = makeAssigner(business, sched, service, staff, req.addonIds, occ, lastBuffer(0), branch);
   const tails = extras.map((svc, i) => {
     const cands = staffForService(sched, svc.id).sort((a, b) => (a.id === staff.id ? -1 : b.id === staff.id ? 1 : a.sort_order - b.sort_order));
-    return { svc, options: cands.map((st) => ({ st, a: makeAssigner(business, sched, svc, st, [], occ, lastBuffer(i + 1)) })) };
+    return { svc, options: cands.map((st) => ({ st, a: makeAssigner(business, sched, svc, st, [], occ, lastBuffer(i + 1), branch) })) };
   });
 
   function assign(t: number) {
@@ -211,7 +224,7 @@ function makeChain(business: BkBusiness, sched: Schedule, service: BkService, st
     for (let i = 0; i < tails.length; i++) {
       let picked: ItemPlan | null = null;
       for (const { st, a } of tails[i].options) {
-        if (!inHours(sched, st, cursor, cursor + a.plan.total * 60000)) continue;
+        if (!inHours(sched, st, cursor, cursor + a.plan.total * 60000, branch)) continue;
         const got = a.assign(cursor, seqs[i + 1]);
         if (!got) continue;
         allocs.push(...got.allocs);
@@ -234,6 +247,7 @@ export async function availability(business: BkBusiness, sched: Schedule, req: S
   if (!service) throw new BookingError('VALIDATION_ERROR', '這個服務目前無法預約。', 422);
   let candidates = staffForService(sched, service.id);
   if (req.staffId) candidates = candidates.filter((s) => s.id === req.staffId);
+  if (req.branchId && service.branch_ids?.length && !service.branch_ids.includes(req.branchId)) candidates = [];
   const fromIso = new Date(new Date(`${fromDate}T00:00:00+08:00`).getTime() - 86400000).toISOString();
   const toIso = new Date(new Date(`${fromDate}T00:00:00+08:00`).getTime() + (days + 1) * 86400000).toISOString();
   const occ = await occupancy(business.id, fromIso, toIso, req.excludeBookingId);
@@ -243,7 +257,7 @@ export async function availability(business: BkBusiness, sched: Schedule, req: S
   for (const staff of candidates) {
     const c = makeChain(business, sched, service, staff, req, occ);
     chains.set(staff.id, c);
-    byStaff.set(staff.id, computeSlotsWith({ business: rules, hours: hoursOf(sched, staff), duration: c.head.plan.total, fromDate, days, ok: (t) => c.assign(t) !== null }));
+    byStaff.set(staff.id, computeSlotsWith({ business: rules, hours: hoursOf(sched, staff, req.branchId ?? null), duration: c.head.plan.total, fromDate, days, ok: (t) => c.assign(t) !== null }));
   }
   const merged: { date: string; slots: string[]; closed: boolean }[] = [];
   for (let i = 0; i < days; i++) {
@@ -356,7 +370,7 @@ const cleanContact = (c: { name: string; phone: string; note: string }) => ({
 
 // 顧客建立預約:伺服器重新核對服務、人員、時段、床位與金額(不採用前端的時長與金額)
 export async function createBooking(input: {
-  slug: string; userId: string; serviceId: string; addonIds: string[]; staffId: string | null; startAt: string; extras?: string[]; packageId?: string | null;
+  slug: string; userId: string; serviceId: string; addonIds: string[]; staffId: string | null; startAt: string; extras?: string[]; packageId?: string | null; branchId?: string | null;
   contact: { name: string; phone: string; note: string }; idempotencyKey: string; channel: string;
 }) {
   // 重送(網路重試、連點):同一顧客同一個 key 直接回傳原本那筆
@@ -378,7 +392,8 @@ export async function createBooking(input: {
   if (Number.isNaN(start.getTime())) throw new BookingError('VALIDATION_ERROR', '時間格式錯誤。', 422);
 
   const extras = cleanExtras(sched, service.id, input.extras);
-  const req: SlotRequest = { serviceId: service.id, addonIds: input.addonIds, staffId: input.staffId, extras };
+  const branchId = pickBranch(sched, input.branchId);
+  const req: SlotRequest = { serviceId: service.id, addonIds: input.addonIds, staffId: input.staffId, extras, branchId };
 
   const manual = business.approval_mode === 'manual';
   const contact = cleanContact(input.contact);
@@ -410,7 +425,7 @@ export async function createBooking(input: {
         service_snapshot: snapshotOf(service, p), start_at: start.toISOString(), end_at: p.end.toISOString(), occupy_end_at: p.occupyEnd.toISOString(),
         status: confirmed ? 'confirmed' : 'pending', approval_status: manual ? 'pending' : 'not_required', expires_at: expires,
         contact, source_card_id: card.id, source_channel: input.channel.slice(0, 20) || 'card', idempotency_key: idem || null,
-        staff_id: p.staff.id, staff_requested: Boolean(input.staffId), resource_id: p.resourceId, addons: p.q.addons, allocations: p.allocs, items: p.items.length > 1 ? p.items : [], package_id: input.packageId || null,
+        staff_id: p.staff.id, staff_requested: Boolean(input.staffId), resource_id: p.resourceId, addons: p.q.addons, allocations: p.allocs, items: p.items.length > 1 ? p.items : [], package_id: input.packageId || null, branch_id: branchId,
         total_price: total, deposit_amount: deposit, payment_status: deposit ? 'awaiting' : 'none',
         created_by: 'customer', actor_type: 'customer', actor_id: input.userId,
       },
@@ -424,7 +439,7 @@ export async function createBooking(input: {
 
 // 店家人工加單(電話、現場客):一樣經過人員 / 床位衝突檢查,不受最短提前與可約天數限制
 export async function ownerCreateBooking(ownerUserId: string, input: {
-  serviceId: string; addonIds: string[]; staffId: string | null; startAt: string; contact: { name: string; phone: string; note: string }; extras?: string[]; customerId?: string | null;
+  serviceId: string; addonIds: string[]; staffId: string | null; startAt: string; contact: { name: string; phone: string; note: string }; extras?: string[]; customerId?: string | null; branchId?: string | null;
 }) {
   const business = await ownerBusiness(ownerUserId);
   if (!business) throw new BookingError('NOT_FOUND', '請先完成預約設定。', 404);
@@ -440,7 +455,8 @@ export async function ownerCreateBooking(ownerUserId: string, input: {
     const { data: c } = await db().from('bk_customers').select('id').eq('id', input.customerId).eq('business_id', business.id).maybeSingle();
     customerId = c?.id ?? null;
   }
-  const req: SlotRequest = { serviceId: service.id, addonIds: input.addonIds, staffId: input.staffId, extras: cleanExtras(sched, service.id, input.extras), ignoreLimits: true };
+  const branchId = pickBranch(sched, input.branchId);
+  const req: SlotRequest = { serviceId: service.id, addonIds: input.addonIds, staffId: input.staffId, extras: cleanExtras(sched, service.id, input.extras), ignoreLimits: true, branchId };
   return tryPlacements(() => placements(business, sched, req, start), async (p) => {
     const { data, error } = await db().rpc('bk_create_booking2', {
       p: {
@@ -449,7 +465,7 @@ export async function ownerCreateBooking(ownerUserId: string, input: {
         status: 'confirmed', approval_status: 'not_required', expires_at: null, contact: cleanContact(input.contact),
         source_card_id: business.card_id, source_channel: 'owner', staff_id: p.staff.id, staff_requested: Boolean(input.staffId),
         resource_id: p.resourceId, addons: p.q.addons, allocations: p.allocs, items: p.items.length > 1 ? p.items : [], total_price: p.total, deposit_amount: 0, payment_status: 'none',
-        created_by: 'owner', actor_type: 'owner', actor_id: ownerUserId, customer_id: customerId,
+        created_by: 'owner', actor_type: 'owner', actor_id: ownerUserId, customer_id: customerId, branch_id: branchId,
       },
       p_notices: [],
     });
@@ -554,6 +570,14 @@ export async function ownerPayment(ownerUserId: string, bookingId: string, expec
   return recordPayment(business, b, expectedVersion, input.kind, input.amount, input.method, input.note, 'owner', ownerUserId);
 }
 
+// 分店:商家有分店時必須選一間開放中的分店;沒有分店時一律為空
+function pickBranch(sched: Schedule, branchId?: string | null) {
+  const open = sched.branches.filter((b) => b.active);
+  if (!open.length) return null;
+  if (!branchId || !open.some((b) => b.id === branchId)) throw new BookingError('VALIDATION_ERROR', '請選擇分店。', 422);
+  return branchId;
+}
+
 // 同一次再加的服務:最多 2 項,不能和主服務重複,須是開放中的服務
 function cleanExtras(sched: Schedule, mainId: string, extras?: string[]) {
   const ids = [...new Set((extras ?? []).filter((id) => id !== mainId && sched.services.some((s) => s.id === id)))];
@@ -594,7 +618,7 @@ async function reschedule(business: BkBusiness, b: BkBooking, expectedVersion: n
   const start = new Date(startAt);
   if (Number.isNaN(start.getTime())) throw new BookingError('VALIDATION_ERROR', '時間格式錯誤。', 422);
   const sched = await loadSchedule(business.id);
-  const req: SlotRequest = { ...(await chainOf(sched, b)), staffId, excludeBookingId: b.id, ignoreLimits };
+  const req: SlotRequest = { ...(await chainOf(sched, b)), staffId, excludeBookingId: b.id, ignoreLimits, branchId: b.branch_id ?? null };
   const notices: Notice[] = [
     { event: 'rescheduled', audience: actor.type === 'owner' ? 'customer' : 'owner' },
     ...(actor.type === 'customer' ? [{ event: 'rescheduled', audience: 'customer' as const }] : []),
@@ -617,14 +641,14 @@ export async function ownerReschedule(ownerUserId: string, bookingId: string, ex
 }
 
 // 店家改期 / 人工加單用的可約時段(不受最短提前限制)
-export async function ownerSlots(ownerUserId: string, input: { serviceId: string; addonIds: string[]; staffId: string | null; bookingId?: string; date: string; extras?: string[] }) {
+export async function ownerSlots(ownerUserId: string, input: { serviceId: string; addonIds: string[]; staffId: string | null; bookingId?: string; date: string; extras?: string[]; branchId?: string | null }) {
   const business = await ownerBusiness(ownerUserId);
   if (!business) throw new BookingError('NOT_FOUND', '請先完成預約設定。', 404);
   const sched = await loadSchedule(business.id);
-  let req: SlotRequest = { serviceId: input.serviceId, addonIds: input.addonIds, staffId: input.staffId, extras: input.bookingId ? [] : cleanExtras(sched, input.serviceId, input.extras), ignoreLimits: true };
+  let req: SlotRequest = { serviceId: input.serviceId, addonIds: input.addonIds, staffId: input.staffId, extras: input.bookingId ? [] : cleanExtras(sched, input.serviceId, input.extras), ignoreLimits: true, branchId: input.branchId || null };
   if (input.bookingId) {
     const { b } = await ownerBooking(ownerUserId, input.bookingId);
-    req = { ...req, ...(await chainOf(sched, b)), excludeBookingId: b.id };
+    req = { ...req, ...(await chainOf(sched, b)), excludeBookingId: b.id, branchId: b.branch_id ?? null };
   }
   const { days } = await availability(business, sched, req, input.date, 1);
   return days[0];
@@ -658,7 +682,7 @@ export async function customerRescheduleSlots(userId: string, bookingId: string,
   customerChangeAllowed(business, b, '改期');
   if (b.reschedule_count >= business.reschedule_limit) throw new BookingError('POLICY_BLOCKED', '已達線上改期次數上限,請直接聯絡店家。', 422);
   const sched = await loadSchedule(business.id);
-  const req: SlotRequest = { ...(await chainOf(sched, b)), staffId: b.staff_requested ? b.staff_id : null, excludeBookingId: b.id };
+  const req: SlotRequest = { ...(await chainOf(sched, b)), staffId: b.staff_requested ? b.staff_id : null, excludeBookingId: b.id, branchId: b.branch_id ?? null };
   return (await availability(business, sched, req, fromDate, days)).days;
 }
 
@@ -1026,7 +1050,7 @@ export function publicCatalog(sched: Schedule) {
   return {
     services: sched.services.map((s) => ({
       id: s.id, name: s.name, description: s.description, duration_minutes: s.duration_minutes, price: s.price, price_note: s.price_note,
-      image: s.image, deposit: s.deposit, price_mode: s.price_mode, service_mode: s.service_mode,
+      image: s.image, deposit: s.deposit, price_mode: s.price_mode, service_mode: s.service_mode, branch_ids: s.branch_ids ?? [],
       steps: stepsOf(sched, s.id).map((st) => ({ name: st.name, minutes: st.minutes, who: st.who })),
       addons: sched.addons.filter((a) => a.service_id === s.id).map((a) => ({ id: a.id, name: a.name, price: a.price, extra_minutes: a.extra_minutes })),
       staff: staffForService(sched, s.id).map((st) => {
@@ -1036,5 +1060,6 @@ export function publicCatalog(sched: Schedule) {
       }),
     })),
     staff: sched.staff.map((st) => ({ id: st.id, name: st.name, title: st.title, avatar: st.avatar })),
+    branches: sched.branches.filter((b) => b.active).map((b) => ({ id: b.id, name: b.name, address: b.address })),
   };
 }

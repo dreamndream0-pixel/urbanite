@@ -32,7 +32,7 @@ async function saveHours(businessId: string, staffId: string, hours: unknown) {
   if (!Array.isArray(hours)) return;
   const db = createAdminClient();
   const rows = (hours as Record<string, unknown>[])
-    .map((h) => ({ business_id: businessId, staff_id: staffId, weekday: int(h.weekday, 0, 6), start_min: int(h.start_min, 0, 1439), end_min: int(h.end_min, 1, 1440) }))
+    .map((h) => ({ business_id: businessId, staff_id: staffId, weekday: int(h.weekday, 0, 6), start_min: int(h.start_min, 0, 1439), end_min: int(h.end_min, 1, 1440), branch_id: typeof h.branch_id === 'string' && /^[0-9a-f-]{36}$/.test(h.branch_id) ? h.branch_id : null }))
     .filter((h) => h.end_min > h.start_min)
     .slice(0, 50);
   await db.from('bk_staff_hours').delete().eq('staff_id', staffId).eq('business_id', businessId);

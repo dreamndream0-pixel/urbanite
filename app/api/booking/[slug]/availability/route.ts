@@ -20,6 +20,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ slug
       serviceId: url.searchParams.get('service') ?? '',
       addonIds: (url.searchParams.get('addons') ?? '').split(',').filter(Boolean).slice(0, 20),
       staffId: url.searchParams.get('staff') || null,
+      branchId: url.searchParams.get('branch') || null,
       extras: (url.searchParams.get('extra') ?? '').split(',').filter(Boolean).slice(0, 2),
     }, from < today ? today : from, days);
     return NextResponse.json({ days: result.days, server_time: new Date().toISOString() }, { headers: { 'Cache-Control': 'no-store' } });

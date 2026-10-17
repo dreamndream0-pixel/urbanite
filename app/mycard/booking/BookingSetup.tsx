@@ -11,11 +11,11 @@ import { api, btn, btnDark, btnSm, card, errMsg, input, isTeam, stylists, type D
 import { PackageProducts } from './LoyaltyParts';
 
 // ---------- 每週時段編輯(營業時段、人員班表共用) ----------
-type DayRange = { start: string; end: string };
+type DayRange = { start: string; end: string; branch?: string };
 type Week = DayRange[][];
-type HourRow = { weekday: number; start_min: number; end_min: number };
+type HourRow = { weekday: number; start_min: number; end_min: number; branch_id?: string | null };
 
-export const toWeek = (rows: HourRow[]): Week => WEEKDAYS.map((_, d) => rows.filter((h) => h.weekday === d).map((h) => ({ start: minutesToHHMM(h.start_min), end: h.end_min === 1440 ? '24:00' : minutesToHHMM(h.end_min) })));
+export const toWeek = (rows: HourRow[]): Week => WEEKDAYS.map((_, d) => rows.filter((h) => h.weekday === d).map((h) => ({ start: minutesToHHMM(h.start_min), end: h.end_min === 1440 ? '24:00' : minutesToHHMM(h.end_min), branch: h.branch_id ?? '' })));
 
 function fromWeek(week: Week): HourRow[] | string {
   const rows: HourRow[] = [];
@@ -24,13 +24,13 @@ function fromWeek(week: Week): HourRow[] | string {
       const s = hhmmToMinutes(r.start);
       const e = hhmmToMinutes(r.end);
       if (!(e > s)) return `週${WEEKDAYS[d]}的時段結束時間要晚於開始時間`;
-      rows.push({ weekday: d, start_min: s, end_min: e });
+      rows.push({ weekday: d, start_min: s, end_min: e, branch_id: r.branch || null });
     }
   }
   return rows;
 }
 
-function WeekEditor({ week, setWeek }: { week: Week; setWeek: (w: Week) => void }) {
+function WeekEditor({ week, setWeek, branches = [] }: { week: Week; setWeek: (w: Week) => void; branches?: { id: string; name: string }[] }) {
   const setDay = (d: number, ranges: DayRange[]) => setWeek(week.map((r, i) => (i === d ? ranges : r)));
   return (
     <>
@@ -42,10 +42,16 @@ function WeekEditor({ week, setWeek }: { week: Week; setWeek: (w: Week) => void 
             </label>
             <div className="min-w-0 flex-1 space-y-2">
               {!week[d].length ? <p className="pl-6 text-sm text-[#a99e8f] sm:pl-0 sm:pt-2">休息</p> : week[d].map((r, i) => (
-                <div key={i} className="flex items-center gap-1.5">
-                  <input type="time" step={900} value={r.start} onChange={(e) => setDay(d, week[d].map((x, j) => (j === i ? { ...x, start: e.target.value } : x)))} className="min-w-0 flex-1 rounded-lg border border-[#e5ded4] px-1.5 py-1.5 text-[13px]" />
+                <div key={i} className="flex flex-wrap items-center gap-1.5">
+                  <input type="time" step={900} value={r.start} onChange={(e) => setDay(d, week[d].map((x, j) => (j === i ? { ...x, start: e.target.value } : x)))} className="min-w-0 flex-1 rounded-lg border border-[#e5ded4] px-1.5 py-1.5 text-[13px] max-sm:[&::-webkit-calendar-picker-indicator]:hidden" />
                   <span className="text-[#a99e8f]">–</span>
-                  <input type="time" step={900} value={r.end === '24:00' ? '23:59' : r.end} onChange={(e) => setDay(d, week[d].map((x, j) => (j === i ? { ...x, end: e.target.value } : x)))} className="min-w-0 flex-1 rounded-lg border border-[#e5ded4] px-1.5 py-1.5 text-[13px]" />
+                  <input type="time" step={900} value={r.end === '24:00' ? '23:59' : r.end} onChange={(e) => setDay(d, week[d].map((x, j) => (j === i ? { ...x, end: e.target.value } : x)))} className="min-w-0 flex-1 rounded-lg border border-[#e5ded4] px-1.5 py-1.5 text-[13px] max-sm:[&::-webkit-calendar-picker-indicator]:hidden" />
+                  {branches.length ? (
+                    <select value={r.branch ?? ''} onChange={(e) => setDay(d, week[d].map((x, j) => (j === i ? { ...x, branch: e.target.value } : x)))} aria-label="分店" className="order-last w-full rounded-lg border border-[#e5ded4] px-1.5 py-1.5 text-xs">
+                      <option value="">任一分店</option>
+                      {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+                    </select>
+                  ) : null}
                   <button type="button" onClick={() => setDay(d, week[d].filter((_, j) => j !== i))} aria-label="移除時段" className="shrink-0 px-1.5 text-lg leading-none text-[#a03b3b]">×</button>
                 </div>
               ))}
@@ -69,9 +75,9 @@ const STEP_MINUTES = [5, 10, 15, 20, 25, 30, 40, 45, 50, 60, 75, 90, 120, 150, 1
 type ServiceDraft = {
   id?: string; name: string; description: string; duration_minutes: number; price: number; price_note: string; active: boolean;
   deposit: number; needs_resource: boolean; addons: AddonDraft[]; staff: StaffLink[]; steps: StepDraft[];
-  price_mode: 'fixed' | 'quote'; service_mode: 'in_store' | 'outcall'; revisit_days: number;
+  price_mode: 'fixed' | 'quote'; service_mode: 'in_store' | 'outcall'; revisit_days: number; branch_ids: string[];
 };
-const blankService: ServiceDraft = { name: '', description: '', duration_minutes: 60, price: 0, price_note: '', active: true, deposit: 0, needs_resource: false, addons: [], staff: [], steps: [], price_mode: 'fixed', service_mode: 'in_store', revisit_days: 0 };
+const blankService: ServiceDraft = { name: '', description: '', duration_minutes: 60, price: 0, price_note: '', active: true, deposit: 0, needs_resource: false, addons: [], staff: [], steps: [], price_mode: 'fixed', service_mode: 'in_store', revisit_days: 0, branch_ids: [] };
 const digits = (v: string) => Number(v.replace(/\D/g, '')) || 0;
 
 export function ServicesTab({ data, reload }: { data: Data; reload: () => Promise<void> }) {
@@ -84,7 +90,7 @@ export function ServicesTab({ data, reload }: { data: Data; reload: () => Promis
   function edit(s: BkService) {
     setEditing({
       id: s.id, name: s.name, description: s.description, duration_minutes: s.duration_minutes, price: s.price, price_note: s.price_note, active: s.active,
-      deposit: s.deposit, needs_resource: s.needs_resource, price_mode: s.price_mode, service_mode: s.service_mode, revisit_days: s.revisit_days ?? 0,
+      deposit: s.deposit, needs_resource: s.needs_resource, price_mode: s.price_mode, service_mode: s.service_mode, revisit_days: s.revisit_days ?? 0, branch_ids: s.branch_ids ?? [],
       addons: data.addons.filter((a) => a.service_id === s.id).map((a) => ({ id: a.id, name: a.name, price: a.price, extra_minutes: a.extra_minutes, active: a.active })),
       staff: data.staffServices.filter((x) => x.service_id === s.id).map((x) => ({ staff_id: x.staff_id, duration_minutes: x.duration_minutes, price: x.price })),
       steps: data.steps.filter((x) => x.service_id === s.id).sort((a, b) => a.seq - b.seq).map((x) => ({ name: x.name, minutes: x.minutes, who: x.who, seat: x.seat })),
@@ -259,6 +265,17 @@ export function ServicesTab({ data, reload }: { data: Data; reload: () => Promis
             </div>
           ) : null}
 
+          {data.branches.length ? (
+            <div>
+              <p className="text-xs text-[#8a7f72]">提供這項服務的分店(都不勾 = 所有分店)</p>
+              <div className="mt-1 flex flex-wrap gap-1.5">
+                {data.branches.map((b) => {
+                  const on = editing.branch_ids.includes(b.id);
+                  return <button key={b.id} type="button" aria-pressed={on} onClick={() => setEditing({ ...editing, branch_ids: on ? editing.branch_ids.filter((x) => x !== b.id) : [...editing.branch_ids, b.id] })} className={`rounded-full px-2.5 py-1 text-xs ${on ? 'bg-[#1f1b19] text-white' : 'border border-[#d7c9bd] bg-white'}`}>{b.name}</button>;
+                })}
+              </div>
+            </div>
+          ) : null}
           {data.resources.length ? (
             <label className="flex items-start gap-2 text-sm"><input type="checkbox" checked={editing.needs_resource} onChange={(e) => setEditing({ ...editing, needs_resource: e.target.checked })} className="mt-1" />
               <span>需要床位 / 座位<span className="block text-[11px] text-[#8a7f72]">床位都被占用時,這個時段就不能約(目前 {data.resources.filter((r) => r.active).length} 個)</span></span>
@@ -299,6 +316,7 @@ export function StaffTab({ data, reload }: { data: Data; reload: () => Promise<v
   const [editing, setEditing] = useState<StaffDraft | null>(null);
   const [saving, setSaving] = useState(false);
   const [resName, setResName] = useState('');
+  const [resBranch, setResBranch] = useState('');
 
   function edit(s: BkStaff) {
     setEditing({ id: s.id, name: s.name, title: s.title, active: s.active, use_business_hours: s.use_business_hours, role: s.role, commission_rate: Number(s.commission_rate ?? 0), week: toWeek(data.staffHours.filter((h) => h.staff_id === s.id)) });
@@ -325,7 +343,7 @@ export function StaffTab({ data, reload }: { data: Data; reload: () => Promise<v
   }
   async function addResource() {
     if (!resName.trim()) return;
-    try { await api('/api/mycard/booking/resources', { method: 'POST', body: JSON.stringify({ name: resName }) }); setResName(''); void reload(); }
+    try { await api('/api/mycard/booking/resources', { method: 'POST', body: JSON.stringify({ name: resName, branch_id: resBranch || null }) }); setResName(''); void reload(); }
     catch (e) { void uiAlert(errMsg(e, '新增失敗')); }
   }
   async function toggleResource(id: string, name: string, active: boolean) {
@@ -370,7 +388,7 @@ export function StaffTab({ data, reload }: { data: Data; reload: () => Promise<v
               <input inputMode="decimal" value={editing.commission_rate || ''} onChange={(e) => setEditing({ ...editing, commission_rate: Math.min(100, Number(e.target.value.replace(/[^0-9.]/g, '')) || 0) })} placeholder="例:40" className={`${input} mt-1`} />
             </label>
             <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={editing.use_business_hours} onChange={(e) => setEditing({ ...editing, use_business_hours: e.target.checked })} />班表跟營業時段相同</label>
-            {!editing.use_business_hours ? <div className="rounded-lg bg-white p-2"><p className="text-xs font-semibold">這位人員的每週班表</p><WeekEditor week={editing.week} setWeek={(w) => setEditing({ ...editing, week: w })} /></div> : null}
+            {!editing.use_business_hours ? <div className="rounded-lg bg-white p-2"><p className="text-xs font-semibold">這位人員的每週班表{data.branches.length ? '(每一段可指定在哪間分店)' : ''}</p><WeekEditor week={editing.week} setWeek={(w) => setEditing({ ...editing, week: w })} branches={data.branches.filter((b) => b.active)} /></div> : null}
             <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={editing.active} onChange={(e) => setEditing({ ...editing, active: e.target.checked })} />可接預約(離職或暫停請取消勾選,歷史紀錄會保留)</label>
             <div className="flex justify-end gap-2">
               <button type="button" onClick={() => setEditing(null)} className={btn}>取消</button>
@@ -400,13 +418,19 @@ export function StaffTab({ data, reload }: { data: Data; reload: () => Promise<v
         </div>
         <div className="flex gap-2">
           <input value={resName} onChange={(e) => setResName(e.target.value)} maxLength={30} placeholder="例:美睫床 A" className={`${input} min-w-0 flex-1`} />
+          {data.branches.length ? (
+            <select value={resBranch} onChange={(e) => setResBranch(e.target.value)} aria-label="分店" className="w-24 shrink-0 rounded-xl border border-[#e5ded4] bg-white px-1 text-sm">
+              <option value="">所有分店</option>
+              {data.branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+            </select>
+          ) : null}
           <button type="button" onClick={() => void addResource()} className={`${btnDark} shrink-0`}>新增</button>
         </div>
         {data.resources.length ? (
           <div className="divide-y divide-[#f0ebe2]">
             {data.resources.map((r) => (
               <div key={r.id} className={`flex items-center gap-2 py-2 text-sm ${r.active ? '' : 'opacity-60'}`}>
-                <span className="min-w-0 flex-1 truncate">{r.name}{r.active ? '' : '(停用)'}</span>
+                <span className="min-w-0 flex-1 truncate">{r.name}{r.branch_id ? ` · ${data.branches.find((b) => b.id === r.branch_id)?.name ?? ''}` : ''}{r.active ? '' : '(停用)'}</span>
                 <button type="button" onClick={() => void toggleResource(r.id, r.name, !r.active)} className={btnSm}>{r.active ? '停用' : '啟用'}</button>
                 <button type="button" onClick={() => void removeResource(r.id, r.name)} className="shrink-0 px-1 text-xs text-[#a03b3b]">刪除</button>
               </div>
@@ -420,16 +444,19 @@ export function StaffTab({ data, reload }: { data: Data; reload: () => Promise<v
 
 // ---------- 營業時段與休假 ----------
 export function HoursTab({ data, reload }: { data: Data; reload: () => Promise<void> }) {
-  const [week, setWeek] = useState<Week>(() => toWeek(data.hours));
+  const [branch, setBranch] = useState(data.branches[0]?.id ?? '');
+  // 分店還沒有自己的時段時,先帶入共用時段(儲存後成為這間分店的時段)
+  const hoursFor = (id: string) => { const own = data.hours.filter((h) => (h.branch_id ?? '') === id); return own.length || !id ? own : data.hours.filter((h) => !h.branch_id); };
+  const [week, setWeek] = useState<Week>(() => toWeek(hoursFor(data.branches[0]?.id ?? '')));
   const [saving, setSaving] = useState(false);
-  const [off, setOff] = useState({ date: '', allDay: true, start: '10:00', end: '18:00', reason: '', staff: '' });
+  const [off, setOff] = useState({ date: '', allDay: true, start: '10:00', end: '18:00', reason: '', staff: '', branch: '' });
   const team = isTeam(data);
 
   async function save() {
     const rows = fromWeek(week);
     if (typeof rows === 'string') return void uiAlert(rows);
     setSaving(true);
-    try { await api('/api/mycard/booking', { method: 'PUT', body: JSON.stringify({ hours: rows }) }); uiToast('已儲存營業時段'); void reload(); }
+    try { await api('/api/mycard/booking', { method: 'PUT', body: JSON.stringify({ hours: rows.map((r) => ({ ...r, branch_id: undefined })), branch_id: branch || null }) }); uiToast('已儲存營業時段'); void reload(); }
     catch (e) { void uiAlert(errMsg(e, '儲存失敗')); }
     finally { setSaving(false); }
   }
@@ -438,7 +465,7 @@ export function HoursTab({ data, reload }: { data: Data; reload: () => Promise<v
     const start = off.allDay ? fromLocal(off.date, 0) : fromLocal(off.date, hhmmToMinutes(off.start));
     const end = off.allDay ? fromLocal(off.date, 1440) : fromLocal(off.date, hhmmToMinutes(off.end));
     try {
-      const res = await api<{ affected: BkBooking[] }>('/api/mycard/booking/exceptions', { method: 'POST', body: JSON.stringify({ start_at: start.toISOString(), end_at: end.toISOString(), reason: off.reason, staff_id: off.staff || null }) });
+      const res = await api<{ affected: BkBooking[] }>('/api/mycard/booking/exceptions', { method: 'POST', body: JSON.stringify({ start_at: start.toISOString(), end_at: end.toISOString(), reason: off.reason, staff_id: off.staff || null, branch_id: off.branch || null }) });
       if (res.affected.length) void uiAlert(`已設定休假。\n這段時間已有 ${res.affected.length} 筆預約,系統不會自動取消,請到「預約」改期或聯絡顧客:\n${res.affected.map((b) => `${formatRange(b.start_at, b.end_at)} ${b.contact?.name ?? ''}`).join('\n')}`);
       else uiToast('已設定休假');
       setOff({ ...off, date: '', reason: '' });
@@ -454,6 +481,13 @@ export function HoursTab({ data, reload }: { data: Data; reload: () => Promise<v
     <div className="space-y-4">
       <section className={card}>
         <p className="font-semibold">每週營業時段</p>
+        {data.branches.length ? (
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {data.branches.map((b) => (
+              <button key={b.id} type="button" onClick={() => { setBranch(b.id); setWeek(toWeek(hoursFor(b.id))); }} className={`rounded-full px-3 py-1 text-sm ${branch === b.id ? 'bg-[#1f1b19] text-white' : 'border border-[#e5ded4] bg-white text-[#6b6156]'}`}>{b.name}</button>
+            ))}
+          </div>
+        ) : null}
         <p className="mt-1 text-xs text-[#8a7f72]">顧客只能預約這些時段;同一天可以分成多段(例如中午休息)。{team ? '人員可在「人員床位」設定自己的班表。' : ''}</p>
         <div className="mt-3"><WeekEditor week={week} setWeek={setWeek} /></div>
         <div className="mt-3 flex items-center justify-between gap-2">
@@ -468,6 +502,12 @@ export function HoursTab({ data, reload }: { data: Data; reload: () => Promise<v
         <div className="mt-3 space-y-2">
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             <input type="date" value={off.date} min={localParts(new Date()).date} onChange={(e) => setOff({ ...off, date: e.target.value })} className={input} aria-label="日期" />
+            {data.branches.length ? (
+              <select value={off.branch} onChange={(e) => setOff({ ...off, branch: e.target.value })} aria-label="適用分店" className={input}>
+                <option value="">所有分店</option>
+                {data.branches.map((b) => <option key={b.id} value={b.id}>{b.name} 休息</option>)}
+              </select>
+            ) : null}
             {team ? (
               <select value={off.staff} onChange={(e) => setOff({ ...off, staff: e.target.value })} aria-label="適用人員" className={input}>
                 <option value="">全店休息</option>
@@ -490,7 +530,7 @@ export function HoursTab({ data, reload }: { data: Data; reload: () => Promise<v
           <div className="mt-3 divide-y divide-[#f0ebe2]">
             {data.exceptions.map((x) => (
               <div key={x.id} className="flex items-center gap-2 py-2 text-sm">
-                <span className="min-w-0 flex-1 truncate">{formatRange(x.start_at, x.end_at)}{x.staff_id ? ` · ${data.staff.find((s) => s.id === x.staff_id)?.name ?? ''}` : team ? ' · 全店' : ''}{x.reason ? ` · ${x.reason}` : ''}</span>
+                <span className="min-w-0 flex-1 truncate">{formatRange(x.start_at, x.end_at)}{x.branch_id ? ` · ${data.branches.find((b) => b.id === x.branch_id)?.name ?? ''}` : ''}{x.staff_id ? ` · ${data.staff.find((s) => s.id === x.staff_id)?.name ?? ''}` : team ? ' · 全店' : ''}{x.reason ? ` · ${x.reason}` : ''}</span>
                 <button type="button" onClick={() => void removeOff(x)} className="shrink-0 text-xs text-[#a03b3b]">移除</button>
               </div>
             ))}
@@ -579,6 +619,7 @@ export function SettingsTab({ data, reload }: { data: Data; reload: () => Promis
         ) : null}
         <p className="text-[11px] leading-5 text-[#a99e8f]">服務完成且付清後,依實收金額入帳(只付訂金不入帳;點數與套票折抵的部分不再回饋);退款會自動沖銷。購買套票時就入帳,用套票兌換不再重複回饋。完成服務時可用點數折抵。</p>
       </section>
+      <BranchesSection data={data} reload={reload} travel={b.branch_travel_minutes} setTravel={(n) => setB({ ...b, branch_travel_minutes: n })} />
       <PackageProducts data={data} reload={reload} />
       <section className={`${card} space-y-3`}>
         <p className="font-semibold">候補與回訪</p>
@@ -608,5 +649,60 @@ export function SettingsTab({ data, reload }: { data: Data; reload: () => Promis
         <button type="button" disabled={saving} onClick={() => void save()} className={`${btnDark} px-6 py-2.5`}>{saving ? '儲存中…' : '儲存設定'}</button>
       </div>
     </div>
+  );
+}
+
+// ---------- 分店 ----------
+function BranchesSection({ data, reload, travel, setTravel }: { data: Data; reload: () => Promise<void>; travel: number; setTravel: (n: number) => void }) {
+  const [draft, setDraft] = useState({ name: '', address: '' });
+  const [editing, setEditing] = useState<{ id: string; name: string; address: string; active: boolean } | null>(null);
+  async function add() {
+    if (!draft.name.trim()) return void uiAlert('請填寫分店名稱');
+    try { await api('/api/mycard/booking/branches', { method: 'POST', body: JSON.stringify(draft) }); setDraft({ name: '', address: '' }); uiToast('已新增分店,請到「營業時段」設定這間分店的時段'); void reload(); }
+    catch (e) { void uiAlert(errMsg(e)); }
+  }
+  async function save() {
+    if (!editing) return;
+    try { await api('/api/mycard/booking/branches', { method: 'PATCH', body: JSON.stringify(editing) }); setEditing(null); void reload(); }
+    catch (e) { void uiAlert(errMsg(e)); }
+  }
+  async function remove(id: string, name: string) {
+    if (!(await uiConfirm(`刪除分店「${name}」?`, { danger: true }))) return;
+    try { await api(`/api/mycard/booking/branches?id=${id}`, { method: 'DELETE' }); void reload(); }
+    catch (e) { void uiAlert(errMsg(e)); }
+  }
+  return (
+    <section className={`${card} space-y-3`}>
+      <div>
+        <p className="font-semibold">分店</p>
+        <p className="text-xs leading-5 text-[#8a7f72]">只有一個據點就不用設定。新增分店後,顧客會先選分店;營業時段、床位、休假可分店設定,人員班表可指定每一段在哪間分店。</p>
+      </div>
+      {data.branches.map((b) => editing?.id === b.id ? (
+        <div key={b.id} className="space-y-2 rounded-xl bg-[#faf7f2] p-3">
+          <input value={editing.name} onChange={(e) => setEditing({ ...editing, name: e.target.value })} maxLength={30} aria-label="分店名稱" className={input} />
+          <input value={editing.address} onChange={(e) => setEditing({ ...editing, address: e.target.value })} maxLength={120} placeholder="地址" aria-label="地址" className={input} />
+          <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={editing.active} onChange={(e) => setEditing({ ...editing, active: e.target.checked })} />開放預約</label>
+          <div className="flex justify-end gap-2"><button type="button" onClick={() => setEditing(null)} className={btnSm}>取消</button><button type="button" onClick={() => void save()} className={`${btnSm} border-[#1f1b19] bg-[#1f1b19] text-white`}>儲存</button></div>
+        </div>
+      ) : (
+        <div key={b.id} className={`flex items-center gap-2 text-sm ${b.active ? '' : 'opacity-60'}`}>
+          <span className="min-w-0 flex-1 truncate">{b.name}{b.address ? ` · ${b.address}` : ''}{b.active ? '' : '(停用)'}</span>
+          <button type="button" onClick={() => setEditing({ id: b.id, name: b.name, address: b.address, active: b.active })} className={btnSm}>編輯</button>
+          <button type="button" onClick={() => void remove(b.id, b.name)} className="shrink-0 text-xs text-[#a03b3b]">刪除</button>
+        </div>
+      ))}
+      <div className="grid grid-cols-[1fr_auto] gap-2">
+        <input value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} maxLength={30} placeholder="分店名稱,例:信義店" aria-label="分店名稱" className={`${input} min-w-0`} />
+        <button type="button" onClick={() => void add()} className={btnDark}>新增</button>
+        <input value={draft.address} onChange={(e) => setDraft({ ...draft, address: e.target.value })} maxLength={120} placeholder="地址(選填)" aria-label="分店地址" className={`${input} col-span-2`} />
+      </div>
+      {data.branches.length > 1 ? (
+        <label className="block text-xs text-[#8a7f72]">同一位人員跨分店的移動時間
+          <select value={travel} onChange={(e) => setTravel(Number(e.target.value))} className={`${input} mt-1`}>
+            {[0, 15, 30, 45, 60, 90].map((n) => <option key={n} value={n}>{n ? `${n} 分鐘` : '不需要'}</option>)}
+          </select>
+        </label>
+      ) : null}
+    </section>
   );
 }

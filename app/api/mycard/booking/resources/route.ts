@@ -24,7 +24,8 @@ export async function POST(request: Request) {
   const db = createAdminClient();
   const { count } = await db.from('bk_resources').select('id', { count: 'exact', head: true }).eq('business_id', c.business.id);
   if ((count ?? 0) >= 30) return err(422, 'POLICY_BLOCKED', '最多 30 個。');
-  const { data, error } = await db.from('bk_resources').insert({ business_id: c.business.id, name, sort_order: count ?? 0 }).select('*').single();
+  const branchId = typeof body?.branch_id === 'string' && /^[0-9a-f-]{36}$/.test(body.branch_id) ? body.branch_id : null;
+  const { data, error } = await db.from('bk_resources').insert({ business_id: c.business.id, name, sort_order: count ?? 0, branch_id: branchId }).select('*').single();
   if (error) return err(400, 'SERVER_ERROR', error.message);
   return NextResponse.json(data, { status: 201 });
 }
