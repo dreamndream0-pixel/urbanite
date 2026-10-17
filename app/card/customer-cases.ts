@@ -6,6 +6,8 @@ export type CustomerCase = {
   categoryLabel: string;
   kind: 'live' | 'demo' | 'pending' | 'redacted';
   image: string;
+  /** 手機版截圖(案例頁以手機外框呈現) */
+  mobile?: string;
   gallery?: { image: string; label: string }[];
   description: string;
   tags: string[];
@@ -21,9 +23,9 @@ export const caseCategories: { key: 'all' | CaseCategory; label: string }[] = [
 ];
 
 export const customerCases: CustomerCase[] = [
-  { id: 'urbanite', name: 'URBANITE', category: 'fashion', categoryLabel: '服飾品牌官網', kind: 'live', image: '/card/cases/urbanite-live.webp', description: '從素 T 到日常穿搭，將品牌商品、分類與購物流程放在同一個網站。', tags: ['品牌官網', '購物商店'], url: 'https://www.urbanite.com.tw/' },
-  { id: 'chue', name: 'CHUÉ', category: 'fashion', categoryLabel: '服飾・二手選品', kind: 'live', image: '/card/cases/chue.webp', description: '以專屬活動頁呈現二手服飾，保留品牌風格與清楚的商品分類。', tags: ['服飾選品', '活動頁'], url: 'https://chue.urbanite.com.tw/promo/second-hand' },
-  { id: 'snail-rental', name: '小蝸出租', category: 'rental', categoryLabel: '全方位租屋網', kind: 'live', image: '/card/cases/snail-rental.webp', description: '透過地區、租金與房型搜尋房源，連結物件資訊與房東的公開頁面。', tags: ['房源搜尋', '租屋平台'], url: 'https://xiaowo-rental.vercel.app/' },
+  { id: 'urbanite', name: 'URBANITE', category: 'fashion', categoryLabel: '服飾品牌官網', kind: 'live', image: '/card/cases/urbanite-live.webp', mobile: '/card/cases/urbanite-mobile.webp', description: '從素 T 到日常穿搭，將品牌商品、分類與購物流程放在同一個網站。', tags: ['品牌官網', '購物商店'], url: 'https://www.urbanite.com.tw/' },
+  { id: 'chue', name: 'CHUÉ', category: 'fashion', categoryLabel: '服飾・二手選品', kind: 'live', image: '/card/cases/chue.webp', mobile: '/card/cases/chue-mobile.webp', description: '以專屬活動頁呈現二手服飾，保留品牌風格與清楚的商品分類。', tags: ['服飾選品', '活動頁'], url: 'https://chue.urbanite.com.tw/promo/second-hand' },
+  { id: 'snail-rental', name: '小蝸出租', category: 'rental', categoryLabel: '全方位租屋網', kind: 'live', image: '/card/cases/snail-rental.webp', mobile: '/card/cases/snail-rental-mobile.webp', description: '透過地區、租金與房型搜尋房源，連結物件資訊與房東的公開頁面。', tags: ['房源搜尋', '租屋平台'], url: 'https://xiaowo-rental.vercel.app/' },
   {
     id: 'rental-management', name: '包租代管模組', category: 'rental', categoryLabel: '租屋營運後台', kind: 'redacted',
     image: '/card/cases/rental-management-overview-redacted.webp',

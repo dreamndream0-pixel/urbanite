@@ -567,7 +567,8 @@ export function SettingsTab({ data, reload }: { data: Data; reload: () => Promis
       <section className={`${card} space-y-3`}>
         <p className="font-semibold">基本資料</p>
         <label className="block text-xs text-[#8a7f72]">店名 / 工作室名稱
-          <input value={b.name} onChange={(e) => setB({ ...b, name: e.target.value })} maxLength={60} className={`${input} mt-1`} />
+          <input value={b.name} onChange={(e) => setB({ ...b, name: e.target.value })} maxLength={60} placeholder="留空就顯示名片名稱" className={`${input} mt-1`} />
+          <span className="mt-1 block text-[11px] text-[#a99d8e]">顯示在預約頁上方;留空會自動使用名片名稱</span>
         </label>
         <label className="block text-xs text-[#8a7f72]">服務地點(確認與提醒時告訴顧客)
           <input value={b.address} onChange={(e) => setB({ ...b, address: e.target.value })} maxLength={120} placeholder="例:台北市大安區…(可只寫捷運站)" className={`${input} mt-1`} />

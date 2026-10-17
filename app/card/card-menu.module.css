@@ -2,7 +2,7 @@
 .floating { position: fixed; right: 12px; z-index: 60; }
 .trigger { display: grid; place-items: center; width: 40px; height: 40px; border: 0; border-radius: 50%; color: #202632; background: transparent; cursor: pointer; }
 .floating .trigger { background: #ffffffbf; backdrop-filter: blur(8px); box-shadow: 0 2px 10px #0002; }
-.drawer { position: fixed; inset: 0 0 0 auto; margin: 0; width: 66.666667vw; max-width: none; height: 100dvh; max-height: 100dvh; padding: 0; border: 0; background: #fafbf9; color: #182137; letter-spacing: 0; box-shadow: -16px 0 60px #10182a20; overflow: hidden; }
+.drawer { position: fixed; inset: 0 0 0 auto; margin: 0; width: min(66.666667vw, 620px); max-width: none; height: 100dvh; max-height: 100dvh; padding: 0; border: 0; background: #fafbf9; color: #182137; letter-spacing: 0; box-shadow: -16px 0 60px #10182a20; overflow: hidden; }
 .drawer:not([open]) { display: none; }
 .drawer[open] { display: flex; flex-direction: column; animation: slideIn 320ms cubic-bezier(.22,.7,.2,1) both; }
 .drawer[data-closing=true] { animation: slideOut 220ms ease-in both; }
@@ -12,7 +12,7 @@
 .heading > a { display: flex; min-width: 0; }
 .heading img { object-fit: contain; width: 165px; height: auto; }
 .heading button { display: grid; place-items: center; flex-shrink: 0; border: 1px solid #d9dfdf; width: 40px; height: 40px; border-radius: 50%; background: transparent; cursor: pointer; }
-.content { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior-y: contain; -webkit-overflow-scrolling: touch; display: grid; grid-template-columns: minmax(0,1fr) minmax(0,.8fr); gap: 44px; align-content: start; padding: 36px; }
+.content { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior-y: contain; -webkit-overflow-scrolling: touch; display: grid; grid-template-columns: minmax(0,1fr); gap: 44px; align-content: start; padding: 36px; }
 .navigation h2 { font-size: 11px; font-weight: 500; color: #788084; margin: 0 0 18px; }
 .navigation nav { display: grid; }
 .navLink { display: flex; align-items: center; gap: 14px; min-height: 70px; padding: 16px 0; border-bottom: 1px solid #e4e7e7; font-size: 22px; font-weight: 600; }
@@ -29,15 +29,6 @@
 .account a > svg:last-child { margin-left: auto; width: 13px; }
 .account small { display: block; color: #838a8a; font-size: 10px; padding-top: 3px; }
 .account a[aria-current=page] { color: #6f2940; font-weight: 700; }
-.caseSpace { border-left: 1px solid #e4e7e7; padding-left: 30px; }
-.caseHeading { display: flex; gap: 9px; align-items: center; margin-bottom: 20px; }
-.caseHeading h3 { font-size: 15px; font-weight: 600; }
-.caseLinks { display: grid; gap: 22px; }
-.caseLinks > a { display: grid; grid-template-columns: 100px minmax(0,1fr) 16px; gap: 12px; align-items: center; }
-.caseLinks img { width: 100%; height: 72px; object-fit: cover; object-position: top; border: 1px solid #e3e7e6; border-radius: 4px; }
-.caseLinks strong { display: block; font-size: 13px; font-weight: 600; overflow-wrap: anywhere; }
-.caseLinks small { display: block; color: #788084; font-size: 10px; margin-top: 5px; }
-.allCases { display: flex; gap: 12px; align-items: center; margin-top: 26px; font-size: 12px; }
 .footer { display: flex; flex: 0 0 auto; justify-content: space-between; gap: 12px; align-items: center; padding: 22px 36px max(22px, env(safe-area-inset-bottom)); border-top: 1px solid #e4e7e7; }
 .footer a, .footer button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 10px 22px; border: 1px solid #d4dada; border-radius: 4px; font-size: 13px; cursor: pointer; background: transparent; }
 .footer a:last-child { background: #121b33; color: #fff; border-color: #121b33; }
@@ -48,10 +39,6 @@
 @keyframes veilOut { from { opacity: 1; } to { opacity: 0; } }
 @media (max-width: 1100px) {
   .content { gap: 24px; padding: 30px; grid-template-columns: minmax(0,1fr); }
-  .caseSpace { border-left: 0; padding: 24px 0 0; border-top: 1px solid #e4e7e7; }
-  .caseLinks { gap: 15px; }
-  .caseLinks > a { grid-template-columns: 72px minmax(0,1fr) 16px; }
-  .caseLinks img { height: 50px; }
 }
 @media (max-width: 760px) {
   .heading { padding: 18px 18px 16px; gap: 8px; }
@@ -62,13 +49,6 @@
   .navLink > span small { font-size: 9px; line-height: 1.6; }
   .navLink > svg { width: 16px; }
   .navLink > small { font-size: 8px; }
-  .caseHeading { margin-bottom: 16px; }
-  .caseHeading h3 { font-size: 14px; }
-  .caseLinks > a { grid-template-columns: 50px minmax(0,1fr) 12px; gap: 9px; }
-  .caseLinks img { height: 40px; }
-  .caseLinks strong { font-size: 11px; }
-  .caseLinks small { font-size: 9px; }
-  .allCases { font-size: 11px; }
   .footer { gap: 8px; padding: 14px 18px max(14px, env(safe-area-inset-bottom)); }
   .footer a, .footer button { flex: 1; padding: 9px 6px; font-size: 12px; gap: 5px; }
 }
@@ -81,8 +61,7 @@
 }
 @media (hover: hover) {
   .trigger:hover, .heading button:hover { background: #e9edeb; }
-  .navLink:hover, .account a:hover, .allCases:hover { color: #777e90; }
-  .caseLinks > a:hover strong { text-decoration: underline; }
+  .navLink:hover, .account a:hover { color: #777e90; }
 }
 @media (prefers-reduced-motion: reduce) {
   .drawer[open], .drawer::backdrop, .drawer[data-closing=true], .drawer[data-closing=true]::backdrop { animation: none; }

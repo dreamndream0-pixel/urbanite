@@ -898,9 +898,14 @@
   }
   .topActions .start {
     min-height: 38px;
-    padding: 0 16px;
-    gap: 6px;
-    font-size: 13px;
+    padding: 0 12px;
+    gap: 4px;
+    font-size: 12px;
+    white-space: nowrap;
+  }
+  .topActions .start svg {
+    width: 14px;
+    height: 14px;
   }
   .importField input {
     font-size: 16px;

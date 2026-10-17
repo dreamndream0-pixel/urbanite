@@ -4,11 +4,10 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useId, useRef, useState, type MouseEvent } from 'react';
-import { ArrowRight, CalendarCheck, ChevronRight, CreditCard, House, LayoutDashboard, LogOut, Menu, PanelsTopLeft, Store, UserRound, X } from 'lucide-react';
+import { ArrowRight, CalendarCheck, ChevronRight, CreditCard, House, LayoutDashboard, LogOut, Menu, Store, UserRound, X } from 'lucide-react';
 import { createBrowserSupabase } from '@/lib/supabase/client';
 import { SERVICE_LOGO } from '@/lib/card-plan';
 import { useScrollLock } from '@/app/components/useScrollLock';
-import { customerCases } from './customer-cases';
 import styles from './card-menu.module.css';
 
 type Me = { email: string; name: string; isAdmin?: boolean; shops?: { slug: string; name: string; current: boolean; adminUrl: string }[] } | null;
@@ -78,7 +77,6 @@ export default function CardMenu({ variant = 'header', loggedIn, current, top = 
     { href: '/card/pricing', label: '方案價格' },
   ];
   if (!navigation.some(link => link.href === '/card/cases')) navigation.splice(Math.max(1, navigation.length - 1), 0, { href: '/card/cases', label: '客戶案例' });
-  const featured = customerCases.filter(item => item.kind === 'live').slice(0, 3);
 
   return (
     <div className={variant === 'floating' ? styles.floating : styles.wrapper} style={variant === 'floating' ? { top } : undefined}>
@@ -128,13 +126,6 @@ export default function CardMenu({ variant = 'header', loggedIn, current, top = 
               {!navigation.some(link => link.href === '/card') && <Link href="/card" onClick={event => navigate(event, '/card')}><House />URBANLINKS 首頁<ChevronRight /></Link>}
             </div>}
           </div>
-          <aside className={styles.caseSpace} aria-label="精選客戶案例">
-            <div className={styles.caseHeading}><PanelsTopLeft size={18} /><h3>客戶案例</h3></div>
-            <div className={styles.caseLinks}>{featured.map(item => <Link href={`/card/cases#${item.id}`} key={item.id} onClick={event => navigate(event, `/card/cases#${item.id}`)}>
-              <Image src={item.image} alt="" width={220} height={140} sizes="(max-width: 760px) 56px, 200px" /><span><strong>{item.name}</strong><small>{item.categoryLabel}</small></span><ChevronRight size={16} />
-            </Link>)}</div>
-            <Link className={styles.allCases} href="/card/cases" onClick={event => navigate(event, '/card/cases')}>查看全部案例<ArrowRight size={16} /></Link>
-          </aside>
         </div>
         <footer className={styles.footer}>{signedIn ? <button type="button" onClick={signOut}><LogOut size={17} />登出</button> : <><Link href="/card/login" onClick={event => navigate(event, '/card/login')}>登入</Link><Link href="/card/register" onClick={event => navigate(event, '/card/register')}>免費開始<ArrowRight size={17} /></Link></>}</footer>
       </dialog>

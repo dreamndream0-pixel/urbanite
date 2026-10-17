@@ -31,7 +31,7 @@ export default function HeroScene({
         </Link>
         <div className={styles.topActions}>
           <Link href={startHref} className={styles.start}>
-            建立名片
+            免費建立名片・官網
             <ArrowRight />
           </Link>
           <CardMenu

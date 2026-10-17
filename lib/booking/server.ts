@@ -1038,7 +1038,7 @@ export async function ownerBusiness(userId: string, create = false) {
   if (data || !create) return (data as BkBusiness | null) ?? null;
   const { data: card } = await db().from('profile_cards').select('id, display_name').eq('owner_user_id', userId).maybeSingle();
   const { data: created, error } = await db().from('bk_businesses')
-    .insert({ owner_user_id: userId, card_id: card?.id ?? null, name: card?.display_name ?? '' })
+    .insert({ owner_user_id: userId, card_id: card?.id ?? null, name: '' })
     .select('*').single();
   if (error) {
     const { data: again } = await db().from('bk_businesses').select('*').eq('owner_user_id', userId).maybeSingle();
