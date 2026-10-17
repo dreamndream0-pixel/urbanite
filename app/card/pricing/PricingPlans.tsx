@@ -60,16 +60,21 @@ export default function PricingPlans({ promo, initialNow, loggedIn }: {
           const covered = !free && active && tierRank(tier.key) <= tierRank(promo.tier);
           const price = tier.prices?.[period] ?? 0;
           const upgrade = `/mycard/upgrade?tier=${tier.key}&period=${period}`;
-          const href = !tier.available ? CONTACT_LINE_URL : free || covered ? startHref : loggedIn ? upgrade : `/card/register?next=${encodeURIComponent(upgrade)}`;
+          // U Pro / U Max 限時免費期間:登入後直接進開店精靈自己開通官網(沒登入先註冊,完成後回到開店精靈)
+          const selfServe = !tier.available && covered;
+          const contact = !tier.available && !covered;
+          const shopHref = loggedIn ? '/shop/new' : `/card/register?next=${encodeURIComponent('/shop/new')}`;
+          const href = selfServe ? shopHref : contact ? CONTACT_LINE_URL : free || covered ? startHref : loggedIn ? upgrade : `/card/register?next=${encodeURIComponent(upgrade)}`;
           return <article key={tier.key} className={`${styles.plan} ${tier.key === 'max' ? styles.max : ''} ${tier.key === 'pro' ? styles.pro : ''}`}>
             <header><h3>{tier.name}</h3>{covered && <span className={styles.badge}>限時免費</span>}</header>
             <p className={styles.caption}>{captions[index]}</p>
             <div className={styles.price} aria-live="polite"><span>NT$</span><strong>{covered ? '0' : price.toLocaleString()}</strong><span>/{period === 'month' ? '月' : '年'}</span></div>
             <p className={styles.priceNote}>{covered ? <><s>NT${price.toLocaleString()} / {period === 'month' ? '月' : '年'}</s>　活動期間免費</> : period === 'year' && tier.prices ? `年繳省 NT$${(tier.prices.month * 12 - price).toLocaleString()}` : free ? '不需信用卡' : '預付制，不自動扣款'}</p>
             <p className={styles.audience}>{audiences[index]}</p>
-            <Link className={styles.action} href={href} target={!tier.available ? '_blank' : undefined} rel={!tier.available ? 'noopener noreferrer' : undefined}>
-              {!tier.available ? '聯絡專員建立官網' : free || covered ? '免費使用' : '立即升級'}<ArrowRight size={16} />
+            <Link className={styles.action} href={href} target={contact ? '_blank' : undefined} rel={contact ? 'noopener noreferrer' : undefined}>
+              {selfServe ? '免費開通官網' : contact ? '聯絡專員建立官網' : free || covered ? '免費使用' : '立即升級'}<ArrowRight size={16} />
             </Link>
+            {selfServe ? <a className={styles.assist} href={CONTACT_LINE_URL} target="_blank" rel="noopener noreferrer">想請專員協助建立?加入官方 LINE</a> : null}
             <ul>{features.map(row => <li key={row.label} className={row.values[index] === '—' ? styles.unavailable : ''}>
               {row.values[index] === '—' ? <Minus size={16} /> : <Check size={16} />}
               <span>{row.label}{!['✓', '—'].includes(row.values[index]) && <small>{row.values[index]}</small>}</span>
