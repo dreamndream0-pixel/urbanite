@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { uiAlert, uiConfirm } from '@/lib/ui-dialog';
 import { uiToast } from '@/lib/ui-toast';
+import { shrinkImage } from '@/lib/booking/shrink-image';
 import {
   formatDateLabel, formatDateTime, formatRange, localParts, money, statusText, STATUS_COLOR,
   type ApprovalStatus, type BookingStatus, type PaymentStatus,
@@ -18,6 +19,10 @@ type Service = {
 };
 type Staff = { id: string; name: string; title: string; avatar: string };
 type Business = { name: string; address: string; notice: string; approval_mode: 'auto' | 'manual'; cancel_hours: number; allow_any_staff: boolean; payment_info: string; service_area: string; open: boolean };
+type MyRecord = {
+  id: string; service_name: string; performed_on: string; consent: 'none' | 'requested' | 'granted' | 'declined' | 'revoked'; delete_requested: boolean;
+  business: { name: string; slug: string }; photos: { id: string; kind: 'before' | 'after' | 'other' }[];
+};
 type MyQuote = {
   id: string; quote_no: string; service_name: string; status: 'requested' | 'sent' | 'accepted' | 'declined' | 'cancelled'; current_version: number; created_at: string;
   request: { event_date: string; time: string; event_type: string; address: string };
@@ -56,7 +61,7 @@ export default function BookingClient({ slug, card, business, services, staff }:
   const [time, setTime] = useState('');
   const [days, setDays] = useState<Day[] | null>(null);
   const [loadingSlots, setLoadingSlots] = useState(false);
-  const [auth, setAuth] = useState<{ loggedIn: boolean; lineBound: boolean; bookings: MyBooking[]; quotes: MyQuote[] } | null>(null);
+  const [auth, setAuth] = useState<{ loggedIn: boolean; lineBound: boolean; bookings: MyBooking[]; quotes: MyQuote[]; records: MyRecord[] } | null>(null);
   const [contact, setContact] = useState({ name: '', phone: '', note: '' });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -92,11 +97,12 @@ export default function BookingClient({ slug, card, business, services, staff }:
   // 登入狀態與我的預約(也用來帶入上次填的聯絡資料)
   const loadMine = useCallback(async () => {
     const res = await fetch('/api/booking/my', { cache: 'no-store' });
-    if (res.status === 401) { setAuth({ loggedIn: false, lineBound: false, bookings: [], quotes: [] }); return; }
+    if (res.status === 401) { setAuth({ loggedIn: false, lineBound: false, bookings: [], quotes: [], records: [] }); return; }
     const data = await res.json().catch(() => null);
     const bookings = ((data?.bookings ?? []) as MyBooking[]).filter((b) => b.business.slug === slug);
     const quotes = ((data?.quotes ?? []) as MyQuote[]).filter((q) => q.business.slug === slug);
-    setAuth({ loggedIn: true, lineBound: Boolean(data?.line_bound), bookings, quotes });
+    const records = ((data?.records ?? []) as MyRecord[]).filter((r) => r.business.slug === slug);
+    setAuth({ loggedIn: true, lineBound: Boolean(data?.line_bound), bookings, quotes, records });
     const last = (data?.bookings ?? [])[0] as MyBooking | undefined;
     if (last?.contact) setContact((c) => (c.name || c.phone ? c : { name: last.contact.name ?? '', phone: last.contact.phone ?? '', note: '' }));
   }, [slug]);
@@ -503,7 +509,7 @@ function ResultView({ result, business, lineBound, here, onMore, onMine, onRepor
   );
 }
 
-function MyBookings({ auth, loginNext, onCancel, onBook, reload }: { auth: { loggedIn: boolean; bookings: MyBooking[]; quotes: MyQuote[] } | null; loginNext: string; onCancel: (b: MyBooking) => void; onBook: () => void; reload: () => Promise<void> }) {
+function MyBookings({ auth, loginNext, onCancel, onBook, reload }: { auth: { loggedIn: boolean; bookings: MyBooking[]; quotes: MyQuote[]; records: MyRecord[] } | null; loginNext: string; onCancel: (b: MyBooking) => void; onBook: () => void; reload: () => Promise<void> }) {
   // 頁面打開時的時間(判斷可否取消);只在第一次取得,避免每次重畫都變
   const [now] = useState(() => Date.now());
   const [moving, setMoving] = useState('');
@@ -517,7 +523,7 @@ function MyBookings({ auth, loginNext, onCancel, onBook, reload }: { auth: { log
       </div>
     );
   }
-  if (!auth.bookings.length && !auth.quotes.length) {
+  if (!auth.bookings.length && !auth.quotes.length && !auth.records.length) {
     return (
       <div className="rounded-2xl bg-white p-8 text-center">
         <p className="text-sm text-[#8a7f72]">還沒有預約紀錄</p>
@@ -527,6 +533,7 @@ function MyBookings({ auth, loginNext, onCancel, onBook, reload }: { auth: { log
   }
   return (
     <div className="space-y-2">
+      {auth.records.map((r) => <RecordConsent key={`${r.id}-${r.consent}-${r.delete_requested}`} record={r} onDone={() => void reload()} />)}
       {auth.quotes.filter((q) => q.status !== 'accepted').map((q) => <QuoteOffer key={`${q.id}-${q.current_version}-${q.status}`} quote={q} onDone={() => void reload()} />)}
       {auth.bookings.map((b) => {
         const active = ACTIVE.includes(b.status) && new Date(b.start_at).getTime() > now;
@@ -616,18 +623,6 @@ function Reschedule({ booking, onClose, onDone }: { booking: MyBooking; onClose:
       </div>
     </div>
   );
-}
-
-// 參考圖先在手機上縮小(長邊 1600px、JPEG),避免上傳太大
-async function shrinkImage(file: File): Promise<Blob> {
-  const bitmap = await createImageBitmap(file);
-  const scale = Math.min(1, 1600 / Math.max(bitmap.width, bitmap.height));
-  const canvas = document.createElement('canvas');
-  canvas.width = Math.round(bitmap.width * scale);
-  canvas.height = Math.round(bitmap.height * scale);
-  canvas.getContext('2d')!.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-  bitmap.close();
-  return new Promise((resolve, reject) => canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('shrink'))), 'image/jpeg', 0.85));
 }
 
 // 需報價服務的詢價表單:不占檔期,店家回覆報價後再決定
@@ -777,6 +772,45 @@ function QuoteOffer({ quote: q, onDone }: { quote: MyQuote; onDone: () => void }
           ) : <p className="pt-1 text-[#a03b3b]">報價已過期,請聯絡店家重新報價。</p>}
         </div>
       ) : null}
+    </div>
+  );
+}
+
+// 店家想把服務照片公開為作品:顧客同意 / 不同意 / 撤回 / 要求刪除
+function RecordConsent({ record: r, onDone }: { record: MyRecord; onDone: () => void }) {
+  const [busy, setBusy] = useState(false);
+  async function act(action: 'grant' | 'decline' | 'revoke' | 'request_delete') {
+    if (action === 'request_delete' && !(await uiConfirm('請店家刪除這些照片?店家會收到通知。'))) return;
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/booking/my/records/${r.id}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action }) });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) return void uiAlert(data?.error?.message ?? '操作失敗');
+      uiToast(action === 'grant' ? '已同意公開' : action === 'decline' ? '已選擇不公開' : action === 'revoke' ? '已撤回同意' : '已通知店家刪除');
+      onDone();
+    } finally { setBusy(false); }
+  }
+  const label = { none: '', requested: '店家想分享這些照片', granted: '你已同意公開', declined: '你選擇不公開', revoked: '你已撤回同意' }[r.consent];
+  return (
+    <div className="rounded-2xl bg-white p-4">
+      <p className="text-sm font-semibold">{r.performed_on} {r.service_name} 的服務照片</p>
+      <p className="mt-0.5 text-xs text-[#8a7f72]">{label}{r.delete_requested ? ' · 已要求店家刪除' : ''}</p>
+      {r.photos.length ? (
+        <div className="mt-2 grid grid-cols-3 gap-1.5">
+          {r.photos.map((p) => (
+            <a key={p.id} href={`/api/booking/photo?id=${p.id}`} target="_blank" rel="noopener noreferrer" className="block aspect-square overflow-hidden rounded-lg bg-[#efe8dd]">
+              <img src={`/api/booking/photo?id=${p.id}`} alt="服務照片" loading="lazy" width={120} height={120} className="h-full w-full object-cover" />
+            </a>
+          ))}
+        </div>
+      ) : null}
+      {r.consent === 'requested' ? <p className="mt-2 text-xs leading-5 text-[#6b6156]">同意後店家可以把這些照片作為作品分享(例如社群、名片作品集);不同意也不影響你的預約。同意後可以隨時撤回。</p> : null}
+      <div className="mt-3 flex flex-wrap gap-2">
+        {['requested', 'declined', 'revoked'].includes(r.consent) ? <button type="button" disabled={busy} onClick={() => void act('grant')} className="rounded-full bg-[#1f1b19] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">同意公開</button> : null}
+        {r.consent === 'requested' ? <button type="button" disabled={busy} onClick={() => void act('decline')} className="rounded-full border border-[#d7c9bd] px-4 py-2 text-sm">不同意</button> : null}
+        {r.consent === 'granted' ? <button type="button" disabled={busy} onClick={() => void act('revoke')} className="rounded-full border border-[#d7c9bd] px-4 py-2 text-sm">撤回同意</button> : null}
+        {!r.delete_requested ? <button type="button" disabled={busy} onClick={() => void act('request_delete')} className="ml-auto text-xs text-[#a03b3b]">要求刪除照片</button> : null}
+      </div>
     </div>
   );
 }

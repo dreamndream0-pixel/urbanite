@@ -418,7 +418,7 @@ export async function createBooking(input: {
 
 // 店家人工加單(電話、現場客):一樣經過人員 / 床位衝突檢查,不受最短提前與可約天數限制
 export async function ownerCreateBooking(ownerUserId: string, input: {
-  serviceId: string; addonIds: string[]; staffId: string | null; startAt: string; contact: { name: string; phone: string; note: string }; extras?: string[];
+  serviceId: string; addonIds: string[]; staffId: string | null; startAt: string; contact: { name: string; phone: string; note: string }; extras?: string[]; customerId?: string | null;
 }) {
   const business = await ownerBusiness(ownerUserId);
   if (!business) throw new BookingError('NOT_FOUND', '請先完成預約設定。', 404);
@@ -429,6 +429,11 @@ export async function ownerCreateBooking(ownerUserId: string, input: {
   if (Number.isNaN(start.getTime())) throw new BookingError('VALIDATION_ERROR', '時間格式錯誤。', 422);
   if (start.getTime() < Date.now() - 12 * 3600000) throw new BookingError('VALIDATION_ERROR', '不能新增已經過去的預約。', 422);
   if (!input.contact.name.trim()) throw new BookingError('VALIDATION_ERROR', '請填寫顧客姓名。', 422);
+  let customerId: string | null = null;
+  if (input.customerId) {
+    const { data: c } = await db().from('bk_customers').select('id').eq('id', input.customerId).eq('business_id', business.id).maybeSingle();
+    customerId = c?.id ?? null;
+  }
   const req: SlotRequest = { serviceId: service.id, addonIds: input.addonIds, staffId: input.staffId, extras: cleanExtras(sched, service.id, input.extras), ignoreLimits: true };
   return tryPlacements(() => placements(business, sched, req, start), async (p) => {
     const { data, error } = await db().rpc('bk_create_booking2', {
@@ -438,7 +443,7 @@ export async function ownerCreateBooking(ownerUserId: string, input: {
         status: 'confirmed', approval_status: 'not_required', expires_at: null, contact: cleanContact(input.contact),
         source_card_id: business.card_id, source_channel: 'owner', staff_id: p.staff.id, staff_requested: Boolean(input.staffId),
         resource_id: p.resourceId, addons: p.q.addons, allocations: p.allocs, items: p.items.length > 1 ? p.items : [], total_price: p.total, deposit_amount: 0, payment_status: 'none',
-        created_by: 'owner', actor_type: 'owner', actor_id: ownerUserId,
+        created_by: 'owner', actor_type: 'owner', actor_id: ownerUserId, customer_id: customerId,
       },
       p_notices: [],
     });
@@ -760,6 +765,40 @@ async function deliverQuote(row: OutboxRow, token: string): Promise<{ state: 'ap
   return pushLine(token, row.id, lineId, message);
 }
 
+// 服務紀錄的通知:請顧客同意公開照片(不在訊息裡放照片或紀錄內容)、顧客要求刪除照片
+async function deliverRecord(row: OutboxRow, token: string): Promise<{ state: 'api_accepted' | 'skipped' | 'retry' | 'failed'; error?: string }> {
+  const { data: r } = await db().from('bk_service_records').select('id, business_id, customer_id, service_name, performed_on, consent, delete_requested').eq('id', row.record_id!).maybeSingle();
+  if (!r) return { state: 'skipped', error: 'record_missing' };
+  if (row.event === 'consent_requested' && r.consent !== 'requested') return { state: 'skipped', error: 'stale' };
+  const { data: business } = await db().from('bk_businesses').select('owner_user_id, name, card_id').eq('id', r.business_id).single();
+  const { data: customer } = await db().from('bk_customers').select('user_id, name').eq('id', r.customer_id).single();
+  const recipient = row.audience === 'owner' ? business?.owner_user_id : customer?.user_id;
+  const lineId = recipient ? await lineUserIdOf(recipient) : null;
+  if (!lineId) return { state: 'skipped', error: 'no_line' };
+  const { data: card } = business?.card_id ? await db().from('profile_cards').select('slug, display_name').eq('id', business.card_id).maybeSingle() : { data: null };
+  const site = getConfiguredSiteUrl();
+  const businessName = business?.name || card?.display_name || '';
+  const owner = row.audience === 'owner';
+  const title = row.event === 'consent_requested' ? '店家想把服務照片作為作品分享' : '顧客要求刪除服務照片';
+  const text = row.event === 'consent_requested'
+    ? `${r.performed_on} ${r.service_name} 的照片。同意前不會公開,同意後也可以隨時撤回。`
+    : `${customer?.name ?? ''} 要求刪除 ${r.performed_on} ${r.service_name} 的照片,請到顧客檔案處理。`;
+  return pushLine(token, row.id, lineId, {
+    type: 'flex', altText: `【${businessName}】${title}`.slice(0, 300),
+    contents: {
+      type: 'bubble',
+      header: { type: 'box', layout: 'vertical', backgroundColor: '#1f6f8b', paddingAll: '16px', contents: [
+        { type: 'text', text: businessName || 'URBANLINKS 預約', size: 'xs', color: '#ffffffcc' },
+        { type: 'text', text: title, size: 'lg', weight: 'bold', color: '#ffffff', wrap: true, margin: 'sm' },
+      ] },
+      body: { type: 'box', layout: 'vertical', contents: [{ type: 'text', text, size: 'sm', color: '#1f1b19', wrap: true }] },
+      footer: { type: 'box', layout: 'vertical', contents: [
+        { type: 'button', style: 'primary', color: '#1f1b19', height: 'sm', action: { type: 'uri', label: owner ? '到後台處理' : '查看並決定', uri: owner ? `${site}/mycard/booking` : `${site}/@${card?.slug ?? ''}/book?tab=my` } },
+      ] },
+    },
+  });
+}
+
 async function lineUserIdOf(userId: string) {
   const { data } = await scopedClient(URBANITE_SHOP_ID).from('customers').select('line_user_id').eq('user_id', userId).maybeSingle();
   return (data?.line_user_id as string | null) || null;
@@ -800,10 +839,10 @@ function flexMessage(opts: { title: string; color: string; businessName: string;
   };
 }
 
-type OutboxRow = { id: string; booking_id: string | null; quote_id: string | null; booking_version: number; event: string; audience: 'customer' | 'owner'; attempts: number; due_at: string };
+type OutboxRow = { id: string; booking_id: string | null; quote_id: string | null; record_id: string | null; booking_version: number; event: string; audience: 'customer' | 'owner'; attempts: number; due_at: string };
 
 async function deliver(row: OutboxRow, token: string): Promise<{ state: 'api_accepted' | 'skipped' | 'retry' | 'failed'; error?: string }> {
-  if (!row.booking_id) return row.quote_id ? deliverQuote(row, token) : { state: 'skipped', error: 'no_target' };
+  if (!row.booking_id) return row.quote_id ? deliverQuote(row, token) : row.record_id ? deliverRecord(row, token) : { state: 'skipped', error: 'no_target' };
   const { data: booking } = await db().from('bk_bookings').select('*').eq('id', row.booking_id).maybeSingle();
   if (!booking) return { state: 'skipped', error: 'booking_missing' };
   const b = booking as BkBooking;

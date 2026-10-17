@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getSessionUser } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { scopedClient, URBANITE_SHOP_ID } from '@/lib/shop';
+import { myRecords } from '@/lib/booking/customers';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,7 +18,8 @@ export async function GET() {
     .eq('customer_user_id', user.id).order('created_at', { ascending: false }).limit(30);
   const quoteIds = (quotes ?? []).filter((q) => q.current_version > 0).map((q) => q.id);
   const { data: versions } = quoteIds.length ? await db.from('bk_quote_versions').select('quote_id, version, items, total, deposit, start_at, minutes, travel_minutes, valid_until, hold_until, note').in('quote_id', quoteIds) : { data: [] };
-  const ids = [...new Set([...(bookings ?? []).map((b) => b.business_id), ...(quotes ?? []).map((q) => q.business_id)])];
+  const records = await myRecords(user.id);
+  const ids = [...new Set([...(bookings ?? []).map((b) => b.business_id), ...(quotes ?? []).map((q) => q.business_id), ...records.map((r) => r.business_id)])];
   const [{ data: businesses }, { data: staff }] = await Promise.all([
     ids.length ? db.from('bk_businesses').select('id, name, card_id, address, cancel_hours, payment_info, reschedule_limit').in('id', ids) : Promise.resolve({ data: [] }),
     ids.length ? db.from('bk_staff').select('id, name, business_id, active').in('business_id', ids) : Promise.resolve({ data: [] }),
@@ -32,6 +34,7 @@ export async function GET() {
   };
   return NextResponse.json({
     line_bound: Boolean(customer?.line_user_id),
+    records: records.map((r) => ({ ...r, business: bizInfo(r.business_id) })),
     quotes: (quotes ?? []).map((q) => ({
       ...q, business: bizInfo(q.business_id),
       offer: (versions ?? []).find((v) => v.quote_id === q.id && v.version === q.current_version) ?? null,

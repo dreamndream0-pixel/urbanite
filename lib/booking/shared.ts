@@ -95,7 +95,19 @@ export type BkBooking = {
   reschedule_count: number;
   created_by: 'customer' | 'owner';
   quote_id?: string | null;
+  customer_id?: string | null;
 };
+
+// 顧客檔案(每間店各自一份)、服務紀錄、照片
+export type BkCustomer = { id: string; business_id: string; user_id: string | null; name: string; phone: string; note: string; tags: string[]; created_at: string; updated_at: string };
+export type ConsentStatus = 'none' | 'requested' | 'granted' | 'declined' | 'revoked';
+export type BkServiceRecord = {
+  id: string; customer_id: string; booking_id: string | null; staff_id: string | null; service_name: string; performed_on: string;
+  content: string; consent: ConsentStatus; consent_at: string | null; delete_requested: boolean; created_at: string;
+};
+export type BkAttachment = { id: string; record_id: string; kind: 'before' | 'after' | 'other'; created_at: string };
+export const CONSENT_LABEL: Record<ConsentStatus, string> = { none: '私人', requested: '等顧客同意', granted: '同意公開', declined: '不同意公開', revoked: '已撤回同意' };
+export const PHOTO_KIND_LABEL = { before: '前', after: '後', other: '其他' } as const;
 
 export type QuoteStatus = 'requested' | 'sent' | 'accepted' | 'declined' | 'cancelled';
 export type QuoteRequest = { event_date: string; time: string; event_type: string; address: string; people: string; note: string; images: string[] };

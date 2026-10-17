@@ -29,6 +29,8 @@ export async function GET() {
   const { data: quotes } = await db.from('bk_quotes').select('*').eq('business_id', business.id)
     .or(`status.in.(requested,sent),created_at.gte.${new Date(Date.now() - 60 * 86400000).toISOString()}`).order('created_at', { ascending: false }).limit(100);
   const qids = (quotes ?? []).map((q) => q.id);
+  const cids = [...new Set((bookings ?? []).map((b) => b.customer_id).filter(Boolean))];
+  const { data: customers } = cids.length ? await db.from('bk_customers').select('id, name, note, tags, user_id').in('id', cids) : { data: [] };
   const { data: quoteVersions } = qids.length ? await db.from('bk_quote_versions').select('*').in('quote_id', qids).order('version') : { data: [] };
   const [{ data: payments }, { data: allocations }, { data: items }] = ids.length ? await Promise.all([
     db.from('bk_payments').select('id, booking_id, kind, amount, method, note, created_at').in('booking_id', ids).order('created_at'),
@@ -36,7 +38,7 @@ export async function GET() {
     db.from('bk_booking_items').select('id, booking_id, seq, service_id, service_snapshot, staff_id, start_at, end_at, amount, status').in('booking_id', ids).order('seq'),
   ]) : [{ data: [] }, { data: [] }, { data: [] }];
   return NextResponse.json({
-    business, ...sched, exceptions: exceptions ?? [], bookings: bookings ?? [], payments: payments ?? [], allocations: allocations ?? [], items: items ?? [], quotes: quotes ?? [], quoteVersions: quoteVersions ?? [],
+    business, ...sched, exceptions: exceptions ?? [], bookings: bookings ?? [], payments: payments ?? [], allocations: allocations ?? [], items: items ?? [], quotes: quotes ?? [], quoteVersions: quoteVersions ?? [], customers: customers ?? [],
     card: card ?? null, line_bound: Boolean(me?.line_user_id), today: localParts(new Date()).date,
   }, { headers: { 'Cache-Control': 'no-store' } });
 }

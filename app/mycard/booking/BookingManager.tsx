@@ -10,8 +10,9 @@ import {
 import { api, btn, btnDark, btnSm, card, errMsg, input, isTeam, stylists, type Data } from './ui';
 import { HoursTab, ServicesTab, SettingsTab, StaffTab } from './BookingSetup';
 import QuotesTab from './QuotesTab';
+import CustomersTab from './CustomersTab';
 
-type Tab = 'bookings' | 'calendar' | 'quotes' | 'services' | 'staff' | 'hours' | 'settings';
+type Tab = 'bookings' | 'calendar' | 'quotes' | 'customers' | 'services' | 'staff' | 'hours' | 'settings';
 const OPEN = ['pending', 'confirmed', 'checked_in'];
 
 // 名片主人:線上預約管理
@@ -48,7 +49,7 @@ export default function BookingManager() {
   const tabs: [Tab, string][] = [
     ['bookings', `預約${pending ? `(${pending})` : ''}`], ['calendar', '日曆'],
     ...(hasQuote ? [['quotes', `詢價${quoteWaiting ? `(${quoteWaiting})` : ''}`] as [Tab, string]] : []),
-    ['services', '服務'], ['staff', '人員床位'], ['hours', '營業時段'], ['settings', '設定'],
+    ['customers', '顧客'], ['services', '服務'], ['staff', '人員床位'], ['hours', '營業時段'], ['settings', '設定'],
   ];
 
   return (
@@ -90,7 +91,7 @@ export default function BookingManager() {
         </div>
       </section>
 
-      <div className={`grid gap-1 rounded-2xl border border-[#e5ded4] bg-white p-1 ${tabs.length > 6 ? 'grid-cols-4 sm:grid-cols-7' : 'grid-cols-3 sm:grid-cols-6'}`}>
+      <div className={`grid gap-1 rounded-2xl border border-[#e5ded4] bg-white p-1 ${tabs.length > 7 ? 'grid-cols-4 sm:grid-cols-8' : 'grid-cols-4 sm:grid-cols-7'}`}>
         {tabs.map(([k, label]) => (
           <button key={k} type="button" onClick={() => setTab(k)} className={`rounded-xl px-1 py-2 text-sm ${tab === k ? 'bg-[#1f1b19] font-semibold text-white' : 'text-[#6b6156]'}`}>{label}</button>
         ))}
@@ -99,6 +100,7 @@ export default function BookingManager() {
       {tab === 'bookings' && <BookingsTab data={data} reload={load} />}
       {tab === 'calendar' && <CalendarTab data={data} reload={load} />}
       {tab === 'quotes' && <QuotesTab data={data} reload={load} />}
+      {tab === 'customers' && <CustomersTab data={data} />}
       {tab === 'services' && <ServicesTab data={data} reload={load} />}
       {tab === 'staff' && <StaffTab data={data} reload={load} />}
       {tab === 'hours' && <HoursTab data={data} reload={load} />}
@@ -155,6 +157,7 @@ function BookingCard({ booking: b, data, reload }: { booking: BkBooking; data: D
   const staff = data.staff.find((s) => s.id === b.staff_id);
   const resource = data.resources.find((r) => r.id === b.resource_id);
   const payments = data.payments.filter((p) => p.booking_id === b.id);
+  const customer = data.customers.find((c) => c.id === b.customer_id);
   const items = data.items.filter((it) => it.booking_id === b.id).sort((x, y) => x.seq - y.seq);
   const activeItems = items.filter((it) => it.status === 'active').length;
   const total = b.total_price || b.service_snapshot.price;
@@ -214,6 +217,7 @@ function BookingCard({ booking: b, data, reload }: { booking: BkBooking; data: D
       </div>
       <div className="mt-2 space-y-0.5 text-sm text-[#6b6156]">
         <p>{b.contact?.name || '—'}{b.contact?.phone ? <> · <a href={`tel:${b.contact.phone}`} className="text-[#1f6f8b] underline-offset-2 hover:underline">{b.contact.phone}</a></> : null}{b.created_by === 'owner' ? <span className="ml-1 text-[11px] text-[#a99e8f]">(人工加單)</span> : null}</p>
+        {customer?.note || customer?.tags?.length ? <p className="rounded-lg bg-[#fff6e6] px-2.5 py-1.5 text-xs text-[#7a5310]">{customer.tags?.length ? `${customer.tags.join('、')}${customer.note ? ' · ' : ''}` : ''}{customer.note}</p> : null}
         {b.contact?.note ? <p className="whitespace-pre-line rounded-lg bg-[#faf7f2] px-2.5 py-1.5 text-xs">{b.contact.note}</p> : null}
         {total || b.deposit_amount || b.paid_amount ? (
           <p className="text-xs">
@@ -368,8 +372,21 @@ function NewBooking({ data, onClose, onDone, initialDate }: { data: Data; onClos
   const [date, setDate] = useState(initialDate ?? data.today);
   const [time, setTime] = useState('');
   const [contact, setContact] = useState({ name: '', phone: '', note: '' });
+  const [customerId, setCustomerId] = useState('');
+  const [matches, setMatches] = useState<{ id: string; name: string; phone: string }[]>([]);
   const [busy, setBusy] = useState(false);
   const team = isTeam(data);
+  // 輸入姓名或電話時找既有顧客(避免同一人建成兩份檔案)
+  useEffect(() => {
+    const term = contact.name.trim() || contact.phone.trim();
+    if (customerId || term.length < 1) return;
+    let alive = true;
+    const t = setTimeout(() => {
+      void api<{ customers: { id: string; name: string; phone: string }[] }>(`/api/mycard/booking/customers?q=${encodeURIComponent(term)}`)
+        .then((r) => { if (alive) setMatches(r.customers.slice(0, 5)); }).catch(() => {});
+    }, 300);
+    return () => { alive = false; clearTimeout(t); };
+  }, [contact.name, contact.phone, customerId]);
   const addons = data.addons.filter((a) => a.service_id === serviceId && a.active);
   const { slots, error } = useOwnerSlots({ date, service: serviceId, addons: addonIds, staff, extra: extraIds });
 
@@ -379,7 +396,7 @@ function NewBooking({ data, onClose, onDone, initialDate }: { data: Data; onClos
     try {
       await api('/api/mycard/booking/bookings', {
         method: 'POST',
-        body: JSON.stringify({ service_id: serviceId, addon_ids: addonIds, extra_ids: extraIds, staff_id: staff || null, start_at: new Date(`${date}T${time}:00+08:00`).toISOString(), contact }),
+        body: JSON.stringify({ service_id: serviceId, addon_ids: addonIds, extra_ids: extraIds, customer_id: customerId || null, staff_id: staff || null, start_at: new Date(`${date}T${time}:00+08:00`).toISOString(), contact }),
       });
       uiToast('已新增預約');
       onDone();
@@ -428,8 +445,16 @@ function NewBooking({ data, onClose, onDone, initialDate }: { data: Data; onClos
       <TimeGrid slots={slots} time={time} onTime={setTime} error={error} />
       {time ? (
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-          <input value={contact.name} onChange={(e) => setContact({ ...contact, name: e.target.value })} maxLength={40} placeholder="顧客姓名" className={input} />
-          <input value={contact.phone} onChange={(e) => setContact({ ...contact, phone: e.target.value })} inputMode="tel" maxLength={20} placeholder="電話(選填)" className={input} />
+          <input value={contact.name} onChange={(e) => { setContact({ ...contact, name: e.target.value }); setCustomerId(''); }} maxLength={40} placeholder="顧客姓名" aria-label="顧客姓名" autoComplete="off" className={input} />
+          <input value={contact.phone} onChange={(e) => { setContact({ ...contact, phone: e.target.value }); setCustomerId(''); }} inputMode="tel" maxLength={20} placeholder="電話(選填)" aria-label="電話" autoComplete="off" className={input} />
+          {customerId ? (
+            <p className="text-xs text-[#2f6b3f] sm:col-span-2">✓ 已選既有顧客 {contact.name} <button type="button" onClick={() => setCustomerId('')} className="ml-1 text-[#a03b3b]">改為新顧客</button></p>
+          ) : matches.length && (contact.name || contact.phone) ? (
+            <div className="flex flex-wrap items-center gap-1.5 text-xs sm:col-span-2">
+              <span className="text-[#8a7f72]">是這位嗎?</span>
+              {matches.map((m) => <button key={m.id} type="button" onClick={() => { setCustomerId(m.id); setContact({ ...contact, name: m.name, phone: m.phone }); setMatches([]); }} className="rounded-full border border-[#d7c9bd] bg-white px-2.5 py-1">{m.name}{m.phone ? ` ${m.phone.slice(-3)}` : ''}</button>)}
+            </div>
+          ) : null}
           <input value={contact.note} onChange={(e) => setContact({ ...contact, note: e.target.value })} maxLength={200} placeholder="備註(選填)" className={`${input} sm:col-span-2`} />
         </div>
       ) : null}
