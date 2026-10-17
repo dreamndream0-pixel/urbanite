@@ -4485,6 +4485,31 @@ function prepareProductImage(file: File, index: number, maxDim = 1600, quality =
   });
 }
 
+// 檢查圖片是否有透明區域(去背圖)。JPG 一定沒有;PNG / WebP 縮小後逐點檢查 alpha。
+function hasTransparency(file: Blob): Promise<boolean> {
+  if (file.type !== 'image/png' && file.type !== 'image/webp') return Promise.resolve(false);
+  return new Promise((resolve) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const size = 200;
+      const scale = Math.min(1, size / Math.max(img.naturalWidth, img.naturalHeight));
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.max(1, Math.round(img.naturalWidth * scale));
+      canvas.height = Math.max(1, Math.round(img.naturalHeight * scale));
+      const ctx = canvas.getContext('2d', { willReadFrequently: true });
+      if (!ctx) return resolve(false);
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+      for (let i = 3; i < data.length; i += 4) if (data[i] < 250) return resolve(true);
+      resolve(false);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); resolve(false); };
+    img.src = url;
+  });
+}
+
 // 商品照統一 4:5(1080 × 1350):照片比例不同或尺寸不夠時,自動放大並以中央裁切成滿版。
 // 去背圖(透明 PNG)則完整縮放置中,避免把商品本體裁掉。GIF 保留原檔(避免失去動畫)。
 const PRODUCT_PHOTO_W = 1080;
@@ -6887,7 +6912,8 @@ function ProductModal({
           blob = cutout.blob;
           filename = cutout.filename;
         } else {
-          const prepared = await fitProductPhoto(picked[i], i, 'cover');
+          // 已去背(有透明區域)的 PNG / WebP:保留透明、完整縮放置中;一般照片才裁成滿版 JPG
+          const prepared = await fitProductPhoto(picked[i], i, (await hasTransparency(picked[i])) ? 'contain' : 'cover');
           blob = prepared.blob;
           filename = prepared.filename;
         }
