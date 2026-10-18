@@ -49,3 +49,6 @@ export function staffTone(data: Pick<Data, 'staff'>, staffId: string | null | un
   const i = data.staff.findIndex((s) => s.id === staffId);
   return TONES[(i < 0 ? 0 : i) % TONES.length];
 }
+
+// 小顆的主要按鈕(不要用 btnSm 再疊深色底:bg-white 會蓋過,變成白底白字)
+export const btnSmDark = 'rounded-full border border-[#1f1b19] bg-[#1f1b19] px-3 py-1.5 text-xs font-semibold text-white whitespace-nowrap disabled:opacity-40';

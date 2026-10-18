@@ -8,7 +8,7 @@ import {
   fromLocal, formatRange, hhmmToMinutes, localParts, minutesToHHMM, money, STEP_WHO_LABEL, WEEKDAYS,
   type BkBooking, type BkBusiness, type BkException, type BkService, type BkStaff,
 } from '@/lib/booking/shared';
-import { api, btn, btnDark, btnSm, card, errMsg, input, isTeam, stylists, type Data } from './ui';
+import { api, btn, btnDark, btnSm, btnSmDark, card, errMsg, input, isTeam, stylists, type Data } from './ui';
 import { PackageProducts } from './LoyaltyParts';
 import CalendarSync from './CalendarSync';
 
@@ -715,7 +715,7 @@ function BranchesSection({ data, reload, travel, setTravel }: { data: Data; relo
           <input value={editing.name} onChange={(e) => setEditing({ ...editing, name: e.target.value })} maxLength={30} aria-label="分店名稱" className={input} />
           <input value={editing.address} onChange={(e) => setEditing({ ...editing, address: e.target.value })} maxLength={120} placeholder="地址" aria-label="地址" className={input} />
           <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={editing.active} onChange={(e) => setEditing({ ...editing, active: e.target.checked })} />開放預約</label>
-          <div className="flex justify-end gap-2"><button type="button" onClick={() => setEditing(null)} className={btnSm}>取消</button><button type="button" onClick={() => void save()} className={`${btnSm} border-[#1f1b19] bg-[#1f1b19] text-white`}>儲存</button></div>
+          <div className="flex justify-end gap-2"><button type="button" onClick={() => setEditing(null)} className={btnSm}>取消</button><button type="button" onClick={() => void save()} className={btnSmDark}>儲存</button></div>
         </div>
       ) : (
         <div key={b.id} className={`flex items-center gap-2 text-sm ${b.active ? '' : 'opacity-60'}`}>

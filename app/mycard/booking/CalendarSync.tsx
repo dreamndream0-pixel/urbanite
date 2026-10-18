@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { uiAlert, uiConfirm } from '@/lib/ui-dialog';
 import { uiToast } from '@/lib/ui-toast';
 import { formatDateTime } from '@/lib/booking/shared';
-import { api, btnSm, card, errMsg, input, type Data } from './ui';
+import { api, btnSm, btnSmDark, card, errMsg, input, type Data } from './ui';
 
 type Sync = {
   business_token: string | null;
@@ -82,7 +82,7 @@ export default function CalendarSync({ data }: { data: Data }) {
           ) : <span />}
         </div>
         <div className="flex justify-end">
-          <button type="button" disabled={busy || !draft.url.trim()} onClick={() => void (async () => { if (await post({ action: 'add', ...draft, staff_id: draft.staff_id || null }, '已連結,讀到 {n} 個忙碌時段')) setDraft({ url: '', staff_id: '', label: '' }); })()} className={`${btnSm} border-[#1f1b19] bg-[#1f1b19] text-white`}>連結行事曆</button>
+          <button type="button" disabled={busy || !draft.url.trim()} onClick={() => void (async () => { if (await post({ action: 'add', ...draft, staff_id: draft.staff_id || null }, '已連結,讀到 {n} 個忙碌時段')) setDraft({ url: '', staff_id: '', label: '' }); })()} className={btnSmDark}>連結行事曆</button>
         </div>
       </div>
     </section>

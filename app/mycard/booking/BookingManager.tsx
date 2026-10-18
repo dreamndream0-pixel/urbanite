@@ -11,7 +11,7 @@ import {
   formatDateLabel, formatDateTime, formatRange, localParts, minutesToHHMM, money, PAY_METHOD_LABEL, PAYMENT_LABEL, paymentReportText,
   statusText, STATUS_COLOR, type BkBooking,
 } from '@/lib/booking/shared';
-import { api, btn, btnDark, btnSm, card, errMsg, input, isTeam, staffTone, stylists, type Data } from './ui';
+import { api, btn, btnDark, btnSm, btnSmDark, card, errMsg, input, isTeam, staffTone, stylists, type Data } from './ui';
 import { HoursTab, ServicesTab, SettingsTab, StaffTab } from './BookingSetup';
 import QuotesTab from './QuotesTab';
 import CustomersTab from './CustomersTab';
@@ -439,7 +439,7 @@ function PaymentForm({ title, kinds, defaultAmount, busy, allowSkip, onCancel, o
       <div className="flex flex-wrap justify-end gap-2">
         <button type="button" onClick={onCancel} className={btnSm}>取消</button>
         {allowSkip ? <button type="button" disabled={busy} onClick={() => onSubmit({ kind, amount: 0, method, note })} className={btnSm}>不收款,直接完成</button> : null}
-        <button type="button" disabled={busy || !(Number(amount) > 0)} onClick={() => onSubmit({ kind, amount: Number(amount), method, note })} className={`${btnSm} border-[#1f1b19] bg-[#1f1b19] text-white`}>{allowSkip ? `收 ${money(Number(amount) || 0)} 並完成` : '記錄'}</button>
+        <button type="button" disabled={busy || !(Number(amount) > 0)} onClick={() => onSubmit({ kind, amount: Number(amount), method, note })} className={btnSmDark}>{allowSkip ? `收 ${money(Number(amount) || 0)} 並完成` : '記錄'}</button>
       </div>
     </div>
   );
@@ -501,7 +501,7 @@ function MovePanel({ booking, data, busy, onCancel, onSubmit }: { booking: BkBoo
       <p className="text-[11px] text-[#a99e8f]">改期成功後會通知顧客,原本的 LINE 提醒會改成新時間。</p>
       <div className="flex justify-end gap-2">
         <button type="button" onClick={onCancel} className={btnSm}>取消</button>
-        <button type="button" disabled={busy || !time} onClick={() => onSubmit(new Date(`${date}T${time}:00+08:00`).toISOString(), staff || null)} className={`${btnSm} border-[#1f1b19] bg-[#1f1b19] text-white`}>{time ? `改到 ${formatDateLabel(date).md} ${time}` : '確認改期'}</button>
+        <button type="button" disabled={busy || !time} onClick={() => onSubmit(new Date(`${date}T${time}:00+08:00`).toISOString(), staff || null)} className={btnSmDark}>{time ? `改到 ${formatDateLabel(date).md} ${time}` : '確認改期'}</button>
       </div>
     </div>
   );

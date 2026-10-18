@@ -9,7 +9,7 @@ import {
   CONSENT_LABEL, formatDateTime, localParts, money, PHOTO_KIND_LABEL, STATUS_LABEL,
   type BkAttachment, type BkCustomer, type BkServiceRecord, type BookingStatus,
 } from '@/lib/booking/shared';
-import { api, btnDark, btnSm, card, errMsg, input, type Data } from './ui';
+import { api, btnDark, btnSm, btnSmDark, card, errMsg, input, type Data } from './ui';
 import { LoyaltyPanel } from './LoyaltyParts';
 
 type Row = BkCustomer & { visits: number; last_visit: string | null; upcoming: number; paid_total: number };
@@ -64,7 +64,7 @@ export default function CustomersTab({ data }: { data: Data }) {
             <input value={draft.phone} onChange={(e) => setDraft({ ...draft, phone: e.target.value })} inputMode="tel" maxLength={30} placeholder="電話(選填)" aria-label="電話" className={`${input} min-w-0`} />
           </div>
           <textarea value={draft.note} onChange={(e) => setDraft({ ...draft, note: e.target.value })} rows={2} maxLength={1000} placeholder="偏好與注意事項(選填,只有你看得到)" aria-label="注意事項" className={`${input} resize-none`} />
-          <div className="flex justify-end gap-2"><button type="button" onClick={() => setAdding(false)} className={btnSm}>取消</button><button type="button" onClick={() => void add()} className={`${btnSm} border-[#1f1b19] bg-[#1f1b19] text-white`}>新增顧客</button></div>
+          <div className="flex justify-end gap-2"><button type="button" onClick={() => setAdding(false)} className={btnSm}>取消</button><button type="button" onClick={() => void add()} className={btnSmDark}>新增顧客</button></div>
         </div>
       ) : null}
       <p className="text-xs text-[#8a7f72]">線上預約的顧客會自動建檔;電話客在「加單」時可選既有顧客。顧客資料只有你看得到,不會跨店共用。</p>
@@ -194,7 +194,7 @@ function NewRecord({ customerId, bookings, data, onDone, onCancel }: { customerI
         <div className="block text-xs text-[#8a7f72]">日期<DateField value={f.performed_on} onChange={(d) => setF({ ...f, performed_on: d })} className="mt-1" /></div>
       </div>
       <label className="block text-xs text-[#8a7f72]">紀錄(配方、施作細節)<textarea value={f.content} onChange={(e) => setF({ ...f, content: e.target.value })} rows={3} maxLength={2000} placeholder="例:7N + 8/43(1:1),雙氧 6%,停留 35 分" className={`${input} mt-1 resize-none`} /></label>
-      <div className="flex justify-end gap-2"><button type="button" onClick={onCancel} className={btnSm}>取消</button><button type="button" disabled={busy} onClick={() => void save()} className={`${btnSm} border-[#1f1b19] bg-[#1f1b19] text-white`}>儲存紀錄</button></div>
+      <div className="flex justify-end gap-2"><button type="button" onClick={onCancel} className={btnSm}>取消</button><button type="button" disabled={busy} onClick={() => void save()} className={btnSmDark}>儲存紀錄</button></div>
     </div>
   );
 }
@@ -244,7 +244,7 @@ function RecordCard({ record: r, photos, data, canAsk, reload }: { record: BkSer
           <textarea value={content} onChange={(e) => setContent(e.target.value)} rows={4} maxLength={2000} aria-label="紀錄內容" className={`${input} resize-none`} />
           <div className="flex justify-end gap-2">
             <button type="button" onClick={() => setEditing(false)} className={btnSm}>取消</button>
-            <button type="button" disabled={busy} onClick={() => void call(() => api(`/api/mycard/booking/records/${r.id}`, { method: 'PATCH', body: JSON.stringify({ service_name: r.service_name, content, performed_on: r.performed_on }) }), '已儲存')} className={`${btnSm} border-[#1f1b19] bg-[#1f1b19] text-white`}>儲存</button>
+            <button type="button" disabled={busy} onClick={() => void call(() => api(`/api/mycard/booking/records/${r.id}`, { method: 'PATCH', body: JSON.stringify({ service_name: r.service_name, content, performed_on: r.performed_on }) }), '已儲存')} className={btnSmDark}>儲存</button>
           </div>
         </div>
       ) : (

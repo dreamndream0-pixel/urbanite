@@ -5,7 +5,7 @@ import { uiAlert, uiConfirm, uiPrompt } from '@/lib/ui-dialog';
 import { uiToast } from '@/lib/ui-toast';
 import { formatDateTime, money } from '@/lib/booking/shared';
 import type { CustomerPackage } from '@/lib/booking/loyalty';
-import { api, btnSm, card, errMsg, input, type Data } from './ui';
+import { api, btnSm, btnSmDark, card, errMsg, input, type Data } from './ui';
 
 // ---------- 設定:套票商品 ----------
 type ProductDraft = { id?: string; name: string; scope: 'service' | 'addon'; service_ids: string[]; addon_ids: string[]; sessions: number; price: number; valid_days: number; active: boolean };
@@ -70,7 +70,7 @@ export function PackageProducts({ data, reload }: { data: Data; reload: () => Pr
           </div>
           )}
           <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={editing.active} onChange={(e) => setEditing({ ...editing, active: e.target.checked })} />販售中</label>
-          <div className="flex justify-end gap-2"><button type="button" onClick={() => setEditing(null)} className={btnSm}>取消</button><button type="button" disabled={busy} onClick={() => void save()} className={`${btnSm} border-[#1f1b19] bg-[#1f1b19] text-white`}>儲存</button></div>
+          <div className="flex justify-end gap-2"><button type="button" onClick={() => setEditing(null)} className={btnSm}>取消</button><button type="button" disabled={busy} onClick={() => void save()} className={btnSmDark}>儲存</button></div>
         </div>
       ) : null}
       {data.products.length ? (
@@ -153,7 +153,7 @@ export function LoyaltyPanel({ customerId, data }: { customerId: string; data: D
                 <option value="cash">現金</option><option value="transfer">轉帳</option><option value="card">刷卡</option><option value="other">其他</option>
               </select>
             </div>
-            <div className="flex justify-end gap-2"><button type="button" onClick={() => setSelling(false)} className={btnSm}>取消</button><button type="button" disabled={busy || !sale.product_id} onClick={() => void post({ action: 'sell', ...sale, price: Number(sale.price) || 0 }, '已售出套票')} className={`${btnSm} border-[#1f1b19] bg-[#1f1b19] text-white`}>確認售出</button></div>
+            <div className="flex justify-end gap-2"><button type="button" onClick={() => setSelling(false)} className={btnSm}>取消</button><button type="button" disabled={busy || !sale.product_id} onClick={() => void post({ action: 'sell', ...sale, price: Number(sale.price) || 0 }, '已售出套票')} className={btnSmDark}>確認售出</button></div>
           </div>
         ) : <button type="button" onClick={() => setSelling(true)} className={btnSm}>+ 售出套票</button>
       ) : null}

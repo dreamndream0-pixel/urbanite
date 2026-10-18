@@ -5,7 +5,7 @@ import { DateField } from '@/app/components/BookingDatePicker';
 import { uiAlert, uiConfirm } from '@/lib/ui-dialog';
 import { uiToast } from '@/lib/ui-toast';
 import { formatDateTime, formatRange, money, QUOTE_STATUS_LABEL, type BkQuote, type BkQuoteVersion } from '@/lib/booking/shared';
-import { api, btn, btnDark, btnSm, card, errMsg, input, stylists, type Data } from './ui';
+import { api, btn, btnDark, btnSm, btnSmDark, card, errMsg, input, stylists, type Data } from './ui';
 
 const STATUS_TONE: Record<BkQuote['status'], string> = {
   requested: 'bg-[#fff3df] text-[#9a6412]', sent: 'bg-[#e3eef6] text-[#1f5f7f]', accepted: 'bg-[#e7f3ea] text-[#2f6b3f]',
@@ -197,7 +197,7 @@ function QuoteForm({ quote: q, current, data, onDone, onCancel }: { quote: BkQuo
       <p className="text-[11px] leading-5 text-[#8a7f72]">暫保留期間這段時間(含交通)不會被別人約走;到期未接受就釋放。顧客接受後{Number(deposit) ? '要在期限內轉帳訂金,你核對後成立' : '直接成立'}。</p>
       <div className="flex justify-end gap-2">
         <button type="button" onClick={onCancel} className={btnSm}>取消</button>
-        <button type="button" disabled={busy} onClick={() => void send()} className={`${btnSm} border-[#1f1b19] bg-[#1f1b19] text-white`}>{busy ? '送出中…' : '送出報價'}</button>
+        <button type="button" disabled={busy} onClick={() => void send()} className={btnSmDark}>{busy ? '送出中…' : '送出報價'}</button>
       </div>
     </div>
   );
