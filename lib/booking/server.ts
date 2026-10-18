@@ -376,7 +376,7 @@ const cleanContact = (c: { name: string; phone: string; note: string }) => ({
 
 // 顧客建立預約:伺服器重新核對服務、人員、時段、床位與金額(不採用前端的時長與金額)
 export async function createBooking(input: {
-  slug: string; userId: string; serviceId: string; addonIds: string[]; staffId: string | null; startAt: string; extras?: string[]; packageId?: string | null; branchId?: string | null;
+  slug: string; userId: string; serviceId: string; addonIds: string[]; staffId: string | null; startAt: string; extras?: string[]; packageId?: string | null; branchId?: string | null; addonPackages?: { addon_id: string; package_id: string }[];
   contact: { name: string; phone: string; note: string }; idempotencyKey: string; channel: string;
 }) {
   // 重送(網路重試、連點):同一顧客同一個 key 直接回傳原本那筆
@@ -404,8 +404,10 @@ export async function createBooking(input: {
   const manual = business.approval_mode === 'manual';
   const contact = cleanContact(input.contact);
   return tryPlacements(() => placements(business, sched, req, start), async (p) => {
-    // 用套票:主服務的基本價格由套票支付,只收加購與其他項目
-    const covered = input.packageId ? p.q.total - p.q.addons.reduce((n, a) => n + a.price, 0) : 0;
+    // 用套票:主服務的基本價格由套票支付,只收加購與其他項目;加購票券再扣掉該加購的價格
+    const addonPkgs = [...new Map((input.addonPackages ?? []).filter((x) => p.q.addons.some((a) => a.id === x.addon_id) && x.package_id).map((x) => [x.addon_id, x])).values()];
+    const covered = (input.packageId ? p.q.total - p.q.addons.reduce((n, a) => n + a.price, 0) : 0)
+      + p.q.addons.filter((a) => addonPkgs.some((x) => x.addon_id === a.id)).reduce((n, a) => n + a.price, 0);
     const total = Math.max(0, p.total - covered);
     const wanted = (input.packageId ? 0 : service.deposit) + p.extraDeposit;
     const deposit = wanted > 0 ? (total > 0 ? Math.min(wanted, total) : 0) : 0;
@@ -431,7 +433,7 @@ export async function createBooking(input: {
         service_snapshot: snapshotOf(service, p), start_at: start.toISOString(), end_at: p.end.toISOString(), occupy_end_at: p.occupyEnd.toISOString(),
         status: confirmed ? 'confirmed' : 'pending', approval_status: manual ? 'pending' : 'not_required', expires_at: expires,
         contact, source_card_id: card.id, source_channel: input.channel.slice(0, 20) || 'card', idempotency_key: idem || null,
-        staff_id: p.staff.id, staff_requested: Boolean(input.staffId), resource_id: p.resourceId, addons: p.q.addons, allocations: p.allocs, items: p.items.length > 1 ? p.items : [], package_id: input.packageId || null, branch_id: branchId,
+        staff_id: p.staff.id, staff_requested: Boolean(input.staffId), resource_id: p.resourceId, addons: p.q.addons, allocations: p.allocs, items: p.items.length > 1 ? p.items : [], package_id: input.packageId || null, branch_id: branchId, addon_packages: addonPkgs,
         total_price: total, deposit_amount: deposit, payment_status: deposit ? 'awaiting' : 'none',
         created_by: 'customer', actor_type: 'customer', actor_id: input.userId,
       },

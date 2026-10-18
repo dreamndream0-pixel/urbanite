@@ -1,15 +1,17 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { DateField, MonthGrid, dateLabel, monthCells, shiftDate, shiftMonth, weekdayOf } from '@/app/components/BookingDatePicker';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import CardServiceHeader from '@/app/card/CardServiceHeader';
+import { useScrollLock } from '@/app/components/useScrollLock';
 import { uiAlert, uiConfirm, uiPrompt } from '@/lib/ui-dialog';
 import { uiToast } from '@/lib/ui-toast';
 import {
-  addDays, formatDateLabel, formatDateTime, formatRange, localParts, minutesToHHMM, money, PAY_METHOD_LABEL, PAYMENT_LABEL, paymentReportText,
+  formatDateLabel, formatDateTime, formatRange, localParts, minutesToHHMM, money, PAY_METHOD_LABEL, PAYMENT_LABEL, paymentReportText,
   statusText, STATUS_COLOR, type BkBooking,
 } from '@/lib/booking/shared';
-import { api, btn, btnDark, btnSm, card, errMsg, input, isTeam, stylists, type Data } from './ui';
+import { api, btn, btnDark, btnSm, card, errMsg, input, isTeam, staffTone, stylists, type Data } from './ui';
 import { HoursTab, ServicesTab, SettingsTab, StaffTab } from './BookingSetup';
 import QuotesTab from './QuotesTab';
 import CustomersTab from './CustomersTab';
@@ -29,6 +31,9 @@ export default function BookingManager() {
   const tab: Tab = TABS.includes(search.get('tab') as Tab) ? (search.get('tab') as Tab) : 'bookings';
   const setTab = (t: Tab) => router.replace(`${pathname}?tab=${t}`, { scroll: false });
   const [loadError, setLoadError] = useState('');
+  const [adding, setAdding] = useState(false);
+  const [calDate, setCalDate] = useState('');
+  useScrollLock(adding);
 
   const load = useCallback(async () => {
     try { setData(await api<Data>('/api/mycard/booking')); setLoadError(''); }
@@ -66,10 +71,16 @@ export default function BookingManager() {
   return (
     <>
     <CardServiceHeader loggedIn current="booking" title="線上預約管理" appNav={menu} />
-    <div className="mx-auto max-w-3xl space-y-4 px-4 pb-24 pt-5 sm:px-6">
-      <div className="flex items-center gap-2">
-        <h1 className="min-w-0 flex-1 truncate text-xl font-bold">{tabs.find(([k]) => k === tab)?.[1] ?? '預約'}</h1>
-        <button type="button" onClick={() => setTab('settings')} className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold ${data.business.enabled ? 'bg-[#e7f3ea] text-[#2f6b3f]' : 'bg-[#efe8dd] text-[#8a7f72]'}`}>{data.business.enabled ? '● 開放預約中' : '○ 尚未開放'}</button>
+    <div className="mx-auto max-w-3xl space-y-4 px-4 pb-[calc(6.5rem+env(safe-area-inset-bottom))] pt-4 sm:px-6">
+      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#efe6da] via-[#f6f0e8] to-[#f6f2ec] px-4 py-4">
+        <span aria-hidden="true" className="pointer-events-none absolute -right-6 -top-10 h-32 w-32 rounded-full bg-[#e6d8c6]/60" />
+        <div className="relative flex items-end gap-2">
+          <div className="min-w-0 flex-1">
+            <h1 className="truncate text-[28px] font-bold leading-tight tracking-tight">{PAGE_TITLE[tab]}</h1>
+            <p className="mt-0.5 text-sm text-[#6b6156]">{todayText(data.today)}{tab === 'bookings' && pending ? ` · ${pending} 筆待處理` : ''}</p>
+          </div>
+          <button type="button" onClick={() => setTab('settings')} className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold ${data.business.enabled ? 'bg-white/80 text-[#2f6b3f]' : 'bg-white/80 text-[#8a7f72]'}`}>{data.business.enabled ? '● 開放預約中' : '○ 尚未開放'}</button>
+        </div>
       </div>
       {!data.business.enabled && tab !== 'settings' ? (
         <button type="button" onClick={() => setTab('settings')} className="block w-full rounded-2xl border border-[#e5d6b8] bg-[#fffaf1] p-3 text-left text-sm text-[#9a6412]">線上預約還沒開放,顧客看不到預約按鈕 →<span className="block text-xs text-[#a08550]">到「設定」開啟開關、複製預約連結</span></button>
@@ -115,7 +126,7 @@ export default function BookingManager() {
         </>
       )}
       {tab === 'bookings' && <BookingsTab data={data} reload={load} />}
-      {tab === 'calendar' && <CalendarTab data={data} reload={load} />}
+      {tab === 'calendar' && <CalendarTab data={data} reload={load} onDate={setCalDate} />}
       {tab === 'quotes' && <QuotesTab data={data} reload={load} />}
       {tab === 'customers' && <CustomersTab data={data} />}
       {tab === 'reports' && <ReportsTab data={data} />}
@@ -124,14 +135,68 @@ export default function BookingManager() {
       {tab === 'hours' && <HoursTab data={data} reload={load} />}
       {tab === 'settings' && <SettingsTab data={data} reload={load} />}
     </div>
+
+    {/* 底部導覽:預約 / 日曆 / 加單 / 顧客 / 報表(其他功能在右上角選單,目前所在的功能會取代第五格) */}
+    <nav aria-label="預約功能" className="fixed inset-x-0 bottom-0 z-40 border-t border-[#ece4d9] bg-[#fbf8f4]/95 pb-[env(safe-area-inset-bottom)] backdrop-blur">
+      <div className="mx-auto grid h-16 max-w-3xl grid-cols-5 items-center px-2">
+        {navItems(tab, pending).map((it) => it.key === 'add' ? (
+          <button key="add" type="button" onClick={() => setAdding(true)} aria-label="新增預約(加單)" className="mx-auto -mt-6 flex h-14 w-14 items-center justify-center rounded-full bg-[#6b4a3a] text-3xl! font-light! leading-none text-white shadow-[0_6px_16px_#6b4a3a55]">+</button>
+        ) : (
+          <button key={it.key} type="button" onClick={() => setTab(it.key as Tab)} aria-current={tab === it.key ? 'page' : undefined}
+            className={`relative flex flex-col items-center gap-0.5 py-1 text-[11px]! ${tab === it.key ? 'font-semibold! text-[#1f1b19]' : 'text-[#8a7f72]'}`}>
+            <NavIcon name={it.key} active={tab === it.key} />
+            {it.label}
+            {it.badge ? <span className="absolute right-[18%] top-0 min-w-4 rounded-full bg-[#b5523f] px-1 text-[10px]! leading-4 text-white">{it.badge}</span> : null}
+          </button>
+        ))}
+      </div>
+    </nav>
+
+    {adding ? (
+      <div className="fixed inset-0 z-[60] flex items-end justify-center bg-[#1f1b19]/40 sm:items-center" onClick={(e) => { if (e.target === e.currentTarget) setAdding(false); }}>
+        <div role="dialog" aria-modal="true" aria-label="新增預約" className="max-h-[90dvh] w-full max-w-xl overflow-y-auto overscroll-contain rounded-t-3xl bg-[#f6f2ec] p-3 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:rounded-3xl">
+          <div aria-hidden="true" className="mx-auto mb-2 h-1 w-10 rounded-full bg-[#d8cfc4] sm:hidden" />
+          <NewBooking data={data} initialDate={tab === 'calendar' && calDate ? calDate : data.today} onClose={() => setAdding(false)} onDone={() => { setAdding(false); void load(); }} />
+        </div>
+      </div>
+    ) : null}
     </>
   );
+}
+
+const PAGE_TITLE: Record<Tab, string> = {
+  bookings: '預約', calendar: '日曆', quotes: '詢價', customers: '顧客', reports: '營業報表', services: '服務項目', staff: '服務人員', hours: '每週營業時段', settings: '接單規則',
+};
+const todayText = (d: string) => `${Number(d.slice(5, 7))}月${Number(d.slice(8, 10))}日 週${'日一二三四五六'[weekdayOf(d)]}`;
+const NAV_LABEL: Record<Tab, string> = { bookings: '預約', calendar: '日曆', quotes: '詢價', customers: '顧客', reports: '報表', services: '服務', staff: '人員床位', hours: '營業時段', settings: '設定' };
+function navItems(tab: Tab, pending: number) {
+  const fifth: Tab = ['bookings', 'calendar', 'customers', 'reports'].includes(tab) ? 'reports' : tab;
+  return [
+    { key: 'bookings', label: '預約', badge: pending },
+    { key: 'calendar', label: '日曆', badge: 0 },
+    { key: 'add', label: '', badge: 0 },
+    { key: 'customers', label: '顧客', badge: 0 },
+    { key: fifth, label: NAV_LABEL[fifth], badge: 0 },
+  ];
+}
+
+// 底部導覽圖示(線條風格)
+function NavIcon({ name, active }: { name: string; active: boolean }) {
+  const p = { width: 22, height: 22, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: active ? 2 : 1.6, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const, 'aria-hidden': true };
+  if (name === 'bookings') return <svg {...p}><path d="M4 11.5 12 4l8 7.5V20a1 1 0 0 1-1 1h-4.5v-6h-5v6H5a1 1 0 0 1-1-1z" /></svg>;
+  if (name === 'calendar') return <svg {...p}><rect x="3.5" y="5" width="17" height="15.5" rx="2.5" /><path d="M3.5 9.5h17M8 3v4M16 3v4" /></svg>;
+  if (name === 'customers') return <svg {...p}><circle cx="9" cy="8.5" r="3.5" /><path d="M3 20c.6-3.4 3-5.5 6-5.5s5.4 2.1 6 5.5M16 5.2a3.4 3.4 0 0 1 0 6.6M18 14.8c1.7.7 2.7 2.4 3 5.2" /></svg>;
+  if (name === 'reports') return <svg {...p}><rect x="4" y="3.5" width="16" height="17" rx="2.5" /><path d="M8.5 16v-3M12 16V9M15.5 16v-5" /></svg>;
+  if (name === 'services') return <svg {...p}><path d="M5 7h14M5 12h14M5 17h9" /></svg>;
+  if (name === 'staff') return <svg {...p}><circle cx="12" cy="8" r="4" /><path d="M4.5 20.5c.8-4 3.8-6.5 7.5-6.5s6.7 2.5 7.5 6.5" /></svg>;
+  if (name === 'hours') return <svg {...p}><circle cx="12" cy="12" r="8.5" /><path d="M12 7.5V12l3 2" /></svg>;
+  if (name === 'quotes') return <svg {...p}><path d="M6 3.5h9l3.5 3.5v13.5H6z" /><path d="M9 11h6M9 15h6" /></svg>;
+  return <svg {...p}><circle cx="12" cy="12" r="3" /><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1" /></svg>;
 }
 
 // ---------- 預約清單 ----------
 function BookingsTab({ data, reload }: { data: Data; reload: () => Promise<void> }) {
   const [filter, setFilter] = useState<'pending' | 'upcoming' | 'past' | 'all' | 'waitlist'>(() => (data.bookings.some((b) => b.status === 'pending') ? 'pending' : 'upcoming'));
-  const [adding, setAdding] = useState(false);
   const [now] = useState(() => Date.now());
   const list = useMemo(() => data.bookings.filter((b) => {
     const future = new Date(b.end_at).getTime() >= now;
@@ -147,18 +212,16 @@ function BookingsTab({ data, reload }: { data: Data; reload: () => Promise<void>
       <div className="flex items-center gap-2">
         <div className="flex min-w-0 flex-1 gap-1.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {([['pending', '待處理'], ['upcoming', '即將到來'], ['past', '已結束'], ['all', '全部'], ...(data.waitlist.length ? [['waitlist', `候補(${data.waitlist.length})`]] : [])] as [typeof filter, string][]).map(([k, label]) => (
-            <button key={k} type="button" onClick={() => setFilter(k)} className={`shrink-0 rounded-full px-3.5 py-1.5 text-sm ${filter === k ? 'bg-[#1f1b19] text-white' : 'border border-[#e5ded4] bg-white text-[#6b6156]'}`}>{label}</button>
+            <button key={k} type="button" onClick={() => setFilter(k)} className={`shrink-0 rounded-full px-4 py-1.5 text-sm ${filter === k ? 'bg-[#1f1b19] font-semibold text-white' : 'bg-white text-[#6b6156] shadow-[0_0_0_1px_#e9e1d6]'}`}>{label}</button>
           ))}
         </div>
-        <button type="button" onClick={() => setAdding(true)} className={`${btnDark} shrink-0 px-3`}>+ 加單</button>
       </div>
-      {adding ? <NewBooking data={data} onClose={() => setAdding(false)} onDone={() => { setAdding(false); void reload(); }} /> : null}
       {filter === 'waitlist' ? <WaitlistList data={data} reload={reload} /> : !list.length ? <p className="rounded-2xl bg-white p-8 text-center text-sm text-[#a99e8f]">沒有預約</p> : list.map((b) => {
         const d = localParts(b.start_at).date;
         const header = d !== lastDate ? (lastDate = d) : '';
         return (
           <div key={b.id}>
-            {header ? <p className="mb-1.5 mt-2 text-xs font-semibold text-[#8a7f72]">{formatDateTime(b.start_at).split(' ')[0]}</p> : null}
+            {header ? <p className="mb-1.5 mt-3 text-xs font-semibold text-[#8a7f72]">{d === data.today ? '今天 · ' : ''}{dateLabel(d)}</p> : null}
             <BookingCard booking={b} data={data} reload={reload} />
           </div>
         );
@@ -193,8 +256,9 @@ function WaitlistList({ data, reload }: { data: Data; reload: () => Promise<void
 }
 
 // ---------- 單筆預約(清單與日曆共用) ----------
-function BookingCard({ booking: b, data, reload }: { booking: BkBooking; data: Data; reload: () => Promise<void> }) {
+function BookingCard({ booking: b, data, reload, defaultOpen = false }: { booking: BkBooking; data: Data; reload: () => Promise<void>; defaultOpen?: boolean }) {
   const [busy, setBusy] = useState(false);
+  const [open, setOpen] = useState(defaultOpen);
   const [panel, setPanel] = useState<'' | 'pay' | 'move' | 'complete'>('');
   const [now] = useState(() => Date.now());
   const team = isTeam(data);
@@ -236,58 +300,40 @@ function BookingCard({ booking: b, data, reload }: { booking: BkBooking; data: D
     await post({ command, reason }, `已${label}`);
   }
 
+  const tone = staffTone(data, b.staff_id);
+  const svc = data.services.find((s) => s.id === b.service_id);
+  const where = [b.branch_id ? data.branches.find((x) => x.id === b.branch_id)?.name ?? '' : '', resource?.name ?? ''].filter(Boolean).join(' · ');
   return (
-    <div className={card}>
-      <div className="flex items-start gap-2">
-        <div className="min-w-0 flex-1">
-          <p className="text-base font-semibold">{formatRange(b.start_at, b.end_at).split(' ')[1]}{team && staff ? <span className="ml-2 text-sm font-normal text-[#6b6156]">· {staff.name}</span> : null}</p>
-          <p className="text-sm">{b.service_snapshot.name}{b.addons?.length ? ` + ${b.addons.map((a) => a.name).join('、')}` : ''}</p>
-          {b.branch_id ? <p className="text-xs text-[#8a7f72]">{data.branches.find((x) => x.id === b.branch_id)?.name ?? ''}</p> : null}
-          {resource ? <p className="text-xs text-[#8a7f72]">{resource.name}</p> : null}
-          {items.length > 1 ? (
-            <ul className="mt-1 space-y-1">
-              {items.map((it) => (
-                <li key={it.id} className={`flex items-center gap-2 rounded-lg bg-[#faf7f2] px-2 py-1 text-xs ${it.status === 'cancelled' ? 'text-[#a99e8f] line-through' : 'text-[#3d3631]'}`}>
-                  <span className="min-w-0 flex-1 truncate">{formatRange(it.start_at, it.end_at).split(' ')[1]} {it.service_snapshot.name}{team ? ` · ${data.staff.find((s) => s.id === it.staff_id)?.name ?? ''}` : ''}{it.amount ? ` · ${money(it.amount)}` : ''}</span>
-                  {it.status === 'active' && activeItems > 1 && ['pending', 'confirmed', 'checked_in'].includes(b.status)
-                    ? <button type="button" disabled={busy} onClick={() => void cancelItem(it.seq, it.service_snapshot.name)} className="shrink-0 text-[#a03b3b] no-underline">取消此項</button>
-                    : null}
-                </li>
-              ))}
-            </ul>
-          ) : null}
-          {data.allocations.filter((a) => a.booking_id === b.id && a.role === 'assistant').map((a) => (
-            <p key={a.id} className="text-xs text-[#1f4f6e]">助理 {data.staff.find((s) => s.id === a.staff_id)?.name ?? ''} {formatRange(a.start_at, a.end_at).split(' ')[1]}</p>
-          ))}
-          {b.service_snapshot.steps?.length ? <p className="text-[11px] text-[#a99e8f]">{b.service_snapshot.steps.map((s) => `${s.name} ${s.minutes}`).join(' → ')} 分</p> : null}
+    <div className="relative overflow-hidden rounded-2xl border border-[#ece4d9] bg-white shadow-[0_1px_3px_#2b1d1408]">
+      <span aria-hidden="true" className="absolute inset-y-0 left-0 w-1.5" style={{ background: tone.bar }} />
+      <div className="p-3.5 pl-5">
+        <div className="flex items-start gap-2">
+          <div className="min-w-0 flex-1">
+            <div className="flex min-w-0 flex-wrap items-baseline gap-x-2.5">
+              <p className="shrink-0 text-[17px]! font-bold! tabular-nums tracking-tight">{formatRange(b.start_at, b.end_at).split(' ')[1].replace('–', ' – ')}</p>
+              <p className="min-w-0 truncate text-sm! font-semibold!">{b.service_snapshot.name}{b.addons?.length ? ` + ${b.addons.map((x) => x.name).join('、')}` : ''}</p>
+            </div>
+            {where ? <p className="truncate text-xs! text-[#8a7f72]">{where}</p> : null}
+          </div>
+          <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs! font-semibold! ${STATUS_COLOR[b.status]}`}>{statusText(b)}</span>
         </div>
-        <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-semibold ${STATUS_COLOR[b.status]}`}>{statusText(b)}</span>
-      </div>
-      <div className="mt-2 space-y-0.5 text-sm text-[#6b6156]">
-        <p>{b.contact?.name || '—'}{b.contact?.phone ? <> · <a href={`tel:${b.contact.phone}`} className="text-[#1f6f8b] underline-offset-2 hover:underline">{b.contact.phone}</a></> : null}{b.created_by === 'owner' ? <span className="ml-1 text-[11px] text-[#a99e8f]">(人工加單)</span> : null}</p>
-        {customer?.note || customer?.tags?.length ? <p className="rounded-lg bg-[#fff6e6] px-2.5 py-1.5 text-xs text-[#7a5310]">{customer.tags?.length ? `${customer.tags.join('、')}${customer.note ? ' · ' : ''}` : ''}{customer.note}</p> : null}
-        {b.contact?.note ? <p className="whitespace-pre-line rounded-lg bg-[#faf7f2] px-2.5 py-1.5 text-xs">{b.contact.note}</p> : null}
-        {total || b.deposit_amount || b.paid_amount ? (
-          <p className="text-xs">
-            {total ? `總額 ${money(total)}` : '現場報價'}{b.deposit_amount ? ` · 訂金 ${money(b.deposit_amount)}` : ''} · 已收 {money(b.paid_amount)}
-            {total > b.paid_amount ? <span className="text-[#9a6412]"> · 未收 {money(total - b.paid_amount)}</span> : null}
-            {b.payment_status !== 'none' ? <span className="ml-1 text-[#8a7f72]">({PAYMENT_LABEL[b.payment_status]})</span> : null}
-          </p>
-        ) : null}
-        {b.package_id ? <p className="text-xs text-[#2f5a3a]">使用套票{b.status === 'completed' ? '(已扣次)' : ['cancelled', 'expired', 'no_show'].includes(b.status) ? '(已退回)' : '(保留 1 次)'}</p> : null}
-        {report ? <p className="rounded-lg bg-[#eaf4f7] px-2.5 py-1.5 text-xs text-[#1f5f7f]">顧客回報已轉帳:{paymentReportText(report)}<span className="block text-[11px] text-[#5d8597]">請核對入帳後按「收到{report.kind === 'full' ? '全額' : '訂金'}」</span></p> : null}
-        {b.status === 'pending' && b.expires_at ? <p className="text-xs text-[#9a6412]">{b.approval_status === 'pending' ? '請在' : '訂金期限'} {formatDateTime(b.expires_at)}{b.approval_status === 'pending' ? ' 前確認' : ''},逾時自動取消</p> : null}
-        {b.cancel_reason && ['cancelled', 'expired'].includes(b.status) ? <p className="text-xs text-[#8a7f72]">原因:{b.cancel_reason}</p> : null}
-        {payments.length ? (
-          <ul className="text-[11px] text-[#a99e8f]">
-            {payments.map((p) => <li key={p.id}>{formatDateTime(p.created_at)} {p.kind === 'refund' ? '退款' : p.kind === 'deposit' ? '訂金' : '尾款'} {money(p.amount)}({PAY_METHOD_LABEL[p.method]}){p.note ? ` ${p.note}` : ''}</li>)}
-          </ul>
-        ) : null}
-        <p className="text-[11px] text-[#a99e8f]">{b.booking_no}{b.reschedule_count ? ` · 已改期 ${b.reschedule_count} 次` : ''}</p>
-      </div>
+        <div className="mt-2.5 flex items-center gap-3">
+          {svc?.image
+            ? <img src={svc.image} alt="" className="h-14 w-14 shrink-0 rounded-full object-cover" />
+            : <span aria-hidden="true" className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full text-lg! font-semibold!" style={{ background: tone.soft, color: tone.text }}>{b.service_snapshot.name.slice(0, 1)}</span>}
+          <div className="min-w-0 flex-1">
+            {team && staff ? <p className="flex min-w-0 items-center gap-1.5 text-sm! font-semibold!"><span aria-hidden="true" className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px]!" style={{ background: tone.soft, color: tone.text }}>{staff.name.slice(0, 1)}</span><span className="truncate">{staff.name}</span></p> : null}
+            <p className="truncate text-sm! text-[#6b6156]">{b.contact?.name || '—'}{b.contact?.phone ? <> · <a href={`tel:${b.contact.phone}`} className="text-[#1f6f8b]">{b.contact.phone}</a></> : null}{b.created_by === 'owner' ? <span className="ml-1 text-[11px]! text-[#a99e8f]">(人工加單)</span> : null}</p>
+            {total || b.paid_amount ? <p className="truncate text-xs! text-[#8a7f72]">{total ? money(total) : '現場報價'}{total > b.paid_amount ? <span className="text-[#b5523f]"> · 未收 {money(total - b.paid_amount)}</span> : <span className="text-[#2f6b3f]"> · 已付清</span>}</p> : null}
+          </div>
+          <button type="button" aria-expanded={open} aria-label={open ? '收合詳細' : '詳細與更多操作'} onClick={() => setOpen(!open)}
+            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-lg! leading-none ${open ? 'bg-[#1f1b19] text-white' : 'text-[#6b6156] hover:bg-[#f3ede4]'}`}>⋮</button>
+        </div>
+        {report ? <p className="rounded-lg bg-[#eaf4f7] px-2.5 py-1.5 text-xs! text-[#1f5f7f]">顧客回報已轉帳:{paymentReportText(report)}<span className="block text-[11px]! text-[#5d8597]">請核對入帳後按「收到{report.kind === 'full' ? '全額' : '訂金'}」</span></p> : null}
+        {b.status === 'pending' && b.expires_at ? <p className="text-xs! text-[#9a6412]">{b.approval_status === 'pending' ? '請在' : '訂金期限'} {formatDateTime(b.expires_at)}{b.approval_status === 'pending' ? ' 前確認' : ''},逾時自動取消</p> : null}
 
-      <div className="mt-3 flex flex-wrap gap-2">
-        {b.quote_id && b.status === 'pending' && b.approval_status === 'pending' ? <p className="w-full text-xs text-[#1f5f7f]">報價暫保留中,等顧客接受(到「詢價」修改或取消)</p> : null}
+        <div className="mt-3 flex flex-wrap gap-2 empty:hidden">
+        {b.quote_id && b.status === 'pending' && b.approval_status === 'pending' ? <p className="w-full text-xs! text-[#1f5f7f]">報價暫保留中,等顧客接受(到「詢價」修改或取消)</p> : null}
         {b.status === 'pending' && b.approval_status === 'pending' && !b.quote_id && <>
           <button type="button" disabled={busy} onClick={() => void run('approve', '確認')} className={btnDark}>確認預約</button>
           <button type="button" disabled={busy} onClick={() => void run('reject', '婉拒')} className={btn}>婉拒</button>
@@ -299,19 +345,59 @@ function BookingCard({ booking: b, data, reload }: { booking: BkBooking; data: D
           <button type="button" disabled={busy} onClick={() => (total > b.paid_amount ? setPanel(panel === 'complete' ? '' : 'complete') : void run('complete', '完成'))} className={btnDark}>完成服務</button>
           <button type="button" disabled={busy} onClick={() => void run('no_show', '標記未到')} className={btn}>未到</button>
         </>}
-        {['pending', 'confirmed'].includes(b.status) && !started && <button type="button" disabled={busy} onClick={() => setPanel(panel === 'move' ? '' : 'move')} className={btn}>改期</button>}
-        {(b.status === 'confirmed' || waitingPay) && !started && <button type="button" disabled={busy} onClick={() => void run('cancel', '取消')} className={`${btn} text-[#a03b3b]`}>取消</button>}
-        {b.status !== 'expired' && <button type="button" disabled={busy} onClick={() => setPanel(panel === 'pay' ? '' : 'pay')} className={btn}>收款 / 退款</button>}
-        {data.business.reward_enabled && customer && customer.points > 0 && total > b.paid_amount && ['confirmed', 'checked_in', 'completed'].includes(b.status) ? (
-          <button type="button" disabled={busy} onClick={() => void (async () => {
-            const max = Math.min(customer.points, Math.ceil((total - b.paid_amount) / data.business.point_value));
-            const v = await uiPrompt(`用點數折抵(目前 ${customer.points} 點,1 點 = ${money(data.business.point_value)}),最多 ${max} 點:`, { defaultValue: String(max) });
-            if (v === null) return;
-            await post({ command: 'redeem_points', points: Number(v) || 0 }, '已用點數折抵');
-          })()} className={btn}>點數折抵</button>
-        ) : null}
-      </div>
+        </div>
 
+        {open ? (
+          <div className="mt-3 space-y-1 border-t border-[#f0ebe2] pt-3 text-sm text-[#6b6156]">
+            {items.length > 1 ? (
+              <ul className="mt-1 space-y-1">
+                {items.map((it) => (
+                  <li key={it.id} className={`flex items-center gap-2 rounded-lg bg-[#faf7f2] px-2 py-1 text-xs ${it.status === 'cancelled' ? 'text-[#a99e8f] line-through' : 'text-[#3d3631]'}`}>
+                    <span className="min-w-0 flex-1 truncate">{formatRange(it.start_at, it.end_at).split(' ')[1]} {it.service_snapshot.name}{team ? ` · ${data.staff.find((s) => s.id === it.staff_id)?.name ?? ''}` : ''}{it.amount ? ` · ${money(it.amount)}` : ''}</span>
+                    {it.status === 'active' && activeItems > 1 && ['pending', 'confirmed', 'checked_in'].includes(b.status)
+                      ? <button type="button" disabled={busy} onClick={() => void cancelItem(it.seq, it.service_snapshot.name)} className="shrink-0 text-[#a03b3b] no-underline">取消此項</button>
+                      : null}
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+            {data.allocations.filter((a) => a.booking_id === b.id && a.role === 'assistant').map((a) => (
+              <p key={a.id} className="text-xs text-[#1f4f6e]">助理 {data.staff.find((s) => s.id === a.staff_id)?.name ?? ''} {formatRange(a.start_at, a.end_at).split(' ')[1]}</p>
+            ))}
+            {b.service_snapshot.steps?.length ? <p className="text-[11px] text-[#a99e8f]">{b.service_snapshot.steps.map((s) => `${s.name} ${s.minutes}`).join(' → ')} 分</p> : null}
+  
+          {customer?.note || customer?.tags?.length ? <p className="rounded-lg bg-[#fff6e6] px-2.5 py-1.5 text-xs text-[#7a5310]">{customer.tags?.length ? `${customer.tags.join('、')}${customer.note ? ' · ' : ''}` : ''}{customer.note}</p> : null}
+          {b.contact?.note ? <p className="whitespace-pre-line rounded-lg bg-[#faf7f2] px-2.5 py-1.5 text-xs">{b.contact.note}</p> : null}
+          {total || b.deposit_amount || b.paid_amount ? (
+            <p className="text-xs">
+              {total ? `總額 ${money(total)}` : '現場報價'}{b.deposit_amount ? ` · 訂金 ${money(b.deposit_amount)}` : ''} · 已收 {money(b.paid_amount)}
+              {total > b.paid_amount ? <span className="text-[#9a6412]"> · 未收 {money(total - b.paid_amount)}</span> : null}
+              {b.payment_status !== 'none' ? <span className="ml-1 text-[#8a7f72]">({PAYMENT_LABEL[b.payment_status]})</span> : null}
+            </p>
+          ) : null}
+          {b.package_id ? <p className="text-xs text-[#2f5a3a]">使用套票{b.status === 'completed' ? '(已扣次)' : ['cancelled', 'expired', 'no_show'].includes(b.status) ? '(已退回)' : '(保留 1 次)'}</p> : null}
+            {b.cancel_reason && ['cancelled', 'expired'].includes(b.status) ? <p className="text-xs text-[#8a7f72]">原因:{b.cancel_reason}</p> : null}
+          {payments.length ? (
+            <ul className="text-[11px] text-[#a99e8f]">
+              {payments.map((p) => <li key={p.id}>{formatDateTime(p.created_at)} {p.kind === 'refund' ? '退款' : p.kind === 'deposit' ? '訂金' : '尾款'} {money(p.amount)}({PAY_METHOD_LABEL[p.method]}){p.note ? ` ${p.note}` : ''}</li>)}
+            </ul>
+          ) : null}
+          <p className="text-[11px] text-[#a99e8f]">{b.booking_no}{b.reschedule_count ? ` · 已改期 ${b.reschedule_count} 次` : ''}</p>
+              <div className="flex flex-wrap gap-2 pt-2">
+            {['pending', 'confirmed'].includes(b.status) && !started && <button type="button" disabled={busy} onClick={() => setPanel(panel === 'move' ? '' : 'move')} className={btn}>改期</button>}
+            {(b.status === 'confirmed' || waitingPay) && !started && <button type="button" disabled={busy} onClick={() => void run('cancel', '取消')} className={`${btn} text-[#a03b3b]`}>取消</button>}
+            {b.status !== 'expired' && <button type="button" disabled={busy} onClick={() => setPanel(panel === 'pay' ? '' : 'pay')} className={btn}>收款 / 退款</button>}
+            {data.business.reward_enabled && customer && customer.points > 0 && total > b.paid_amount && ['confirmed', 'checked_in', 'completed'].includes(b.status) ? (
+              <button type="button" disabled={busy} onClick={() => void (async () => {
+                const max = Math.min(customer.points, Math.ceil((total - b.paid_amount) / data.business.point_value));
+                const v = await uiPrompt(`用點數折抵(目前 ${customer.points} 點,1 點 = ${money(data.business.point_value)}),最多 ${max} 點:`, { defaultValue: String(max) });
+                if (v === null) return;
+                await post({ command: 'redeem_points', points: Number(v) || 0 }, '已用點數折抵');
+              })()} className={btn}>點數折抵</button>
+            ) : null}
+                </div>
+          </div>
+        ) : null}
       {panel === 'complete' && (
         <PaymentForm title="完成服務並收尾款" kinds={['balance']} defaultAmount={total - b.paid_amount} busy={busy} allowSkip
           onCancel={() => setPanel('')} onSubmit={(p) => void post({ command: 'complete', balance: p.amount ? { amount: p.amount, method: p.method } : undefined }, '已完成')} />
@@ -321,6 +407,7 @@ function BookingCard({ booking: b, data, reload }: { booking: BkBooking; data: D
           onCancel={() => setPanel('')} onSubmit={(p) => void post({ command: 'payment', ...p }, p.kind === 'refund' ? '已記錄退款' : '已記錄收款')} />
       )}
       {panel === 'move' && <MovePanel booking={b} data={data} busy={busy} onCancel={() => setPanel('')} onSubmit={(startAt, staffId) => void post({ command: 'reschedule', start_at: startAt, staff_id: staffId }, '已改期,已通知顧客')} />}
+      </div>
     </div>
   );
 }
@@ -402,7 +489,7 @@ function MovePanel({ booking, data, busy, onCancel, onSubmit }: { booking: BkBoo
     <div className="mt-3 space-y-2 rounded-xl bg-[#faf7f2] p-3">
       <p className="text-sm font-semibold">改期{team ? ' / 換人員' : ''}</p>
       <div className={`grid gap-2 ${team ? 'grid-cols-2' : 'grid-cols-1'}`}>
-        <input type="date" value={date} min={localParts(new Date()).date} onChange={(e) => { setDate(e.target.value); setTime(''); }} aria-label="日期" className={`${input} min-w-0`} />
+        <DateField value={date} min={localParts(new Date()).date} onChange={(d) => { setDate(d); setTime(''); }} className={team ? 'col-span-2' : ''} />
         {team ? (
           <select value={staff} onChange={(e) => { setStaff(e.target.value); setTime(''); }} aria-label="人員" className={`${input} min-w-0`}>
             <option value="">不指定</option>
@@ -498,7 +585,7 @@ function NewBooking({ data, onClose, onDone, initialDate }: { data: Data; onClos
         </div>
       ) : null}
       <div className={`grid gap-2 ${team ? 'grid-cols-2' : 'grid-cols-1'}`}>
-        <input type="date" value={date} min={data.today} onChange={(e) => { setDate(e.target.value); setTime(''); }} aria-label="日期" className={`${input} min-w-0`} />
+        <DateField value={date} min={data.today} onChange={(d) => { setDate(d); setTime(''); }} className={team ? 'col-span-2' : ''} />
         {team ? (
           <select value={staff} onChange={(e) => { setStaff(e.target.value); setTime(''); }} aria-label="人員" className={`${input} min-w-0`}>
             <option value="">不指定</option>
@@ -532,29 +619,130 @@ function NewBooking({ data, onClose, onDone, initialDate }: { data: Data; onClos
 }
 
 
-// ---------- 日曆(日視圖;人員視圖每位人員一欄、座位視圖每個座位一欄;分段預約畫出每一段與等待空檔) ----------
+// ---------- 日曆:日 / 週 / 月 / 年;自製月曆(可收合)與預約注記;人員篩選、分店篩選 ----------
+// 日視圖:每位人員一欄(或座位視圖每個座位一欄),分段預約畫出每一段與等待空檔
 const HOUR_PX = 72;
+const WEEK_HOUR_PX = 48;
 type Block = { key: string; booking: BkBooking; start: number; end: number; kind: 'main' | 'assistant' | 'seat' | 'wait' };
+type CalView = 'day' | 'week' | 'month' | 'year';
+const WEEKDAYS = ['日', '一', '二', '三', '四', '五', '六'];
 
-function CalendarTab({ data, reload }: { data: Data; reload: () => Promise<void> }) {
-  const [date, setDate] = useState(data.today);
+function CalendarTab({ data, reload, onDate }: { data: Data; reload: () => Promise<void>; onDate?: (date: string) => void }) {
+  const [date, setDateRaw] = useState(data.today);
+  const [view, setView] = useState<CalView>('day');
+  const [expanded, setExpanded] = useState(false);
   const [selected, setSelected] = useState('');
-  const [adding, setAdding] = useState(false);
-  const [view, setView] = useState<'staff' | 'seat'>('staff');
+  const [mode, setMode] = useState<'staff' | 'seat'>('staff');
   const [branch, setBranch] = useState('');
-  const { weekday } = formatDateLabel(date);
-  const day = data.bookings.filter((b) => localParts(b.start_at).date === date && b.status !== 'expired' && (!branch || b.branch_id === branch));
-  const shown = day.filter((b) => b.status !== 'cancelled');
+  const [onlyStaff, setOnlyStaff] = useState<string[]>([]);
+  const setDate = (d: string) => { setDateRaw(d); setSelected(''); onDate?.(d); };
   const team = isTeam(data);
-  const seatView = view === 'seat' && data.resources.length > 0;
+  const people = data.staff.filter((s) => s.active || data.bookings.some((b) => b.staff_id === s.id));
+
+  // 篩選後的預約(不含逾期;取消的只在日視圖統計)
+  const visible = data.bookings.filter((b) => b.status !== 'expired' && b.status !== 'cancelled' && (!branch || b.branch_id === branch) && (!onlyStaff.length || onlyStaff.includes(b.staff_id ?? '')));
+  const marks: Record<string, number> = {};
+  for (const b of visible) { const d = localParts(b.start_at).date; marks[d] = (marks[d] ?? 0) + 1; }
+  const byDate = (d: string) => visible.filter((b) => localParts(b.start_at).date === d).sort((x, y) => x.start_at.localeCompare(y.start_at));
+
+  const weekStart = shiftDate(date, -weekdayOf(date));
+  const weekDays = Array.from({ length: 7 }, (_, i) => shiftDate(weekStart, i));
+  const step = (dir: number) => setDate(view === 'day' ? shiftDate(date, dir) : view === 'week' ? shiftDate(date, dir * 7) : view === 'month' ? shiftMonth(date, dir) : shiftMonth(date, dir * 12));
+  const title = view === 'year' ? `${date.slice(0, 4)} 年` : `${date.slice(0, 4)} 年 ${Number(date.slice(5, 7))} 月`;
+  const sel = data.bookings.find((b) => b.id === selected);
+
+  return (
+    <div className="space-y-3">
+      <div className="rounded-3xl border border-[#ece4d9] bg-white p-3 shadow-[0_1px_3px_#2b1d1408]">
+        <div className="flex items-center gap-1">
+          <button type="button" onClick={() => (view === 'day' || view === 'week' ? setExpanded(!expanded) : setView('month'))} aria-expanded={view === 'day' || view === 'week' ? expanded : undefined}
+            className="flex min-w-0 items-center gap-1 rounded-full px-2 py-1 text-lg! font-bold!">
+            <span className="truncate">{title}</span>
+            {view === 'day' || view === 'week' ? <span aria-hidden="true" className={`text-xs! text-[#8a7f72] transition ${expanded ? 'rotate-180' : ''}`}>▾</span> : null}
+          </button>
+          <span className="flex-1" />
+          <button type="button" onClick={() => step(-1)} aria-label="上一段" className="h-9 w-9 shrink-0 rounded-full text-xl! text-[#6b6156] hover:bg-[#f3ede4]">‹</button>
+          <button type="button" onClick={() => step(1)} aria-label="下一段" className="h-9 w-9 shrink-0 rounded-full text-xl! text-[#6b6156] hover:bg-[#f3ede4]">›</button>
+          <button type="button" onClick={() => setDate(data.today)} className="shrink-0 rounded-full border border-[#e5ded4] px-3 py-1.5 text-xs! font-semibold!">今天</button>
+        </div>
+
+        <div className="mt-2 grid grid-cols-4 gap-1 rounded-full bg-[#f3ede4] p-1" role="group" aria-label="顯示範圍">
+          {([['day', '日'], ['week', '週'], ['month', '月'], ['year', '年']] as const).map(([k, label]) => (
+            <button key={k} type="button" aria-pressed={view === k} onClick={() => { setView(k); setSelected(''); }} className={`rounded-full py-1.5 text-sm! ${view === k ? 'bg-white font-semibold! text-[#1f1b19] shadow-sm' : 'text-[#6b6156]'}`}>{label}</button>
+          ))}
+        </div>
+
+        {/* 日 / 週:收合時是一週的日期列,展開是整個月;有預約的日期有注記 */}
+        {view === 'day' || view === 'week' ? (
+          expanded ? (
+            <div className="mt-2"><MonthGrid month={date} value={date} today={data.today} marks={marks} onPick={(d) => { setDate(d); setExpanded(false); }} /></div>
+          ) : (
+            <div className="mt-2 grid grid-cols-7 text-center">
+              {weekDays.map((d) => {
+                const on = d === date;
+                return (
+                  <button key={d} type="button" onClick={() => { setDate(d); if (view === 'week') setView('day'); }} aria-pressed={on} className="flex flex-col items-center gap-1 py-1">
+                    <span className="text-[11px]! text-[#a99e8f]">{WEEKDAYS[weekdayOf(d)]}</span>
+                    <span className={`flex h-9 w-9 items-center justify-center rounded-full text-sm! ${on ? 'bg-[#1f1b19] font-semibold! text-white' : d === data.today ? 'font-semibold! text-[#9a3b2e] ring-1 ring-[#e3cfc7]' : 'text-[#3d3631]'}`}>{Number(d.slice(8))}</span>
+                    <span className="flex h-1.5 gap-0.5">{Array.from({ length: Math.min(3, marks[d] ?? 0) }, (_, i) => <span key={i} className="h-1.5 w-1.5 rounded-full bg-[#c99a6b]" />)}</span>
+                  </button>
+                );
+              })}
+            </div>
+          )
+        ) : null}
+
+        {/* 人員篩選 + 分店 */}
+        {team || data.branches.length ? (
+          <div className="mt-2 flex items-center gap-1.5 overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {team ? <>
+              <button type="button" aria-pressed={!onlyStaff.length} onClick={() => setOnlyStaff([])} className={`shrink-0 rounded-full border px-3 py-1 text-xs! ${!onlyStaff.length ? 'border-[#1f1b19] bg-[#1f1b19] text-white' : 'border-[#e5ded4] text-[#6b6156]'}`}>全部人員</button>
+              {people.filter((s) => s.role !== 'assistant').map((s) => {
+                const on = onlyStaff.includes(s.id);
+                const tone = staffTone(data, s.id);
+                return (
+                  <button key={s.id} type="button" aria-pressed={on} onClick={() => setOnlyStaff(on ? onlyStaff.filter((x) => x !== s.id) : [...onlyStaff, s.id])}
+                    className={`flex shrink-0 items-center gap-1.5 rounded-full border py-0.5 pl-0.5 pr-2.5 text-xs! ${on ? 'border-[#1f1b19] font-semibold!' : 'border-[#e5ded4] text-[#6b6156]'}`}>
+                    <span className="flex h-6 w-6 items-center justify-center rounded-full text-[11px]! font-semibold!" style={{ background: tone.soft, color: tone.text }}>{s.name.slice(0, 1)}</span>{s.name}
+                  </button>
+                );
+              })}
+            </> : null}
+            {data.branches.length ? (
+              <select value={branch} onChange={(e) => { setBranch(e.target.value); setSelected(''); }} aria-label="分店" className="shrink-0 rounded-full border border-[#e5ded4] bg-white px-2 py-1 text-xs!">
+                <option value="">所有分店</option>
+                {data.branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+              </select>
+            ) : null}
+          </div>
+        ) : null}
+      </div>
+
+      {view === 'day' ? <DayGrid data={data} date={date} branch={branch} onlyStaff={onlyStaff} mode={mode} setMode={setMode} selected={selected} setSelected={setSelected} /> : null}
+      {view === 'week' ? <WeekGrid data={data} days={weekDays} bookings={visible} selected={selected} setSelected={setSelected} onDay={(d) => { setDate(d); setView('day'); }} /> : null}
+      {view === 'month' ? <MonthBoard data={data} month={date} byDate={byDate} today={data.today} onDay={(d) => { setDate(d); setView('day'); }} /> : null}
+      {view === 'year' ? <YearBoard year={Number(date.slice(0, 4))} marks={marks} today={data.today} onMonth={(d) => { setDate(d); setView('month'); }} /> : null}
+
+      {sel ? <BookingCard key={`${sel.id}-${sel.version}`} booking={sel} data={data} reload={reload} defaultOpen /> : view === 'day' || view === 'week' ? <p className="text-center text-xs! text-[#a99e8f]">點日曆上的預約查看詳細與操作;右下「+」可在這天加單</p> : null}
+    </div>
+  );
+}
+
+// 日視圖
+function DayGrid({ data, date, branch, onlyStaff, mode, setMode, selected, setSelected }: {
+  data: Data; date: string; branch: string; onlyStaff: string[]; mode: 'staff' | 'seat'; setMode: (m: 'staff' | 'seat') => void; selected: string; setSelected: (id: string) => void;
+}) {
+  const day = data.bookings.filter((b) => localParts(b.start_at).date === date && b.status !== 'expired' && (!branch || b.branch_id === branch));
+  const shown = day.filter((b) => b.status !== 'cancelled' && (!onlyStaff.length || onlyStaff.includes(b.staff_id ?? '')));
+  const team = isTeam(data);
+  const seatView = mode === 'seat' && data.resources.length > 0;
   const columns = seatView
     ? data.resources.filter((r) => (!branch || !r.branch_id || r.branch_id === branch) && (r.active || shown.some((b) => b.resource_id === r.id))).map((r) => ({ id: r.id, name: r.name }))
     : team
-      ? data.staff.filter((s) => s.active || shown.some((b) => b.staff_id === s.id)).map((s) => ({ id: s.id, name: s.name }))
+      ? data.staff.filter((s) => (s.active || shown.some((b) => b.staff_id === s.id)) && (!onlyStaff.length || onlyStaff.includes(s.id))).map((s) => ({ id: s.id, name: s.name }))
       : [{ id: '', name: '' }];
   const toMin = (iso: string) => localParts(iso).minutes + (localParts(iso).date > date ? 1440 : 0);
 
-  // 每欄的區塊:有占用區段的用區段(含助理段);已完成等沒有有效區段的用整筆時間
   function blocksFor(colId: string): Block[] {
     const out: Block[] = [];
     for (const b of shown) {
@@ -572,7 +760,6 @@ function CalendarTab({ data, reload }: { data: Data; reload: () => Promise<void>
       }
       const sorted = [...mine].sort((x, y) => x.start_at.localeCompare(y.start_at));
       sorted.forEach((a) => out.push({ key: a.id, booking: b, start: toMin(a.start_at), end: toMin(a.end_at), kind: a.role === 'assistant' ? 'assistant' : 'main' }));
-      // 主要人員兩段之間的等待:這段時間可以接其他客人
       const mains = sorted.filter((a) => a.role === 'main');
       for (let i = 1; i < mains.length; i++) {
         const gapStart = toMin(mains[i - 1].end_at);
@@ -584,91 +771,162 @@ function CalendarTab({ data, reload }: { data: Data; reload: () => Promise<void>
   }
 
   // 顯示範圍:當天營業 / 班表時段與預約時間的聯集,至少 10:00–19:00
-  const wd = localParts(new Date(`${date}T12:00:00+08:00`)).weekday;
+  const wd = weekdayOf(date);
   const ranges = [...data.hours.filter((h) => h.weekday === wd), ...data.staffHours.filter((h) => h.weekday === wd)];
-  const mins = shown.map((b) => toMin(b.start_at));
-  const ends = shown.map((b) => toMin(b.occupy_end_at));
-  const startH = Math.floor(Math.min(10 * 60, ...ranges.map((r) => r.start_min), ...mins) / 60);
-  const endH = Math.min(26, Math.ceil(Math.max(19 * 60, ...ranges.map((r) => r.end_min), ...ends) / 60));
+  const startH = Math.floor(Math.min(10 * 60, ...ranges.map((r) => r.start_min), ...shown.map((b) => toMin(b.start_at))) / 60);
+  const endH = Math.min(26, Math.ceil(Math.max(19 * 60, ...ranges.map((r) => r.end_min), ...shown.map((b) => toMin(b.occupy_end_at))) / 60));
   const hours = Array.from({ length: endH - startH }, (_, i) => startH + i);
-  const sel = data.bookings.find((b) => b.id === selected);
   const closedAll = data.exceptions.filter((x) => !x.staff_id && new Date(x.start_at) < new Date(`${date}T23:59:59+08:00`) && new Date(x.end_at) > new Date(`${date}T00:00:00+08:00`));
   const wide = columns.length > 1;
 
   return (
-    <div className="space-y-3">
-      <div className={`${card} flex flex-wrap items-center gap-2`}>
-        <button type="button" onClick={() => { setDate(addDays(date, -1)); setSelected(''); }} aria-label="前一天" className={btnSm}>‹</button>
-        <input type="date" value={date} onChange={(e) => { if (e.target.value) { setDate(e.target.value); setSelected(''); } }} aria-label="日期" className="min-w-0 flex-1 rounded-lg border border-[#e5ded4] px-2 py-1.5 text-base" />
-        <button type="button" onClick={() => { setDate(addDays(date, 1)); setSelected(''); }} aria-label="後一天" className={btnSm}>›</button>
-        <button type="button" onClick={() => { setDate(data.today); setSelected(''); }} className={btnSm}>今天</button>
-        {data.branches.length ? (
-          <select value={branch} onChange={(e) => { setBranch(e.target.value); setSelected(''); }} aria-label="分店" className="w-full rounded-lg border border-[#e5ded4] bg-white px-2 py-1.5 text-sm">
-            <option value="">所有分店</option>
-            {data.branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
-          </select>
-        ) : null}
-        <div className="flex w-full flex-wrap items-center gap-2">
-          <p className="min-w-0 flex-1 text-xs text-[#8a7f72]">週{weekday} · {shown.length} 筆預約{closedAll.length ? ' · 有休假設定' : ''}{day.length > shown.length ? ` · 已取消 ${day.length - shown.length} 筆` : ''}</p>
-          {data.resources.length ? (
-            <div className="flex shrink-0 gap-1 rounded-full bg-[#f3ede4] p-1" role="group" aria-label="日曆視圖">
-              {([['staff', '人員'], ['seat', '座位']] as const).map(([k, label]) => (
-                <button key={k} type="button" aria-pressed={view === k} onClick={() => setView(k)} className={`rounded-full px-3 py-1 text-xs ${view === k ? 'bg-white font-semibold text-[#1f1b19]' : 'text-[#6b6156]'}`}>{label}</button>
-              ))}
-            </div>
-          ) : null}
-        </div>
-      </div>
-
-      <div className={`${card} overflow-hidden p-0 sm:p-0`}>
-        <div className="overflow-x-auto">
-          <div className="flex" style={{ minWidth: wide ? `${44 + columns.length * 110}px` : undefined }}>
-            <div className="w-11 shrink-0 border-r border-[#f0ebe2]">
-              {wide ? <div className="h-8 border-b border-[#f0ebe2]" /> : null}
-              {hours.map((h) => <div key={h} style={{ height: HOUR_PX }} className="pr-1 pt-0.5 text-right text-[10px] text-[#a99e8f]">{String(h % 24).padStart(2, '0')}:00</div>)}
-            </div>
-            {columns.map((col) => (
-              <div key={col.id || 'solo'} className="min-w-0 flex-1 border-r border-[#f0ebe2] last:border-r-0">
-                {wide ? <div className="flex h-8 items-center justify-center truncate border-b border-[#f0ebe2] px-1 text-xs font-semibold">{col.name}</div> : null}
-                <div className="relative" style={{ height: hours.length * HOUR_PX }}>
-                  {hours.map((h, i) => <div key={h} className="absolute inset-x-0 border-t border-[#f5f1ea]" style={{ top: i * HOUR_PX }} />)}
-                  {blocksFor(col.id).sort((x, y) => (x.kind === 'wait' ? -1 : 0) - (y.kind === 'wait' ? -1 : 0)).map((blk) => {
-                    const b = blk.booking;
-                    const top = ((blk.start - startH * 60) / 60) * HOUR_PX;
-                    const height = Math.max(blk.kind === 'wait' ? 14 : 22, ((blk.end - blk.start) / 60) * HOUR_PX - 2);
-                    const tone = blk.kind === 'wait'
-                      ? 'border-transparent bg-[#e3efe5] text-[#2f5a3a]'
-                      : blk.kind === 'assistant'
-                        ? 'border-[#bcd3e3] bg-[#e6f0f7]'
-                        : b.status === 'pending' ? 'border-[#e7c98f] bg-[#fff6e6]' : b.status === 'completed' ? 'border-[#d5d9e3] bg-[#f1f3f7]' : b.status === 'no_show' ? 'border-[#e8c4c4] bg-[#fbeeee]' : 'border-[#b9d8c1] bg-[#eef7f0]';
-                    return (
-                      <button key={blk.key} type="button" onClick={() => setSelected(b.id === selected ? '' : b.id)} style={{ top, height }}
-                        className={`absolute inset-x-1 overflow-hidden rounded-lg border px-1.5 ${height < 40 ? 'py-px' : 'py-1'} text-left text-[11px]! leading-4! ${tone} ${b.id === selected ? 'ring-2 ring-[#1f1b19]' : ''}`}>
-                        {blk.kind === 'wait' ? (
-                          <span className="block truncate">等待 · 可接其他客人</span>
-                        ) : height < 40 ? (
-                          <span className="block truncate font-semibold">{minutesToHHMM(blk.start % 1440)} {b.contact?.name || '—'}<span className="font-normal text-[#6b6156]"> · {blk.kind === 'assistant' ? '助理' : b.service_snapshot.name}</span></span>
-                        ) : (
-                          <>
-                            <span className="block truncate font-semibold">{minutesToHHMM(blk.start % 1440)} {b.contact?.name || '—'}</span>
-                            <span className="block truncate text-[#6b6156]">{blk.kind === 'assistant' ? '助理 · ' : ''}{b.service_snapshot.name}</span>
-                          </>
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
+    <div className="overflow-hidden rounded-3xl border border-[#ece4d9] bg-white shadow-[0_1px_3px_#2b1d1408]">
+      <div className="flex items-center gap-2 border-b border-[#f0ebe2] px-3 py-2">
+        <p className="min-w-0 flex-1 truncate text-xs! text-[#8a7f72]">{dateLabel(date)} · {shown.length} 筆預約{closedAll.length ? ' · 有休假設定' : ''}{day.length > shown.length ? ` · 已取消 ${day.filter((b) => b.status === 'cancelled').length} 筆` : ''}</p>
+        {data.resources.length ? (
+          <div className="flex shrink-0 gap-1 rounded-full bg-[#f3ede4] p-0.5" role="group" aria-label="日曆欄位">
+            {([['staff', '人員'], ['seat', '座位']] as const).map(([k, label]) => (
+              <button key={k} type="button" aria-pressed={mode === k} onClick={() => setMode(k)} className={`rounded-full px-2.5 py-0.5 text-xs! ${mode === k ? 'bg-white font-semibold! text-[#1f1b19]' : 'text-[#6b6156]'}`}>{label}</button>
             ))}
           </div>
+        ) : null}
+      </div>
+      <div className="overflow-x-auto">
+        <div className="flex" style={{ minWidth: wide ? `${44 + columns.length * 120}px` : undefined }}>
+          <div className="w-11 shrink-0 border-r border-[#f0ebe2]">
+            {wide ? <div className="h-8 border-b border-[#f0ebe2]" /> : null}
+            {hours.map((h) => <div key={h} style={{ height: HOUR_PX }} className="pr-1 pt-0.5 text-right text-[10px]! text-[#a99e8f]">{String(h % 24).padStart(2, '0')}:00</div>)}
+          </div>
+          {columns.map((col) => (
+            <div key={col.id || 'solo'} className="min-w-0 flex-1 border-r border-[#f0ebe2] last:border-r-0">
+              {wide ? <div className="flex h-8 items-center justify-center truncate border-b border-[#f0ebe2] px-1 text-xs! font-semibold!">{col.name}</div> : null}
+              <div className="relative" style={{ height: hours.length * HOUR_PX }}>
+                {hours.map((h, i) => <div key={h} className="absolute inset-x-0 border-t border-[#f5f1ea]" style={{ top: i * HOUR_PX }} />)}
+                {blocksFor(col.id).sort((x, y) => (x.kind === 'wait' ? -1 : 0) - (y.kind === 'wait' ? -1 : 0)).map((blk) => {
+                  const b = blk.booking;
+                  const top = ((blk.start - startH * 60) / 60) * HOUR_PX;
+                  const height = Math.max(blk.kind === 'wait' ? 14 : 22, ((blk.end - blk.start) / 60) * HOUR_PX - 2);
+                  const tone = staffTone(data, blk.kind === 'assistant' ? data.allocations.find((a) => a.id === blk.key)?.staff_id : b.staff_id);
+                  const who = data.staff.find((s) => s.id === b.staff_id)?.name;
+                  const res = data.resources.find((r) => r.id === b.resource_id)?.name;
+                  const style = blk.kind === 'wait'
+                    ? { top, height, background: '#eef5ee', color: '#2f5a3a', borderColor: 'transparent' }
+                    : { top, height, background: b.status === 'pending' ? '#fff6e6' : tone.soft, borderColor: b.status === 'pending' ? '#e7c98f' : tone.bar, color: '#2b2622', opacity: ['completed', 'no_show'].includes(b.status) ? 0.6 : 1 };
+                  return (
+                    <button key={blk.key} type="button" onClick={() => setSelected(b.id === selected ? '' : b.id)} style={style}
+                      className={`absolute inset-x-1 overflow-hidden rounded-xl border-l-4 px-2 ${height < 40 ? 'py-px' : 'py-1'} text-left text-[11px]! leading-4! ${b.id === selected ? 'ring-2 ring-[#1f1b19]' : ''}`}>
+                      {blk.kind === 'wait' ? (
+                        <span className="block truncate">等待 · 可接其他客人</span>
+                      ) : height < 40 ? (
+                        <span className="block truncate font-semibold!">{minutesToHHMM(blk.start % 1440)} {b.contact?.name || '—'}<span className="font-normal! text-[#6b6156]"> · {blk.kind === 'assistant' ? '助理' : b.service_snapshot.name}</span></span>
+                      ) : (
+                        <>
+                          <span className="block truncate font-semibold!">{team && who && !wide ? `${who} / ` : ''}{blk.kind === 'assistant' ? '助理 · ' : ''}{b.service_snapshot.name}</span>
+                          <span className="block truncate text-[#6b6156]">{b.contact?.name || '—'} · {minutesToHHMM(blk.start % 1440)}–{minutesToHHMM(blk.end % 1440)}</span>
+                          {res && height > 60 ? <span className="block truncate text-[#8a7f72]">{res}</span> : null}
+                        </>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
         </div>
       </div>
+    </div>
+  );
+}
 
-      <div className="flex justify-end">
-        <button type="button" onClick={() => setAdding(true)} className={btnDark}>+ 在這天加單</button>
+// 週視圖:七天各一欄,依人員上色
+function WeekGrid({ data, days, bookings, selected, setSelected, onDay }: { data: Data; days: string[]; bookings: BkBooking[]; selected: string; setSelected: (id: string) => void; onDay: (d: string) => void }) {
+  const inWeek = bookings.filter((b) => days.includes(localParts(b.start_at).date));
+  const startH = Math.floor(Math.min(10 * 60, ...data.hours.map((h) => h.start_min), ...inWeek.map((b) => localParts(b.start_at).minutes)) / 60);
+  const endH = Math.min(24, Math.ceil(Math.max(19 * 60, ...data.hours.map((h) => h.end_min), ...inWeek.map((b) => localParts(b.end_at).minutes || 1440)) / 60));
+  const hours = Array.from({ length: endH - startH }, (_, i) => startH + i);
+  return (
+    <div className="overflow-hidden rounded-3xl border border-[#ece4d9] bg-white shadow-[0_1px_3px_#2b1d1408]">
+      <div className="overflow-x-auto">
+        <div className="flex min-w-[460px]">
+          <div className="w-10 shrink-0 border-r border-[#f0ebe2]">
+            <div className="h-11 border-b border-[#f0ebe2]" />
+            {hours.map((h) => <div key={h} style={{ height: WEEK_HOUR_PX }} className="pr-1 pt-0.5 text-right text-[10px]! text-[#a99e8f]">{String(h).padStart(2, '0')}</div>)}
+          </div>
+          {days.map((d) => (
+            <div key={d} className="min-w-0 flex-1 border-r border-[#f0ebe2] last:border-r-0">
+              <button type="button" onClick={() => onDay(d)} className={`flex h-11 w-full flex-col items-center justify-center border-b border-[#f0ebe2] text-[11px]! ${d === data.today ? 'font-semibold! text-[#9a3b2e]' : 'text-[#6b6156]'}`}>
+                <span>{WEEKDAYS[weekdayOf(d)]}</span><span className="text-sm!">{Number(d.slice(8))}</span>
+              </button>
+              <div className="relative" style={{ height: hours.length * WEEK_HOUR_PX }}>
+                {hours.map((h, i) => <div key={h} className="absolute inset-x-0 border-t border-[#f5f1ea]" style={{ top: i * WEEK_HOUR_PX }} />)}
+                {inWeek.filter((b) => localParts(b.start_at).date === d).map((b) => {
+                  const s = localParts(b.start_at).minutes;
+                  const e = localParts(b.end_at).date > d ? 1440 : localParts(b.end_at).minutes;
+                  const tone = staffTone(data, b.staff_id);
+                  const top = ((s - startH * 60) / 60) * WEEK_HOUR_PX;
+                  const height = Math.max(18, ((e - s) / 60) * WEEK_HOUR_PX - 2);
+                  return (
+                    <button key={b.id} type="button" onClick={() => setSelected(b.id === selected ? '' : b.id)} style={{ top, height, background: b.status === 'pending' ? '#fff6e6' : tone.soft, borderColor: b.status === 'pending' ? '#e7c98f' : tone.bar }}
+                      className={`absolute inset-x-0.5 overflow-hidden rounded-md border-l-[3px] px-1 text-left text-[10px]! leading-[13px]! text-[#2b2622] ${b.id === selected ? 'ring-2 ring-[#1f1b19]' : ''}`}>
+                      <span className="block truncate font-semibold!">{minutesToHHMM(s)}</span>
+                      {height > 28 ? <span className="block truncate">{b.contact?.name || b.service_snapshot.name}</span> : null}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
-      {adding ? <NewBooking key={date} data={data} initialDate={date} onClose={() => setAdding(false)} onDone={() => { setAdding(false); void reload(); }} /> : null}
-      {sel ? <BookingCard key={`${sel.id}-${sel.version}`} booking={sel} data={data} reload={reload} /> : <p className="text-center text-xs text-[#a99e8f]">點日曆上的預約查看詳細與操作</p>}
+    </div>
+  );
+}
+
+// 月視圖:每天列出前幾筆(依人員上色),點日期看當天
+function MonthBoard({ data, month, byDate, today, onDay }: { data: Data; month: string; byDate: (d: string) => BkBooking[]; today: string; onDay: (d: string) => void }) {
+  const [y, m] = month.split('-').map(Number);
+  return (
+    <div className="rounded-3xl border border-[#ece4d9] bg-white p-2 shadow-[0_1px_3px_#2b1d1408]">
+      <div className="grid grid-cols-7 text-center text-[11px]! text-[#a99e8f]">{WEEKDAYS.map((w) => <span key={w} className="py-1">{w}</span>)}</div>
+      <div className="grid grid-cols-7 gap-px overflow-hidden rounded-xl bg-[#f0ebe2]">
+        {monthCells(y, m).map((d, i) => {
+          if (!d) return <span key={`e${i}`} className="min-h-[64px] bg-[#faf7f2]" />;
+          const list = byDate(d);
+          return (
+            <button key={d} type="button" onClick={() => onDay(d)} className="flex min-h-[64px] min-w-0 flex-col items-stretch gap-0.5 bg-white p-0.5 text-left">
+              <span className={`mx-auto flex h-5 w-5 items-center justify-center rounded-full text-[11px]! ${d === today ? 'bg-[#1f1b19] font-semibold! text-white' : 'text-[#3d3631]'}`}>{Number(d.slice(8))}</span>
+              {list.slice(0, 2).map((b) => {
+                const tone = staffTone(data, b.staff_id);
+                return <span key={b.id} className="block truncate rounded px-0.5 text-[9px]! leading-[13px]" style={{ background: tone.soft, color: tone.text }}>{minutesToHHMM(localParts(b.start_at).minutes)}</span>;
+              })}
+              {list.length > 2 ? <span className="text-center text-[9px]! leading-3 text-[#8a7f72]">+{list.length - 2}</span> : null}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// 年視圖:12 個月的預約量(顏色越深越多),點月份看那個月
+function YearBoard({ year, marks, today, onMonth }: { year: number; marks: Record<string, number>; today: string; onMonth: (d: string) => void }) {
+  return (
+    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+      {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => {
+        const cells = monthCells(year, m);
+        const count = cells.reduce((n, d) => n + (d ? marks[d] ?? 0 : 0), 0);
+        return (
+          <button key={m} type="button" onClick={() => onMonth(`${year}-${String(m).padStart(2, '0')}-01`)} className="rounded-2xl border border-[#ece4d9] bg-white p-2 text-left">
+            <span className="flex items-baseline justify-between"><span className="text-sm! font-semibold!">{m} 月</span><span className="text-[11px]! text-[#8a7f72]">{count ? `${count} 筆` : ''}</span></span>
+            <span className="mt-1 grid grid-cols-7 gap-0.5">
+              {cells.map((d, j) => {
+                const n = d ? marks[d] ?? 0 : 0;
+                return <span key={d ?? `e${j}`} className={`aspect-square rounded-[3px] ${d === today ? 'ring-1 ring-[#1f1b19]' : ''}`} style={{ background: !d ? 'transparent' : n >= 4 ? '#b5523f' : n >= 2 ? '#d99b7c' : n ? '#efcfb6' : '#f5f0e8' }} />;
+              })}
+            </span>
+          </button>
+        );
+      })}
     </div>
   );
 }

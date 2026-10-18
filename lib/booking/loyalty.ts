@@ -7,9 +7,10 @@ import type { BkBusiness } from './shared';
 
 const db = () => createAdminClient();
 
-export type PackageProduct = { id: string; name: string; service_ids: string[]; sessions: number; price: number; valid_days: number; active: boolean };
+// scope:service = 主服務票券(service_ids 空 = 全部服務);addon = 加購票券(addon_ids 空 = 全部加購)
+export type PackageProduct = { id: string; name: string; scope: 'service' | 'addon'; service_ids: string[]; addon_ids: string[]; sessions: number; price: number; valid_days: number; active: boolean };
 export type CustomerPackage = {
-  id: string; customer_id: string; name: string; service_ids: string[]; sessions_total: number; price_paid: number; pay_method: string;
+  id: string; customer_id: string; name: string; scope: 'service' | 'addon'; service_ids: string[]; addon_ids: string[]; sessions_total: number; price_paid: number; pay_method: string;
   expires_at: string; status: 'active' | 'refunded'; created_at: string; available: number; used: number; reserved: number;
 };
 
@@ -24,7 +25,9 @@ export async function saveProduct(ownerUserId: string, input: Partial<PackagePro
   const business = await owned(ownerUserId);
   const row = {
     name: String(input.name ?? '').trim().slice(0, 40),
-    service_ids: (input.service_ids ?? []).filter((x) => /^[0-9a-f-]{36}$/.test(x)).slice(0, 20),
+    scope: input.scope === 'addon' ? 'addon' : 'service',
+    service_ids: input.scope === 'addon' ? [] : (input.service_ids ?? []).filter((x) => /^[0-9a-f-]{36}$/.test(x)).slice(0, 20),
+    addon_ids: input.scope === 'addon' ? (input.addon_ids ?? []).filter((x) => /^[0-9a-f-]{36}$/.test(x)).slice(0, 30) : [],
     sessions: Math.min(100, Math.max(1, Math.round(Number(input.sessions) || 1))),
     price: Math.max(0, Math.round(Number(input.price) || 0)),
     valid_days: Math.min(3650, Math.max(1, Math.round(Number(input.valid_days) || 365))),

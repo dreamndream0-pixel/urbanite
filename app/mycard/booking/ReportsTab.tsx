@@ -1,10 +1,11 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { DateField } from '@/app/components/BookingDatePicker';
 import { uiAlert, uiConfirm } from '@/lib/ui-dialog';
 import { uiToast } from '@/lib/ui-toast';
 import { addDays, formatDateTime, money, PAY_METHOD_LABEL } from '@/lib/booking/shared';
-import { api, btnSm, card, errMsg, input, type Data } from './ui';
+import { api, btnSm, card, errMsg, type Data } from './ui';
 
 type Report = {
   from: string; to: string;
@@ -74,9 +75,9 @@ export default function ReportsTab({ data }: { data: Data }) {
           ))}
         </div>
         {preset === 'custom' ? (
-          <div className="grid grid-cols-2 gap-2">
-            <input type="date" value={range.from} onChange={(e) => e.target.value && setRange({ ...range, from: e.target.value })} aria-label="開始日期" className={`${input} min-w-0`} />
-            <input type="date" value={range.to} onChange={(e) => e.target.value && setRange({ ...range, to: e.target.value })} aria-label="結束日期" className={`${input} min-w-0`} />
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            <DateField value={range.from} onChange={(d) => d && setRange({ ...range, from: d })} />
+            <DateField value={range.to} onChange={(d) => d && setRange({ ...range, to: d })} />
           </div>
         ) : <p className="text-xs text-[#8a7f72]">{range.from} ~ {range.to}</p>}
       </section>

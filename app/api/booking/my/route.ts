@@ -47,7 +47,7 @@ export async function GET() {
     records: records.map((r) => ({ ...r, business: bizInfo(r.business_id) })),
     waitlist: (waitlist ?? []).map((w) => ({ ...w, service_name: (wsvc ?? []).find((s) => s.id === w.service_id)?.name ?? '', business: bizInfo(w.business_id) })),
     prefs: (optRows ?? []).map((o) => ({ business: bizInfo(o.business_id), marketing_opt_out: o.marketing_opt_out })),
-    packages: pkgs.filter((p) => p.status === 'active').map((p) => ({ id: p.id, name: p.name, service_ids: p.service_ids, available: p.available, used: p.used, reserved: p.reserved, sessions_total: p.sessions_total, expires_at: p.expires_at, business: bizInfo((myCustomers ?? []).find((c) => c.id === p.customer_id)?.business_id ?? '') })),
+    packages: pkgs.filter((p) => p.status === 'active').map((p) => ({ id: p.id, name: p.name, scope: p.scope ?? 'service', service_ids: p.service_ids, addon_ids: p.addon_ids ?? [], available: p.available, used: p.used, reserved: p.reserved, sessions_total: p.sessions_total, expires_at: p.expires_at, business: bizInfo((myCustomers ?? []).find((c) => c.id === p.customer_id)?.business_id ?? '') })),
     points: (myCustomers ?? []).map((c) => ({ business: bizInfo(c.business_id), points: pts.get(c.id) ?? 0 })).filter((x) => x.points > 0),
     quotes: (quotes ?? []).map((q) => ({
       ...q, business: bizInfo(q.business_id),

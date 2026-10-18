@@ -34,3 +34,18 @@ export const isTeam = (data: Pick<Data, 'staff'>) => data.staff.filter((s) => s.
 
 // 可接主要服務的人員(助理只做助理步驟)
 export const stylists = (data: Pick<Data, 'staff'>) => data.staff.filter((s) => s.active && s.role !== 'assistant');
+
+// 每位人員一個顏色(預約卡左側色條、日曆區塊、人員頭像)
+const TONES = [
+  { bar: '#e9a48f', soft: '#fbe9e3', text: '#9a4a36' },
+  { bar: '#e1bf8a', soft: '#f8eedb', text: '#8a6224' },
+  { bar: '#9db8d9', soft: '#e7eff8', text: '#3f5f86' },
+  { bar: '#a9c9a4', soft: '#e9f3e7', text: '#3d6a38' },
+  { bar: '#c3a8d6', soft: '#f1e9f7', text: '#674a80' },
+  { bar: '#e4a8bf', soft: '#fae9f0', text: '#8e4560' },
+];
+export type Tone = (typeof TONES)[number];
+export function staffTone(data: Pick<Data, 'staff'>, staffId: string | null | undefined): Tone {
+  const i = data.staff.findIndex((s) => s.id === staffId);
+  return TONES[(i < 0 ? 0 : i) % TONES.length];
+}

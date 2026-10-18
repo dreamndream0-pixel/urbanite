@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { DateField } from '@/app/components/BookingDatePicker';
 import { uiAlert, uiConfirm } from '@/lib/ui-dialog';
 import { uiToast } from '@/lib/ui-toast';
 import { shrinkImage } from '@/lib/booking/shrink-image';
@@ -190,7 +191,7 @@ function NewRecord({ customerId, bookings, data, onDone, onCancel }: { customerI
       ) : null}
       <div className="grid grid-cols-2 gap-2">
         <label className="block text-xs text-[#8a7f72]">服務<input value={f.service_name} onChange={(e) => setF({ ...f, service_name: e.target.value })} maxLength={60} className={`${input} mt-1`} /></label>
-        <label className="block text-xs text-[#8a7f72]">日期<input type="date" value={f.performed_on} onChange={(e) => setF({ ...f, performed_on: e.target.value })} className={`${input} mt-1`} /></label>
+        <div className="block text-xs text-[#8a7f72]">日期<DateField value={f.performed_on} onChange={(d) => setF({ ...f, performed_on: d })} className="mt-1" /></div>
       </div>
       <label className="block text-xs text-[#8a7f72]">紀錄(配方、施作細節)<textarea value={f.content} onChange={(e) => setF({ ...f, content: e.target.value })} rows={3} maxLength={2000} placeholder="例:7N + 8/43(1:1),雙氧 6%,停留 35 分" className={`${input} mt-1 resize-none`} /></label>
       <div className="flex justify-end gap-2"><button type="button" onClick={onCancel} className={btnSm}>取消</button><button type="button" disabled={busy} onClick={() => void save()} className={`${btnSm} border-[#1f1b19] bg-[#1f1b19] text-white`}>儲存紀錄</button></div>

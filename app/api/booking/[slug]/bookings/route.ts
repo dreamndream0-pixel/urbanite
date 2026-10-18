@@ -27,6 +27,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
       staffId: body?.staff_id ? String(body.staff_id) : null,
       extras: Array.isArray(body?.extra_ids) ? (body.extra_ids as unknown[]).map(String).slice(0, 3) : [],
       packageId: body?.package_id ? String(body.package_id) : null,
+      addonPackages: Array.isArray(body?.addon_packages) ? (body.addon_packages as { addon_id?: unknown; package_id?: unknown }[]).slice(0, 20).map((x) => ({ addon_id: String(x?.addon_id ?? ''), package_id: String(x?.package_id ?? '') })) : [],
       branchId: body?.branch_id ? String(body.branch_id) : null,
       startAt: String(body?.start_at ?? ''),
       contact: { name, phone, note: String(body?.contact?.note ?? '') },

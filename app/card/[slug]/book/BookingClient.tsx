@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { DateField } from '@/app/components/BookingDatePicker';
 import Link from 'next/link';
 import { uiAlert, uiConfirm } from '@/lib/ui-dialog';
 import { uiToast } from '@/lib/ui-toast';
@@ -21,7 +22,7 @@ type Branch = { id: string; name: string; address: string };
 type Staff = { id: string; name: string; title: string; avatar: string; branch_ids?: string[] };
 type Business = { name: string; address: string; notice: string; approval_mode: 'auto' | 'manual'; cancel_hours: number; allow_any_staff: boolean; payment_info: string; service_area: string; waitlist: boolean; open: boolean };
 type MyWait = { id: string; service_name: string; date: string; from_min: number; to_min: number; status: 'waiting' | 'invited'; invited_slot: string | null; invite_expires_at: string | null; service_id: string; staff_id: string | null; business: { slug: string } };
-type MyPackage = { id: string; name: string; service_ids: string[]; available: number; used: number; reserved: number; sessions_total: number; expires_at: string; business: { slug: string } };
+type MyPackage = { id: string; name: string; scope?: 'service' | 'addon'; service_ids: string[]; addon_ids?: string[]; available: number; used: number; reserved: number; sessions_total: number; expires_at: string; business: { slug: string } };
 type MyRecord = {
   id: string; service_name: string; performed_on: string; consent: 'none' | 'requested' | 'granted' | 'declined' | 'revoked'; delete_requested: boolean;
   business: { name: string; slug: string }; photos: { id: string; kind: 'before' | 'after' | 'other' }[];
@@ -77,8 +78,22 @@ export default function BookingClient({ slug, card, business, services: allServi
   const idemKey = useRef('');
   const service = services.find((s) => s.id === serviceId) ?? null;
   const isQuote = service?.price_mode === 'quote';
-  const pkg = service ? auth?.packages.find((p) => p.available > 0 && (!p.service_ids.length || p.service_ids.includes(service.id))) ?? null : null;
+  const pkg = service ? auth?.packages.find((p) => (p.scope ?? 'service') === 'service' && p.available > 0 && (!p.service_ids.length || p.service_ids.includes(service.id))) ?? null : null;
   const pkgOn = Boolean(pkg && usePackage);
+  // 加購票券:每個勾選的加購找一張可用的加購票券(同一張票券依剩餘次數分配);顧客可取消勾選
+  const [skipAddonPkg, setSkipAddonPkg] = useState<string[]>([]);
+  const addonPkgs = useMemo(() => {
+    const left = new Map((auth?.packages ?? []).filter((p) => p.scope === 'addon' && p.available > 0).map((p) => [p.id, p.available]));
+    const out: { addon_id: string; package_id: string; name: string; available: number; on: boolean }[] = [];
+    for (const id of service ? addonIds.filter((x) => service.addons.some((a) => a.id === x)) : []) {
+      const p = (auth?.packages ?? []).find((x) => x.scope === 'addon' && (left.get(x.id) ?? 0) > 0 && (!x.addon_ids?.length || x.addon_ids.includes(id)));
+      if (!p) continue;
+      const on = !skipAddonPkg.includes(id);
+      if (on) left.set(p.id, (left.get(p.id) ?? 0) - 1);
+      out.push({ addon_id: id, package_id: p.id, name: p.name, available: p.available, on });
+    }
+    return out;
+  }, [auth?.packages, service, addonIds, skipAddonPkg]);
   const here = `/@${slug}/book`;
 
   // 這個服務可選的人員;只有一位時不顯示人員步驟
@@ -183,7 +198,7 @@ export default function BookingClient({ slug, card, business, services: allServi
       const res = await fetch(`/api/booking/${encodeURIComponent(slug)}/bookings`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Idempotency-Key': idemKey.current },
-        body: JSON.stringify({ service_id: service.id, addon_ids: addonIds, extra_ids: extraIds, package_id: pkgOn ? pkg!.id : null, branch_id: branchId || null, staff_id: staffParam || null, start_at: startAt, contact, channel: /Line\//.test(navigator.userAgent) ? 'line' : 'card' }),
+        body: JSON.stringify({ service_id: service.id, addon_ids: addonIds, extra_ids: extraIds, package_id: pkgOn ? pkg!.id : null, addon_packages: addonPkgs.filter((x) => x.on).map((x) => ({ addon_id: x.addon_id, package_id: x.package_id })), branch_id: branchId || null, staff_id: staffParam || null, start_at: startAt, contact, channel: /Line\//.test(navigator.userAgent) ? 'line' : 'card' }),
       });
       const data = await res.json().catch(() => null);
       if (!res.ok) {
@@ -379,7 +394,16 @@ export default function BookingClient({ slug, card, business, services: allServi
                   {pkg ? (
                     <label className="flex items-center gap-2 rounded-lg bg-[#eef6ef] px-2.5 py-2 text-[#2f5a3a]"><input type="checkbox" checked={usePackage} onChange={(e) => setUsePackage(e.target.checked)} />使用套票「{pkg.name}」(剩 {pkg.available} 次)</label>
                   ) : null}
-                  <p>{pkgOn ? `主服務由套票支付${quote.total - (quote.base ?? 0) > 0 ? `,其他項目 ${money(quote.total - (quote.base ?? 0))}` : ''}` : priceText(quote.total, quote.varies ? '起(依人員)' : service.price_note)}</p>
+                  {addonPkgs.map((x) => {
+                    const a = service.addons.find((y) => y.id === x.addon_id);
+                    return <label key={x.addon_id} className="flex items-center gap-2 rounded-lg bg-[#eef6ef] px-2.5 py-2 text-[#2f5a3a]"><input type="checkbox" checked={x.on} onChange={(e) => setSkipAddonPkg((list) => (e.target.checked ? list.filter((id) => id !== x.addon_id) : [...list, x.addon_id]))} />加購「{a?.name}」用票券「{x.name}」(剩 {x.available} 次)</label>;
+                  })}
+                  {(() => {
+                    const addonCovered = addonPkgs.filter((x) => x.on).reduce((n, x) => n + (service.addons.find((y) => y.id === x.addon_id)?.price ?? 0), 0);
+                    const rest = quote.total - (pkgOn ? quote.base ?? 0 : 0) - addonCovered;
+                    if (!pkgOn && !addonCovered) return <p>{priceText(quote.total, quote.varies ? '起(依人員)' : service.price_note)}</p>;
+                    return <p>{[pkgOn ? '主服務' : '', addonCovered ? '加購' : ''].filter(Boolean).join('、')}由票券支付{rest > 0 ? `,其他項目 ${money(rest)}` : ''}</p>;
+                  })()}
                   {quote.deposit && !pkgOn ? <p className="text-[#9a6412]">需付訂金 {money(quote.deposit)}(轉帳){business.approval_mode === 'manual' ? ',店家確認後再付' : ''},{quote.total ? `到店再付尾款 ${money(Math.max(0, quote.total - quote.deposit))}` : '其餘到店付'}</p> : null}
                   {branch ? <p className="text-xs text-[#8a7f72]">分店:{branch.name}{branch.address ? ` · ${branch.address}` : ''}</p> : business.address ? <p className="text-xs text-[#8a7f72]">地點:{business.address}</p> : null}
                 </div>
@@ -810,7 +834,7 @@ function InquiryForm({ slug, service, staff, business, auth, loginNext, onDone }
       <div className="space-y-3 rounded-2xl bg-white p-4">
         <p className="text-xs leading-5 text-[#8a7f72]">送出後由店家依需求報價,報價前不會保留檔期。{outcall && business.service_area ? ` 服務範圍:${business.service_area}` : ''}</p>
         <div className="grid grid-cols-2 gap-3">
-          <label className="block text-xs text-[#8a7f72]">活動日期<input type="date" min={today} value={f.event_date} onChange={(e) => set('event_date', e.target.value)} className={field} /></label>
+          <div className="block text-xs text-[#8a7f72]">活動日期<DateField value={f.event_date} min={today} onChange={(d) => set('event_date', d)} className="mt-1" /></div>
           <label className="block text-xs text-[#8a7f72]">需完成 / 開始時間<input type="time" step={900} value={f.time} onChange={(e) => set('time', e.target.value)} className={field} /></label>
         </div>
         <label className="block text-xs text-[#8a7f72]">活動類型<input value={f.event_type} onChange={(e) => set('event_type', e.target.value)} maxLength={40} placeholder="例:結婚宴客、訂婚、拍攝…" className={field} /></label>

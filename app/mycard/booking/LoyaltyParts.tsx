@@ -8,7 +8,7 @@ import type { CustomerPackage } from '@/lib/booking/loyalty';
 import { api, btnSm, card, errMsg, input, type Data } from './ui';
 
 // ---------- 設定:套票商品 ----------
-type ProductDraft = { id?: string; name: string; service_ids: string[]; sessions: number; price: number; valid_days: number; active: boolean };
+type ProductDraft = { id?: string; name: string; scope: 'service' | 'addon'; service_ids: string[]; addon_ids: string[]; sessions: number; price: number; valid_days: number; active: boolean };
 
 export function PackageProducts({ data, reload }: { data: Data; reload: () => Promise<void> }) {
   const [editing, setEditing] = useState<ProductDraft | null>(null);
@@ -27,9 +27,9 @@ export function PackageProducts({ data, reload }: { data: Data; reload: () => Pr
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <p className="font-semibold">套票</p>
-          <p className="text-xs text-[#8a7f72]">例:頭皮護理 10 次。在「顧客」檔案裡售出;預約時保留 1 次,完成才扣,取消會退回。</p>
+          <p className="text-xs text-[#8a7f72]">例:頭皮護理 10 次、卸甲加購 5 次。在「顧客」檔案裡售出;預約時保留 1 次,完成才扣,取消會退回。</p>
         </div>
-        <button type="button" onClick={() => setEditing({ name: '', service_ids: [], sessions: 10, price: 0, valid_days: 365, active: true })} className={`${btnSm} shrink-0`}>+ 新增</button>
+        <button type="button" onClick={() => setEditing({ name: '', scope: 'service', service_ids: [], addon_ids: [], sessions: 10, price: 0, valid_days: 365, active: true })} className={`${btnSm} shrink-0`}>+ 新增</button>
       </div>
       {editing ? (
         <div className="space-y-2 rounded-xl bg-[#faf7f2] p-3">
@@ -39,6 +39,26 @@ export function PackageProducts({ data, reload }: { data: Data; reload: () => Pr
             <label className="block text-xs text-[#8a7f72]">售價<input inputMode="numeric" value={editing.price || ''} onChange={(e) => setEditing({ ...editing, price: Number(e.target.value.replace(/\D/g, '')) || 0 })} className={`${input} mt-1`} /></label>
             <label className="block text-xs text-[#8a7f72]">有效天數<input inputMode="numeric" value={editing.valid_days || ''} onChange={(e) => setEditing({ ...editing, valid_days: Number(e.target.value.replace(/\D/g, '')) || 0 })} className={`${input} mt-1`} /></label>
           </div>
+          <div className="grid grid-cols-2 gap-2" role="group" aria-label="票券種類">
+            {([['service', '服務票券', '折抵主服務'], ['addon', '加購票券', '折抵加購項目']] as const).map(([k, label, hint]) => (
+              <button key={k} type="button" aria-pressed={editing.scope === k} onClick={() => setEditing({ ...editing, scope: k })} className={`rounded-xl border bg-white p-2 text-left ${editing.scope === k ? 'border-[#1f1b19] ring-2 ring-[#1f1b19]/10' : 'border-[#e5ded4]'}`}>
+                <span className="block text-sm font-semibold">{label}</span><span className="block text-[11px] text-[#8a7f72]">{hint}</span>
+              </button>
+            ))}
+          </div>
+          {editing.scope === 'addon' ? (
+            <div>
+              <p className="text-xs text-[#8a7f72]">可兌換的加購(都不勾 = 全部加購)</p>
+              <div className="mt-1 flex flex-wrap gap-1.5">
+                {data.addons.filter((a) => a.active).map((a) => {
+                  const on = editing.addon_ids.includes(a.id);
+                  const svc = data.services.find((s) => s.id === a.service_id)?.name;
+                  return <button key={a.id} type="button" aria-pressed={on} onClick={() => setEditing({ ...editing, addon_ids: on ? editing.addon_ids.filter((x) => x !== a.id) : [...editing.addon_ids, a.id] })} className={`rounded-full px-2.5 py-1 text-xs ${on ? 'bg-[#1f1b19] text-white' : 'border border-[#d7c9bd] bg-white'}`}>{a.name}{svc ? `(${svc})` : ''}</button>;
+                })}
+                {!data.addons.some((a) => a.active) ? <span className="text-xs text-[#a99e8f]">還沒有加購項目,請先到「服務」新增</span> : null}
+              </div>
+            </div>
+          ) : (
           <div>
             <p className="text-xs text-[#8a7f72]">可兌換的服務(都不勾 = 全部服務)</p>
             <div className="mt-1 flex flex-wrap gap-1.5">
@@ -48,6 +68,7 @@ export function PackageProducts({ data, reload }: { data: Data; reload: () => Pr
               })}
             </div>
           </div>
+          )}
           <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={editing.active} onChange={(e) => setEditing({ ...editing, active: e.target.checked })} />販售中</label>
           <div className="flex justify-end gap-2"><button type="button" onClick={() => setEditing(null)} className={btnSm}>取消</button><button type="button" disabled={busy} onClick={() => void save()} className={`${btnSm} border-[#1f1b19] bg-[#1f1b19] text-white`}>儲存</button></div>
         </div>
@@ -56,8 +77,8 @@ export function PackageProducts({ data, reload }: { data: Data; reload: () => Pr
         <div className="divide-y divide-[#f0ebe2]">
           {data.products.map((p) => (
             <div key={p.id} className={`flex items-center gap-2 py-2 text-sm ${p.active ? '' : 'opacity-60'}`}>
-              <span className="min-w-0 flex-1 truncate">{p.name} · {p.sessions} 次 · {money(p.price)} · {p.valid_days} 天{p.active ? '' : '(停售)'}</span>
-              <button type="button" onClick={() => setEditing({ ...p })} className={btnSm}>編輯</button>
+              <span className="min-w-0 flex-1 truncate">{p.scope === 'addon' ? '【加購】' : ''}{p.name} · {p.sessions} 次 · {money(p.price)} · {p.valid_days} 天{p.active ? '' : '(停售)'}</span>
+              <button type="button" onClick={() => setEditing({ ...p, scope: p.scope ?? 'service', addon_ids: p.addon_ids ?? [] })} className={btnSm}>編輯</button>
             </div>
           ))}
         </div>

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { DateField } from '@/app/components/BookingDatePicker';
 import { uiAlert, uiConfirm } from '@/lib/ui-dialog';
 import { uiToast } from '@/lib/ui-toast';
 import { formatDateTime, formatRange, money, QUOTE_STATUS_LABEL, type BkQuote, type BkQuoteVersion } from '@/lib/booking/shared';
@@ -163,9 +164,9 @@ function QuoteForm({ quote: q, current, data, onDone, onCancel }: { quote: BkQuo
             {staffList.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
           </select>
         </label>
-        <label className="block text-xs text-[#8a7f72]">服務日期
-          <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={`${input} mt-1`} />
-        </label>
+        <div className="col-span-2 block text-xs text-[#8a7f72]">服務日期
+          <DateField value={date} onChange={(d) => setDate(d)} className="mt-1" />
+        </div>
         <label className="block text-xs text-[#8a7f72]">開始時間
           <input type="time" step={900} value={time} onChange={(e) => setTime(e.target.value)} className={`${input} mt-1`} />
         </label>

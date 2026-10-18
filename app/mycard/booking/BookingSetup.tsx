@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { DateField } from '@/app/components/BookingDatePicker';
 import { uiAlert, uiConfirm } from '@/lib/ui-dialog';
 import { uiToast } from '@/lib/ui-toast';
 import {
@@ -531,7 +532,7 @@ export function HoursTab({ data, reload }: { data: Data; reload: () => Promise<v
         <p className="mt-1 text-xs text-[#8a7f72]">設定後這段時間不能預約;已成立的預約不會被自動取消。</p>
         <div className="mt-3 space-y-2">
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-            <input type="date" value={off.date} min={localParts(new Date()).date} onChange={(e) => setOff({ ...off, date: e.target.value })} className={input} aria-label="日期" />
+            <DateField value={off.date} min={localParts(new Date()).date} onChange={(d) => setOff({ ...off, date: d })} />
             {data.branches.length ? (
               <select value={off.branch} onChange={(e) => setOff({ ...off, branch: e.target.value })} aria-label="適用分店" className={input}>
                 <option value="">所有分店</option>
