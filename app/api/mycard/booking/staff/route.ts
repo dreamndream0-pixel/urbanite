@@ -24,6 +24,8 @@ function clean(b: Record<string, unknown>) {
     use_business_hours: b.use_business_hours === undefined ? true : Boolean(b.use_business_hours),
     role: b.role === 'assistant' ? 'assistant' : 'stylist',
     commission_rate: Math.min(100, Math.max(0, Math.round((Number(b.commission_rate) || 0) * 100) / 100)),
+    // 所屬分店(空 = 所有分店)
+    branch_ids: Array.isArray(b.branch_ids) ? [...new Set((b.branch_ids as unknown[]).filter((x): x is string => typeof x === 'string' && /^[0-9a-f-]{36}$/.test(x)))].slice(0, 20) : [],
   };
 }
 

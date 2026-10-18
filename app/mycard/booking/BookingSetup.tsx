@@ -311,7 +311,7 @@ export function ServicesTab({ data, reload }: { data: Data; reload: () => Promis
 }
 
 // ---------- 人員與床位 ----------
-type StaffDraft = { id?: string; name: string; title: string; active: boolean; use_business_hours: boolean; role: 'stylist' | 'assistant'; week: Week; commission_rate: number };
+type StaffDraft = { id?: string; name: string; title: string; active: boolean; use_business_hours: boolean; role: 'stylist' | 'assistant'; week: Week; commission_rate: number; branch_ids: string[] };
 
 export function StaffTab({ data, reload }: { data: Data; reload: () => Promise<void> }) {
   const [editing, setEditing] = useState<StaffDraft | null>(null);
@@ -320,7 +320,7 @@ export function StaffTab({ data, reload }: { data: Data; reload: () => Promise<v
   const [resBranch, setResBranch] = useState('');
 
   function edit(s: BkStaff) {
-    setEditing({ id: s.id, name: s.name, title: s.title, active: s.active, use_business_hours: s.use_business_hours, role: s.role, commission_rate: Number(s.commission_rate ?? 0), week: toWeek(data.staffHours.filter((h) => h.staff_id === s.id)) });
+    setEditing({ id: s.id, name: s.name, title: s.title, active: s.active, use_business_hours: s.use_business_hours, role: s.role, commission_rate: Number(s.commission_rate ?? 0), branch_ids: s.branch_ids ?? [], week: toWeek(data.staffHours.filter((h) => h.staff_id === s.id)) });
   }
   async function save() {
     if (!editing) return;
@@ -337,6 +337,13 @@ export function StaffTab({ data, reload }: { data: Data; reload: () => Promise<v
     } catch (e) { void uiAlert(errMsg(e, '儲存失敗')); }
     finally { setSaving(false); }
   }
+  const branches = data.branches.filter((b) => b.active);
+  const blank = (branchIds: string[] = []): StaffDraft => ({ name: '', title: '', active: true, use_business_hours: true, role: 'stylist', commission_rate: 0, branch_ids: branchIds, week: toWeek(data.hours) });
+  // 有分店時依分店分組;同一人可屬於多間分店,沒指定 = 所有分店
+  const groups: { id: string; name: string; list: BkStaff[] }[] = branches.length
+    ? [...branches.map((b) => ({ id: b.id, name: b.name, list: data.staff.filter((x) => x.branch_ids?.includes(b.id)) })), { id: '', name: '所有分店(未指定)', list: data.staff.filter((x) => !x.branch_ids?.length || !x.branch_ids.some((id) => branches.some((b) => b.id === id))) }].filter((g) => g.list.length || g.id)
+    : [{ id: '', name: '', list: data.staff }];
+
   async function remove(s: BkStaff) {
     if (!(await uiConfirm(`刪除「${s.name}」?`, { danger: true }))) return;
     try { await api(`/api/mycard/booking/staff?id=${s.id}`, { method: 'DELETE' }); void reload(); }
@@ -363,9 +370,9 @@ export function StaffTab({ data, reload }: { data: Data; reload: () => Promise<v
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0">
             <p className="font-semibold">服務人員</p>
-            <p className="text-xs text-[#8a7f72]">一人工作室保留一位即可;多位人員時,顧客可指定人員或選「不指定」。</p>
+            <p className="text-xs text-[#8a7f72]">一人工作室保留一位即可;多位人員時,顧客可指定人員或選「不指定」。{branches.length ? '人員可歸屬分店,顧客選了分店只會排到該店的人員。' : ''}</p>
           </div>
-          <button type="button" onClick={() => setEditing({ name: '', title: '', active: true, use_business_hours: true, role: 'stylist', commission_rate: 0, week: toWeek(data.hours) })} className={`${btnDark} shrink-0`}>+ 新增</button>
+          <button type="button" onClick={() => setEditing(blank())} className={`${btnDark} shrink-0`}>+ 新增</button>
         </div>
         {editing && (
           <div className="space-y-3 rounded-xl bg-[#faf7f2] p-3">
@@ -385,6 +392,17 @@ export function StaffTab({ data, reload }: { data: Data; reload: () => Promise<v
                 </button>
               ))}
             </div>
+            {branches.length ? (
+              <div>
+                <p className="text-xs text-[#8a7f72]">所屬分店(可複選;都不選 = 所有分店都能排)</p>
+                <div className="mt-1 flex flex-wrap gap-1.5">
+                  {branches.map((b) => {
+                    const on = editing.branch_ids.includes(b.id);
+                    return <button key={b.id} type="button" aria-pressed={on} onClick={() => setEditing({ ...editing, branch_ids: on ? editing.branch_ids.filter((x) => x !== b.id) : [...editing.branch_ids, b.id] })} className={`rounded-full border px-3 py-1.5 text-sm ${on ? 'border-[#1f1b19] bg-[#1f1b19] text-white' : 'border-[#e5ded4] bg-white text-[#6b6156]'}`}>{b.name}</button>;
+                  })}
+                </div>
+              </div>
+            ) : null}
             <label className="block text-xs text-[#8a7f72]">抽成比例(%,服務營收的百分比;0 = 不計)
               <input inputMode="decimal" value={editing.commission_rate || ''} onChange={(e) => setEditing({ ...editing, commission_rate: Math.min(100, Number(e.target.value.replace(/[^0-9.]/g, '')) || 0) })} placeholder="例:40" className={`${input} mt-1`} />
             </label>
@@ -397,8 +415,17 @@ export function StaffTab({ data, reload }: { data: Data; reload: () => Promise<v
             </div>
           </div>
         )}
+        {groups.map((g) => (
+        <div key={g.id || 'all'}>
+          {g.name ? (
+            <div className="mt-1 flex items-center gap-2 border-b border-[#efe8dd] pb-1.5">
+              <p className="min-w-0 flex-1 truncate text-xs font-semibold text-[#6b6156]">{g.name}<span className="ml-1 font-normal text-[#a99e8f]">{g.list.length} 位</span></p>
+              {g.id ? <button type="button" onClick={() => setEditing(blank([g.id]))} className="shrink-0 text-xs text-[#1f6f8b]">+ 新增到此分店</button> : null}
+            </div>
+          ) : null}
+          {!g.list.length ? <p className="py-2 text-xs text-[#a99e8f]">尚無人員</p> : null}
         <div className="divide-y divide-[#f0ebe2]">
-          {data.staff.map((s) => (
+          {g.list.map((s) => (
             <div key={s.id} className={`flex items-center gap-3 py-2.5 ${s.active ? '' : 'opacity-60'}`}>
               <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#efe8dd] text-sm font-semibold text-[#6b6156]">{s.name.slice(0, 1)}</span>
               <div className="min-w-0 flex-1">
@@ -410,6 +437,8 @@ export function StaffTab({ data, reload }: { data: Data; reload: () => Promise<v
             </div>
           ))}
         </div>
+        </div>
+        ))}
       </section>
 
       <section className={`${card} space-y-3`}>

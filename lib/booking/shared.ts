@@ -61,7 +61,7 @@ export type BkService = {
 
 export type BkBranch = { id: string; name: string; address: string; active: boolean; sort_order: number };
 
-export type BkStaff = { id: string; business_id: string; name: string; title: string; avatar: string; active: boolean; use_business_hours: boolean; sort_order: number; role: 'stylist' | 'assistant'; commission_rate?: number };
+export type BkStaff = { id: string; business_id: string; name: string; title: string; avatar: string; active: boolean; use_business_hours: boolean; sort_order: number; role: 'stylist' | 'assistant'; commission_rate?: number; branch_ids?: string[] };
 // 服務步驟:who = 主要人員 / 助理 / 不需人員(等待);seat = 這段是否占用座位
 export type BkServiceStep = { id?: string; service_id: string; seq: number; name: string; minutes: number; who: 'main' | 'assistant' | 'none'; seat: 'keep' | 'release' };
 export type BkAllocation = { id: string; booking_id: string; staff_id: string | null; resource_id: string | null; role: 'main' | 'assistant' | 'seat'; start_at: string; end_at: string; item_seq?: number };
@@ -103,7 +103,7 @@ export type BkBooking = {
   deposit_amount: number;
   paid_amount: number;
   payment_status: PaymentStatus;
-  payment_report: { last5?: string; amount?: number; note?: string; at?: string };
+  payment_report: { last5?: string; amount?: number; note?: string; at?: string; kind?: 'deposit' | 'full'; paid_at?: string; payer?: string };
   reschedule_count: number;
   created_by: 'customer' | 'owner';
   quote_id?: string | null;
@@ -196,6 +196,19 @@ export const PAYMENT_LABEL: Record<PaymentStatus, string> = {
 };
 
 // 預約畫面上的狀態文字:主流程 + 審核 + 收款組合而成(規格 9 章)
+// 顧客回報的付款內容,例:全額 NT $1,000 · 末 5 碼 12345 · 10/19 14:30 轉帳 · 戶名 王小明
+export function paymentReportText(r: BkBooking['payment_report'] | null | undefined) {
+  if (!r) return '';
+  const when = r.paid_at ? r.paid_at.replace('T', ' ').slice(5) : '';
+  return [
+    `${r.kind === 'full' ? '全額' : '訂金'}${r.amount ? ` ${money(r.amount)}` : ''}`,
+    `末 5 碼 ${r.last5 ?? '—'}`,
+    when ? `${when.replace('-', '/')} 轉帳` : '',
+    r.payer ? `戶名 ${r.payer}` : '',
+    r.note ?? '',
+  ].filter(Boolean).join(' · ');
+}
+
 export function statusText(b: Pick<BkBooking, 'status' | 'approval_status' | 'payment_status'> & { quote_id?: string | null }) {
   if (b.status !== 'pending') return STATUS_LABEL[b.status];
   if (b.approval_status === 'pending') return b.quote_id ? '報價保留中' : '待店家確認';

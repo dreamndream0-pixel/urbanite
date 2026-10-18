@@ -10,14 +10,18 @@ import { SERVICE_LOGO } from '@/lib/card-plan';
 import { useScrollLock } from '@/app/components/useScrollLock';
 import styles from './card-menu.module.css';
 
+// 後台模式(例:線上預約管理):選單只放這個後台的功能 + 首頁 / 我的名片 / 升級官網
+export type AppNav = { title: string; items: { href: string; label: string; active?: boolean }[] };
+
 type Me = { email: string; name: string; isAdmin?: boolean; shops?: { slug: string; name: string; current: boolean; adminUrl: string }[] } | null;
 
-export default function CardMenu({ variant = 'header', loggedIn, current, top = 12, links = [] }: {
+export default function CardMenu({ variant = 'header', loggedIn, current, top = 12, links = [], appNav }: {
   variant?: 'header' | 'floating';
   loggedIn?: boolean;
   current?: 'mycard' | 'upgrade' | 'login' | 'booking';
   top?: number;
   links?: { href: string; label: string }[];
+  appNav?: AppNav;
 }) {
   const [open, setOpen] = useState(false);
   const [closing, setClosing] = useState(false);
@@ -107,11 +111,21 @@ export default function CardMenu({ variant = 'header', loggedIn, current, top = 
           if (event.clientX < box.left || event.clientX > box.right || event.clientY < box.top || event.clientY > box.bottom) closeMenu();
         }}>
         <header className={styles.heading}>
-          <Link href="/card" onClick={event => navigate(event, '/card')} aria-label="URBANLINKS 首頁"><Image src={SERVICE_LOGO} alt="URBANLINKS" width={184} height={36} /></Link>
+          {appNav ? <p className={styles.appTitle}>{appNav.title}</p> : <Link href="/card" onClick={event => navigate(event, '/card')} aria-label="URBANLINKS 首頁"><Image src={SERVICE_LOGO} alt="URBANLINKS" width={184} height={36} /></Link>}
           <button autoFocus type="button" aria-label="關閉選單" onClick={() => closeMenu()}><X size={22} /></button>
         </header>
         <div className={styles.content}>
-          <div className={styles.navigation}>
+          {appNav ? <div className={styles.navigation}>
+            <h2 id={`${id}-title`}>功能選單</h2>
+            <nav aria-label={appNav.title}>{appNav.items.map(item => <Link key={item.href} href={item.href} onClick={event => navigate(event, item.href)} className={styles.appLink} aria-current={item.active ? 'page' : undefined}>
+              <span>{item.label}</span><ChevronRight size={16} />
+            </Link>)}</nav>
+            <div className={styles.account}>
+              <Link href="/card" onClick={event => navigate(event, '/card')}><House />首頁<ChevronRight /></Link>
+              <Link href="/mycard" onClick={event => navigate(event, '/mycard')}><UserRound />我的名片<ChevronRight /></Link>
+              <Link href="/card/pricing" onClick={event => navigate(event, '/card/pricing')}><CreditCard />升級官網<ChevronRight /></Link>
+            </div>
+          </div> : <div className={styles.navigation}>
             <h2 id={`${id}-title`}>探索 URBANLINKS</h2>
             <nav aria-label="主要導覽">{navigation.map((link, index) => <Link key={link.href + link.label} href={link.href} onClick={event => navigate(event, link.href)} className={styles.navLink} aria-current={link.href === '/card/pricing' && current === 'upgrade' ? 'page' : undefined}>
               <small>{String(index + 1).padStart(2, '0')}</small><span>{link.label}{link.href === '/card/cases' && <small>服飾・租屋・美業・LINE AI</small>}</span><ArrowRight size={19} />
@@ -125,7 +139,7 @@ export default function CardMenu({ variant = 'header', loggedIn, current, top = 
               {!navigation.some(link => link.href === '/card/pricing') && <Link href="/card/pricing" aria-current={current === 'upgrade' ? 'page' : undefined} onClick={event => navigate(event, '/card/pricing')}><CreditCard />方案價格<ChevronRight /></Link>}
               {!navigation.some(link => link.href === '/card') && <Link href="/card" onClick={event => navigate(event, '/card')}><House />URBANLINKS 首頁<ChevronRight /></Link>}
             </div>}
-          </div>
+          </div>}
         </div>
         <footer className={styles.footer}>{signedIn ? <button type="button" onClick={signOut}><LogOut size={17} />登出</button> : <><Link href="/card/login" onClick={event => navigate(event, '/card/login')}>登入</Link><Link href="/card/register" onClick={event => navigate(event, '/card/register')}>免費開始<ArrowRight size={17} /></Link></>}</footer>
       </dialog>

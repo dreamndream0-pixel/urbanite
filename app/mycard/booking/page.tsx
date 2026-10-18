@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import { getSessionUser } from '@/lib/supabase/server';
-import CardServiceHeader from '@/app/card/CardServiceHeader';
+import { Suspense } from 'react';
 import BookingManager from './BookingManager';
 
 export const dynamic = 'force-dynamic';
@@ -13,8 +13,7 @@ export default async function MyBookingPage() {
   if (!user) redirect('/card/login?next=/mycard/booking');
   return (
     <main className="min-h-screen bg-[#f6f2ec] text-[#1f1b19]">
-      <CardServiceHeader loggedIn current="booking" />
-      <BookingManager />
+      <Suspense><BookingManager /></Suspense>
     </main>
   );
 }

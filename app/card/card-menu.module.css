@@ -21,6 +21,12 @@
 .navLink > span small { display: block; font-size: 10px; font-weight: 400; color: #7a8388; margin-top: 6px; }
 .navLink > svg { flex-shrink: 0; }
 .navLink[aria-current=page] { color: #6f2940; }
+.appTitle { font-size: 16px; font-weight: 700; color: #182137; }
+.appLink { display: flex; align-items: center; gap: 10px; min-height: 50px; padding: 12px 0; border-bottom: 1px solid #e4e7e7; font-size: 16px; font-weight: 600; }
+.appLink > span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.appLink > svg { flex-shrink: 0; color: #9aa1a5; }
+.appLink[aria-current=page] { color: #6f2940; }
+.appLink[aria-current=page]::before { content: ''; width: 4px; height: 18px; border-radius: 2px; background: #6f2940; margin-left: -2px; }
 .account { margin-top: 30px; }
 .account > p { font-size: 11px; color: #788084; overflow-wrap: anywhere; margin-bottom: 10px; }
 .account a { display: flex; align-items: center; gap: 10px; min-height: 46px; font-size: 13px; padding: 10px 0; }

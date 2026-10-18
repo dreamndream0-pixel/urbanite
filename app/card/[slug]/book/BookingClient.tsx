@@ -6,8 +6,8 @@ import { uiAlert, uiConfirm } from '@/lib/ui-dialog';
 import { uiToast } from '@/lib/ui-toast';
 import { shrinkImage } from '@/lib/booking/shrink-image';
 import {
-  formatDateLabel, formatDateTime, formatRange, localParts, money, statusText, STATUS_COLOR,
-  type ApprovalStatus, type BookingStatus, type PaymentStatus,
+  formatDateLabel, formatDateTime, formatRange, localParts, money, paymentReportText, statusText, STATUS_COLOR,
+  type ApprovalStatus, type BkBooking, type BookingStatus, type PaymentStatus,
 } from '@/lib/booking/shared';
 
 type Addon = { id: string; name: string; price: number; extra_minutes: number };
@@ -18,7 +18,7 @@ type Service = {
   price_mode: 'fixed' | 'quote'; service_mode: 'in_store' | 'outcall'; branch_ids?: string[];
 };
 type Branch = { id: string; name: string; address: string };
-type Staff = { id: string; name: string; title: string; avatar: string };
+type Staff = { id: string; name: string; title: string; avatar: string; branch_ids?: string[] };
 type Business = { name: string; address: string; notice: string; approval_mode: 'auto' | 'manual'; cancel_hours: number; allow_any_staff: boolean; payment_info: string; service_area: string; waitlist: boolean; open: boolean };
 type MyWait = { id: string; service_name: string; date: string; from_min: number; to_min: number; status: 'waiting' | 'invited'; invited_slot: string | null; invite_expires_at: string | null; service_id: string; staff_id: string | null; business: { slug: string } };
 type MyPackage = { id: string; name: string; service_ids: string[]; available: number; used: number; reserved: number; sessions_total: number; expires_at: string; business: { slug: string } };
@@ -37,12 +37,12 @@ type MyBooking = {
   start_at: string; end_at: string; expires_at: string | null; version: number; staff_name: string;
   service_snapshot: { name: string; price: number; price_note?: string }; contact: { name?: string; phone?: string };
   addons: { name: string }[]; total_price: number; deposit_amount: number; paid_amount: number; reschedule_count: number;
-  payment_report: { last5?: string };
+  payment_report: BkBooking['payment_report'];
   business: { name: string; slug: string; cancel_hours: number; payment_info: string; reschedule_limit: number };
 };
 type Result = {
   booking_id: string; booking_no: string; status: BookingStatus; start_at: string; end_at: string; expires_at: string | null; version: number;
-  next_action: 'none' | 'wait_approval' | 'pay_deposit'; deposit_amount: number;
+  next_action: 'none' | 'wait_approval' | 'pay_deposit'; deposit_amount: number; total: number;
 };
 type Day = { date: string; slots: string[]; closed?: boolean };
 
@@ -82,7 +82,7 @@ export default function BookingClient({ slug, card, business, services: allServi
   const here = `/@${slug}/book`;
 
   // 這個服務可選的人員;只有一位時不顯示人員步驟
-  const serviceStaff = useMemo(() => (service?.staff ?? []).map((x) => ({ ...x, info: staff.find((s) => s.id === x.id) })).filter((x) => x.info), [service, staff]);
+  const serviceStaff = useMemo(() => (service?.staff ?? []).map((x) => ({ ...x, info: staff.find((s) => s.id === x.id) })).filter((x) => x.info && (!branchId || !x.info.branch_ids?.length || x.info.branch_ids.includes(branchId))), [service, staff, branchId]);
   const pickStaff = serviceStaff.length > 1;
   const staffChosen = !pickStaff || staffId !== null;
   const staffParam = pickStaff ? staffId || '' : '';
@@ -202,7 +202,7 @@ export default function BookingClient({ slug, card, business, services: allServi
       idemKey.current = '';
       setResult({
         booking_id: data.booking_id, booking_no: data.booking_no, status: data.status, start_at: data.start_at, end_at: data.end_at,
-        expires_at: data.expires_at, version: data.version, next_action: data.next_action, deposit_amount: data.deposit_amount ?? 0,
+        expires_at: data.expires_at, version: data.version, next_action: data.next_action, deposit_amount: data.deposit_amount ?? 0, total: data.total_price ?? 0,
       });
       window.history.replaceState(null, '', here);
       void loadMine();
@@ -492,34 +492,80 @@ function SlotPicker({ days, date, time, onDate, onTime, allowFull = false }: { d
   );
 }
 
-// 訂金轉帳資訊 + 回報末 5 碼
-function DepositBox({ bookingId, version, amount, expiresAt, paymentInfo, reported, onDone }: { bookingId: string; version: number; amount: number; expiresAt: string | null; paymentInfo: string; reported?: string; onDone: () => void }) {
-  const [last5, setLast5] = useState('');
+// 轉帳資訊 + 顧客回報付款:可選付訂金或全額,填末 5 碼、轉帳時間、戶名(店家核對後才算收款)
+// required = 這筆要付訂金才成立;否則是已成立的預約「預先付清」,預設收合
+export function PayBox({ bookingId, version, deposit, full, expiresAt, paymentInfo, report, required, onDone }: {
+  bookingId: string; version: number; deposit: number; full: number; expiresAt: string | null; paymentInfo: string;
+  report?: BkBooking['payment_report'] | null; required: boolean; onDone: () => void;
+}) {
+  const nowLocal = () => { const d = new Date(Date.now() - new Date().getTimezoneOffset() * 60000); return d.toISOString().slice(0, 16); };
+  const [open, setOpen] = useState(required);
+  const [kind, setKind] = useState<'deposit' | 'full'>(deposit > 0 ? 'deposit' : 'full');
+  const [form, setForm] = useState(() => ({ last5: '', paidAt: nowLocal(), payer: '', note: '' }));
   const [busy, setBusy] = useState(false);
-  const [done, setDone] = useState(reported ?? '');
-  async function report() {
-    if (!/^\d{5}$/.test(last5)) return void uiAlert('請填寫匯款帳號末 5 碼');
+  const [done, setDone] = useState(report?.at ? report : null);
+  const amount = kind === 'full' ? full : deposit;
+  const options = ([['deposit', '付訂金', deposit], ['full', '付全額', full]] as const).filter(([, , n]) => n > 0);
+  async function submit() {
+    if (!/^\d{5}$/.test(form.last5)) return void uiAlert('請填寫匯款帳號末 5 碼');
+    if (!form.paidAt) return void uiAlert('請填寫轉帳時間');
     setBusy(true);
     try {
-      const res = await fetch(`/api/booking/my/${bookingId}/payment`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ expected_version: version, last5, amount }) });
+      const res = await fetch(`/api/booking/my/${bookingId}/payment`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ expected_version: version, kind, last5: form.last5, paid_at: form.paidAt, payer: form.payer, note: form.note }) });
       const data = await res.json().catch(() => null);
       if (!res.ok) return void uiAlert(data?.error?.message ?? '回報失敗');
-      setDone(last5);
+      setDone({ kind, amount, last5: form.last5, paid_at: form.paidAt, payer: form.payer, note: form.note, at: new Date().toISOString() });
       uiToast('已通知店家核對');
       onDone();
     } finally { setBusy(false); }
   }
+  if (!options.length) return null;
+  if (done) {
+    return (
+      <div className="rounded-xl bg-[#eef6f0] p-3 text-left text-xs leading-5 text-[#2f6b3f]">
+        <p className="font-semibold">✓ 已回報付款,等待店家核對{required ? ',核對後預約才成立' : ''}</p>
+        <p className="mt-0.5 text-[#4c6b55]">{paymentReportText(done)}</p>
+      </div>
+    );
+  }
+  if (!open) {
+    return <button type="button" onClick={() => setOpen(true)} className="w-full rounded-xl border border-[#e5d6b8] bg-[#fffaf1] px-3 py-2.5 text-left text-sm font-semibold text-[#9a6412]">預先轉帳付款 →<span className="block text-[11px] font-normal text-[#a08550]">可付{options.map(([, label, n]) => `${label.slice(1)} ${money(n)}`).join(' 或 ')},轉帳後在這裡填寫付款資訊</span></button>;
+  }
+  const field = 'mt-1 w-full min-w-0 rounded-lg border border-[#e5d6b8] bg-white px-3 py-2 text-base text-[#1f1b19]';
   return (
-    <div className="space-y-2 rounded-xl bg-[#fff8ec] p-3 text-left text-xs leading-5 text-[#6b5520]">
-      <p className="text-sm font-semibold text-[#9a6412]">訂金 {money(amount)}{expiresAt ? `,請在 ${formatDateTime(expiresAt)} 前完成` : ''}</p>
-      {paymentInfo ? <p className="whitespace-pre-line rounded-lg bg-white/70 p-2 text-[#1f1b19]">{paymentInfo}</p> : <p>匯款帳號請向店家索取。</p>}
-      {done ? <p className="text-[#2f6b3f]">✓ 已回報末 5 碼 {done},等待店家核對;核對後預約才成立。</p> : (
-        <div className="flex gap-2">
-          <input value={last5} onChange={(e) => setLast5(e.target.value.replace(/\D/g, '').slice(0, 5))} inputMode="numeric" placeholder="匯款帳號末 5 碼" aria-label="匯款帳號末 5 碼" className="min-w-0 flex-1 rounded-lg border border-[#e5d6b8] bg-white px-3 py-2 text-base text-[#1f1b19]" />
-          <button type="button" disabled={busy} onClick={() => void report()} className="shrink-0 rounded-full bg-[#1f1b19] px-4 text-sm font-semibold text-white disabled:opacity-50">我已轉帳</button>
+    <div className="space-y-2.5 rounded-xl bg-[#fff8ec] p-3 text-left text-xs leading-5 text-[#6b5520]">
+      <p className="text-sm font-semibold text-[#9a6412]">{required ? '付款後預約才會成立' : '轉帳付款'}{expiresAt && required ? `,請在 ${formatDateTime(expiresAt)} 前完成` : ''}</p>
+      {options.length > 1 ? (
+        <div className="grid grid-cols-2 gap-2" role="group" aria-label="付款方式">
+          {options.map(([k, label, n]) => (
+            <button key={k} type="button" aria-pressed={kind === k} onClick={() => setKind(k)} className={`rounded-xl border bg-white p-2 text-left ${kind === k ? 'border-[#1f1b19] ring-2 ring-[#1f1b19]/10' : 'border-[#e5d6b8]'}`}>
+              <span className="block text-sm font-semibold text-[#1f1b19]">{label}</span>
+              <span className="block text-[11px] text-[#8a7f72]">{money(n)}</span>
+            </button>
+          ))}
         </div>
-      )}
-      <p className="text-[11px] text-[#a08550]">逾時未完成,時段會自動釋放。</p>
+      ) : <p className="text-sm text-[#1f1b19]">{options[0][1]} {money(options[0][2])}</p>}
+      {paymentInfo ? <p className="whitespace-pre-line rounded-lg bg-white/70 p-2 text-[#1f1b19]">{paymentInfo}</p> : <p>匯款帳號請向店家索取。</p>}
+      <p className="font-semibold text-[#6b5520]">轉帳完成後填寫付款資訊(轉帳 {money(amount)})</p>
+      <div className="grid grid-cols-2 gap-2">
+        <label className="block min-w-0">匯款帳號末 5 碼
+          <input value={form.last5} onChange={(e) => setForm({ ...form, last5: e.target.value.replace(/\D/g, '').slice(0, 5) })} inputMode="numeric" placeholder="12345" className={field} />
+        </label>
+        <label className="block min-w-0">匯款戶名(選填)
+          <input value={form.payer} onChange={(e) => setForm({ ...form, payer: e.target.value.slice(0, 30) })} placeholder="例:王小明" className={field} />
+        </label>
+      </div>
+      <label className="block min-w-0">轉帳時間
+        <input type="datetime-local" value={form.paidAt} onChange={(e) => setForm({ ...form, paidAt: e.target.value })} className={`${field} appearance-none`} />
+      </label>
+      <label className="block min-w-0">備註(選填)
+        <input value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value.slice(0, 100) })} placeholder="例:用公司帳戶轉帳" className={field} />
+      </label>
+      <div className="flex gap-2">
+        {!required ? <button type="button" onClick={() => setOpen(false)} className="shrink-0 rounded-full border border-[#e5d6b8] bg-white px-4 py-2 text-sm text-[#6b6156]">收起</button> : null}
+        <button type="button" disabled={busy} onClick={() => void submit()} className="flex-1 rounded-full bg-[#1f1b19] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{busy ? '送出中…' : '送出付款資訊'}</button>
+      </div>
+      {required ? <p className="text-[11px] text-[#a08550]">逾時未完成,時段會自動釋放。</p> : null}
     </div>
   );
 }
@@ -533,7 +579,8 @@ function ResultView({ result, business, lineBound, here, onMore, onMine, onRepor
       <p className="mt-3 text-lg font-semibold">{pay ? '時段已保留' : pending ? '已送出預約申請' : '預約成功'}</p>
       <p className="mt-1 text-sm text-[#6b6156]">{formatRange(result.start_at, result.end_at)}</p>
       <p className="mt-1 text-xs text-[#8a7f72]">預約編號 {result.booking_no}</p>
-      {pay ? <div className="mt-3"><DepositBox bookingId={result.booking_id} version={result.version} amount={result.deposit_amount} expiresAt={result.expires_at} paymentInfo={business.payment_info} onDone={onReported} /></div> : null}
+      {pay ? <div className="mt-3"><PayBox bookingId={result.booking_id} version={result.version} deposit={result.deposit_amount} full={result.total} expiresAt={result.expires_at} paymentInfo={business.payment_info} required onDone={onReported} /></div> : null}
+      {result.status === 'confirmed' && result.total > 0 && business.payment_info ? <div className="mt-3"><PayBox bookingId={result.booking_id} version={result.version} deposit={0} full={result.total} expiresAt={null} paymentInfo={business.payment_info} required={false} onDone={onReported} /></div> : null}
       {result.next_action === 'wait_approval' && result.expires_at ? (
         <p className="mt-3 rounded-xl bg-[#faf7f2] p-3 text-xs leading-5 text-[#6b6156]">{business.name} 會在 {formatDateTime(result.expires_at)} 前確認,逾時未確認會自動取消。{result.deposit_amount ? `確認後會通知你轉帳訂金 ${money(result.deposit_amount)}。` : ''}</p>
       ) : null}
@@ -613,6 +660,8 @@ function MyBookings({ auth, slug, loginNext, onCancel, onBook, reload }: { auth:
         const canMove = active && inWindow && b.reschedule_count < b.business.reschedule_limit;
         const needPay = b.status === 'pending' && b.approval_status !== 'pending' && ['awaiting', 'reported'].includes(b.payment_status);
         const total = b.total_price || b.service_snapshot.price;
+        // 已成立但還沒付清:可以預先轉帳(訂金已付就付剩下的全額)
+        const prepay = !needPay && b.status === 'confirmed' && b.total_price > b.paid_amount && Boolean(b.business.payment_info) && new Date(b.start_at).getTime() > now;
         return (
           <div key={b.id} className="rounded-2xl bg-white p-4">
             <div className="flex items-start gap-2">
@@ -629,7 +678,7 @@ function MyBookings({ auth, slug, loginNext, onCancel, onBook, reload }: { auth:
               </div>
               <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-semibold ${STATUS_COLOR[b.status]}`}>{statusText(b)}</span>
             </div>
-            {needPay ? <div className="mt-3"><DepositBox bookingId={b.id} version={b.version} amount={b.deposit_amount - b.paid_amount} expiresAt={b.expires_at} paymentInfo={b.business.payment_info} reported={b.payment_status === 'reported' ? b.payment_report?.last5 ?? '已回報' : ''} onDone={() => void reload()} /></div> : null}
+            {needPay || prepay ? <div className="mt-3"><PayBox key={`${b.id}-${b.version}`} bookingId={b.id} version={b.version} deposit={needPay ? Math.max(0, b.deposit_amount - b.paid_amount) : 0} full={Math.max(0, (b.total_price || 0) - b.paid_amount)} expiresAt={b.expires_at} paymentInfo={b.business.payment_info} report={b.payment_report?.at && (needPay || b.payment_report.amount) ? b.payment_report : null} required={needPay} onDone={() => void reload()} /></div> : null}
             {b.status === 'pending' && b.approval_status === 'pending' && b.expires_at ? <p className="mt-2 text-[11px] text-[#9a6412]">店家會在 {formatDateTime(b.expires_at)} 前確認</p> : null}
             {moving === b.id ? (
               <Reschedule booking={b} onClose={() => setMoving('')} onDone={() => { setMoving(''); void reload(); }} />

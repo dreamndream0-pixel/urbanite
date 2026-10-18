@@ -1,10 +1,12 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import CardServiceHeader from '@/app/card/CardServiceHeader';
 import { uiAlert, uiConfirm, uiPrompt } from '@/lib/ui-dialog';
 import { uiToast } from '@/lib/ui-toast';
 import {
-  addDays, formatDateLabel, formatDateTime, formatRange, localParts, minutesToHHMM, money, PAY_METHOD_LABEL, PAYMENT_LABEL,
+  addDays, formatDateLabel, formatDateTime, formatRange, localParts, minutesToHHMM, money, PAY_METHOD_LABEL, PAYMENT_LABEL, paymentReportText,
   statusText, STATUS_COLOR, type BkBooking,
 } from '@/lib/booking/shared';
 import { api, btn, btnDark, btnSm, card, errMsg, input, isTeam, stylists, type Data } from './ui';
@@ -14,12 +16,18 @@ import CustomersTab from './CustomersTab';
 import ReportsTab from './ReportsTab';
 
 type Tab = 'bookings' | 'calendar' | 'quotes' | 'customers' | 'reports' | 'services' | 'staff' | 'hours' | 'settings';
+const TABS: Tab[] = ['bookings', 'calendar', 'quotes', 'customers', 'reports', 'services', 'staff', 'hours', 'settings'];
 const OPEN = ['pending', 'confirmed', 'checked_in'];
 
 // 名片主人:線上預約管理
 export default function BookingManager() {
   const [data, setData] = useState<Data | null>(null);
-  const [tab, setTab] = useState<Tab>('bookings');
+  // 功能分頁放在右上角漢堡選單,用網址 ?tab= 切換(可以直接分享、重新整理不會跳回預約)
+  const search = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+  const tab: Tab = TABS.includes(search.get('tab') as Tab) ? (search.get('tab') as Tab) : 'bookings';
+  const setTab = (t: Tab) => router.replace(`${pathname}?tab=${t}`, { scroll: false });
   const [loadError, setLoadError] = useState('');
 
   const load = useCallback(async () => {
@@ -28,7 +36,7 @@ export default function BookingManager() {
   }, []);
   useEffect(() => { void Promise.resolve().then(load); }, [load]);
 
-  if (!data) return <p className="py-16 text-center text-sm text-[#8a7f72]">{loadError || '讀取中…'}</p>;
+  if (!data) return <><CardServiceHeader loggedIn current="booking" title="線上預約管理" /><p className="py-16 text-center text-sm text-[#8a7f72]">{loadError || '讀取中…'}</p></>;
   const pending = data.bookings.filter((b) => b.status === 'pending' && !(b.quote_id && b.approval_status === 'pending')).length;
   const quoteWaiting = data.quotes.filter((q) => q.status === 'requested').length;
   const hasQuote = quoteWaiting > 0 || data.quotes.length > 0 || data.services.some((s) => s.price_mode === 'quote');
@@ -53,51 +61,59 @@ export default function BookingManager() {
     ['customers', '顧客'], ['reports', '報表'], ['services', '服務'], ['staff', '人員床位'], ['hours', '營業時段'], ['settings', '設定'],
   ];
 
+  const menu = { title: '線上預約管理', items: tabs.map(([k, label]) => ({ href: `/mycard/booking?tab=${k}`, label, active: k === tab })) };
+
   return (
+    <>
+    <CardServiceHeader loggedIn current="booking" title="線上預約管理" appNav={menu} />
     <div className="mx-auto max-w-3xl space-y-4 px-4 pb-24 pt-5 sm:px-6">
-      {/* 狀態 */}
-      <section className={card}>
-        <div className="flex items-start gap-3">
-          <div className="min-w-0 flex-1">
-            <p className="text-[11px] font-semibold tracking-[0.2em] text-[#a99e8f]">URBANLINKS × LINE</p>
-            <h1 className="mt-0.5 text-xl font-bold">線上預約</h1>
-            <p className="mt-1 text-xs leading-5 text-[#8a7f72]">顧客從你的名片按「線上預約」,選服務、人員與時段送出;確認、訂金、提醒透過 LINE 通知。</p>
-          </div>
-          <button type="button" role="switch" aria-checked={data.business.enabled} onClick={() => void toggleEnabled()} className={`relative mt-1 inline-flex h-8 w-14 shrink-0 items-center rounded-full transition ${data.business.enabled ? 'bg-[#2f6b3f]' : 'bg-[#d8d0c8]'}`}>
-            <span className={`inline-block h-6 w-6 rounded-full bg-white shadow transition ${data.business.enabled ? 'translate-x-7' : 'translate-x-1'}`} />
-          </button>
-        </div>
-        <p className={`mt-3 text-sm font-semibold ${data.business.enabled ? 'text-[#2f6b3f]' : 'text-[#8a7f72]'}`}>{data.business.enabled ? '● 開放預約中' : '○ 尚未開放'}</p>
-        {!ready ? (
-          <ul className="mt-3 space-y-1 rounded-xl bg-[#faf7f2] p-3 text-xs text-[#6b6156]">
-            <li>{activeServices ? '✓' : '1.'} 新增服務項目 {activeServices ? `(${activeServices} 項)` : ''}</li>
-            <li>{hasHours ? '✓' : '2.'} 設定每週營業時段</li>
-            <li>3. 開啟上方開關,名片就會出現「線上預約」按鈕</li>
-          </ul>
-        ) : null}
-        {publicUrl ? (
-          <div className="mt-3 flex min-w-0 items-center gap-2 rounded-xl bg-[#faf7f2] p-2 pl-3">
-            <span className="min-w-0 flex-1 truncate text-xs text-[#6b6156]">{publicUrl}</span>
-            <button type="button" onClick={() => { void navigator.clipboard?.writeText(publicUrl); uiToast('已複製預約連結'); }} className="shrink-0 rounded-full bg-white px-3 py-1.5 text-xs font-semibold">複製</button>
-            <a href={publicUrl} target="_blank" rel="noopener noreferrer" className="shrink-0 rounded-full bg-white px-3 py-1.5 text-xs font-semibold">開啟</a>
-          </div>
-        ) : <p className="mt-3 text-xs text-[#a03b3b]">請先到「我的名片」建立名片,才有預約入口。</p>}
-        <div className="mt-3 flex items-center gap-2 text-xs">
-          {data.line_bound ? <span className="text-[#2f6b3f]">✓ 新預約會用 LINE 通知你</span> : (
-            <>
-              <span className="text-[#8a7f72]">綁定 LINE,才能收到新預約通知</span>
-              <a href={`/auth/line/start?mode=link&next=${encodeURIComponent('/mycard/booking')}`} className="rounded-full bg-[#06C755] px-3 py-1.5 font-semibold text-white">綁定 LINE</a>
-            </>
-          )}
-        </div>
-      </section>
-
-      <div className={`grid gap-1 rounded-2xl border border-[#e5ded4] bg-white p-1 ${tabs.length > 8 ? 'grid-cols-5 sm:grid-cols-9' : 'grid-cols-4 sm:grid-cols-8'}`}>
-        {tabs.map(([k, label]) => (
-          <button key={k} type="button" onClick={() => setTab(k)} className={`rounded-xl px-1 py-2 text-sm ${tab === k ? 'bg-[#1f1b19] font-semibold text-white' : 'text-[#6b6156]'}`}>{label}</button>
-        ))}
+      <div className="flex items-center gap-2">
+        <h1 className="min-w-0 flex-1 truncate text-xl font-bold">{tabs.find(([k]) => k === tab)?.[1] ?? '預約'}</h1>
+        <button type="button" onClick={() => setTab('settings')} className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold ${data.business.enabled ? 'bg-[#e7f3ea] text-[#2f6b3f]' : 'bg-[#efe8dd] text-[#8a7f72]'}`}>{data.business.enabled ? '● 開放預約中' : '○ 尚未開放'}</button>
       </div>
+      {!data.business.enabled && tab !== 'settings' ? (
+        <button type="button" onClick={() => setTab('settings')} className="block w-full rounded-2xl border border-[#e5d6b8] bg-[#fffaf1] p-3 text-left text-sm text-[#9a6412]">線上預約還沒開放,顧客看不到預約按鈕 →<span className="block text-xs text-[#a08550]">到「設定」開啟開關、複製預約連結</span></button>
+      ) : null}
 
+      {tab === 'settings' && (
+        <>
+          <section className={card}>
+            <div className="flex items-start gap-3">
+              <div className="min-w-0 flex-1">
+                <p className="text-[11px] font-semibold tracking-[0.2em] text-[#a99e8f]">URBANLINKS × LINE</p>
+                <p className="mt-0.5 text-lg font-bold">線上預約開關</p>
+                <p className="mt-1 text-xs leading-5 text-[#8a7f72]">顧客從你的名片按「線上預約」,選服務、人員與時段送出;確認、訂金、提醒透過 LINE 通知。</p>
+              </div>
+              <button type="button" role="switch" aria-checked={data.business.enabled} onClick={() => void toggleEnabled()} className={`relative mt-1 inline-flex h-8 w-14 shrink-0 items-center rounded-full transition ${data.business.enabled ? 'bg-[#2f6b3f]' : 'bg-[#d8d0c8]'}`}>
+                <span className={`inline-block h-6 w-6 rounded-full bg-white shadow transition ${data.business.enabled ? 'translate-x-7' : 'translate-x-1'}`} />
+              </button>
+            </div>
+            <p className={`mt-3 text-sm font-semibold ${data.business.enabled ? 'text-[#2f6b3f]' : 'text-[#8a7f72]'}`}>{data.business.enabled ? '● 開放預約中' : '○ 尚未開放'}</p>
+            {!ready ? (
+              <ul className="mt-3 space-y-1 rounded-xl bg-[#faf7f2] p-3 text-xs text-[#6b6156]">
+                <li>{activeServices ? '✓' : '1.'} 新增服務項目 {activeServices ? `(${activeServices} 項)` : ''}</li>
+                <li>{hasHours ? '✓' : '2.'} 設定每週營業時段</li>
+                <li>3. 開啟上方開關,名片就會出現「線上預約」按鈕</li>
+              </ul>
+            ) : null}
+            {publicUrl ? (
+              <div className="mt-3 flex min-w-0 items-center gap-2 rounded-xl bg-[#faf7f2] p-2 pl-3">
+                <span className="min-w-0 flex-1 truncate text-xs text-[#6b6156]">{publicUrl}</span>
+                <button type="button" onClick={() => { void navigator.clipboard?.writeText(publicUrl); uiToast('已複製預約連結'); }} className="shrink-0 rounded-full bg-white px-3 py-1.5 text-xs font-semibold">複製</button>
+                <a href={publicUrl} target="_blank" rel="noopener noreferrer" className="shrink-0 rounded-full bg-white px-3 py-1.5 text-xs font-semibold">開啟</a>
+              </div>
+            ) : <p className="mt-3 text-xs text-[#a03b3b]">請先到「我的名片」建立名片,才有預約入口。</p>}
+            <div className="mt-3 flex items-center gap-2 text-xs">
+              {data.line_bound ? <span className="text-[#2f6b3f]">✓ 新預約會用 LINE 通知你</span> : (
+                <>
+                  <span className="text-[#8a7f72]">綁定 LINE,才能收到新預約通知</span>
+                  <a href={`/auth/line/start?mode=link&next=${encodeURIComponent('/mycard/booking?tab=settings')}`} className="rounded-full bg-[#06C755] px-3 py-1.5 font-semibold text-white">綁定 LINE</a>
+                </>
+              )}
+            </div>
+          </section>
+        </>
+      )}
       {tab === 'bookings' && <BookingsTab data={data} reload={load} />}
       {tab === 'calendar' && <CalendarTab data={data} reload={load} />}
       {tab === 'quotes' && <QuotesTab data={data} reload={load} />}
@@ -108,6 +124,7 @@ export default function BookingManager() {
       {tab === 'hours' && <HoursTab data={data} reload={load} />}
       {tab === 'settings' && <SettingsTab data={data} reload={load} />}
     </div>
+    </>
   );
 }
 
@@ -191,6 +208,9 @@ function BookingCard({ booking: b, data, reload }: { booking: BkBooking; data: D
   const started = new Date(b.start_at).getTime() <= now;
   const soon = new Date(b.start_at).getTime() - now <= 3 * 3600000;
   const waitingPay = b.status === 'pending' && b.approval_status !== 'pending' && b.deposit_amount > b.paid_amount;
+  // 顧客回報的付款(訂金或全額),還沒收足才顯示
+  const report = b.payment_report?.at && b.payment_report.amount && ['pending', 'confirmed'].includes(b.status) && b.paid_amount < (b.payment_report.kind === 'full' ? b.total_price : b.deposit_amount) ? b.payment_report : null;
+  const reportDue = report ? Math.max(0, (report.kind === 'full' ? b.total_price : b.deposit_amount) - b.paid_amount) : 0;
 
   async function post(body: Record<string, unknown>, done: string) {
     setBusy(true);
@@ -255,7 +275,7 @@ function BookingCard({ booking: b, data, reload }: { booking: BkBooking; data: D
           </p>
         ) : null}
         {b.package_id ? <p className="text-xs text-[#2f5a3a]">使用套票{b.status === 'completed' ? '(已扣次)' : ['cancelled', 'expired', 'no_show'].includes(b.status) ? '(已退回)' : '(保留 1 次)'}</p> : null}
-        {b.payment_status === 'reported' ? <p className="text-xs text-[#1f6f8b]">顧客回報已轉帳,末 5 碼 {b.payment_report?.last5 ?? '—'},請核對後按「收到訂金」</p> : null}
+        {report ? <p className="rounded-lg bg-[#eaf4f7] px-2.5 py-1.5 text-xs text-[#1f5f7f]">顧客回報已轉帳:{paymentReportText(report)}<span className="block text-[11px] text-[#5d8597]">請核對入帳後按「收到{report.kind === 'full' ? '全額' : '訂金'}」</span></p> : null}
         {b.status === 'pending' && b.expires_at ? <p className="text-xs text-[#9a6412]">{b.approval_status === 'pending' ? '請在' : '訂金期限'} {formatDateTime(b.expires_at)}{b.approval_status === 'pending' ? ' 前確認' : ''},逾時自動取消</p> : null}
         {b.cancel_reason && ['cancelled', 'expired'].includes(b.status) ? <p className="text-xs text-[#8a7f72]">原因:{b.cancel_reason}</p> : null}
         {payments.length ? (
@@ -272,7 +292,8 @@ function BookingCard({ booking: b, data, reload }: { booking: BkBooking; data: D
           <button type="button" disabled={busy} onClick={() => void run('approve', '確認')} className={btnDark}>確認預約</button>
           <button type="button" disabled={busy} onClick={() => void run('reject', '婉拒')} className={btn}>婉拒</button>
         </>}
-        {waitingPay && <button type="button" disabled={busy} onClick={() => void post({ command: 'payment', kind: 'deposit', amount: b.deposit_amount - b.paid_amount, method: 'transfer', note: b.payment_report?.last5 ? `末 5 碼 ${b.payment_report.last5}` : '' }, '已記錄訂金,預約成立')} className={btnDark}>收到訂金 {money(b.deposit_amount - b.paid_amount)}</button>}
+        {report && reportDue > 0 && <button type="button" disabled={busy} onClick={() => void post({ command: 'payment', kind: b.status === 'pending' ? 'deposit' : 'balance', amount: reportDue, method: 'transfer', note: paymentReportText(report) }, b.status === 'pending' ? '已記錄收款,預約成立' : '已記錄收款')} className={btnDark}>收到{report.kind === 'full' ? '全額' : '訂金'} {money(reportDue)}</button>}
+        {waitingPay && !report && <button type="button" disabled={busy} onClick={() => void post({ command: 'payment', kind: 'deposit', amount: b.deposit_amount - b.paid_amount, method: 'transfer', note: b.payment_report?.last5 ? `末 5 碼 ${b.payment_report.last5}` : '' }, '已記錄訂金,預約成立')} className={btnDark}>收到訂金 {money(b.deposit_amount - b.paid_amount)}</button>}
         {b.status === 'confirmed' && soon && !started && <button type="button" disabled={busy} onClick={() => void run('check_in', '報到')} className={btnDark}>報到</button>}
         {['confirmed', 'checked_in'].includes(b.status) && (started || b.status === 'checked_in') && <>
           <button type="button" disabled={busy} onClick={() => (total > b.paid_amount ? setPanel(panel === 'complete' ? '' : 'complete') : void run('complete', '完成'))} className={btnDark}>完成服務</button>

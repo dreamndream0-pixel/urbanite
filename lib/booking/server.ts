@@ -6,7 +6,7 @@ import { getMessagingConfig } from '@/lib/line-messaging';
 import { getConfiguredSiteUrl } from '@/lib/site-url';
 import { scopedClient, URBANITE_SHOP_ID } from '@/lib/shop';
 import {
-  addDays, computeSlotsWith, formatDateTime, formatRange, localParts, minutesToHHMM, money,
+  addDays, computeSlotsWith, formatDateTime, formatRange, localParts, minutesToHHMM, money, paymentReportText,
   type BkAddon, type BkBooking, type BkBusiness, type BkHour, type BkResource, type BkService, type BkStaff,
   type BkBranch, type BkServiceStep, type BkStaffHour, type BkStaffService, type BookingStatus,
 } from './shared';
@@ -58,6 +58,9 @@ export async function loadSchedule(businessId: string, all = false): Promise<Sch
 }
 
 // 可做這個服務的人員(助理不接主要服務):服務有設定對應人員就只限那些人,沒設定 = 所有設計師
+// 人員是否在這間分店服務(沒設定所屬分店 = 每間分店都可排)
+export const atBranch = (st: Pick<BkStaff, 'branch_ids'>, branchId: string | null | undefined) => !branchId || !st.branch_ids?.length || st.branch_ids.includes(branchId);
+
 export function staffForService(sched: Schedule, serviceId: string) {
   const links = sched.staffServices.filter((x) => x.service_id === serviceId);
   const active = sched.staff.filter((s) => s.active && s.role !== 'assistant');
@@ -162,7 +165,7 @@ export type AllocInput = { staff_id: string | null; resource_id: string | null; 
 // 一位主要人員做一項服務,在某個開始時間的完整分派:主要人員各段、助理各段、座位(同一張)
 function makeAssigner(business: BkBusiness, sched: Schedule, service: BkService, staff: BkStaff, addonIds: string[], occ: Awaited<ReturnType<typeof occupancy>>, buffer: number, branchId: string | null = null) {
   const plan = planOf(sched, service, staff.id, addonIds, buffer);
-  const assistants = sched.staff.filter((s) => s.active && s.role === 'assistant');
+  const assistants = sched.staff.filter((s) => s.active && s.role === 'assistant' && atBranch(s, branchId));
   const shopOff = occ.exceptions.filter((x) => !x.staff_id && (!x.branch_id || x.branch_id === branchId));
   const travel = business.branch_travel_minutes * 60000;
   const busyOf = (id: string) => [
@@ -213,7 +216,7 @@ function makeChain(business: BkBusiness, sched: Schedule, service: BkService, st
   const branch = req.branchId ?? null;
   const head = makeAssigner(business, sched, service, staff, req.addonIds, occ, lastBuffer(0), branch);
   const tails = extras.map((svc, i) => {
-    const cands = staffForService(sched, svc.id).sort((a, b) => (a.id === staff.id ? -1 : b.id === staff.id ? 1 : a.sort_order - b.sort_order));
+    const cands = staffForService(sched, svc.id).filter((st) => atBranch(st, branch)).sort((a, b) => (a.id === staff.id ? -1 : b.id === staff.id ? 1 : a.sort_order - b.sort_order));
     return { svc, options: cands.map((st) => ({ st, a: makeAssigner(business, sched, svc, st, [], occ, lastBuffer(i + 1), branch) })) };
   });
 
@@ -249,6 +252,7 @@ export async function availability(business: BkBusiness, sched: Schedule, req: S
   if (!service) throw new BookingError('VALIDATION_ERROR', '這個服務目前無法預約。', 422);
   let candidates = staffForService(sched, service.id);
   if (req.staffId) candidates = candidates.filter((s) => s.id === req.staffId);
+  candidates = candidates.filter((s) => atBranch(s, req.branchId));
   if (req.branchId && service.branch_ids?.length && !service.branch_ids.includes(req.branchId)) candidates = [];
   const fromIso = new Date(new Date(`${fromDate}T00:00:00+08:00`).getTime() - 86400000).toISOString();
   const toIso = new Date(new Date(`${fromDate}T00:00:00+08:00`).getTime() + (days + 1) * 86400000).toISOString();
@@ -702,11 +706,12 @@ export async function customerCancel(userId: string, bookingId: string, expected
 }
 
 // 顧客回報已轉帳訂金(店家核對後記錄收款才算付款)
-export async function customerReportPayment(userId: string, bookingId: string, expectedVersion: number, report: { last5: string; amount: number; note: string }) {
+// 顧客回報付款:kind = 訂金 / 全額(金額由資料庫依總額、訂金、已付計算),附末 5 碼、轉帳時間、戶名
+export async function customerReportPayment(userId: string, bookingId: string, expectedVersion: number, report: { kind?: 'deposit' | 'full'; last5: string; paidAt?: string; payer?: string; note?: string }) {
   if (!/^\d{5}$/.test(report.last5)) throw new BookingError('VALIDATION_ERROR', '請填寫匯款帳號末 5 碼。', 422);
   const { data, error } = await db().rpc('bk_report_payment', {
     p_booking_id: bookingId, p_expected_version: expectedVersion, p_customer: userId,
-    p_report: { last5: report.last5, amount: Math.max(0, Math.round(report.amount || 0)), note: report.note.trim().slice(0, 100) },
+    p_report: { kind: report.kind === 'full' ? 'full' : 'deposit', last5: report.last5, paid_at: (report.paidAt ?? '').trim().slice(0, 20), payer: (report.payer ?? '').trim().slice(0, 30), note: (report.note ?? '').trim().slice(0, 100) },
   });
   if (error) throw rpcError(error.message);
   return data as BkBooking;
@@ -734,7 +739,7 @@ const TITLES: Record<string, { customer?: string; owner?: string; color: string 
   received: { customer: '預約申請已送出,等待店家確認', color: '#b07a1f' },
   awaiting_deposit: { customer: '時段已保留,請完成訂金轉帳', color: '#b07a1f' },
   approved_pay: { customer: '店家已確認,請完成訂金轉帳', color: '#b07a1f' },
-  payment_reported: { owner: '顧客已回報轉帳,請核對訂金', color: '#1f6f8b' },
+  payment_reported: { owner: '顧客已回報轉帳,請核對款項', color: '#1f6f8b' },
   confirmed: { customer: '預約已確認', color: '#2f6b3f' },
   rejected: { customer: '預約未成立', color: '#8a5a50' },
   rescheduled: { customer: '預約時間已更改', owner: '顧客更改了預約時間', color: '#1f6f8b' },
@@ -967,7 +972,7 @@ async function deliver(row: OutboxRow, token: string): Promise<{ state: 'api_acc
   if (row.audience === 'customer' && ['awaiting_deposit', 'approved_pay'].includes(row.event)) {
     extra = `請在 ${b.expires_at ? formatDateTime(b.expires_at) : '期限'} 前轉帳訂金 ${money(b.deposit_amount - b.paid_amount)},完成後到「查看預約」回報末 5 碼,逾時會自動取消。${business?.payment_info ? `\n${business.payment_info}` : ''}`;
   } else if (row.audience === 'owner' && row.event === 'payment_reported') {
-    extra = `回報末 5 碼:${b.payment_report?.last5 ?? '—'}${b.payment_report?.amount ? `,金額 ${money(b.payment_report.amount)}` : ''}`;
+    extra = paymentReportText(b.payment_report);
   } else if (row.event === 'thanks') {
     const { data: biz2 } = await db().from('bk_businesses').select('thanks_message').eq('id', b.business_id).single();
     extra = biz2?.thanks_message || '期待下次再為你服務。';
@@ -1062,7 +1067,7 @@ export function publicCatalog(sched: Schedule) {
         return { id: st.id, duration_minutes: stepSum || (link?.duration_minutes ?? s.duration_minutes), price: link?.price ?? s.price };
       }),
     })),
-    staff: sched.staff.map((st) => ({ id: st.id, name: st.name, title: st.title, avatar: st.avatar })),
+    staff: sched.staff.map((st) => ({ id: st.id, name: st.name, title: st.title, avatar: st.avatar, branch_ids: st.branch_ids ?? [] })),
     branches: sched.branches.filter((b) => b.active).map((b) => ({ id: b.id, name: b.name, address: b.address })),
   };
 }

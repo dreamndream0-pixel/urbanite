@@ -4,7 +4,7 @@ import { BookingError, customerReportPayment, processBookingJobs } from '@/lib/b
 
 export const dynamic = 'force-dynamic';
 
-// POST /api/booking/my/[id]/payment { expected_version, last5, amount, note } — 顧客回報已轉帳訂金(店家核對後才算收款)
+// POST /api/booking/my/[id]/payment { expected_version, kind, last5, paid_at, payer, note } — 顧客回報已轉帳(訂金或全額)(店家核對後才算收款)
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const user = await getSessionUser();
   if (!user) return NextResponse.json({ error: { code: 'AUTH_REQUIRED', message: '請先登入。' } }, { status: 401 });
@@ -12,7 +12,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const body = await request.json().catch(() => ({}));
   try {
     const b = await customerReportPayment(user.id, id, Number(body?.expected_version), {
-      last5: String(body?.last5 ?? '').trim(), amount: Number(body?.amount) || 0, note: String(body?.note ?? ''),
+      kind: body?.kind === 'full' ? 'full' : 'deposit', last5: String(body?.last5 ?? '').trim(), paidAt: String(body?.paid_at ?? ''), payer: String(body?.payer ?? ''), note: String(body?.note ?? ''),
     });
     after(() => processBookingJobs().catch((e) => console.error('booking jobs', e)));
     return NextResponse.json({ payment_status: b.payment_status, version: b.version });
