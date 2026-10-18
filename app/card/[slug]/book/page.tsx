@@ -26,6 +26,7 @@ export default async function BookPage({ params }: { params: Promise<{ slug: str
       slug={ctx.card.slug}
       card={{ display_name: ctx.card.display_name, avatar_url: ctx.card.avatar_url }}
       business={{
+        line_own: Boolean(b.line_own), line_name: b.line_name ?? '',
         name: b.name || ctx.card.display_name, address: b.address, notice: b.notice, approval_mode: b.approval_mode, cancel_hours: b.cancel_hours,
         allow_any_staff: b.allow_any_staff, payment_info: b.payment_info, service_area: b.service_area, waitlist: b.waitlist_enabled, open,
       }}

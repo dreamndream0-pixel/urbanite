@@ -3,6 +3,7 @@
 // 同一交易寫入預約、歷程與通知;人員與床位的重複預約由資料庫排他約束擋下
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getMessagingConfig } from '@/lib/line-messaging';
+import { getShopSecret } from '@/lib/integrations';
 import { getConfiguredSiteUrl } from '@/lib/site-url';
 import { scopedClient, URBANITE_SHOP_ID } from '@/lib/shop';
 import {
@@ -778,7 +779,7 @@ async function pushLine(token: string, retryKey: string, to: string, message: un
   }
 }
 
-async function deliverQuote(row: OutboxRow, token: string): Promise<{ state: 'api_accepted' | 'skipped' | 'retry' | 'failed'; error?: string }> {
+async function deliverQuote(row: OutboxRow, ch: Channel): Promise<{ state: 'api_accepted' | 'skipped' | 'retry' | 'failed'; error?: string }> {
   const { data: q } = await db().from('bk_quotes').select('*').eq('id', row.quote_id!).maybeSingle();
   if (!q) return { state: 'skipped', error: 'quote_missing' };
   const meta = QUOTE_TITLES[row.event];
@@ -786,7 +787,7 @@ async function deliverQuote(row: OutboxRow, token: string): Promise<{ state: 'ap
   if (!meta || !title) return { state: 'skipped', error: 'no_template' };
   const { data: business } = await db().from('bk_businesses').select('owner_user_id, name, card_id').eq('id', q.business_id).single();
   const recipient = row.audience === 'owner' ? business?.owner_user_id : q.customer_user_id;
-  const lineId = recipient ? await lineUserIdOf(recipient) : null;
+  const lineId = recipient ? await lineIdFor(ch, recipient, row.audience) : null;
   if (!lineId) return { state: 'skipped', error: 'no_line' };
   const { data: card } = business?.card_id ? await db().from('profile_cards').select('slug, display_name').eq('id', business.card_id).maybeSingle() : { data: null };
   const { data: v } = q.current_version ? await db().from('bk_quote_versions').select('*').eq('quote_id', q.id).eq('version', q.current_version).maybeSingle() : { data: null };
@@ -818,18 +819,18 @@ async function deliverQuote(row: OutboxRow, token: string): Promise<{ state: 'ap
       ] },
     },
   };
-  return pushLine(token, row.id, lineId, message);
+  return pushLine(ch.token, row.id, lineId, message);
 }
 
 // 服務紀錄的通知:請顧客同意公開照片(不在訊息裡放照片或紀錄內容)、顧客要求刪除照片
-async function deliverRecord(row: OutboxRow, token: string): Promise<{ state: 'api_accepted' | 'skipped' | 'retry' | 'failed'; error?: string }> {
+async function deliverRecord(row: OutboxRow, ch: Channel): Promise<{ state: 'api_accepted' | 'skipped' | 'retry' | 'failed'; error?: string }> {
   const { data: r } = await db().from('bk_service_records').select('id, business_id, customer_id, service_name, performed_on, consent, delete_requested').eq('id', row.record_id!).maybeSingle();
   if (!r) return { state: 'skipped', error: 'record_missing' };
   if (row.event === 'consent_requested' && r.consent !== 'requested') return { state: 'skipped', error: 'stale' };
   const { data: business } = await db().from('bk_businesses').select('owner_user_id, name, card_id').eq('id', r.business_id).single();
   const { data: customer } = await db().from('bk_customers').select('user_id, name').eq('id', r.customer_id).single();
   const recipient = row.audience === 'owner' ? business?.owner_user_id : customer?.user_id;
-  const lineId = recipient ? await lineUserIdOf(recipient) : null;
+  const lineId = recipient ? await lineIdFor(ch, recipient, row.audience) : null;
   if (!lineId) return { state: 'skipped', error: 'no_line' };
   const { data: card } = business?.card_id ? await db().from('profile_cards').select('slug, display_name').eq('id', business.card_id).maybeSingle() : { data: null };
   const site = getConfiguredSiteUrl();
@@ -839,7 +840,7 @@ async function deliverRecord(row: OutboxRow, token: string): Promise<{ state: 'a
   const text = row.event === 'consent_requested'
     ? `${r.performed_on} ${r.service_name} 的照片。同意前不會公開,同意後也可以隨時撤回。`
     : `${customer?.name ?? ''} 要求刪除 ${r.performed_on} ${r.service_name} 的照片,請到顧客檔案處理。`;
-  return pushLine(token, row.id, lineId, {
+  return pushLine(ch.token, row.id, lineId, {
     type: 'flex', altText: `【${businessName}】${title}`.slice(0, 300),
     contents: {
       type: 'bubble',
@@ -856,10 +857,10 @@ async function deliverRecord(row: OutboxRow, token: string): Promise<{ state: 'a
 }
 
 // 候補邀請:有空位了,請在期限內預約(先完成預約的人取得名額)
-async function deliverWaitlist(row: OutboxRow, token: string): Promise<{ state: 'api_accepted' | 'skipped' | 'retry' | 'failed'; error?: string }> {
+async function deliverWaitlist(row: OutboxRow, ch: Channel): Promise<{ state: 'api_accepted' | 'skipped' | 'retry' | 'failed'; error?: string }> {
   const { data: w } = await db().from('bk_waitlist').select('*').eq('id', row.waitlist_id!).maybeSingle();
   if (!w || w.status !== 'invited') return { state: 'skipped', error: 'stale' };
-  const lineId = await lineUserIdOf(w.customer_user_id);
+  const lineId = await lineIdFor(ch, w.customer_user_id, 'customer');
   if (!lineId) return { state: 'skipped', error: 'no_line' };
   const { data: business } = await db().from('bk_businesses').select('name, card_id').eq('id', w.business_id).single();
   const { data: card } = business?.card_id ? await db().from('profile_cards').select('slug, display_name').eq('id', business.card_id).maybeSingle() : { data: null };
@@ -867,7 +868,7 @@ async function deliverWaitlist(row: OutboxRow, token: string): Promise<{ state: 
   const businessName = business?.name || card?.display_name || '';
   const link = `${getConfiguredSiteUrl()}/@${card?.slug ?? ''}/book?s=${w.service_id}&d=${w.date}&t=${encodeURIComponent(w.invited_slot ?? '')}${w.staff_id ? `&p=${w.staff_id}` : ''}`;
   const [, mo, da] = String(w.date).split('-');
-  return pushLine(token, row.id, lineId, {
+  return pushLine(ch.token, row.id, lineId, {
     type: 'flex', altText: `【${businessName}】候補的時段有空位了`.slice(0, 300),
     contents: {
       type: 'bubble',
@@ -884,6 +885,18 @@ async function deliverWaitlist(row: OutboxRow, token: string): Promise<{ state: 
       ] },
     },
   });
+}
+
+// 發送管道:店家有連接自己的官方帳號 → 用店家的金鑰,收件人是在店家官方帳號綁定過的 userId;否則用平台官方帳號
+type Channel = { token: string; own: boolean; businessId: string };
+async function channelFor(businessId: string, platformToken: string): Promise<Channel> {
+  const cfg = await getShopSecret<{ accessToken: string }>('BKLINE', businessId).catch(() => null);
+  return cfg?.accessToken ? { token: cfg.accessToken, own: true, businessId } : { token: platformToken, own: false, businessId };
+}
+async function lineIdFor(ch: Channel, userId: string, role: 'customer' | 'owner') {
+  if (!ch.own) return lineUserIdOf(userId);
+  const { data } = await db().from('bk_line_links').select('line_user_id').eq('business_id', ch.businessId).eq('user_id', userId).eq('role', role).maybeSingle();
+  return (data?.line_user_id as string | undefined) ?? null;
 }
 
 async function lineUserIdOf(userId: string) {
@@ -926,13 +939,13 @@ function flexMessage(opts: { title: string; color: string; businessName: string;
   };
 }
 
-type OutboxRow = { id: string; booking_id: string | null; quote_id: string | null; record_id: string | null; waitlist_id: string | null; booking_version: number; event: string; audience: 'customer' | 'owner'; attempts: number; due_at: string };
+type OutboxRow = { id: string; business_id: string; booking_id: string | null; quote_id: string | null; record_id: string | null; waitlist_id: string | null; booking_version: number; event: string; audience: 'customer' | 'owner'; attempts: number; due_at: string };
 
-async function deliver(row: OutboxRow, token: string): Promise<{ state: 'api_accepted' | 'skipped' | 'retry' | 'failed'; error?: string }> {
+async function deliver(row: OutboxRow, ch: Channel): Promise<{ state: 'api_accepted' | 'skipped' | 'retry' | 'failed'; error?: string }> {
   if (!row.booking_id) {
-    if (row.quote_id) return deliverQuote(row, token);
-    if (row.record_id) return deliverRecord(row, token);
-    if (row.waitlist_id) return deliverWaitlist(row, token);
+    if (row.quote_id) return deliverQuote(row, ch);
+    if (row.record_id) return deliverRecord(row, ch);
+    if (row.waitlist_id) return deliverWaitlist(row, ch);
     return { state: 'skipped', error: 'no_target' };
   }
   const { data: booking } = await db().from('bk_bookings').select('*').eq('id', row.booking_id).maybeSingle();
@@ -965,7 +978,7 @@ async function deliver(row: OutboxRow, token: string): Promise<{ state: 'api_acc
   const title = row.event === 'revisit' ? `該預約下一次「${b.service_snapshot.name}」了` : meta?.[row.audience];
   if (!meta || !title) return { state: 'skipped', error: 'no_template' };
   const recipient = row.audience === 'owner' ? business?.owner_user_id : b.customer_user_id;
-  const lineId = recipient ? await lineUserIdOf(recipient) : null;
+  const lineId = recipient ? await lineIdFor(ch, recipient, row.audience) : null;
   if (!lineId) return { state: 'skipped', error: 'no_line' };
   const site = getConfiguredSiteUrl();
   const businessName = business?.name || card?.display_name || '';
@@ -991,7 +1004,7 @@ async function deliver(row: OutboxRow, token: string): Promise<{ state: 'api_acc
   try {
     const res = await fetch('https://api.line.me/v2/bot/message/push', {
       method: 'POST',
-      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', 'X-Line-Retry-Key': row.id },
+      headers: { Authorization: `Bearer ${ch.token}`, 'Content-Type': 'application/json', 'X-Line-Retry-Key': row.id },
       body: JSON.stringify({ to: lineId, messages: [message] }),
     });
     if (res.ok || res.status === 409) return { state: 'api_accepted' }; // 409 = 相同 retry key 已接受過
@@ -1022,8 +1035,11 @@ export async function processBookingJobs(limit = 30) {
   const { data: claimed, error } = await db().rpc('bk_claim_outbox', { p_limit: limit });
   if (error || !claimed?.length) return result;
   const { accessToken } = await getMessagingConfig();
+  const channels = new Map<string, Channel>();
   for (const row of claimed as OutboxRow[]) {
-    const r = accessToken ? await deliver(row, accessToken) : { state: 'skipped' as const, error: 'line_not_configured' };
+    if (!channels.has(row.business_id)) channels.set(row.business_id, await channelFor(row.business_id, accessToken ?? ''));
+    const ch = channels.get(row.business_id)!;
+    const r = ch.token ? await deliver(row, ch) : { state: 'skipped' as const, error: 'line_not_configured' };
     const patch: Record<string, unknown> = { lease_until: null, last_error: r.error ?? '', updated_at: new Date().toISOString() };
     if (r.state === 'retry' && row.attempts < 6) {
       patch.state = 'queued';

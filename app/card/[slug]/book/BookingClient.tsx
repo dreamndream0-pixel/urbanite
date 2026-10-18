@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { DateField } from '@/app/components/BookingDatePicker';
 import Link from 'next/link';
 import { uiAlert, uiConfirm } from '@/lib/ui-dialog';
@@ -20,7 +20,7 @@ type Service = {
 };
 type Branch = { id: string; name: string; address: string };
 type Staff = { id: string; name: string; title: string; avatar: string; branch_ids?: string[] };
-type Business = { name: string; address: string; notice: string; approval_mode: 'auto' | 'manual'; cancel_hours: number; allow_any_staff: boolean; payment_info: string; service_area: string; waitlist: boolean; open: boolean };
+type Business = { line_own?: boolean; line_name?: string; name: string; address: string; notice: string; approval_mode: 'auto' | 'manual'; cancel_hours: number; allow_any_staff: boolean; payment_info: string; service_area: string; waitlist: boolean; open: boolean };
 type MyWait = { id: string; service_name: string; date: string; from_min: number; to_min: number; status: 'waiting' | 'invited'; invited_slot: string | null; invite_expires_at: string | null; service_id: string; staff_id: string | null; business: { slug: string } };
 type MyPackage = { id: string; name: string; scope?: 'service' | 'addon'; service_ids: string[]; addon_ids?: string[]; available: number; used: number; reserved: number; sessions_total: number; expires_at: string; business: { slug: string } };
 type MyRecord = {
@@ -240,6 +240,7 @@ export default function BookingClient({ slug, card, business, services: allServi
   const activeCount = auth?.bookings.filter((b) => ACTIVE.includes(b.status)).length ?? 0;
 
   return (
+    <LineOwnCtx.Provider value={Boolean(business.line_own)}>
     <main className="min-h-screen bg-[#f6f2ec] text-[#1f1b19]">
       <header className="page-header sticky top-0 z-30 border-b border-[#e5ded4] bg-[#faf7f2]/95 backdrop-blur">
         <div className="mx-auto flex max-w-xl items-center gap-3 px-4 py-3">
@@ -261,7 +262,7 @@ export default function BookingClient({ slug, card, business, services: allServi
 
       <div className="mx-auto max-w-xl px-4 pb-32 pt-4">
         {tab === 'my' ? (
-          <MyBookings auth={auth} slug={slug} loginNext={encodeURIComponent(`${here}?tab=my`)} onCancel={cancel} onBook={() => setTab('book')} reload={loadMine} />
+          <MyBookings auth={auth} slug={slug} loginNext={encodeURIComponent(`${here}?tab=my`)} onCancel={cancel} onBook={() => setTab('book')} reload={loadMine} lineOwn={business.line_own} />
         ) : result ? (
           <ResultView result={result} business={business} lineBound={auth?.lineBound ?? false} here={here} onMore={reset} onMine={() => { setResult(null); setTab('my'); }} onReported={loadMine} />
         ) : !business.open || !services.length ? (
@@ -410,7 +411,7 @@ export default function BookingClient({ slug, card, business, services: allServi
                 {auth && !auth.loggedIn ? (
                   <div className="mt-3 space-y-2 rounded-2xl bg-white p-4 text-center">
                     <p className="text-sm text-[#6b6156]">登入後送出預約,剛剛選的時段會保留</p>
-                    <a href={`/auth/line/start?next=${loginNext}`} className="flex w-full items-center justify-center gap-2 rounded-full bg-[#06C755] py-3 text-sm font-semibold text-white">用 LINE 登入並繼續</a>
+                    <LineLoginLink next={loginNext} className="flex w-full items-center justify-center gap-2 rounded-full bg-[#06C755] py-3 text-sm font-semibold text-white">用 LINE 登入並繼續</LineLoginLink>
                     <a href={`/card/login?next=${loginNext}`} className="block w-full rounded-full border border-[#d7c9bd] py-3 text-sm">其他方式登入</a>
                   </div>
                 ) : (
@@ -448,6 +449,47 @@ export default function BookingClient({ slug, card, business, services: allServi
         </div>
       ) : null}
     </main>
+    </LineOwnCtx.Provider>
+  );
+}
+
+const LineOwnCtx = createContext(false);
+
+// 用 LINE 登入:店家有自己的官方帳號時,不邀請加入平台官方帳號
+function LineLoginLink({ next, className, children }: { next: string; className: string; children: React.ReactNode }) {
+  const own = useContext(LineOwnCtx);
+  return <a href={`/auth/line/start?next=${next}${own ? '&bot=off' : ''}`} className={className}>{children}</a>;
+}
+
+// 店家自己的官方 LINE:按下後開啟 LINE 並帶入「綁定 XXXXXX」,傳送就完成綁定(之後預約通知從店家官方帳號發送)
+function OwnLineBox({ slug }: { slug: string }) {
+  const [st, setSt] = useState<{ own: boolean; name?: string; bound?: boolean } | null>(null);
+  const [code, setCode] = useState<{ text: string; url: string } | null>(null);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    fetch(`/api/booking/${encodeURIComponent(slug)}/line`, { cache: 'no-store' }).then((r) => r.json()).then((d) => { if (alive) setSt(d); }).catch(() => {});
+    return () => { alive = false; };
+  }, [slug]);
+  if (!st?.own) return null;
+  if (st.bound) return <p className="rounded-xl bg-[#eef6f0] p-3 text-xs text-[#2f6b3f]">✓ 已綁定「{st.name}」官方 LINE,確認與提醒會從這裡通知你</p>;
+  async function bind() {
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/booking/${encodeURIComponent(slug)}/line`, { method: 'POST' });
+      const d = await res.json().catch(() => null);
+      if (!res.ok) return void uiAlert(d?.error?.message ?? '請稍後再試');
+      setCode(d);
+      window.location.href = d.url;
+    } finally { setBusy(false); }
+  }
+  return (
+    <div className="space-y-2 rounded-xl bg-[#eef8f1] p-3 text-left">
+      <p className="text-sm font-semibold text-[#1f5a35]">加入「{st.name}」官方 LINE 接收預約通知</p>
+      <p className="text-xs leading-5 text-[#4c6b55]">按下後會開啟 LINE,並帶入一段綁定碼,直接按傳送就完成。之後的確認、提醒都會從店家的官方帳號通知你。</p>
+      <button type="button" disabled={busy} onClick={() => void bind()} className="flex w-full items-center justify-center rounded-full bg-[#06C755] py-3 text-sm font-semibold text-white disabled:opacity-50">{busy ? '開啟中…' : '加入官方 LINE 並綁定'}</button>
+      {code ? <p className="text-xs text-[#4c6b55]">沒有自動開啟?請在官方帳號傳送:<span className="font-semibold tracking-wider text-[#1f1b19]">{code.text}</span>(30 分鐘內有效)<br /><a href={code.url} className="text-[#1f6f8b] underline">再開一次 LINE</a></p> : null}
+    </div>
   );
 }
 
@@ -608,7 +650,7 @@ function ResultView({ result, business, lineBound, here, onMore, onMine, onRepor
       {result.next_action === 'wait_approval' && result.expires_at ? (
         <p className="mt-3 rounded-xl bg-[#faf7f2] p-3 text-xs leading-5 text-[#6b6156]">{business.name} 會在 {formatDateTime(result.expires_at)} 前確認,逾時未確認會自動取消。{result.deposit_amount ? `確認後會通知你轉帳訂金 ${money(result.deposit_amount)}。` : ''}</p>
       ) : null}
-      {!lineBound ? (
+      {business.line_own ? <div className="mt-4"><OwnLineBox slug={here.slice(2, -5)} /></div> : !lineBound ? (
         <a href={`/auth/line/start?mode=link&next=${encodeURIComponent(`${here}?tab=my`)}`} className="mt-4 flex w-full items-center justify-center rounded-full bg-[#06C755] py-3 text-sm font-semibold text-white">綁定 LINE 接收預約通知</a>
       ) : <p className="mt-4 text-xs text-[#2f6b3f]">確認、提醒會透過 LINE 通知你</p>}
       <div className="mt-3 grid grid-cols-2 gap-2">
@@ -619,7 +661,7 @@ function ResultView({ result, business, lineBound, here, onMore, onMine, onRepor
   );
 }
 
-function MyBookings({ auth, slug, loginNext, onCancel, onBook, reload }: { auth: { loggedIn: boolean; bookings: MyBooking[]; quotes: MyQuote[]; records: MyRecord[]; packages: MyPackage[]; points: number; waitlist: MyWait[]; optOut: boolean | null } | null; slug: string; loginNext: string; onCancel: (b: MyBooking) => void; onBook: () => void; reload: () => Promise<void> }) {
+function MyBookings({ auth, slug, loginNext, onCancel, onBook, reload, lineOwn }: { auth: { loggedIn: boolean; bookings: MyBooking[]; quotes: MyQuote[]; records: MyRecord[]; packages: MyPackage[]; points: number; waitlist: MyWait[]; optOut: boolean | null } | null; slug: string; loginNext: string; onCancel: (b: MyBooking) => void; onBook: () => void; reload: () => Promise<void>; lineOwn?: boolean }) {
   // 頁面打開時的時間(判斷可否取消);只在第一次取得,避免每次重畫都變
   const [now] = useState(() => Date.now());
   const [moving, setMoving] = useState('');
@@ -628,7 +670,7 @@ function MyBookings({ auth, slug, loginNext, onCancel, onBook, reload }: { auth:
     return (
       <div className="space-y-2 rounded-2xl bg-white p-6 text-center">
         <p className="text-sm text-[#6b6156]">登入後查看你的預約</p>
-        <a href={`/auth/line/start?next=${loginNext}`} className="block w-full rounded-full bg-[#06C755] py-3 text-sm font-semibold text-white">用 LINE 登入</a>
+        <LineLoginLink next={loginNext} className="block w-full rounded-full bg-[#06C755] py-3 text-sm font-semibold text-white">用 LINE 登入</LineLoginLink>
         <a href={`/card/login?next=${loginNext}`} className="block w-full rounded-full border border-[#d7c9bd] py-3 text-sm">其他方式登入</a>
       </div>
     );
@@ -636,6 +678,7 @@ function MyBookings({ auth, slug, loginNext, onCancel, onBook, reload }: { auth:
   if (!auth.bookings.length && !auth.quotes.length && !auth.records.length && !auth.packages.length && !auth.points && !auth.waitlist.length) {
     return (
       <div className="rounded-2xl bg-white p-8 text-center">
+        {lineOwn ? <div className="mb-4 text-left"><OwnLineBox slug={slug} /></div> : null}
         <p className="text-sm text-[#8a7f72]">還沒有預約紀錄</p>
         <button type="button" onClick={onBook} className="mt-3 rounded-full bg-[#1f1b19] px-6 py-2.5 text-sm font-semibold text-white">我要預約</button>
       </div>
@@ -822,7 +865,7 @@ function InquiryForm({ slug, service, staff, business, auth, loginNext, onDone }
     return (
       <section className="space-y-2 rounded-2xl bg-white p-4 text-center">
         <p className="text-sm text-[#6b6156]">這項服務需要先詢價,登入後填寫活動資訊</p>
-        <a href={`/auth/line/start?next=${loginNext}`} className="flex w-full items-center justify-center rounded-full bg-[#06C755] py-3 text-sm font-semibold text-white">用 LINE 登入並繼續</a>
+        <LineLoginLink next={loginNext} className="flex w-full items-center justify-center rounded-full bg-[#06C755] py-3 text-sm font-semibold text-white">用 LINE 登入並繼續</LineLoginLink>
         <a href={`/card/login?next=${loginNext}`} className="block w-full rounded-full border border-[#d7c9bd] py-3 text-sm">其他方式登入</a>
       </section>
     );
@@ -988,7 +1031,7 @@ function WaitlistJoin({ slug, serviceId, staffId, date, auth, contact, loginNext
     } finally { setBusy(false); }
   }
   if (auth && !auth.loggedIn) {
-    return <a href={`/auth/line/start?next=${loginNext}`} className="mt-2 block rounded-full border border-[#d7c9bd] bg-white py-2.5 text-center text-sm">登入後加入候補</a>;
+    return <LineLoginLink next={loginNext} className="mt-2 block rounded-full border border-[#d7c9bd] bg-white py-2.5 text-center text-sm">登入後加入候補</LineLoginLink>;
   }
   return (
     <div className="mt-2 space-y-2 rounded-2xl bg-white p-4">

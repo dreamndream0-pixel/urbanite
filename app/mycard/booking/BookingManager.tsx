@@ -16,6 +16,7 @@ import { HoursTab, ServicesTab, SettingsTab, StaffTab } from './BookingSetup';
 import QuotesTab from './QuotesTab';
 import CustomersTab from './CustomersTab';
 import ReportsTab from './ReportsTab';
+import LineSettings from './LineSettings';
 
 type Tab = 'bookings' | 'calendar' | 'quotes' | 'customers' | 'reports' | 'services' | 'staff' | 'hours' | 'settings';
 const TABS: Tab[] = ['bookings', 'calendar', 'quotes', 'customers', 'reports', 'services', 'staff', 'hours', 'settings'];
@@ -115,7 +116,7 @@ export default function BookingManager() {
               </div>
             ) : <p className="mt-3 text-xs text-[#a03b3b]">請先到「我的名片」建立名片,才有預約入口。</p>}
             <div className="mt-3 flex items-center gap-2 text-xs">
-              {data.line_bound ? <span className="text-[#2f6b3f]">✓ 新預約會用 LINE 通知你</span> : (
+              {data.business.line_own ? <span className="text-[#2f6b3f]">通知由你的官方帳號「{data.business.line_name}」發送(下方設定)</span> : data.line_bound ? <span className="text-[#2f6b3f]">✓ 新預約會用 LINE 通知你</span> : (
                 <>
                   <span className="text-[#8a7f72]">綁定 LINE,才能收到新預約通知</span>
                   <a href={`/auth/line/start?mode=link&next=${encodeURIComponent('/mycard/booking?tab=settings')}`} className="rounded-full bg-[#06C755] px-3 py-1.5 font-semibold text-white">綁定 LINE</a>
@@ -123,6 +124,7 @@ export default function BookingManager() {
               )}
             </div>
           </section>
+          <LineSettings onChanged={() => void load()} />
         </>
       )}
       {tab === 'bookings' && <BookingsTab data={data} reload={load} />}

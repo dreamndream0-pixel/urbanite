@@ -10,6 +10,8 @@ export type BkBusiness = {
   id: string;
   owner_user_id: string;
   card_id: string | null;
+  // 店家自己的 LINE 官方帳號(金鑰另外加密存放)
+  line_own?: boolean; line_basic_id?: string; line_name?: string;
   name: string;
   enabled: boolean;
   timezone: string;

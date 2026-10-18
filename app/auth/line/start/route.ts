@@ -49,7 +49,8 @@ export async function GET(request: Request) {
   lineUrl.searchParams.set('state', state);
   lineUrl.searchParams.set('scope', 'profile');
   // 授權畫面同時邀請加入官方帳號好友(需在 LINE Login channel 連結官方帳號)
-  lineUrl.searchParams.set('bot_prompt', linkMode ? 'aggressive' : 'normal');
+  // bot=off:名片主人有自己的官方帳號時(預約頁),不邀請加入平台官方帳號
+  if (url.searchParams.get('bot') !== 'off') lineUrl.searchParams.set('bot_prompt', linkMode ? 'aggressive' : 'normal');
 
   const response = NextResponse.redirect(lineUrl);
   response.cookies.set('line_oauth_next', next, {
