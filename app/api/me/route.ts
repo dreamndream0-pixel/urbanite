@@ -33,6 +33,7 @@ export async function GET() {
   return NextResponse.json({
     email: customer?.email || user.email,
     name: customer?.name || name,
+    avatar: (customer?.line_picture_url as string) || (user.user_metadata?.avatar_url as string) || (user.user_metadata?.picture as string) || '',
     phone: customer?.phone || user.phone || '',
     address: customer?.address || '',
     recipients: Array.isArray(customer?.recipients) ? customer.recipients : [],

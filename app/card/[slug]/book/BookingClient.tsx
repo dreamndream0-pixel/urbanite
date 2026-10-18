@@ -472,7 +472,14 @@ function OwnLineBox({ slug }: { slug: string }) {
     return () => { alive = false; };
   }, [slug]);
   if (!st?.own) return null;
-  if (st.bound) return <p className="rounded-xl bg-[#eef6f0] p-3 text-xs text-[#2f6b3f]">✓ 已綁定「{st.name}」官方 LINE,確認與提醒會從這裡通知你</p>;
+  async function unbind() {
+    if (!(await uiConfirm(`解除後,「${st?.name}」不會再用 LINE 通知你預約狀態。確定解除?`, { danger: true }))) return;
+    const res = await fetch(`/api/booking/${encodeURIComponent(slug)}/line`, { method: 'DELETE' });
+    if (!res.ok) return void uiAlert('解除失敗,請稍後再試');
+    uiToast('已解除綁定');
+    setSt((x) => (x ? { ...x, bound: false } : x));
+  }
+  if (st.bound) return <div className="flex items-center gap-2 rounded-xl bg-[#eef6f0] p-3"><p className="min-w-0 flex-1 text-xs text-[#2f6b3f]">✓ 已綁定「{st.name}」官方 LINE,確認與提醒會從這裡通知你</p><button type="button" onClick={() => void unbind()} className="shrink-0 rounded-full border border-[#cfe3d5] bg-white px-3 py-1 text-xs text-[#a03b3b]">解除綁定</button></div>;
   async function bind() {
     setBusy(true);
     try {

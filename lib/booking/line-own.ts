@@ -47,6 +47,11 @@ export async function removeBizLine(businessId: string) {
   await db().from('bk_line_codes').delete().eq('business_id', businessId);
 }
 
+// 解除綁定(之後這家店的通知不再發給這個人)
+export async function unlink(businessId: string, userId: string, role: LineRole) {
+  await db().from('bk_line_links').delete().eq('business_id', businessId).eq('user_id', userId).eq('role', role);
+}
+
 export async function isLinked(businessId: string, userId: string, role: LineRole) {
   const { data } = await db().from('bk_line_links').select('line_user_id').eq('business_id', businessId).eq('user_id', userId).eq('role', role).maybeSingle();
   return Boolean(data);

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getSessionUser } from '@/lib/supabase/server';
 import { BookingError, ownerBusiness } from '@/lib/booking/server';
-import { bizWebhookUrl, createBindCode, isLinked, removeBizLine, saveBizLine } from '@/lib/booking/line-own';
+import { bizWebhookUrl, createBindCode, isLinked, removeBizLine, saveBizLine, unlink } from '@/lib/booking/line-own';
 
 export const dynamic = 'force-dynamic';
 
@@ -38,10 +38,12 @@ export async function PUT(request: Request) {
   } catch (e) { return fail(e); }
 }
 
-// POST — 店家本人的綁定碼(綁定後新預約通知從自己的官方帳號發給自己)
-export async function POST() {
+// POST { action?: 'unlink' } — 店家本人的綁定碼(綁定後新預約通知從自己的官方帳號發給自己);unlink = 解除自己的綁定
+export async function POST(request: Request) {
   try {
     const { user, business } = await ctx();
+    const body = await request.json().catch(() => ({}));
+    if (body?.action === 'unlink') { await unlink(business.id, user.id, 'owner'); return NextResponse.json({ ok: true }); }
     if (!business.line_own || !business.line_basic_id) throw new BookingError('VALIDATION_ERROR', '請先連接官方帳號。', 422);
     return NextResponse.json(await createBindCode(business.id, business.line_basic_id, user.id, 'owner'));
   } catch (e) { return fail(e); }

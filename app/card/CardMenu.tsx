@@ -1,19 +1,17 @@
 'use client';
 
-import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useId, useRef, useState, type MouseEvent } from 'react';
 import { ArrowRight, CalendarCheck, ChevronRight, CreditCard, House, LayoutDashboard, LogOut, Menu, Store, UserRound, X } from 'lucide-react';
 import { createBrowserSupabase } from '@/lib/supabase/client';
-import { SERVICE_LOGO } from '@/lib/card-plan';
 import { useScrollLock } from '@/app/components/useScrollLock';
 import styles from './card-menu.module.css';
 
 // 後台模式(例:線上預約管理):選單只放這個後台的功能 + 首頁 / 我的名片 / 升級官網
 export type AppNav = { title: string; items: { href: string; label: string; active?: boolean }[] };
 
-type Me = { email: string; name: string; isAdmin?: boolean; shops?: { slug: string; name: string; current: boolean; adminUrl: string }[] } | null;
+type Me = { email: string; name: string; avatar?: string; isAdmin?: boolean; shops?: { slug: string; name: string; current: boolean; adminUrl: string }[] } | null;
 
 export default function CardMenu({ variant = 'header', loggedIn, current, top = 12, links = [], appNav }: {
   variant?: 'header' | 'floating';
@@ -39,7 +37,7 @@ export default function CardMenu({ variant = 'header', loggedIn, current, top = 
     const controller = new AbortController();
     fetch('/api/me', { cache: 'no-store', signal: controller.signal })
       .then(res => res.ok ? res.json() : null)
-      .then(data => setMe(data?.email ? { email: data.email, name: data.name ?? '', isAdmin: Boolean(data.isAdmin), shops: Array.isArray(data.shops) ? data.shops : [] } : null))
+      .then(data => setMe(data?.email ? { email: data.email, name: data.name ?? '', avatar: data.avatar ?? '', isAdmin: Boolean(data.isAdmin), shops: Array.isArray(data.shops) ? data.shops : [] } : null))
       .catch(() => { if (!controller.signal.aborted) setMe(null); });
     return () => controller.abort();
   }, [loggedIn]);
@@ -111,12 +109,26 @@ export default function CardMenu({ variant = 'header', loggedIn, current, top = 
           if (event.clientX < box.left || event.clientX > box.right || event.clientY < box.top || event.clientY > box.bottom) closeMenu();
         }}>
         <header className={styles.heading}>
-          {appNav ? <p className={styles.appTitle}>{appNav.title}</p> : <Link href="/card" onClick={event => navigate(event, '/card')} aria-label="URBANLINKS 首頁"><Image src={SERVICE_LOGO} alt="URBANLINKS" width={184} height={36} /></Link>}
+          {/* 選單上方:登入者的帳號資訊(LINE 登入的合成 email 不顯示) */}
+          {signedIn ? (
+            <div className={styles.who}>
+              {me?.avatar ? <img src={me.avatar} alt="" className={styles.whoAvatar} /> : <span aria-hidden="true" className={styles.whoAvatar}>{(me?.name || me?.email || '會').slice(0, 1).toUpperCase()}</span>}
+              <span className={styles.whoText}>
+                <strong>{me?.name || '會員'}</strong>
+                <small>{!me ? '讀取中…' : me.email.endsWith('@line.urbanite.com.tw') ? '以 LINE 帳號登入' : me.email}</small>
+              </span>
+            </div>
+          ) : (
+            <div className={styles.who}>
+              <span aria-hidden="true" className={styles.whoAvatar}><UserRound size={20} /></span>
+              <span className={styles.whoText}><strong>尚未登入</strong><small>登入後可管理名片與預約</small></span>
+            </div>
+          )}
           <button autoFocus type="button" aria-label="關閉選單" onClick={() => closeMenu()}><X size={22} /></button>
         </header>
         <div className={styles.content}>
           {appNav ? <div className={styles.navigation}>
-            <h2 id={`${id}-title`}>功能選單</h2>
+            <h2 id={`${id}-title`} className={styles.srOnly}>{appNav.title}選單</h2>
             <nav aria-label={appNav.title}>{appNav.items.map(item => <Link key={item.href} href={item.href} onClick={event => navigate(event, item.href)} className={styles.appLink} aria-current={item.active ? 'page' : undefined}>
               <span>{item.label}</span><ChevronRight size={16} />
             </Link>)}</nav>
@@ -126,12 +138,11 @@ export default function CardMenu({ variant = 'header', loggedIn, current, top = 
               <Link href="/card/pricing" onClick={event => navigate(event, '/card/pricing')}><CreditCard />升級官網<ChevronRight /></Link>
             </div>
           </div> : <div className={styles.navigation}>
-            <h2 id={`${id}-title`}>探索 URBANLINKS</h2>
+            <h2 id={`${id}-title`} className={styles.srOnly}>主要選單</h2>
             <nav aria-label="主要導覽">{navigation.map((link, index) => <Link key={link.href + link.label} href={link.href} onClick={event => navigate(event, link.href)} className={styles.navLink} aria-current={link.href === '/card/pricing' && current === 'upgrade' ? 'page' : undefined}>
               <small>{String(index + 1).padStart(2, '0')}</small><span>{link.label}{link.href === '/card/cases' && <small>服飾・租屋・美業・LINE AI</small>}</span><ArrowRight size={19} />
             </Link>)}</nav>
             {signedIn && <div className={styles.account}>
-              <p>{me?.name || me?.email || '會員專區'}</p>
               {me?.isAdmin && <a href="/admin" onClick={event => navigate(event, '/admin')}><LayoutDashboard />管理後台<ChevronRight /></a>}
               {(me?.shops ?? []).filter(shop => !shop.current).map(shop => <a key={shop.slug} href={shop.adminUrl} onClick={event => navigate(event, shop.adminUrl)}><Store /><span>我的官網後台<small>{shop.name || shop.slug}</small></span><ChevronRight /></a>)}
               <Link href="/mycard" aria-current={current === 'mycard' ? 'page' : undefined} onClick={event => navigate(event, '/mycard')}><UserRound />我的名片<ChevronRight /></Link>

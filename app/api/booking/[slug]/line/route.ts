@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getSessionUser } from '@/lib/supabase/server';
 import { BookingError, getPublicBusiness } from '@/lib/booking/server';
-import { createBindCode, isLinked } from '@/lib/booking/line-own';
+import { createBindCode, isLinked, unlink } from '@/lib/booking/line-own';
 import { accountRateLimit } from '@/lib/account-rate-limit';
 
 export const dynamic = 'force-dynamic';
@@ -32,4 +32,15 @@ export async function POST(_request: Request, { params }: { params: Promise<{ sl
   if (!ctx || !ctx.business.line_own || !ctx.business.line_basic_id) return fail(new BookingError('NOT_FOUND', '這家店還沒連接 LINE 官方帳號。', 404));
   try { return NextResponse.json(await createBindCode(ctx.business.id, ctx.business.line_basic_id, user.id, 'customer')); }
   catch (e) { return fail(e); }
+}
+
+// DELETE /api/booking/[slug]/line — 解除我在這家店官方 LINE 的綁定
+export async function DELETE(_request: Request, { params }: { params: Promise<{ slug: string }> }) {
+  const user = await getSessionUser();
+  if (!user) return fail(new BookingError('AUTH_REQUIRED', '請先登入。', 401));
+  const { slug } = await params;
+  const ctx = await getPublicBusiness(decodeURIComponent(slug).toLowerCase());
+  if (!ctx) return fail(new BookingError('NOT_FOUND', '找不到這個預約頁。', 404));
+  await unlink(ctx.business.id, user.id, 'customer');
+  return NextResponse.json({ ok: true });
 }

@@ -43,6 +43,11 @@ export default function LineSettings({ onChanged }: { onChanged: () => void }) {
       window.location.href = d.url;
     } catch (e) { void uiAlert(errMsg(e)); }
   }
+  async function unbindSelf() {
+    if (!(await uiConfirm('解除後,新預約通知不會再從官方帳號發給你。確定解除?', { danger: true }))) return;
+    try { await api('/api/mycard/booking/line', { method: 'POST', body: JSON.stringify({ action: 'unlink' }) }); uiToast('已解除綁定'); setCode(null); await load(); }
+    catch (e) { void uiAlert(errMsg(e)); }
+  }
   const copy = (t: string) => { void navigator.clipboard?.writeText(t); uiToast('已複製'); };
 
   if (!st) return <section className={card}><p className="text-sm text-[#8a7f72]">讀取中…</p></section>;
@@ -72,7 +77,7 @@ export default function LineSettings({ onChanged }: { onChanged: () => void }) {
           <div className="rounded-xl border border-[#e5ded4] p-3">
             <p className="text-sm font-semibold">我自己接收新預約通知</p>
             {st.owner_bound
-              ? <p className="mt-1 text-xs text-[#2f6b3f]">✓ 已綁定,新預約、付款回報、取消會從「{st.name}」通知你</p>
+              ? <div className="mt-1 flex items-center gap-2"><p className="min-w-0 flex-1 text-xs text-[#2f6b3f]">✓ 已綁定,新預約、付款回報、取消會從「{st.name}」通知你</p><button type="button" onClick={() => void unbindSelf()} className={`${btnSm} shrink-0 text-[#a03b3b]`}>解除綁定</button></div>
               : <>
                   <p className="mt-1 text-xs text-[#8a7f72]">按下後開啟 LINE 並帶入綁定碼,在你的官方帳號聊天室按傳送即可(要先把自己的官方帳號加為好友)。</p>
                   <button type="button" onClick={() => void bindSelf()} className="mt-2 w-full rounded-full bg-[#06C755] py-2.5 text-sm font-semibold text-white">用 LINE 綁定我自己</button>

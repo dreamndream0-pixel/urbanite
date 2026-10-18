@@ -116,7 +116,7 @@ export default function BookingManager() {
               </div>
             ) : <p className="mt-3 text-xs text-[#a03b3b]">請先到「我的名片」建立名片,才有預約入口。</p>}
             <div className="mt-3 flex items-center gap-2 text-xs">
-              {data.business.line_own ? <span className="text-[#2f6b3f]">通知由你的官方帳號「{data.business.line_name}」發送(下方設定)</span> : data.line_bound ? <span className="text-[#2f6b3f]">✓ 新預約會用 LINE 通知你</span> : (
+              {data.business.line_own ? <span className="text-[#2f6b3f]">通知由你的官方帳號「{data.business.line_name}」發送(下方設定)</span> : data.line_bound ? <><span className="min-w-0 flex-1 text-[#2f6b3f]">✓ 新預約會用 LINE 通知你</span><button type="button" onClick={() => void unbindPlatformLine(load)} className="shrink-0 rounded-full border border-[#e5ded4] px-3 py-1 text-[#a03b3b]">解除綁定</button></> : (
                 <>
                   <span className="text-[#8a7f72]">綁定 LINE,才能收到新預約通知</span>
                   <a href={`/auth/line/start?mode=link&next=${encodeURIComponent('/mycard/booking?tab=settings')}`} className="rounded-full bg-[#06C755] px-3 py-1.5 font-semibold text-white">綁定 LINE</a>
@@ -194,6 +194,15 @@ function NavIcon({ name, active }: { name: string; active: boolean }) {
   if (name === 'hours') return <svg {...p}><circle cx="12" cy="12" r="8.5" /><path d="M12 7.5V12l3 2" /></svg>;
   if (name === 'quotes') return <svg {...p}><path d="M6 3.5h9l3.5 3.5v13.5H6z" /><path d="M9 11h6M9 15h6" /></svg>;
   return <svg {...p}><circle cx="12" cy="12" r="3" /><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1" /></svg>;
+}
+
+// 解除平台 LINE 綁定(會員的 LINE;之後不會再收到平台官方帳號的通知)
+async function unbindPlatformLine(reload: () => Promise<void>) {
+  if (!(await uiConfirm('解除 LINE 綁定後,新預約通知不會再用 LINE 發給你。確定解除?', { danger: true }))) return;
+  const res = await fetch('/api/me/line', { method: 'DELETE' });
+  if (!res.ok) return void uiAlert((await res.json().catch(() => null))?.error ?? '解除失敗');
+  uiToast('已解除 LINE 綁定');
+  void reload();
 }
 
 // ---------- 預約清單 ----------
