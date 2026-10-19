@@ -132,7 +132,7 @@ function BlockFields({ block, patch, categories, products, banners, uploading, o
       const groups = [...new Set([1, ...banners.map((b) => b.group_no ?? 1), block.group])].sort((a, b) => a - b);
       return <div className="space-y-2">
         <label className="block text-sm">顯示哪一組輪播圖<select value={block.group} onChange={(e) => patch({ group: Number(e.target.value) })} className={input}>{groups.map((g) => <option key={g} value={g}>輪播圖{g}({banners.filter((b) => (b.group_no ?? 1) === g && b.active).length} 張)</option>)}</select></label>
-        <label className="block text-sm">輪播顯示比例<select value={block.carouselRatio} onChange={(e) => patch({ carouselRatio: e.target.value as StorefrontBlock['carouselRatio'] })} className={input}><option value="auto">自動適配（手機直式／電腦橫式）</option><option value="portrait">直式 4:5</option><option value="square">正方形 1:1</option><option value="wide">橫式 16:9</option></select></label>
+        <label className="block text-sm">輪播顯示比例<select value={block.carouselRatio} onChange={(e) => patch({ carouselRatio: e.target.value as StorefrontBlock['carouselRatio'] })} className={input}><option value="auto">沿用系統設定</option><option value="portrait">直式 4:5</option><option value="square">正方形 1:1</option><option value="wide">橫式 16:9</option></select></label>
         <p className="text-xs text-[#a99e8f]">輪播圖的圖片在「系統設定 → 輪播圖」上傳和排序。</p>
       </div>;
     }

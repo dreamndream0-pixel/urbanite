@@ -9,6 +9,7 @@ import type { DesignCategory } from './StorefrontDesign';
 import styles from './storefront-blocks.module.css';
 import CategoryNavigation from './CategoryNavigation';
 import HeroCarousel from './HeroCarousel';
+import { bannerRatioForGroup, type BannerRatios } from '@/lib/banner-ratio';
 
 export function blockProducts(block: StorefrontBlock, products: Product[]) {
   const live = products.filter(isVisibleInStore);
@@ -42,8 +43,9 @@ function Countdown({ endsAt }: { endsAt: string }) {
   </div>;
 }
 
-export default function StorefrontBlocks({ blocks, products, categories, banners = [], renderProduct, onCategory, onBrowseAll, preview = false, loading = false, designStyle = 'classic', categoryImageStyle = 'circle' }: {
+export default function StorefrontBlocks({ blocks, products, categories, banners = [], bannerRatios, renderProduct, onCategory, onBrowseAll, preview = false, loading = false, designStyle = 'classic', categoryImageStyle = 'circle' }: {
   blocks: StorefrontBlock[]; products: Product[]; categories: DesignCategory[]; images?: string[]; banners?: Banner[];
+  bannerRatios?: BannerRatios;
   renderProduct: (product: Product) => ReactNode; onCategory: (slug: string) => void; onBrowseAll?: () => void;
   preview?: boolean; loading?: boolean; designStyle?: string; categoryImageStyle?: CategoryImageStyle;
 }) {
@@ -124,7 +126,7 @@ export default function StorefrontBlocks({ blocks, products, categories, banners
 
         {block.type === 'carousel' && (() => {
           const slides = banners.filter((b) => b.active && (b.group_no ?? 1) === block.group);
-          return slides.length ? <div className={styles.carousel}><HeroCarousel banners={slides} ratio={block.carouselRatio === 'auto' ? undefined : block.carouselRatio} /></div>
+          return slides.length ? <div className={styles.carousel}><HeroCarousel banners={slides} ratio={bannerRatioForGroup(bannerRatios, block.group, block.carouselRatio)} /></div>
             : preview ? <div className={styles.inner}><p className={styles.empty}>輪播圖{block.group} 還沒有圖片,請到「系統設定 → 輪播圖」上傳</p></div> : null;
         })()}
 

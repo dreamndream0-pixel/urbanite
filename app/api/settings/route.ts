@@ -6,6 +6,7 @@ import { revalidateTag } from 'next/cache';
 import { resolveSiteTheme } from '@/lib/site-theme';
 import { draftSiteTheme } from '@/lib/site-theme-state';
 import { getCurrentShop, isPlatformShop, shopAdminClient } from '@/lib/shop';
+import { isBannerRatio } from '@/lib/banner-ratio';
 
 const DEFAULT_SETTINGS: SiteSettings = {
   id: 1,
@@ -59,6 +60,9 @@ export async function PATCH(request: Request) {
 
   const body = (await request.json()) as Record<string, unknown>;
   if ('site_theme_draft' in body && 'site_theme' in body) return NextResponse.json({ error: '請分別儲存草稿或發布' }, { status: 400 });
+  const bannerPatch = body.banner_ratio as { group?: unknown; ratio?: unknown } | null;
+  if ('banner_ratio' in body && (!bannerPatch || !Number.isInteger(bannerPatch.group) || Number(bannerPatch.group) < 1 || Number(bannerPatch.group) > 9 || !isBannerRatio(bannerPatch.ratio)
+    || 'site_theme' in body || 'site_theme_draft' in body)) return NextResponse.json({ error: '輪播圖組別或顯示比例不正確' }, { status: 400 });
   // 每家店一筆網站設定(以 shop_id 判斷新增或更新)
   const update: Record<string, unknown> = {
     updated_at: new Date().toISOString(),
@@ -97,10 +101,21 @@ export async function PATCH(request: Request) {
   if ('category_image_style' in body) update.category_image_style = ['text', 'square', 'cutout'].includes(String(body.category_image_style)) ? String(body.category_image_style) : 'circle';
 
   const supabase = (await shopAdminClient());
-  if ('site_theme_draft' in body) {
+  if ('site_theme_draft' in body || 'site_theme' in body || 'banner_ratio' in body) {
     const { data: current, error: readError } = await supabase.from('site_settings').select('site_theme').maybeSingle();
-    if (readError) return NextResponse.json({ error: '無法讀取目前官網設定，草稿未儲存' }, { status: 500 });
-    update.site_theme = draftSiteTheme(current?.site_theme, body.site_theme_draft);
+    if (readError) return NextResponse.json({ error: '無法讀取目前官網設定，變更未儲存' }, { status: 500 });
+    const published = resolveSiteTheme(current?.site_theme);
+    if (bannerPatch) {
+      const bannerRatios = { ...published.bannerRatios, [String(bannerPatch.group)]: bannerPatch.ratio };
+      const next = resolveSiteTheme({ ...published, bannerRatios });
+      const stored = current?.site_theme as { draft?: unknown } | null;
+      update.site_theme = stored?.draft ? draftSiteTheme(next, { ...resolveSiteTheme(stored.draft), bannerRatios }) : next;
+    } else if ('site_theme_draft' in body) {
+      update.site_theme = draftSiteTheme(published, { ...resolveSiteTheme(body.site_theme_draft), bannerRatios: published.bannerRatios });
+    } else {
+      // Global carousel settings are saved separately, not overwritten by an older editor draft.
+      update.site_theme = resolveSiteTheme({ ...resolveSiteTheme(body.site_theme), bannerRatios: published.bannerRatios });
+    }
   }
   const { data, error } = await supabase
     .from('site_settings')
@@ -109,6 +124,6 @@ export async function PATCH(request: Request) {
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
-  if ('site_theme' in body) revalidateTag('site-theme', { expire: 0 });
+  if ('site_theme' in body || 'banner_ratio' in body) revalidateTag('site-theme', { expire: 0 });
   return NextResponse.json({ ...DEFAULT_SETTINGS, ...data } as SiteSettings);
 }

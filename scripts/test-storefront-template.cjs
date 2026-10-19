@@ -10,7 +10,8 @@ function load(file, imports = {}) {
 }
 const blocks = load('lib/storefront-blocks.ts');
 const design = load('lib/storefront-template.ts', { './storefront-blocks': blocks });
-const theme = load('lib/site-theme.ts', { './storefront-template': design });
+const ratios = load('lib/banner-ratio.ts');
+const theme = load('lib/site-theme.ts', { './storefront-template': design, './banner-ratio': ratios });
 assert.equal(theme.resolveSiteTheme(null).storefront.enabled, false);
 assert.equal(design.resolveStorefront({ enabled: 'true', style: 'unknown' }).enabled, false);
 assert.equal(design.resolveStorefront({ style: '__proto__' }).style, 'classic');
@@ -76,3 +77,14 @@ for (const carouselRatio of [undefined, null, '', '16/9', 'invalid', {}, 1]) ass
 const independent = blocks.resolveBlocks([{ ...legacyCarousel, carouselRatio: 'portrait' }, { ...legacyCarousel, id: 'second', carouselRatio: 'square' }]);
 assert.deepEqual(independent.map((b) => b.carouselRatio), ['portrait', 'square']);
 console.log('Carousel ratios: legacy defaults, allowlist, persistence, template switching and independent blocks passed');
+assert.deepEqual(ratios.resolveBannerRatios({ 1: 'square', 2: 'wide', 0: 'wide', 10: 'portrait', nope: 'square', 3: 'invalid' }), { 1: 'square', 2: 'wide' });
+assert.equal(ratios.bannerRatioForGroup({ 1: 'square' }, 1), 'square');
+assert.equal(ratios.bannerRatioForGroup({ 1: 'square' }, 1, 'portrait'), 'portrait');
+assert.equal(ratios.bannerRatioForGroup({ 1: 'auto' }, 1), undefined);
+assert.equal(ratios.bannerRatioForGroup(undefined, 1), undefined);
+assert.deepEqual(theme.resolveSiteTheme({ bannerRatios: { 1: 'square' } }).bannerRatios, { 1: 'square' });
+assert.deepEqual(ratios.bannerImageSize('wide'), [1600, 900]);
+assert.deepEqual(ratios.bannerImageSize('square'), [1200, 1200]);
+assert.deepEqual(ratios.bannerImageSize('portrait'), [1080, 1350]);
+assert.deepEqual(ratios.bannerImageSize(), [1080, 1350]);
+console.log('Global banner ratios: bounded group settings, inheritance and explicit overrides passed');

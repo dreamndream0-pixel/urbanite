@@ -53,6 +53,8 @@ import CardMembersManager from './CardMembersManager';
 import ShopsManager from './ShopsManager';
 import { POLICY_LABEL, policyText, stripPolicies, withPolicies } from '@/lib/footer-policies';
 import SiteThemeEditor from './SiteThemeEditor';
+import { BANNER_RATIOS, bannerImageSize, type BannerRatio } from '@/lib/banner-ratio';
+import { resolveSiteTheme } from '@/lib/site-theme';
 import LineBotManager from './line-bot/LineBotManager';
 import LoyaltyManager from './LoyaltyManager';
 import StocktakeManager, { type StocktakeApplied } from './StocktakeManager';
@@ -549,6 +551,9 @@ export default function AdminDashboard({
   const [manualCouponByUser, setManualCouponByUser] = useState<Record<string, string>>({});
   const [logoUrl, setLogoUrl] = useState(initialLogoUrl);
   const [siteTheme, setSiteTheme] = useState(initialSettings?.site_theme);
+  const [savingBannerRatio, setSavingBannerRatio] = useState(false);
+  const bannerRatios = resolveSiteTheme(siteTheme).bannerRatios;
+  const bannerOutput = bannerImageSize(bannerRatios?.[String(bannerGroup)]);
   const [couponHero, setCouponHero] = useState(initialSettings?.coupon_hero_image ?? '');
   const [heroBusy, setHeroBusy] = useState(false);
   const [memberStamp, setMemberStamp] = useState(initialSettings?.member_stamp_image ?? '');
@@ -1561,6 +1566,18 @@ export default function AdminDashboard({
     const data = await res.json();
     if (res.ok) setBanners((l) => l.map((b) => (b.id === id ? (data as Banner) : b)));
     else void uiAlert(data.error ?? '更新失敗');
+  }
+
+  async function saveBannerRatio(group: number, ratio: BannerRatio) {
+    setSavingBannerRatio(true);
+    try {
+      const res = await fetch('/api/settings', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ banner_ratio: { group, ratio } }) });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? '顯示比例儲存失敗');
+      setSiteTheme(data.site_theme);
+    } catch (error) {
+      void uiAlert(error instanceof Error ? error.message : '顯示比例儲存失敗');
+    } finally { setSavingBannerRatio(false); }
   }
 
   function moveBanner(group: number, index: number, delta: number) {
@@ -3038,15 +3055,19 @@ export default function AdminDashboard({
                 return (
                 <Card title="輪播圖">
                   <p className="mb-4 text-sm text-[#8a7f72]">
-                    圖片尺寸 1080 × 1350 px(4:5),每 4 秒自動切換。輪播圖1 是首頁最上方的輪播(頁尾內文頁背景也用它的第一張);其他組可在「模板設定」新增「輪播圖」板塊後選用。
+                    每 4 秒自動切換。輪播圖1 是首頁最上方的輪播(頁尾內文頁背景也用它的第一張);其他組可在「模板設定」新增「輪播圖」板塊後選用。
                   </p>
                   <div className="space-y-4">
                     {groups.map((group) => {
                       const list = banners.filter((b) => (b.group_no ?? 1) === group);
+                      const output = bannerImageSize(bannerRatios?.[String(group)]);
                       return (
                         <section key={group} className="rounded-xl border border-[#e5ded4] p-3">
                           <div className="mb-3 flex items-center justify-between gap-2">
-                            <p className="text-sm font-semibold">輪播圖{group} <span className="font-normal text-[#a99e8f]">{list.length} 張</span></p>
+                            <div className="min-w-0 space-y-2">
+                              <p className="text-sm font-semibold">輪播圖{group} <span className="font-normal text-[#a99e8f]">{list.length} 張</span></p>
+                              <label className="block text-xs text-[#6b6156]">顯示比例<select aria-label={`輪播圖${group}顯示比例`} value={bannerRatios?.[String(group)] ?? 'auto'} disabled={savingBannerRatio} onChange={(e) => void saveBannerRatio(group, e.target.value as BannerRatio)} className="ml-2 max-w-full rounded-md border border-[#e5ded4] bg-white px-2 py-1.5 text-xs disabled:opacity-50">{BANNER_RATIOS.map((ratio) => <option key={ratio.key} value={ratio.key}>{ratio.label}</option>)}</select></label>
+                            </div>
                             <div className="flex items-center gap-2">
                               {list.length === 0 && group !== 1 ? (
                                 <button type="button" onClick={() => setExtraBannerGroups((g) => g.filter((x) => x !== group))} className="text-xs text-[#8a7f72] underline">移除</button>
@@ -3063,7 +3084,7 @@ export default function AdminDashboard({
                             <div className="-mx-1 flex snap-x gap-3 overflow-x-auto px-1 pb-2">
                               {list.map((banner, index) => (
                                 <div key={banner.id} className={`w-32 shrink-0 snap-start ${banner.active ? '' : 'opacity-50'}`}>
-                                  <label title="點圖換圖 / 裁切" className="group relative block aspect-[4/5] cursor-pointer overflow-hidden rounded-lg border border-[#eee5da] bg-[#e9e1d6]">
+                                  <label title="點圖換圖 / 裁切" style={{ aspectRatio: `${output[0]} / ${output[1]}` }} className="group relative block cursor-pointer overflow-hidden rounded-lg border border-[#eee5da] bg-[#e9e1d6]">
                                     <img src={banner.image} alt="" className="h-full w-full object-cover" />
                                     <span className="absolute left-1.5 top-1.5 rounded-full bg-black/55 px-1.5 text-[10px] text-white">{index + 1}</span>
                                     <span className="absolute inset-0 flex items-center justify-center bg-black/0 text-xs font-semibold text-white opacity-0 transition group-hover:bg-black/40 group-hover:opacity-100">換圖</span>
@@ -3447,6 +3468,10 @@ export default function AdminDashboard({
         <FixedBannerCropModal
           file={cropFile}
           busy={uploadingBanner}
+          title={`輪播圖${bannerGroup} — 圖片裁切`}
+          outputW={bannerOutput[0]}
+          outputH={bannerOutput[1]}
+          hint={`輸出尺寸 ${bannerOutput[0]} × ${bannerOutput[1]} px`}
           onCancel={() => {
             setCropFile(null);
             setEditBannerId(null);

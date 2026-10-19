@@ -54,6 +54,7 @@ export default function SiteThemeEditor({ initial, banners, onSaved, categoryIma
   const [previewProducts, setPreviewProducts] = useState<Product[]>([]);
   // Share the dashboard's live banner state instead of a cached, mount-only API snapshot.
   const previewBanners = banners;
+  const bannerRatios = resolveSiteTheme(initial).bannerRatios;
   const previewImages = [...banners.filter((b) => b.active).map((b) => b.image), ...previewProducts.filter(isVisibleInStore).map((p) => p.image)].filter(Boolean);
   const design = draft.storefront ?? resolveStorefront(null);
   useEffect(() => {
@@ -161,7 +162,7 @@ export default function SiteThemeEditor({ initial, banners, onSaved, categoryIma
                     {/* 用真實商品、分類、輪播圖縮小顯示這個排版 */}
                     <div className={`${previewStyles.preview} pointer-events-none h-64 overflow-hidden bg-[var(--c-bg)] text-[var(--c-text)] sm:h-72`} data-card={draft.layout.card} data-radius={draft.layout.radius} data-heading={draft.layout.heading} style={themeVars(draft)} aria-hidden="true">
                       <div className="origin-top-left" style={{ width: 390, transform: 'scale(var(--thumb-scale))' }}>
-                        <StorefrontBlocks designStyle={t.key} categoryImageStyle={categoryImageStyle} blocks={blocks} banners={previewBanners} products={previewProducts} categories={previewCategories} images={previewImages} onCategory={() => {}} preview renderProduct={(product) => <ProductCard product={product} favorited={false} favoritePending={false} favoritesLoaded onFavoriteChange={() => {}} onAdd={() => {}} />} />
+                        <StorefrontBlocks designStyle={t.key} categoryImageStyle={categoryImageStyle} blocks={blocks} banners={previewBanners} bannerRatios={bannerRatios} products={previewProducts} categories={previewCategories} images={previewImages} onCategory={() => {}} preview renderProduct={(product) => <ProductCard product={product} favorited={false} favoritePending={false} favoritesLoaded onFavoriteChange={() => {}} onAdd={() => {}} />} />
                       </div>
                     </div>
                     <div className="border-t border-[#efe8dd] bg-white px-3 py-2">
@@ -284,7 +285,7 @@ export default function SiteThemeEditor({ initial, banners, onSaved, categoryIma
           <button type="button" autoFocus onClick={() => setPreviewOpen(false)} aria-label="關閉預覽" title="關閉預覽" className="flex h-10 w-10 items-center justify-center rounded-full hover:bg-neutral-100"><X size={20} /></button>
         </div>
           <div className={`${previewStyles.preview} max-h-[calc(90dvh-65px)] overflow-y-auto overflow-x-hidden overscroll-contain bg-[var(--c-bg)] text-[var(--c-text)]`} data-card={draft.layout.card} data-radius={draft.layout.radius} data-heading={draft.layout.heading} onClickCapture={(event) => { if ((event.target as HTMLElement).closest('a')) event.preventDefault(); }} style={Object.fromEntries(COLOR_FIELDS.map((f) => [cssVar(f.key), draft.colors[f.key]])) as CSSProperties}>
-            {design.enabled ? <StorefrontBlocks designStyle={design.style} categoryImageStyle={categoryImageStyle} blocks={resolveBlocks(design.blocks) ?? []} banners={previewBanners} products={previewProducts} categories={previewCategories} images={previewImages} onCategory={() => {}} preview renderProduct={(product) => <ProductCard product={product} favorited={false} favoritePending={false} favoritesLoaded onFavoriteChange={() => {}} onAdd={() => {}} />} /> : <StorePreview theme={draft} images={previewImages} />}
+            {design.enabled ? <StorefrontBlocks designStyle={design.style} categoryImageStyle={categoryImageStyle} blocks={resolveBlocks(design.blocks) ?? []} banners={previewBanners} bannerRatios={bannerRatios} products={previewProducts} categories={previewCategories} images={previewImages} onCategory={() => {}} preview renderProduct={(product) => <ProductCard product={product} favorited={false} favoritePending={false} favoritesLoaded onFavoriteChange={() => {}} onAdd={() => {}} />} /> : <StorePreview theme={draft} images={previewImages} />}
           </div>
       </dialog>
     </section>

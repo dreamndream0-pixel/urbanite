@@ -1,6 +1,7 @@
 // 網站外觀(前台):配色與版面配置。存在 site_settings.site_theme,由根版面輸出成 CSS 變數
 
 import { resolveStorefront, type StorefrontDesign } from './storefront-template';
+import { resolveBannerRatios, type BannerRatios } from './banner-ratio';
 
 export type ColorKey =
   | 'bg' | 'header' | 'surface' | 'card' | 'text' | 'text2' | 'muted' | 'border' | 'borderStrong'
@@ -65,7 +66,7 @@ export const LAYOUT_OPTIONS = {
   ] as { key: StockDisplay; label: string }[],
 };
 
-export type SiteTheme = { template: string; colors: Record<ColorKey, string>; layout: SiteLayout; storefront?: StorefrontDesign };
+export type SiteTheme = { template: string; colors: Record<ColorKey, string>; layout: SiteLayout; storefront?: StorefrontDesign; bannerRatios?: BannerRatios };
 
 export const DEFAULT_COLORS: Record<ColorKey, string> = {
   bg: '#f6f2ec',
@@ -218,10 +219,12 @@ export function resolveSiteTheme(raw: unknown): SiteTheme {
   if (!(typeof t.colors?.cartButton === 'string' && HEX.test(t.colors.cartButton))) colors.cartButton = colors.sale;
   const l = (t.layout ?? {}) as Partial<SiteLayout>;
   const pick = <T extends string>(v: unknown, list: { key: T }[], fallback: T) => (list.some((o) => o.key === v) ? (v as T) : fallback);
+  const bannerRatios = resolveBannerRatios(t.bannerRatios);
   return {
     template: typeof t.template === 'string' ? t.template : 'urbanite',
     colors,
     storefront: resolveStorefront(t.storefront),
+    ...(Object.keys(bannerRatios).length ? { bannerRatios } : {}),
     layout: {
       card: pick(l.card, LAYOUT_OPTIONS.card, DEFAULT_LAYOUT.card),
       columns: pick(l.columns, LAYOUT_OPTIONS.columns, DEFAULT_LAYOUT.columns),
