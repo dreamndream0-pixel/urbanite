@@ -15,6 +15,7 @@ export type StorefrontBlock = {
   categoryImageStyle?: 'circle' | 'square' | 'cutout';
   endsAt: string; // 倒數計時結束時間 YYYY-MM-DDTHH:mm(台灣時間)
   group: number; // 輪播圖板塊要顯示的輪播圖組(1 = 輪播圖1)
+  carouselRatio: 'auto' | 'portrait' | 'square' | 'wide';
   copyPos: CopyPosition; // 主視覺文字與按鈕位置
   buttonOpacity: number; // 主視覺按鈕底色不透明度 0~100(%)
 };
@@ -35,7 +36,7 @@ export function safeBlockUrl(value: unknown) {
   try { const parsed = new URL(url); return parsed.protocol === 'https:' && !parsed.username && !parsed.password ? url : ''; } catch { return ''; }
 }
 export function createBlock(type: BlockType, id: string): StorefrontBlock {
-  return { id, type, visible: true, title: BLOCK_TYPES.find((t) => t.key === type)?.label ?? '', text: '', image: '', video: '', action: '', href: '', columns: 2, spacing: 0, background: '', ratio: 'wide', source: 'all', category: '', productIds: [], limit: 8, endsAt: '', group: 1, copyPos: 'bl', buttonOpacity: 30 };
+  return { id, type, visible: true, title: BLOCK_TYPES.find((t) => t.key === type)?.label ?? '', text: '', image: '', video: '', action: '', href: '', columns: 2, spacing: 0, background: '', ratio: 'wide', source: 'all', category: '', productIds: [], limit: 8, endsAt: '', group: 1, carouselRatio: 'auto', copyPos: 'bl', buttonOpacity: 30 };
 }
 export function resolveBlocks(raw: unknown): StorefrontBlock[] | undefined {
   if (!Array.isArray(raw)) return undefined;
@@ -52,6 +53,8 @@ export function resolveBlocks(raw: unknown): StorefrontBlock[] | undefined {
     if (COPY_POSITIONS.some((p) => p.key === value.copyPos)) block.copyPos = value.copyPos as CopyPosition;
     if (typeof value.buttonOpacity === 'number' && Number.isFinite(value.buttonOpacity)) block.buttonOpacity = Math.min(100, Math.max(0, Math.round(value.buttonOpacity)));
     if (Number.isInteger(value.group) && (value.group as number) >= 1 && (value.group as number) <= 9) block.group = value.group as number;
+    // Legacy carousel blocks stored an unused ratio; keep their responsive layout unchanged.
+    if (value.carouselRatio === 'portrait' || value.carouselRatio === 'square' || value.carouselRatio === 'wide') block.carouselRatio = value.carouselRatio;
     if (typeof value.endsAt === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value.endsAt)) block.endsAt = value.endsAt;
     for (const field of ['title', 'text', 'action', 'category'] as const) block[field] = text(value[field], field === 'text' ? 2000 : field === 'action' ? 40 : 120);
     for (const field of ['image', 'video', 'href'] as const) block[field] = safeBlockUrl(value[field]);
@@ -95,7 +98,7 @@ export function starterBlocks(design: Pick<StorefrontDesign, 'style'>): Storefro
   }
 }
 // 換模板:套用新模板的板塊順序與預設文案,但保留使用者改過的文字、圖片與商品設定
-const CARRY = ['title', 'text', 'image', 'video', 'action', 'href', 'source', 'category', 'productIds', 'limit', 'endsAt', 'group', 'copyPos', 'buttonOpacity', 'background'] as const;
+const CARRY = ['title', 'text', 'image', 'video', 'action', 'href', 'source', 'category', 'productIds', 'limit', 'endsAt', 'group', 'carouselRatio', 'copyPos', 'buttonOpacity', 'background'] as const;
 export function switchTemplate(blocks: StorefrontBlock[], from: StorefrontDesign['style'], to: StorefrontDesign['style']): StorefrontBlock[] {
   const oldDefaults = starterBlocks({ style: from });
   const next = starterBlocks({ style: to }).map((fresh) => {

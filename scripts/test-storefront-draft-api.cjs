@@ -30,10 +30,11 @@ function load(file, imports = {}) {
     '@/lib/supabase/server': { getAdminUser: async () => admin },
     'next/cache': { revalidateTag: () => { invalidations++; } },
     '@/lib/site-theme': theme, '@/lib/site-theme-state': state,
+    '@/lib/promo-notices': load('lib/promo-notices.ts'),
     '@/lib/shop': { shopAdminClient: async () => db, getCurrentShop: async () => ({ name: 'Shop', slug: 'shop' }), isPlatformShop: () => false },
   });
   const request = (body) => new Request('https://shop.test/api/settings', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-  const draft = { storefront: { enabled: true, title: 'Secret', blocks: [{ ...blocks.createBlock('announcement', 'a'), title: 'Private', href: 'javascript:alert(1)' }] } };
+  const draft = { storefront: { enabled: true, title: 'Secret', blocks: [{ ...blocks.createBlock('announcement', 'a'), title: 'Private', href: 'javascript:alert(1)' }, { ...blocks.createBlock('carousel', 'c'), carouselRatio: 'square' }] } };
   assert.equal((await route.PATCH(request({ site_theme_draft: draft }))).status, 401);
   assert.equal(writes, 0);
   admin = { id: 'owner' };
@@ -41,6 +42,7 @@ function load(file, imports = {}) {
   assert.equal(row.site_theme.storefront.title, 'Public');
   assert.equal(row.site_theme.draft.storefront.title, 'Secret');
   assert.equal(row.site_theme.draft.storefront.blocks[0].href, '');
+  assert.equal(row.site_theme.draft.storefront.blocks[1].carouselRatio, 'square');
   assert.equal(invalidations, 0);
   const publicData = await (await route.GET()).json();
   assert.equal(publicData.site_theme.storefront.title, 'Public');
@@ -54,5 +56,6 @@ function load(file, imports = {}) {
   assert.equal('draft' in row.site_theme, false);
   assert.equal(invalidations, 1);
   assert.equal((await (await route.GET()).json()).site_theme.storefront.title, 'Secret');
+  assert.equal((await (await route.GET()).json()).site_theme.storefront.blocks[1].carouselRatio, 'square');
   console.log('Draft settings API: authorization, sanitization, public isolation, read failures and publication passed.');
 })().catch((error) => { console.error(error); process.exitCode = 1; });

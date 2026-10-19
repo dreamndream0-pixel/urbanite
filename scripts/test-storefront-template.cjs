@@ -63,3 +63,16 @@ assert.equal(switched.some((b) => b.type === 'categories'), false);
 assert.equal(blocks.resolveBlocks([{ type: 'countdown', endsAt: '2026-12-31T23:59' }])[0].endsAt, '2026-12-31T23:59');
 assert.equal(blocks.resolveBlocks([{ type: 'countdown', endsAt: 'tomorrow' }])[0].endsAt, '');
 console.log('Template switching and countdown: 12 checks passed');
+const legacyCarousel = { type: 'carousel', id: 'carousel', group: 2, ratio: 'wide' };
+assert.equal(blocks.resolveBlocks([legacyCarousel])[0].carouselRatio, 'auto');
+assert.equal(blocks.createBlock('carousel', 'new').carouselRatio, 'auto');
+for (const carouselRatio of ['auto', 'portrait', 'square', 'wide']) {
+  const resolved = blocks.resolveBlocks([{ ...legacyCarousel, carouselRatio }]);
+  assert.equal(resolved[0].carouselRatio, carouselRatio);
+  assert.deepEqual(blocks.resolveBlocks(JSON.parse(JSON.stringify(resolved))), resolved);
+  assert.equal(blocks.switchTemplate([...list, ...resolved], 'classic', 'editorial').find((b) => b.type === 'carousel').carouselRatio, carouselRatio);
+}
+for (const carouselRatio of [undefined, null, '', '16/9', 'invalid', {}, 1]) assert.equal(blocks.resolveBlocks([{ ...legacyCarousel, carouselRatio }])[0].carouselRatio, 'auto');
+const independent = blocks.resolveBlocks([{ ...legacyCarousel, carouselRatio: 'portrait' }, { ...legacyCarousel, id: 'second', carouselRatio: 'square' }]);
+assert.deepEqual(independent.map((b) => b.carouselRatio), ['portrait', 'square']);
+console.log('Carousel ratios: legacy defaults, allowlist, persistence, template switching and independent blocks passed');

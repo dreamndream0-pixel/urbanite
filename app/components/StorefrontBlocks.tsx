@@ -124,7 +124,7 @@ export default function StorefrontBlocks({ blocks, products, categories, banners
 
         {block.type === 'carousel' && (() => {
           const slides = banners.filter((b) => b.active && (b.group_no ?? 1) === block.group);
-          return slides.length ? <div className={styles.carousel}><HeroCarousel banners={slides} /></div>
+          return slides.length ? <div className={styles.carousel}><HeroCarousel banners={slides} ratio={block.carouselRatio === 'auto' ? undefined : block.carouselRatio} /></div>
             : preview ? <div className={styles.inner}><p className={styles.empty}>輪播圖{block.group} 還沒有圖片,請到「系統設定 → 輪播圖」上傳</p></div> : null;
         })()}
 
