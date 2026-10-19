@@ -11,7 +11,6 @@
 .heading { display: flex; flex: 0 0 auto; justify-content: space-between; align-items: center; gap: 12px; padding: 25px 36px; border-bottom: 1px solid #e4e7e7; }
 .heading > a { display: flex; min-width: 0; }
 .who { display: flex; align-items: center; gap: 12px; min-width: 0; }
-.whoAvatar { display: grid; place-items: center; flex-shrink: 0; width: 44px; height: 44px; border-radius: 50%; object-fit: cover; background: #ece6dc; color: #5b4c40; font-size: 17px; font-weight: 700; }
 .whoText { display: flex; flex-direction: column; min-width: 0; }
 .whoText strong { font-size: 16px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .whoText small { font-size: 12px; color: #788084; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 2px; }

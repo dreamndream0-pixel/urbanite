@@ -11,7 +11,7 @@ import styles from './card-menu.module.css';
 // 後台模式(例:線上預約管理):選單只放這個後台的功能 + 首頁 / 我的名片 / 升級官網
 export type AppNav = { title: string; items: { href: string; label: string; active?: boolean }[] };
 
-type Me = { email: string; name: string; avatar?: string; isAdmin?: boolean; shops?: { slug: string; name: string; current: boolean; adminUrl: string }[] } | null;
+type Me = { email: string; name: string; isAdmin?: boolean; shops?: { slug: string; name: string; current: boolean; adminUrl: string }[] } | null;
 
 export default function CardMenu({ variant = 'header', loggedIn, current, top = 12, links = [], appNav }: {
   variant?: 'header' | 'floating';
@@ -37,7 +37,7 @@ export default function CardMenu({ variant = 'header', loggedIn, current, top = 
     const controller = new AbortController();
     fetch('/api/me', { cache: 'no-store', signal: controller.signal })
       .then(res => res.ok ? res.json() : null)
-      .then(data => setMe(data?.email ? { email: data.email, name: data.name ?? '', avatar: data.avatar ?? '', isAdmin: Boolean(data.isAdmin), shops: Array.isArray(data.shops) ? data.shops : [] } : null))
+      .then(data => setMe(data?.email ? { email: data.email, name: data.name ?? '', isAdmin: Boolean(data.isAdmin), shops: Array.isArray(data.shops) ? data.shops : [] } : null))
       .catch(() => { if (!controller.signal.aborted) setMe(null); });
     return () => controller.abort();
   }, [loggedIn]);
@@ -112,7 +112,6 @@ export default function CardMenu({ variant = 'header', loggedIn, current, top = 
           {/* 選單上方:登入者的帳號資訊(LINE 登入的合成 email 不顯示) */}
           {signedIn ? (
             <div className={styles.who}>
-              {me?.avatar ? <img src={me.avatar} alt="" className={styles.whoAvatar} /> : <span aria-hidden="true" className={styles.whoAvatar}>{(me?.name || me?.email || '會').slice(0, 1).toUpperCase()}</span>}
               <span className={styles.whoText}>
                 <strong>{me?.name || '會員'}</strong>
                 <small>{!me ? '讀取中…' : me.email.endsWith('@line.urbanite.com.tw') ? '以 LINE 帳號登入' : me.email}</small>
@@ -120,7 +119,6 @@ export default function CardMenu({ variant = 'header', loggedIn, current, top = 
             </div>
           ) : (
             <div className={styles.who}>
-              <span aria-hidden="true" className={styles.whoAvatar}><UserRound size={20} /></span>
               <span className={styles.whoText}><strong>尚未登入</strong><small>登入後可管理名片與預約</small></span>
             </div>
           )}
