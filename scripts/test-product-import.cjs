@@ -39,6 +39,22 @@ for (const value of [-1, '1-200', '', '100元起', Infinity, null]) assert.equal
 assert.equal(parse.importMoney('NT$ 1,280'), 1280);
 assert.equal(parse.canonicalProductUrl(`${source}/?utm_source=ad&variant=1&item=4#top`), `${source}?item=4&variant=1`);
 assert.notEqual(parse.canonicalProductUrl(`${source}?ref=product-a`), parse.canonicalProductUrl(`${source}?ref=product-b`));
+const shopeeSource = 'https://shopee.tw/product/4390451/5745868376';
+assert.equal(parse.canonicalProductUrl(`${shopeeSource}?d_id=abc&uls_trackid=random&utm_content=share`), shopeeSource);
+assert.equal(parse.canonicalProductUrl('https://www.shopee.tw/example-product-i.4390451.5745868376?sp_atk=random'), shopeeSource);
+assert.equal(parse.canonicalProductUrl('https://shopee.tw/seller?shop=1&category=2'), 'https://shopee.tw/seller?category=2&shop=1');
+assert.equal(parse.canonicalProductUrl('https://shopee.tw.evil.example/product/1/2?ref=keep'), 'https://shopee.tw.evil.example/product/1/2?ref=keep');
+const shopeeShell = '<html><head><meta name="apple-mobile-web-app-title" content="Shopee"></head><body><script type="text/shopee-page-manifest">{}</script><noscript>Please enable JavaScript on your browser.</noscript></body></html>';
+assert.throws(() => parse.parseProductPage(shopeeShell, shopeeSource), /動態載入頁/);
+assert.throws(() => parse.productsAndPages(shopeeShell, 'https://shopee.tw/example-shop'), /動態載入頁/);
+for (const blocked of ['https://shopee.tw/verify/traffic/error?type=4', 'https://shopee.tw/buyer/login']) {
+  const pattern = blocked.includes('verify') ? /流量驗證/ : /要求登入/;
+  assert.throws(() => parse.parseProductPage('<h1>登入或驗證</h1>', blocked), pattern);
+  assert.throws(() => parse.productsAndPages('<h1>登入或驗證</h1>', blocked), pattern);
+}
+const shopeePublic = parse.parseProductPage(html({ '@type': 'Product', name: '公開商品', image: '/a.jpg', offers: { price: '100', priceCurrency: 'TWD' } }), shopeeSource);
+assert.equal(shopeePublic.name, '公開商品');
+assert.equal(shopeePublic.price, 100);
 assert.throws(() => parse.parseProductPage('<title>Access denied</title>', source), /驗證|拒絕/);
 assert.throws(() => parse.parseProductPage(html([{ '@type': 'Product', url: '/products/other', name: 'A' }, { '@type': 'Product', url: '/products/other2', name: 'B' }]), source), /商品列表/);
 const generic = parse.parseProductPage('<meta property="og:title" content="通用商品"><meta property="og:image" content="/a.jpg"><meta property="product:price:amount" content="99"><meta property="product:price:currency" content="TWD"><form><select name="options[size]"><option value="">請選擇</option><option value="S">S</option><option value="M">M</option></select></form>', source);
@@ -64,9 +80,18 @@ assert.deepEqual(catalog.products, ['https://merchant.example/product-detail?id=
   const extraction = load('lib/extract-url.ts');
   let network = new Map();
   const requested = [];
-  const fetched = { ...safe, fetchPublic: async (url) => { requested.push(url); const result = network.get(url); if (!result) return { url, res: new Response('missing', { status: 404 }) }; return { url, res: new Response(result.body, { status: result.status || 200, headers: { 'content-type': result.type || 'text/html' } }) }; } };
+  const fetched = { ...safe, fetchPublic: async (url) => { requested.push(url); const result = network.get(url); if (!result) return { url, res: new Response('missing', { status: 404 }) }; return { url: result.url || url, res: new Response(result.body, { status: result.status || 200, headers: { 'content-type': result.type || 'text/html' } }) }; } };
   const read = load('lib/product-import-read.ts', { './extract-url': extraction, './public-fetch': fetched, './product-import-parse': parse, './product-import-types': types });
   for (const url of ['http://127.0.0.1/a', 'http://10.0.0.1', 'file:///x', 'https://u:p@merchant.example']) assert.throws(() => read.normalizeImportUrl(url));
+  const shortUrl = 'https://tw.shp.ee/3T9UEXXQ';
+  network.set(shortUrl, { url: `${shopeeSource}?uls_trackid=random`, body: shopeeShell });
+  await assert.rejects(() => read.readImportedProduct(shortUrl), /動態載入頁/);
+  await assert.rejects(() => read.discoverProducts(shortUrl, shortUrl, 0, true), /動態載入頁/);
+  network.set(shortUrl, { url: 'https://shopee.tw/verify/traffic/error', body: '<h1>驗證</h1>' });
+  await assert.rejects(() => read.readImportedProduct(shortUrl), /流量驗證/);
+  await assert.rejects(() => read.discoverProducts(shortUrl, shortUrl, 0, true), /流量驗證/);
+  network.set(shortUrl, { url: `${shopeeSource}?uls_trackid=changing`, body: html({ '@type': 'Product', name: '可公開讀取商品', image: '/a.jpg', offers: { price: '99', priceCurrency: 'TWD' } }) });
+  assert.equal((await read.readImportedProduct(shortUrl)).sourceUrl, shopeeSource);
   network.set(source, { body: html(productJson) });
   assert.equal((await read.readImportedProduct(source)).variants[1].price, 450);
   const graph = { '@graph': [{ '@type': 'Product', name: '參照價格', image: '/a.jpg', url: source, offers: { '@id': '#offer' } }, { '@id': '#offer', '@type': 'Offer', price: 88, priceCurrency: 'TWD' }] };

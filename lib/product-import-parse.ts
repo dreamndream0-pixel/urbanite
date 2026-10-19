@@ -15,6 +15,14 @@ export function importUrl(value: unknown, base: string): string {
 export function canonicalProductUrl(raw: string): string {
   const url = publicUrl(raw);
   url.hash = '';
+  if (/^(?:www\.)?shopee\.tw$/i.test(url.hostname)) {
+    const product = url.pathname.match(/^\/product\/(\d+)\/(\d+)\/?$/) || url.pathname.match(/-i\.(\d+)\.(\d+)\/?$/);
+    if (product) {
+      url.hostname = 'shopee.tw';
+      url.pathname = `/product/${product[1]}/${product[2]}`;
+      url.search = '';
+    }
+  }
   for (const key of [...url.searchParams.keys()]) if (/^(utm_|fbclid$|gclid$|mc_)/i.test(key)) url.searchParams.delete(key);
   url.searchParams.sort();
   url.pathname = url.pathname.replace(/\/$/, '') || '/';
@@ -78,6 +86,16 @@ const offersOf = (v: Obj) => array(v.offers).flatMap((o) => array(obj(o).offers)
 const offerPrice = (v: Obj) => importMoney(v.price) ?? importMoney(obj(v.priceSpecification).price);
 const meta = ($: CheerioAPI, key: string) => $(`meta[property="${key}"],meta[name="${key}"]`).first().attr('content') ?? '';
 
+function assertReadableSourcePage($: CheerioAPI, source: string, nodes: Obj[]) {
+  const url = new URL(source);
+  if (/captcha|verify you are human|access denied|驗證您是人類/i.test($('title').text())) throw new Error('來源網站要求驗證或拒絕讀取，請使用公開商品網址或匯出資料');
+  if (!/^(?:www\.)?shopee\.tw$/i.test(url.hostname)) return;
+  if (/^\/verify(?:\/|$)/.test(url.pathname)) throw new Error('蝦皮已轉到流量驗證頁，無法讀取商品資料。更換長網址也無法解除限制；請使用賣家匯出資料或官方授權串接。');
+  if (/^\/buyer\/(?:login|signup)(?:\/|$)/.test(url.pathname)) throw new Error('蝦皮要求登入後才能讀取商品。本站不會索取你的蝦皮密碼或登入 Cookie；請使用賣家匯出資料或官方授權串接。');
+  const hasData = nodes.some((node) => typeOf(node, 'Product') || typeOf(node, 'ProductGroup') || typeOf(node, 'ItemList'));
+  if (!hasData && !$('h1').text().trim() && !meta($, 'product:price:amount')) throw new Error('已連上蝦皮，但來源只回傳動態載入頁，沒有提供可搬移的商品資料。完整搬移需另行串接賣家匯出資料或官方授權 API；不會將空白頁當成商品。');
+}
+
 function finalize(product: ImportedProduct): ImportedProduct {
   const images = [...new Set(product.images)];
   if (images.length > 10) { product.warnings.push('來源商品照片超過 10 張，已保留前 10 張'); product.reviewRequired = true; }
@@ -115,8 +133,8 @@ export function parseShopifyProduct(value: unknown, source: string): ImportedPro
 
 export function parseProductPage(html: string, source: string): ImportedProduct {
   const $ = load(html);
-  if (/captcha|verify you are human|access denied|驗證您是人類/i.test($('title').text())) throw new Error('來源網站要求驗證或拒絕讀取，請使用公開商品網址或匯出資料');
   const nodes = jsonNodes($);
+  assertReadableSourcePage($, source, nodes);
   const references = new Map<string, Obj>();
   for (const node of nodes) if (node['@id'] && Object.keys(node).length > Object.keys(references.get(string(node['@id'])) ?? {}).length) references.set(string(node['@id']), node);
   const deref = (v: unknown) => { const o = obj(v); return references.get(string(o['@id'])) ?? o; };
@@ -203,11 +221,13 @@ export function replaceDescriptionImages(description: string, images: Map<string
 
 export function productsAndPages(html: string, base: string): { products: string[]; pages: string[] } {
   const $ = load(html);
+  const nodes = jsonNodes($);
+  assertReadableSourcePage($, base, nodes);
   const origin = new URL(base).origin;
   const safe = (value: unknown) => { const url = importUrl(value, base); return url && new URL(url).origin === origin ? canonicalProductUrl(url) : ''; };
   const products = new Set<string>();
   const pages = new Set<string>();
-  for (const node of jsonNodes($)) {
+  for (const node of nodes) {
     if (typeOf(node, 'Product') || typeOf(node, 'ProductGroup')) { const url = safe(node.url || node['@id']); if (url) products.add(url); }
     if (typeOf(node, 'ItemList')) for (const entry of array(node.itemListElement)) { const list = obj(entry); const item = obj(list.item); const url = safe(list.url || item.url || item['@id'] || (typeof list.item === 'string' ? list.item : '')); if (url) products.add(url); }
   }

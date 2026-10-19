@@ -44,6 +44,22 @@ a journal failure is explicitly reported after a successful product insert.
 
 No new database migration, AI key, or external crawling service is required.
 
+## Shopee Source Limitations
+
+Shopee Taiwan short links can redirect correctly while returning only a dynamic
+app shell without product data. The browser can also redirect to a traffic
+verification or login page. These responses are explicitly rejected for both
+single-product and whole-shop reads, rather than importing a login heading or
+reporting an empty successful scan. A public page with usable product data is
+still accepted. Product IDs in Taiwan share links are normalized across long
+URLs and randomized tracking parameters to avoid duplicate imports.
+
+Changing a short URL to a long URL does not solve missing source data. This
+implementation does not bypass verification, borrow browser cookies, or call
+private marketplace APIs. Seller export files and an officially authorized
+marketplace integration are possible future import sources, not supported
+workflows in this version.
+
 ## Verification
 
 ```sh
