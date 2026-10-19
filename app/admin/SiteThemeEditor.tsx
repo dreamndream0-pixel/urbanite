@@ -27,7 +27,7 @@ import {
 import { uiAlert, uiConfirm } from '@/lib/ui-dialog';
 
 // 後台 系統設定 → 一般設定 → 網站外觀:6 種樣板+全部顏色選擇器+版面配置,即時預覽
-export default function SiteThemeEditor({ initial, onSaved, categoryImageStyle = 'circle', onCategoryImageStyle }: { initial: unknown; onSaved?: (theme: unknown) => void; categoryImageStyle?: CategoryImageStyle; onCategoryImageStyle?: (style: CategoryImageStyle) => void }) {
+export default function SiteThemeEditor({ initial, banners, onSaved, categoryImageStyle = 'circle', onCategoryImageStyle }: { initial: unknown; banners: Banner[]; onSaved?: (theme: unknown) => void; categoryImageStyle?: CategoryImageStyle; onCategoryImageStyle?: (style: CategoryImageStyle) => void }) {
   const [saved, setSaved] = useState<SiteTheme>(() => editableSiteTheme(initial));
   const [published, setPublished] = useState<SiteTheme>(() => resolveSiteTheme(initial));
   const [draft, setDraft] = useState<SiteTheme>(() => {
@@ -50,26 +50,23 @@ export default function SiteThemeEditor({ initial, onSaved, categoryImageStyle =
       dialog?.close();
     };
   }, [previewOpen]);
-  const [previewImages, setPreviewImages] = useState<string[]>([]);
   const [previewCategories, setPreviewCategories] = useState<DesignCategory[]>([]);
   const [previewProducts, setPreviewProducts] = useState<Product[]>([]);
-  const [previewBanners, setPreviewBanners] = useState<Banner[]>([]);
+  // Share the dashboard's live banner state instead of a cached, mount-only API snapshot.
+  const previewBanners = banners;
+  const previewImages = [...banners.filter((b) => b.active).map((b) => b.image), ...previewProducts.filter(isVisibleInStore).map((p) => p.image)].filter(Boolean);
   const design = draft.storefront ?? resolveStorefront(null);
   useEffect(() => {
     let active = true;
     async function load() {
       try {
-        const bannersRes = await fetch('/api/banners');
-        const banners: Banner[] = bannersRes.ok ? await bannersRes.json() : [];
         const productsRes = await fetch('/api/products');
         const products: Product[] = productsRes.ok ? await productsRes.json() : [];
         const categoriesRes = await fetch('/api/categories');
         const categories: DesignCategory[] = categoriesRes.ok ? await categoriesRes.json() : [];
         if (active) {
-          setPreviewImages([...banners.filter((b) => b.active).map((b) => b.image), ...products.filter(isVisibleInStore).map((p) => p.image)].filter(Boolean));
           setPreviewCategories(categories.filter((c) => c.sort_order === undefined || c.sort_order >= 0));
           setPreviewProducts(products);
-          setPreviewBanners(banners);
         }
       } catch { /* Preview assets are optional; saved settings remain editable. */ }
     }

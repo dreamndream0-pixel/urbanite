@@ -3103,7 +3103,7 @@ export default function AdminDashboard({
                 );
               })()}
 
-              <div hidden={settingsTab !== 'templates'}><SiteThemeEditor initial={siteTheme} onSaved={setSiteTheme} categoryImageStyle={categoryImageStyle} onCategoryImageStyle={(style) => void saveCategoryImageStyle(style)} /></div>
+              <div hidden={settingsTab !== 'templates'}><SiteThemeEditor initial={siteTheme} banners={banners} onSaved={setSiteTheme} categoryImageStyle={categoryImageStyle} onCategoryImageStyle={(style) => void saveCategoryImageStyle(style)} /></div>
 
               {settingsTab === 'general' && (
               <Card title="網站 Logo">
