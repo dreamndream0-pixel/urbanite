@@ -3,6 +3,8 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import QRCode from 'qrcode';
 import ProfileCardView, { type CardProduct } from '@/app/components/ProfileCardView';
+import ProfileBookingButtonEditor from './ProfileBookingButtonEditor';
+import { DEFAULT_BOOKING_BUTTON, resolveBookingButton } from '@/lib/profile-booking-button';
 import { LayoutThumb } from '@/app/components/ProfileImageBlock';
 import LinkIcon, { ICON_PREFIX, isIconImage, LINK_ICONS } from '@/app/components/LinkIcon';
 import SocialIcon from '@/app/components/SocialIcon';
@@ -397,6 +399,9 @@ export default function ProfileCardManager({ products, lineUrl = '', upgradeHref
   const [card, setCard] = useState<ProfileCard | null>(null);
   const [draft, setDraft] = useState<ProfileCard | null>(null);
   const [blocks, setBlocks] = useState<ProfileCardBlock[]>([]);
+  const [bookingHref, setBookingHref] = useState('');
+  const [bookingSaving, setBookingSaving] = useState(false);
+  const [bookingError, setBookingError] = useState('');
   const [loadError, setLoadError] = useState('');
   const [mainTab, setMainTab] = useState<MainTab>('content');
   const [contentTab, setContentTab] = useState<'links' | 'profile'>('links');
@@ -419,6 +424,7 @@ export default function ProfileCardManager({ products, lineUrl = '', upgradeHref
         setCard(data.card);
         setDraft(data.card);
         setBlocks(data.blocks);
+        setBookingHref(data.bookingHref ?? '');
       });
   }
 
@@ -457,6 +463,7 @@ export default function ProfileCardManager({ products, lineUrl = '', upgradeHref
         setCard(data.card);
         setDraft(data.card);
         setBlocks(data.blocks);
+        setBookingHref(data.bookingHref ?? '');
         if (data.plan) setPlan(data.plan);
         void runPendingImport();
       })
@@ -559,7 +566,26 @@ export default function ProfileCardManager({ products, lineUrl = '', upgradeHref
     }
   }
 
-  const preview = <ProfileCardView card={draft} blocks={blocks} products={productMap} lineUrl={lineUrl} preview />;
+  async function saveBookingButton() {
+    if (!draft || bookingSaving) return;
+    setBookingSaving(true);
+    setBookingError('');
+    try {
+      const res = await fetch('/api/profile-card', {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ booking_button: draft.theme.bookingButton ?? DEFAULT_BOOKING_BUTTON }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? '儲存失敗');
+      const bookingButton = resolveBookingButton(data.theme?.bookingButton);
+      setCard((current) => current ? { ...current, theme: { ...current.theme, bookingButton } } : current);
+      setDraft((current) => current ? { ...current, theme: { ...current.theme, bookingButton } } : current);
+    } catch (error) {
+      setBookingError(error instanceof Error ? error.message : '儲存失敗，請再試一次');
+    } finally { setBookingSaving(false); }
+  }
+
+  const preview = <ProfileCardView card={draft} blocks={blocks} products={productMap} lineUrl={lineUrl} bookingHref={bookingHref} preview />;
 
   return (
     <PlanCtx.Provider value={{ plan, upgradeHref, baseUrl }}>
@@ -637,6 +663,11 @@ export default function ProfileCardManager({ products, lineUrl = '', upgradeHref
             </div>
             {contentTab === 'links' ? (
               <div className="space-y-3">
+                <ProfileBookingButtonEditor card={draft} blocks={blocks} value={draft.theme.bookingButton ?? DEFAULT_BOOKING_BUTTON}
+                  onChange={(bookingButton) => setDraft({ ...draft, theme: { ...draft.theme, bookingButton } })}
+                  onSave={() => void saveBookingButton()} saving={bookingSaving || saving} error={bookingError}
+                  dirty={JSON.stringify(draft.theme.bookingButton ?? DEFAULT_BOOKING_BUTTON) !== JSON.stringify(resolveBookingButton(card.theme.bookingButton))}
+                  available={Boolean(bookingHref)} customStyle={plan.limits.customStyle} upgradeHref={upgradeHref} />
                 {picker ? (
                   <div className="rounded-2xl border border-[#e5ded4] bg-white p-3">
                     <div className="mb-2 flex items-center justify-between px-1">
@@ -713,7 +744,7 @@ export default function ProfileCardManager({ products, lineUrl = '', upgradeHref
             <button
               type="button"
               onClick={saveCard}
-              disabled={saving || !dirty}
+              disabled={saving || bookingSaving || !dirty}
               className="w-full max-w-xs rounded-full bg-[#1f1b19] py-3 text-sm font-semibold text-white shadow-lg transition disabled:opacity-40"
             >
               {saving ? '儲存中…' : dirty ? '儲存' : '已儲存'}

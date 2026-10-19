@@ -12,7 +12,7 @@ import type { ProfileCard, ProfileCardBlock } from '@/lib/profile-card';
 import type { SiteSettings } from '@/lib/types';
 import { getCheckoutLine, lineAddFriendUrl } from '@/lib/checkout-line';
 import { scopedClient, URBANITE_SHOP_ID } from '@/lib/shop';
-import { getPublicBusiness, loadSchedule } from '@/lib/booking/server';
+import { getCardBookingHref } from '@/lib/booking/card-link';
 
 export const dynamic = 'force-dynamic';
 
@@ -80,9 +80,7 @@ export default async function CardPage({ params }: { params: Promise<{ slug: str
     );
   }
   // 名片主人開放線上預約(有服務、有營業時段)才顯示預約按鈕
-  const booking = await getPublicBusiness(data.card.slug);
-  const schedule = booking ? await loadSchedule(booking.business.id) : null;
-  const bookingHref = schedule && schedule.services.length && schedule.hours.length ? `/@${data.card.slug}/book` : '';
+  const bookingHref = await getCardBookingHref(data.card.slug);
   // 社群追蹤卡片:追蹤數超過一天就在背景更新(不影響這次的載入速度)
   after(() => refreshStaleSocialBlocks(data.blocks));
   return (

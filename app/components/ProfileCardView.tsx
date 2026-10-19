@@ -4,6 +4,8 @@ import { useEffect, useMemo, useRef, type CSSProperties, type ReactNode } from '
 import Link from 'next/link';
 import SocialIcon from '@/app/components/SocialIcon';
 import ProfileImageBlock from '@/app/components/ProfileImageBlock';
+import ProfileBookingButton from '@/app/components/ProfileBookingButton';
+import { bookingButtonIndex } from '@/lib/profile-booking-button';
 import LinkIcon, { isIconImage } from '@/app/components/LinkIcon';
 import { blockOptions, followLogo, followPlatform,
   coverSpec,
@@ -50,7 +52,7 @@ export default function ProfileCardView({
   preview?: boolean;
   fullScreen?: boolean;
   serviceFooter?: boolean; // 會員的名片:頁尾改為「用 URBANITE 建立你的名片」
-  bookingHref?: string; // 名片主人開放線上預約時,區塊最上方顯示「線上預約」按鈕
+  bookingHref?: string; // 預約開放時提供網址;按鈕樣式與位置由名片設定決定
 }) {
   const theme = resolveTheme(card.theme);
   const left = theme.align === 'left';
@@ -74,6 +76,9 @@ export default function ProfileCardView({
     [blocks, products, lineUrl],
   );
   const socials = card.show_socials ? card.socials.filter((s) => s.value.trim()) : [];
+  const bookingButton = bookingHref && theme.bookingButton.visible ? <ProfileBookingButton key="booking-button" theme={theme} href={bookingHref} preview={preview} /> : null;
+  const displayBlocks: (ProfileCardBlock | null)[] = [...visible];
+  if (bookingButton) displayBlocks.splice(bookingButtonIndex(blocks, visible, theme.bookingButton.after), 0, null);
 
   // 瀏覽計數:同一個分頁、同一天只算一次
   useEffect(() => {
@@ -726,17 +731,12 @@ export default function ProfileCardView({
 
         {/* 區塊 */}
         <div className={`${theme.imageOnly ? '' : 'mt-8 '}w-full space-y-3`}>
-          {bookingHref ? (
-            <Link href={bookingHref} className="flex w-full items-center justify-center gap-2 px-4 py-3.5 text-[15px] font-semibold shadow-sm transition hover:opacity-90" style={{ borderRadius: radius, background: theme.accentColor, color: isDarkColor(theme.accentColor) ? '#ffffff' : '#1f1b19' }}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2" /><path d="M16 2v4M8 2v4M3 10h18M9 16l2 2 4-4" /></svg>
-              線上預約
-            </Link>
-          ) : null}
-          {visible.map((b, i) => {
+          {displayBlocks.map((b, i) => {
+            if (!b) return bookingButton;
             if (b.type === 'hotspot') {
               // 熱區圖片:滿版顯示;連續的熱區圖片之間沒有間距,看起來像同一張圖
               const spots = blockOptions(b).spots.filter((s) => s.url);
-              const joined = visible[i + 1]?.type === 'hotspot';
+              const joined = displayBlocks[i + 1]?.type === 'hotspot';
               return (
                 <div key={b.id} className={`relative -mx-5 ${joined ? '!mb-0' : ''}`}>
                   <img src={b.image} alt={b.title || spots.map((s) => s.label).filter(Boolean).join('、')} className="block h-auto w-full" />

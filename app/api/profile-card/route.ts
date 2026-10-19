@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { requireCardOwner } from '@/lib/card-access';
 import { FREE_TEMPLATE_KEYS, RESERVED_SLUGS } from '@/lib/card-plan';
+import { bookingButtonForPlan } from '@/lib/profile-booking-button';
+import { getCardBookingHref } from '@/lib/booking/card-link';
 import { BIO_LIMIT, CARD_TEMPLATES, DEFAULT_THEME, MAX_TAGS, SLUG_PATTERN, type ProfileCard, type ProfileCardBlock, type SocialLink } from '@/lib/profile-card';
 
 export const dynamic = 'force-dynamic';
@@ -21,7 +23,8 @@ export async function GET() {
       .select('*')
       .eq('card_id', card.id)
       .order('sort_order');
-    return NextResponse.json({ card, blocks: (blocks ?? []) as ProfileCardBlock[], plan }, { headers: { 'Cache-Control': 'no-store' } });
+    const bookingHref = await getCardBookingHref(card.slug).catch(() => '');
+    return NextResponse.json({ card, blocks: (blocks ?? []) as ProfileCardBlock[], plan, bookingHref }, { headers: { 'Cache-Control': 'no-store' } });
   } catch (error) {
     const message = error instanceof Error ? error.message : '讀取失敗';
     return NextResponse.json({ error: message + tableHint(message) }, { status: 500 });
@@ -80,11 +83,12 @@ export async function PATCH(request: Request) {
       const value = (body.theme as Record<string, unknown>)[key];
       if (typeof value === typeof DEFAULT_THEME[key]) theme[key] = value;
     }
+    theme.bookingButton = bookingButtonForPlan(theme.bookingButton ?? card.theme?.bookingButton, limits.customStyle);
     // 免費版:只能用免費樣板,樣式固定為樣板原樣(封面、大頭照開關保留)
     if (!limits.customStyle) {
       const key = FREE_TEMPLATE_KEYS.includes(String(theme.template)) ? String(theme.template) : 'ivory';
       const tpl = CARD_TEMPLATES.find((t) => t.key === key);
-      update.theme = { ...(tpl?.theme ?? {}), template: key, coverImage: theme.coverImage ?? '', showAvatar: theme.showAvatar ?? true };
+      update.theme = { ...(tpl?.theme ?? {}), template: key, coverImage: theme.coverImage ?? '', showAvatar: theme.showAvatar ?? true, bookingButton: theme.bookingButton };
     } else {
       if (!limits.allTemplates && !FREE_TEMPLATE_KEYS.includes(String(theme.template))) theme.template = 'ivory';
       update.theme = theme;
@@ -92,6 +96,13 @@ export async function PATCH(request: Request) {
   }
   if (Array.isArray(body.tags)) {
     update.tags = (body.tags as unknown[]).map((t) => String(t).trim()).filter(Boolean).slice(0, MAX_TAGS);
+  }
+  // Save the booking button independently without replacing other theme settings.
+  if (body.booking_button && typeof body.booking_button === 'object' && !Array.isArray(body.booking_button)) {
+    update.theme = {
+      ...((update.theme ?? card.theme ?? {}) as Record<string, unknown>),
+      bookingButton: bookingButtonForPlan(body.booking_button, limits.customStyle),
+    };
   }
 
   const { data, error } = await createAdminClient().from('profile_cards').update(update).eq('id', card.id).select().single();

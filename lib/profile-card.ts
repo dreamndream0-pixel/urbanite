@@ -1,4 +1,5 @@
 // 個人名片頁:前後台共用的型別與規則
+import { DEFAULT_BOOKING_BUTTON, resolveBookingButton, type BookingButton } from './profile-booking-button';
 
 export type SocialLink = { type: string; value: string };
 
@@ -39,6 +40,7 @@ export const LINK_STYLES: { key: LinkStyle; label: string }[] = [
 ];
 
 export type CardTheme = {
+  bookingButton: BookingButton;
   template: string;
   layout: ProfileLayout; // 頁首版面配置
   linkStyle: LinkStyle; // 連結排列方式
@@ -68,6 +70,7 @@ export type CardTheme = {
 };
 
 export const DEFAULT_THEME: CardTheme = {
+  bookingButton: DEFAULT_BOOKING_BUTTON,
   template: 'ivory',
   layout: 'classic',
   linkStyle: 'button',
@@ -96,7 +99,7 @@ export const DEFAULT_THEME: CardTheme = {
 };
 
 // 套用樣板時保留的欄位(使用者自己上傳的內容)
-export const THEME_CONTENT_KEYS = ['coverImage', 'showAvatar', 'bgImage', 'imageOnly'] as const;
+export const THEME_CONTENT_KEYS = ['coverImage', 'showAvatar', 'bgImage', 'imageOnly', 'bookingButton'] as const;
 
 export type TemplateCategory = 'lively' | 'minimal' | 'dark';
 export const TEMPLATE_CATEGORIES: { key: 'all' | TemplateCategory; label: string }[] = [
@@ -197,7 +200,7 @@ export function coverSpec(layout: ProfileLayout, shape: CardTheme['avatarShape']
 
 export function resolveTheme(theme: unknown): CardTheme {
   const t = (theme && typeof theme === 'object' ? theme : {}) as Partial<CardTheme>;
-  return { ...DEFAULT_THEME, ...t };
+  return { ...DEFAULT_THEME, ...t, bookingButton: resolveBookingButton(t.bookingButton) };
 }
 
 export const FONT_OPTIONS: { key: CardTheme['font']; label: string; css: string }[] = [

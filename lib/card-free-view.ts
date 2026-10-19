@@ -1,5 +1,6 @@
 import { CARD_TEMPLATES, type ProfileCard, type ProfileCardBlock } from '@/lib/profile-card';
 import { FREE_LIMITS, FREE_TEMPLATE_KEYS } from '@/lib/card-plan';
+import { bookingButtonForPlan } from '@/lib/profile-booking-button';
 
 // 付費或限時免費結束後,名片自動回到免費版樣子(資料不刪,升級後就恢復)
 export function applyFreeView(card: ProfileCard, blocks: ProfileCardBlock[]) {
@@ -8,7 +9,7 @@ export function applyFreeView(card: ProfileCard, blocks: ProfileCardBlock[]) {
   const tpl = CARD_TEMPLATES.find((t) => t.key === key);
   const freeCard: ProfileCard = {
     ...card,
-    theme: { ...(tpl?.theme ?? {}), template: key, coverImage: theme.coverImage ?? '', showAvatar: theme.showAvatar ?? true } as ProfileCard['theme'],
+    theme: { ...(tpl?.theme ?? {}), template: key, coverImage: theme.coverImage ?? '', showAvatar: theme.showAvatar ?? true, bookingButton: bookingButtonForPlan(theme.bookingButton, false) } as ProfileCard['theme'],
     show_footer_logo: true,
     seo_title: '',
     seo_description: '',

@@ -1,0 +1,14 @@
+{
+  "card": {
+    "id": "booking-card", "slug": "booking-fixture", "display_name": "Studio", "avatar_url": "", "email": "", "show_email": false,
+    "bio": "", "show_bio": false, "socials": [], "show_socials": false, "tags": [], "show_tags": false,
+    "theme": { "template": "blank", "imageOnly": true, "bgColor": "#ffffff", "accentColor": "#1f1b19", "buttonColor": "#1f1b19", "buttonTextColor": "#1f1b19", "buttonFill": "outline" },
+    "published": true, "seo_title": "", "seo_description": "", "seo_image": "", "show_footer_logo": false
+  },
+  "blocks": [
+    { "id": "first", "card_id": "booking-card", "type": "link", "title": "官方網站", "url": "https://example.invalid/store", "image": "", "product_id": "", "enabled": true, "sort_order": 0, "clicks": 0, "start_at": null, "end_at": null },
+    { "id": "hidden", "card_id": "booking-card", "type": "link", "title": "未公開連結", "url": "https://example.invalid/hidden", "image": "", "product_id": "", "enabled": false, "sort_order": 1, "clicks": 0, "start_at": null, "end_at": null },
+    { "id": "recommendation", "card_id": "booking-card", "type": "image", "title": "本週推薦", "url": "https://example.invalid/feature", "image": "/card/demo-fashion.webp", "product_id": "", "enabled": true, "sort_order": 2, "clicks": 0, "start_at": null, "end_at": null },
+    { "id": "last", "card_id": "booking-card", "type": "link", "title": "品牌介紹", "url": "https://example.invalid/about", "image": "", "product_id": "", "enabled": true, "sort_order": 3, "clicks": 0, "start_at": null, "end_at": null }
+  ]
+}
