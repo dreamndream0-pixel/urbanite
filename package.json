@@ -15,6 +15,7 @@
     "@imgly/background-removal": "^1.7.0",
     "@supabase/ssr": "^0.12.5",
     "@supabase/supabase-js": "^2.112.4",
+    "cheerio": "1.2.0",
     "embla-carousel-auto-scroll": "8.6.0",
     "embla-carousel-react": "8.6.0",
     "lucide-react": "^1.52.0",

@@ -33,6 +33,8 @@ import {
 } from '@/lib/order-status';
 import { uiToast } from '@/lib/ui-toast';
 import NumberInput from './NumberInput';
+import ProductImportModal from './ProductImportModal';
+import { PackagePlus } from 'lucide-react';
 import { formatProductPrice, productPriceError } from '@/lib/product-price';
 import DraggableChips from './DraggableChips';
 import { useLongPressReorder } from './useLongPressReorder';
@@ -511,6 +513,7 @@ export default function AdminDashboard({
   const [overviewOrderSearch, setOverviewOrderSearch] = useState('');
   const [openOrderId, setOpenOrderId] = useState<string | null>(null);
   const [productsTab, setProductsTab] = useState<'items' | 'categories'>('items');
+  const [productImportOpen, setProductImportOpen] = useState(false);
   const [productListTab, setProductListTab] = useState<AdminProductTab>('上架中');
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
   const [categoryProductQuery, setCategoryProductQuery] = useState('');
@@ -2137,6 +2140,8 @@ export default function AdminDashboard({
               <Card
                 title="商品"
                 action={
+                  <div className="flex flex-wrap justify-end gap-2">
+                  <button type="button" onClick={() => setProductImportOpen(true)} className="inline-flex items-center gap-1.5 rounded-full border border-[#d7c9bd] px-3 py-2 text-sm font-semibold"><PackagePlus size={16} />一鍵搬家</button>
                   <button
                     onClick={() => {
                       setEditing(blankDraft(null, products));
@@ -2146,6 +2151,7 @@ export default function AdminDashboard({
                   >
                     新增商品
                   </button>
+                  </div>
                 }
               >
                 {/* 商品分類標籤:上架中 / 未上架 / 已售完(純現貨售完自動歸到已售完,補貨後自動回到上架中) */}
@@ -3452,6 +3458,7 @@ export default function AdminDashboard({
         </div>
       </div>
 
+      {productImportOpen && <ProductImportModal categories={categories} onClose={() => setProductImportOpen(false)} onImported={(product) => setProducts((list) => list.some((p) => p.id === product.id) ? list.map((p) => p.id === product.id ? product : p) : [...list, product])} />}
       {editing && (
         <ProductModal
           draft={editing}
