@@ -16,6 +16,7 @@ import { sendOrderEmails } from '@/lib/order-email';
 import { notifyShopOrder } from '@/lib/shop-line';
 import { getConfiguredSiteUrl } from '@/lib/site-url';
 import { kickOrderNotifications } from '@/lib/order-notification-kick';
+import { isValidPrice, productPrice } from '@/lib/product-price';
 
 // GET /api/orders — 取得所有訂單(限管理員)
 export async function GET() {
@@ -127,19 +128,22 @@ export async function POST(request: Request) {
     const variants = Array.isArray(product.variants) ? product.variants : [];
     if (variants.length > 0) {
       const label = String(item.variant ?? '');
-      const v = variants.find((vv: { options: string[] }) => vv.options.join(' / ') === label);
-      if (!v || v.inventory < quantity) {
+      const matches = variants.filter((vv) => vv.options.join(' / ') === label);
+      const v = matches[0];
+      if (matches.length !== 1 || v.inventory < quantity) {
         return NextResponse.json({ error: `「${product.name}」${label} 庫存不足` }, { status: 409 });
       }
     } else if (product.inventory < quantity) {
       return NextResponse.json({ error: `「${product.name}」庫存不足` }, { status: 409 });
     }
-    subtotal += product.price * quantity;
+    const unitPrice = productPrice(product, String(item.variant ?? ''));
+    if (!isValidPrice(unitPrice)) return NextResponse.json({ error: `「${product.name}」售價設定有誤，請聯絡店家` }, { status: 409 });
+    subtotal += unitPrice * quantity;
     const label = item.variant ?? '標準款';
     orderItems.push({
       name: product.name,
       variant: label,
-      price: product.price,
+      price: unitPrice,
       quantity,
       productId: product.id,
       sku: label && label !== '標準款' ? `${product.id}::${label}` : product.id,
@@ -418,7 +422,7 @@ export async function POST(request: Request) {
           variant_key: hasVariants ? String(item.variant ?? '') : '',
           type: 'out',
           quantity: Math.max(1, Math.floor(Number(item.quantity) || 1)),
-          unit_price: base.price ?? 0,
+          unit_price: productPrice(base, String(item.variant ?? '')),
           location: customer_name || '',
           handler: '系統(訂單)',
           note: `訂單 ${orderNo}`,

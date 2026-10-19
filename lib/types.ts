@@ -7,6 +7,7 @@ export type SpecDim = { name: string; options: string[]; display?: 'text' | 'ima
 export type Variant = {
   options: string[];
   inventory: number;
+  price?: number | null; // 未設定時沿用商品基本售價
   cost?: number; // 單位成本
   safety?: number; // 安全庫存
   location?: string; // 儲位

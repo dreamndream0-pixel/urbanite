@@ -33,6 +33,7 @@ import {
 } from '@/lib/order-status';
 import { uiToast } from '@/lib/ui-toast';
 import NumberInput from './NumberInput';
+import { formatProductPrice, productPriceError } from '@/lib/product-price';
 import DraggableChips from './DraggableChips';
 import { useLongPressReorder } from './useLongPressReorder';
 import { cleanRichText } from '@/lib/rich-text';
@@ -145,6 +146,7 @@ type Draft = {
   specs: { name: string; optionsText: string; display?: 'text' | 'image' }[];
   variantStock: Record<string, number>; // key = 各選項用 ' / ' 串起來
   variantCost: Record<string, number>; // 各規格單位成本
+  variantPrice: Record<string, number>; // 未填的規格沿用基本售價
   variantSafety: Record<string, number>; // 各規格安全庫存
   is_featured: boolean;
   sort_order: number;
@@ -389,6 +391,7 @@ function blankDraft(campaignId: string | null = null, products: Pick<Product, 'i
     specs: [],
     variantStock: {},
     variantCost: {},
+    variantPrice: {},
     variantSafety: {},
     is_featured: false,
     sort_order: 0,
@@ -401,11 +404,13 @@ function toDraft(p: Product): Draft {
   const specs = (p.specs ?? []).map((s) => ({ name: s.name, optionsText: s.options.join(', '), display: s.display }));
   const variantStock: Record<string, number> = {};
   const variantCost: Record<string, number> = {};
+  const variantPrice: Record<string, number> = {};
   const variantSafety: Record<string, number> = {};
   for (const v of p.variants ?? []) {
     const k = v.options.join(' / ');
     variantStock[k] = v.inventory;
     if (v.cost != null) variantCost[k] = v.cost;
+    if (v.price != null) variantPrice[k] = v.price;
     if (v.safety != null) variantSafety[k] = v.safety;
   }
   return {
@@ -422,6 +427,7 @@ function toDraft(p: Product): Draft {
     specs,
     variantStock,
     variantCost,
+    variantPrice,
     variantSafety,
     campaign_id: p.campaign_id ?? null,
   };
@@ -817,7 +823,9 @@ export default function AdminDashboard({
     const variants = specCombos(specs).map((opts) => {
       const k = opts.join(' / ');
       return {
+        ...products.find((p) => p.id === editing.id)?.variants?.find((v) => v.options.join(' / ') === k),
         options: opts,
+        price: editing.variantPrice[k] ?? null,
         inventory: Math.max(0, Math.floor(Number(editing.variantStock[k] ?? 0))),
         cost: Math.max(0, Math.floor(Number(editing.variantCost[k] ?? 0))),
         safety: Math.max(0, Math.floor(Number(editing.variantSafety[k] ?? 0))),
@@ -843,6 +851,8 @@ export default function AdminDashboard({
         ? sizeDim.options
         : editing.sizes.split(',').map((s) => s.trim()).filter(Boolean),
     };
+    const priceError = productPriceError(payload);
+    if (priceError) return void uiAlert(priceError);
     // 勾滿店家目前所有方式 = 不限制(存空陣列),之後店家在系統設定新增的物流/金流才會自動出現在結帳頁
     const coversAll = (list: string[], all: string[]) => all.length > 0 && all.every((m) => list.includes(m));
     if (!payload.available_shipping_methods.includes('免運') && coversAll(payload.available_shipping_methods, enabledShippingMethods)) payload.available_shipping_methods = [];
@@ -2185,7 +2195,7 @@ export default function AdminDashboard({
                           )}
                         </p>
                         <p className="text-sm text-[#8a7f72]">
-                          {formatter.format(product.price)} · 庫存 {product.inventory} · {product.status}
+                          {formatProductPrice(product, formatter.format)} · 庫存 {product.inventory} · {product.status}
                         </p>
                       </div>
                       <div className="flex gap-2">
@@ -7012,7 +7022,7 @@ function ProductModal({
 	          </Field>
 	          </div>
 	          <div className="grid grid-cols-2 gap-3">
-            <Field label="售價">
+            <Field label="基本售價">
               <NumberInput
                 inputMode="numeric"
                 placeholder="0"
@@ -7132,11 +7142,35 @@ function ProductModal({
                 ))}
 	              </div>
 	            </FieldGroup>
-	            {hasSpecs && (
-	              <p className="mt-3 text-xs text-[#8a7f72]">
-	                已建立 {modalCombos.length} 個規格組合。新增商品時不建庫存,請到「庫存管理」使用入庫單登錄。
-	              </p>
-	            )}
+                {hasSpecs && (
+                  <div className="mt-4 border-t border-[#e5ded4] pt-3">
+                    <h3 className="text-sm font-semibold">規格售價</h3>
+                    <div className="mt-2 divide-y divide-[#e5ded4]">
+                      {modalCombos.map((opts) => {
+                        const key = opts.join(' / ');
+                        return (
+                          <label key={key} className="grid grid-cols-[minmax(0,1fr)_minmax(120px,160px)] items-center gap-3 py-2 text-sm">
+                            <span className="break-words">{key}</span>
+                            <NumberInput
+                              aria-label={`${key} 售價`}
+                              min={0}
+                              value={draft.variantPrice[key] ?? ''}
+                              placeholder={`沿用 ${draft.price}`}
+                              className="min-w-0 w-full rounded-lg border border-[#e5ded4] px-3 py-2"
+                              onChange={(e) => {
+                                const next = { ...draft.variantPrice };
+                                if (e.target.value === '') delete next[key];
+                                else next[key] = Number(e.target.value);
+                                set('variantPrice', next);
+                              }}
+                            />
+                          </label>
+                        );
+                      })}
+                    </div>
+                    <p className="mt-2 text-xs text-[#8a7f72]">售價留空沿用基本售價。新增商品的庫存請至庫存管理登錄入庫單。</p>
+                  </div>
+                )}
 	          </div>
 	          <div className="grid gap-3 sm:grid-cols-2">
 	            <Field label={draft.campaign_id ? "活動分類(活動頁篩選用)" : "分類(首頁篩選用)"}>

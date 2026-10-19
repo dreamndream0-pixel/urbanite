@@ -59,7 +59,7 @@ export async function restoreOrderStock(
       variant_key: hasVariants ? String(item.variant ?? '') : '',
       type: 'in',
       quantity,
-      unit_price: base.price ?? 0,
+      unit_price: item.price ?? base.price ?? 0,
       location: '',
       handler,
       note: `取消回補 ${order.order_no ?? ''}`.trim(),

@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { cleanRichText } from '@/lib/rich-text';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Product } from '@/lib/types';
+import { productPrice } from '@/lib/product-price';
 import { resolvePromoNotices, type PromoNotice } from '@/lib/promo-notices';
 import StoreHeader from '@/app/components/StoreHeader';
 import { useLoopCarousel } from '@/app/components/useLoopCarousel';
@@ -138,6 +139,7 @@ export default function ProductDetailClient({ product, homeHref = '/', categoryN
     if (hasSpecs) return specSel.filter(Boolean).join(' / ') || '標準款';
     return [selectedColor, selectedSize].filter(Boolean).join(' / ') || '標準款';
   }, [hasSpecs, specSel, selectedColor, selectedSize]);
+  const selectedPrice = productPrice(product, variantLabel);
 
   // 依所選規格找到對應的庫存組合
   const selectedVariant = useMemo(() => {
@@ -234,13 +236,14 @@ export default function ProductDetailClient({ product, homeHref = '/', categoryN
       }
       if (existing) {
         existing.quantity = capped;
+        existing.price = selectedPrice;
       } else {
         cart.push({
           id,
           productId: product.id,
           name: product.name,
           variant: variantLabel,
-          price: product.price,
+          price: selectedPrice,
           quantity: capped,
         });
       }
@@ -372,8 +375,8 @@ export default function ProductDetailClient({ product, homeHref = '/', categoryN
           </div>
 
           <div className="mt-3 flex items-baseline gap-2.5">
-            <span className="text-lg font-bold text-[var(--c-sale)]">{ntd(product.price)}</span>
-            {product.original_price ? (
+            <span className="text-lg font-bold text-[var(--c-sale)]">{ntd(selectedPrice)}</span>
+            {product.original_price && product.original_price > selectedPrice ? (
               <span className="text-sm text-[var(--c-muted)] line-through">
                 {ntd(product.original_price)}
               </span>

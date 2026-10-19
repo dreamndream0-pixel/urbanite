@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import type { Product, Recipient, SiteSettings, UserCoupon } from '@/lib/types';
 import { isOnlinePayment } from '@/lib/payment';
+import { repriceCart } from '@/lib/product-price';
 import { TW_CITIES, TW_REGIONS } from '@/lib/tw-regions';
 import { computeShipping, resolveMethodFee } from '@/lib/shipping';
 import ShopHeader from '@/app/components/ShopHeader';
@@ -90,8 +91,10 @@ function readCart(): CartItem[] {
 export default function CheckoutPage() {
   const shopHome = useShopHome();
   // 先以空購物車渲染,掛載後再從 localStorage 載入,避免 hydration 不匹配
-  const [cart, setCart] = useState<CartItem[]>([]);
+  const [storedCart, setCart] = useState<CartItem[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const [priceState, setPriceState] = useState<'pending' | 'ready' | 'error'>('pending');
+  const cart = useMemo(() => repriceCart(storedCart, products), [storedCart, products]);
   const [settings, setSettings] = useState<SiteSettings | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [name, setName] = useState('');
@@ -166,10 +169,10 @@ export default function CheckoutPage() {
       })
       .catch(() => {});
 
-    fetch('/api/products?cart=1')
-      .then((res) => (res.ok ? res.json() : []))
-      .then((data: Product[]) => setProducts(data))
-      .catch(() => setProducts([]));
+    fetch('/api/products?cart=1', { cache: 'no-store' })
+      .then((res) => { if (!res.ok) throw new Error('Product prices unavailable'); return res.json(); })
+      .then((data: Product[]) => { setProducts(data); setPriceState('ready'); })
+      .catch(() => setPriceState('error'));
 
     fetch('/api/settings')
       .then((res) => (res.ok ? res.json() : null))
@@ -266,7 +269,7 @@ export default function CheckoutPage() {
 
   useEffect(() => {
     let alive = true;
-    if (!loaded || memberCoupons.length === 0 || subtotal <= 0) {
+    if (!loaded || priceState !== 'ready' || memberCoupons.length === 0 || subtotal <= 0) {
       setCouponChecks({});
       return;
     }
@@ -304,7 +307,7 @@ export default function CheckoutPage() {
     return () => {
       alive = false;
     };
-  }, [cart, loaded, memberCoupons, shipping, subtotal]);
+  }, [cart, loaded, priceState, memberCoupons, shipping, subtotal]);
 
   // 開超商門市地圖:電腦用彈出視窗(選完由回傳頁 postMessage 帶回);手機或彈窗被擋時同頁開,回來再帶回已填資料
   function openStoreMap(shipType: string) {
@@ -463,6 +466,7 @@ export default function CheckoutPage() {
 
   async function submitOrder() {
     setMessage(null);
+    if (priceState !== 'ready') return;
     if (cart.length === 0) {
       setMessage({ type: 'err', text: '購物車是空的' });
       return;
@@ -575,7 +579,12 @@ export default function CheckoutPage() {
               繼續購物
             </Link>
           </div>
-        ) : !loaded ? (
+        ) : priceState === 'error' ? (
+          <div className="py-20 text-center">
+            <p role="alert">無法取得最新商品售價，請重新載入後再結帳。</p>
+            <button type="button" onClick={() => window.location.reload()} className="mt-4 rounded-lg border border-[var(--c-border)] px-4 py-2">重新載入</button>
+          </div>
+        ) : !loaded || priceState === 'pending' ? (
           <p className="py-20 text-center text-[var(--c-muted)]">載入中…</p>
         ) : cart.length === 0 ? (
           <div className="rounded-2xl bg-[var(--c-surface)] p-8 text-center shadow-sm">

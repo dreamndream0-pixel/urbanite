@@ -1,12 +1,13 @@
 'use client';
 
-import { type ReactNode, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { type ReactNode, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { createBrowserSupabase } from '@/lib/supabase/client';
 import type { Product, Category, SiteSettings, Banner, Campaign, StorefrontBootstrap } from '@/lib/types';
 import { canOptimizeStoreImage } from '@/lib/store-image';
+import { formatProductPrice, productPrice, repriceCart } from '@/lib/product-price';
 import { uiAlert } from '@/lib/ui-dialog';
 import { computeShipping } from '@/lib/shipping';
 import { setShopHome } from '@/lib/shop-home';
@@ -148,7 +149,9 @@ export default function Storefront({ campaign = null, preview = false, initialDa
   const [cartOpen, setCartOpen] = useState(false);
   // 購物車一律先以空陣列渲染,掛載後再從 localStorage 載入,
   // 這樣伺服器與瀏覽器第一次渲染一致,避免 hydration 不匹配警告。
-  const [cart, setCart] = useState<CartItem[]>(() => (cached ? readCart() : []));
+  const [storedCart, setCart] = useState<CartItem[]>(() => (cached ? readCart() : []));
+  const [cartCatalog, setCartCatalog] = useState<Product[]>([]);
+  const cart = useMemo(() => repriceCart(storedCart, [...cartCatalog, ...products]), [storedCart, cartCatalog, products]);
   const [cartHydrated, setCartHydrated] = useState(!!cached);
   const [user, setUser] = useState<{ email: string; name: string; isAdmin: boolean } | null>(null);
   const [quickAdd, setQuickAdd] = useState<Product | null>(null);
@@ -423,7 +426,6 @@ export default function Storefront({ campaign = null, preview = false, initialDa
   const activeCategory = categoryTabs.flatMap((c) => [c, ...(c.children ?? [])]).find((c) => c.slug === category) ?? ALL_TAB;
 
   // 購物車縮圖:購物車可能有另一個商店(主站/活動頁)的商品,不在本頁清單時另外查詢
-  const [cartCatalog, setCartCatalog] = useState<Product[]>([]);
   const missingCartIds = cart.some((item) => !products.some((p) => p.id === item.productId) && !cartCatalog.some((p) => p.id === item.productId));
   useEffect(() => {
     if (!cartOpen || !missingCartIds) return;
@@ -448,7 +450,10 @@ export default function Storefront({ campaign = null, preview = false, initialDa
     const quantity = opts?.quantity ?? 1;
     const variant =
       opts?.variant ??
+      product.variants?.find((v) => v.inventory > 0)?.options.join(' / ') ??
+      product.variants?.[0]?.options.join(' / ') ??
       ([product.colors[0], product.sizes[0]].filter(Boolean).join(' / ') || '標準款');
+    const price = productPrice(product, variant);
     const id = `${product.id}-${variant}`;
     const stock = stockOf(product, variant);
     const current = cart.find((item) => item.id === id)?.quantity ?? 0;
@@ -470,11 +475,11 @@ export default function Storefront({ campaign = null, preview = false, initialDa
     setCart((items) => {
       const existing = items.find((item) => item.id === id);
       if (existing) {
-        return items.map((item) => (item.id === id ? { ...item, quantity: capped } : item));
+        return items.map((item) => (item.id === id ? { ...item, price, quantity: capped } : item));
       }
       return [
         ...items,
-        { id, productId: product.id, name: product.name, variant, price: product.price, quantity: capped },
+        { id, productId: product.id, name: product.name, variant, price, quantity: capped },
       ];
     });
     notifyAdded();
@@ -790,7 +795,7 @@ function FavoritesDrawer({
                   >
                     {product.name}
                   </Link>
-                  <span className="mt-1 font-semibold">{formatter.format(product.price)}</span>
+                  <span className="mt-1 font-semibold">{formatProductPrice(product, formatter.format)}</span>
                   <div className="mt-auto flex items-center gap-3 pt-2">
                     <button
                       onClick={() => onAdd(product)}
@@ -1244,7 +1249,7 @@ export function ProductCard({
         </Link>
         <div className="mt-3 flex items-center justify-between">
           <div className="flex items-baseline gap-2">
-            <span className="font-semibold tracking-wide">{formatter.format(product.price)}</span>
+            <span className="font-semibold tracking-wide">{formatProductPrice(product, formatter.format)}</span>
             {product.original_price ? (
               <span className="text-xs text-[var(--c-muted)] line-through">
                 {formatter.format(product.original_price)}
@@ -1514,7 +1519,7 @@ function CartDrawer({
                         {product.name}
                       </Link>
                       <p className="text-sm font-semibold text-[var(--c-sale)]">
-                        {formatter.format(product.price)}
+                        {formatProductPrice(product, formatter.format)}
                       </p>
                     </div>
                     <button
@@ -1649,8 +1654,8 @@ function QuickAddModal({
               <p className="mt-1 line-clamp-2 text-sm text-[var(--c-muted)]">{plainText(product.tagline)}</p>
             )}
             <div className="mt-3 flex items-baseline gap-2">
-              <span className="text-2xl font-bold text-[var(--c-sale)]">{formatter.format(product.price)}</span>
-              {product.original_price ? (
+              <span className="text-2xl font-bold text-[var(--c-sale)]">{formatter.format(productPrice(product, variantLabel))}</span>
+              {product.original_price && product.original_price > productPrice(product, variantLabel) ? (
                 <span className="text-sm text-[var(--c-muted)] line-through">
                   {formatter.format(product.original_price)}
                 </span>

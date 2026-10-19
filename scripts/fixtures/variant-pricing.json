@@ -1,0 +1,7 @@
+{
+  "id": "pack-fixture", "name": "規格售價測試商品", "tagline": "", "price": 100, "original_price": 200,
+  "inventory": 30, "status": "上架中", "category": "", "image": "/card/demo-fashion.webp", "images": ["/card/demo-fashion.webp"],
+  "colors": [], "sizes": [], "specs": [{ "name": "入數", "options": ["1入", "5入", "10入"] }],
+  "variants": [{ "options": ["1入"], "inventory": 10 }, { "options": ["5入"], "inventory": 10, "price": 450, "cost": 200, "safety": 2, "location": "A1" }, { "options": ["10入"], "inventory": 10, "price": 800 }],
+  "is_featured": true, "sort_order": 0
+}

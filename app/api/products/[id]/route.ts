@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getAdminUser } from '@/lib/supabase/server';
 import type { Product } from '@/lib/types';
+import { productPriceError } from '@/lib/product-price';
 import { shopAdminClient } from '@/lib/shop';
 
 // 可被後台編輯的欄位
@@ -39,6 +40,8 @@ export async function PATCH(
 
   const { id } = await params;
   const body = await request.json();
+  const priceError = productPriceError(body);
+  if (priceError) return NextResponse.json({ error: priceError }, { status: 400 });
 
   const update: Record<string, unknown> = {};
   for (const key of EDITABLE) {

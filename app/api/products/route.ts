@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getAdminUser } from '@/lib/supabase/server';
 import { isCampaignLive } from '@/lib/campaign';
 import type { Campaign, Product } from '@/lib/types';
+import { productPriceError } from '@/lib/product-price';
 import { isPlatformShop, requireCurrentShop, shopAdminClient } from '@/lib/shop';
 
 // GET /api/products — 取得商品(前台與後台共用)
@@ -29,7 +30,7 @@ export async function GET(request: NextRequest) {
   }
   return NextResponse.json(result, {
     // 活動頁可能是管理員預覽草稿,不可被 CDN 快取給其他人
-    headers: { 'Cache-Control': campaignId ? 'no-store' : 's-maxage=120, stale-while-revalidate=600' },
+    headers: { 'Cache-Control': campaignId || forCart ? 'no-store' : 's-maxage=120, stale-while-revalidate=600' },
   });
 }
 
@@ -42,6 +43,8 @@ export async function POST(request: Request) {
   if (!body?.id || !body?.name || typeof body?.price !== 'number') {
     return NextResponse.json({ error: '缺少必填欄位(id / name / price)' }, { status: 400 });
   }
+  const priceError = productPriceError(body);
+  if (priceError) return NextResponse.json({ error: priceError }, { status: 400 });
 
   const supabase = (await shopAdminClient());
   // 商品代碼全站唯一:其他店家自動加上店家代稱前綴(例如 bonsucre-love-set),避免和別家店撞號
