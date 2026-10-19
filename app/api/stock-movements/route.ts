@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getAdminUser } from '@/lib/supabase/server';
 import type { StockMovement, Variant } from '@/lib/types';
 import { shopAdminClient } from '@/lib/shop';
+import { resolveStockMovementTarget } from '@/lib/stock-movement-target';
 
 // GET /api/stock-movements — 進出庫紀錄(限管理員)
 export async function GET() {
@@ -26,13 +27,13 @@ export async function POST(request: Request) {
 
   const body = await request.json();
   const productId = String(body?.product_id ?? '').trim();
-  const variantKey = String(body?.variant_key ?? '').trim();
+  const requestedVariantKey = String(body?.variant_key ?? '').trim();
   const type = body?.type === 'out' ? 'out' : 'in';
-  const quantity = Math.max(1, Math.floor(Number(body?.quantity) || 0));
+  const quantity = Number(body?.quantity);
   const unitPrice = Math.max(0, Math.floor(Number(body?.unit_price) || 0));
 
   if (!productId) return NextResponse.json({ error: '請選擇品項' }, { status: 400 });
-  if (!quantity) return NextResponse.json({ error: '數量需大於 0' }, { status: 400 });
+  if (!Number.isSafeInteger(quantity) || quantity <= 0) return NextResponse.json({ error: '數量需為大於 0 的整數' }, { status: 400 });
 
   const supabase = (await shopAdminClient());
   const { data: product, error: prodErr } = await supabase
@@ -42,22 +43,27 @@ export async function POST(request: Request) {
     .maybeSingle();
   if (prodErr) return NextResponse.json({ error: prodErr.message }, { status: 500 });
   if (!product) return NextResponse.json({ error: '找不到品項' }, { status: 400 });
+  const target = resolveStockMovementTarget(product, requestedVariantKey);
+  if (!target.ok) return NextResponse.json({ error: target.error }, { status: 400 });
+  const variantKey = target.variantKey;
 
   const delta = type === 'in' ? quantity : -quantity;
   const variants: Variant[] = Array.isArray(product.variants) ? product.variants : [];
 
-  if (variants.length > 0 && variantKey) {
-    const next = variants.map((v) =>
-      v.options.join(' / ') === variantKey
+  let stockUpdate;
+  if (target.variantIndex !== null) {
+    const next = variants.map((v, index) =>
+      index === target.variantIndex
         ? { ...v, inventory: Math.max(0, (v.inventory ?? 0) + delta) }
         : v,
     );
     const total = next.reduce((n, v) => n + (v.inventory ?? 0), 0);
-    await supabase.from('products').update({ variants: next, inventory: total }).eq('id', productId);
+    stockUpdate = await supabase.from('products').update({ variants: next, inventory: total }).eq('id', productId);
   } else {
     const inv = Math.max(0, (product.inventory ?? 0) + delta);
-    await supabase.from('products').update({ inventory: inv }).eq('id', productId);
+    stockUpdate = await supabase.from('products').update({ inventory: inv }).eq('id', productId);
   }
+  if (stockUpdate.error) return NextResponse.json({ error: stockUpdate.error.message }, { status: 500 });
 
   const { data: movement, error: mvErr } = await supabase
     .from('stock_movements')
@@ -106,19 +112,24 @@ export async function DELETE(request: Request) {
     const delta = movement.type === 'in' ? -movement.quantity : movement.quantity;
     const variantKey = String(movement.variant_key ?? '');
     const variants: Variant[] = Array.isArray(product.variants) ? product.variants : [];
+    const target = resolveStockMovementTarget(product, variantKey);
+    if (!target.ok) return NextResponse.json({ error: target.error }, { status: 409 });
+    if (target.variantKey !== variantKey) return NextResponse.json({ error: '商品規格已變更，無法比對原入庫品項' }, { status: 409 });
 
-    if (variants.length > 0 && variantKey) {
-      const next = variants.map((v) =>
-        v.options.join(' / ') === variantKey
+    let stockUpdate;
+    if (target.variantIndex !== null) {
+      const next = variants.map((v, index) =>
+        index === target.variantIndex
           ? { ...v, inventory: Math.max(0, (v.inventory ?? 0) + delta) }
           : v,
       );
       const total = next.reduce((n, v) => n + (v.inventory ?? 0), 0);
-      await supabase.from('products').update({ variants: next, inventory: total }).eq('id', product.id);
+      stockUpdate = await supabase.from('products').update({ variants: next, inventory: total }).eq('id', product.id);
     } else {
       const inv = Math.max(0, (product.inventory ?? 0) + delta);
-      await supabase.from('products').update({ inventory: inv }).eq('id', product.id);
+      stockUpdate = await supabase.from('products').update({ inventory: inv }).eq('id', product.id);
     }
+    if (stockUpdate.error) return NextResponse.json({ error: stockUpdate.error.message }, { status: 500 });
   }
 
   const { error } = await supabase.from('stock_movements').delete().eq('id', id);
