@@ -98,4 +98,4 @@ export const TIER_FEATURES: { group: string; rows: { label: string; values: [str
 ];
 
 // 代稱不能用的字(與網站頁面衝突)
-export const RESERVED_SLUGS = ['admin', 'business', 'cases', 'api', 'card', 'mycard', 'login', 'register', 'account', 'checkout', 'products', 'promo', 'line', 'auth', 'www', 'help', 'about', 'pricing', 'settings', 'shop', 'store', 'mail', 'my', 'booking', 'feed', 'photo', 'quote-image'];
+export const RESERVED_SLUGS = ['admin', 'business', 'cases', 'api', 'card', 'mycard', 'login', 'register', 'account', 'checkout', 'products', 'promo', 'line', 'auth', 'www', 'help', 'about', 'pricing', 'settings', 'shop', 'store', 'mail', 'my', 'booking', 'feed', 'photo', 'quote-image', 'staff'];

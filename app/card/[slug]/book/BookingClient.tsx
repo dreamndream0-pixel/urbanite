@@ -55,7 +55,9 @@ const baseMinutes = (x: Service) => (x.steps.length > 1 ? x.steps.reduce((n, st)
 const minPrice = (x: Service) => (x.staff.length ? Math.min(...x.staff.map((st) => st.price)) : x.price);
 
 // 名片線上預約:選服務 → 加購 → 人員 → 日期時段 → 登入 → 聯絡資料 → 送出;另有「我的預約」(付訂金回報、改期、取消、加入行事曆)
-export default function BookingClient({ slug, card, business, services: allServices, staff, branches = [] }: { slug: string; card: { display_name: string; avatar_url: string }; business: Business; services: Service[]; staff: Staff[]; branches?: Branch[] }) {
+// lockedStaff:人員專屬預約連結(?staff=),只顯示這位人員能做的服務,不再選人員
+export default function BookingClient({ slug, card, business, services: rawServices, staff, branches = [], lockedStaff = null }: { slug: string; card: { display_name: string; avatar_url: string }; business: Business; services: Service[]; staff: Staff[]; branches?: Branch[]; lockedStaff?: { id: string; name: string } | null }) {
+  const allServices = useMemo(() => (lockedStaff ? rawServices.filter((s) => s.staff.some((x) => x.id === lockedStaff.id)) : rawServices), [rawServices, lockedStaff]);
   const [branchId, setBranchId] = useState(branches.length === 1 ? branches[0].id : '');
   const branch = branches.find((b) => b.id === branchId) ?? null;
   // 有分店時只顯示這間分店提供的服務
@@ -97,10 +99,10 @@ export default function BookingClient({ slug, card, business, services: allServi
   const here = `/@${slug}/book`;
 
   // 這個服務可選的人員;只有一位時不顯示人員步驟
-  const serviceStaff = useMemo(() => (service?.staff ?? []).map((x) => ({ ...x, info: staff.find((s) => s.id === x.id) })).filter((x) => x.info && (!branchId || !x.info.branch_ids?.length || x.info.branch_ids.includes(branchId))), [service, staff, branchId]);
+  const serviceStaff = useMemo(() => (service?.staff ?? []).map((x) => ({ ...x, info: staff.find((s) => s.id === x.id) })).filter((x) => x.info && (!lockedStaff || x.id === lockedStaff.id) && (!branchId || !x.info.branch_ids?.length || x.info.branch_ids.includes(branchId))), [service, staff, branchId, lockedStaff]);
   const pickStaff = serviceStaff.length > 1;
   const staffChosen = !pickStaff || staffId !== null;
-  const staffParam = pickStaff ? staffId || '' : '';
+  const staffParam = lockedStaff ? lockedStaff.id : pickStaff ? staffId || '' : '';
 
   // 試算(最終以伺服器計算為準)
   const quote = useMemo(() => {
@@ -182,7 +184,7 @@ export default function BookingClient({ slug, card, business, services: allServi
 
   const slots = useMemo(() => days?.find((d) => d.date === date)?.slots ?? [], [days, date]);
   const ready = Boolean(service && staffChosen && date && time && slots.includes(time));
-  const nextParams = `${branchId ? `b=${branchId}&` : ''}s=${serviceId}&a=${addonIds.join(',')}&x=${extraIds.join(',')}${pickStaff && staffId !== null ? `&p=${staffId}` : ''}&d=${date}&t=${encodeURIComponent(time)}`;
+  const nextParams = `${lockedStaff ? `staff=${lockedStaff.id}&` : ''}${branchId ? `b=${branchId}&` : ''}s=${serviceId}&a=${addonIds.join(',')}&x=${extraIds.join(',')}${pickStaff && staffId !== null ? `&p=${staffId}` : ''}&d=${date}&t=${encodeURIComponent(time)}`;
   const loginNext = encodeURIComponent(`${here}?${nextParams}`);
   const resetSlot = () => { setTime(''); idemKey.current = ''; };
 
@@ -250,7 +252,7 @@ export default function BookingClient({ slug, card, business, services: allServi
           {card.avatar_url ? <img src={card.avatar_url} alt="" className="h-9 w-9 shrink-0 rounded-full object-cover" /> : null}
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-semibold">{business.name}</p>
-            <p className="text-[11px] text-[#8a7f72]">線上預約</p>
+            <p className="text-[11px] text-[#8a7f72]">線上預約{lockedStaff ? ` · 指定 ${lockedStaff.name}` : ''}</p>
           </div>
         </div>
         <div className="mx-auto flex max-w-xl gap-1 px-4 pb-2">

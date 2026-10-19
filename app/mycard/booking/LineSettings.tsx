@@ -97,6 +97,13 @@ export default function LineSettings({ onChanged }: { onChanged: () => void }) {
             <li>貼到下面儲存,系統會自動驗證。</li>
             <li>儲存後把畫面上的 Webhook 網址貼回 LINE Developers,開啟 Use webhook;官方帳號後台的「自動回應訊息」建議關閉。</li>
           </ol>
+          <div className="space-y-1">
+            <p className="text-xs text-[#8a7f72]">你的 Webhook 網址(步驟 4 要用)</p>
+            <div className="flex min-w-0 items-center gap-2 rounded-xl bg-white p-2 pl-3">
+              <span className="min-w-0 flex-1 truncate text-xs text-[#6b6156]">{st.webhook_url}</span>
+              <button type="button" onClick={() => copy(st.webhook_url)} className={btnSm}>複製</button>
+            </div>
+          </div>
           <label className="block text-xs text-[#8a7f72]">Channel secret
             <input value={form.channel_secret} onChange={(e) => setForm({ ...form, channel_secret: e.target.value.trim() })} autoComplete="off" spellCheck={false} placeholder="32 碼英數字" className={`${input} mt-1 font-mono`} />
           </label>

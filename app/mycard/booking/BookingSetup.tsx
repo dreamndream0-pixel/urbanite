@@ -14,12 +14,12 @@ import CalendarSync from './CalendarSync';
 
 // ---------- 每週時段編輯(營業時段、人員班表共用) ----------
 type DayRange = { start: string; end: string; branch?: string };
-type Week = DayRange[][];
+export type Week = DayRange[][];
 type HourRow = { weekday: number; start_min: number; end_min: number; branch_id?: string | null };
 
 export const toWeek = (rows: HourRow[]): Week => WEEKDAYS.map((_, d) => rows.filter((h) => h.weekday === d).map((h) => ({ start: minutesToHHMM(h.start_min), end: h.end_min === 1440 ? '24:00' : minutesToHHMM(h.end_min), branch: h.branch_id ?? '' })));
 
-function fromWeek(week: Week): HourRow[] | string {
+export function fromWeek(week: Week): HourRow[] | string {
   const rows: HourRow[] = [];
   for (let d = 0; d < 7; d++) {
     for (const r of week[d]) {
@@ -32,7 +32,7 @@ function fromWeek(week: Week): HourRow[] | string {
   return rows;
 }
 
-function WeekEditor({ week, setWeek, branches = [] }: { week: Week; setWeek: (w: Week) => void; branches?: { id: string; name: string }[] }) {
+export function WeekEditor({ week, setWeek, branches = [] }: { week: Week; setWeek: (w: Week) => void; branches?: { id: string; name: string }[] }) {
   const setDay = (d: number, ranges: DayRange[]) => setWeek(week.map((r, i) => (i === d ? ranges : r)));
   return (
     <>
@@ -427,7 +427,8 @@ export function StaffTab({ data, reload }: { data: Data; reload: () => Promise<v
           {!g.list.length ? <p className="py-2 text-xs text-[#a99e8f]">尚無人員</p> : null}
         <div className="divide-y divide-[#f0ebe2]">
           {g.list.map((s) => (
-            <div key={s.id} className={`flex items-center gap-3 py-2.5 ${s.active ? '' : 'opacity-60'}`}>
+            <div key={s.id} className="py-2.5">
+            <div className={`flex items-center gap-3 ${s.active ? '' : 'opacity-60'}`}>
               <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#efe8dd] text-sm font-semibold text-[#6b6156]">{s.name.slice(0, 1)}</span>
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-semibold">{s.name}{s.active ? '' : '(停用)'}</p>
@@ -435,6 +436,8 @@ export function StaffTab({ data, reload }: { data: Data; reload: () => Promise<v
               </div>
               <button type="button" onClick={() => edit(s)} className={btnSm}>編輯</button>
               {data.staff.length > 1 ? <button type="button" onClick={() => void remove(s)} className="shrink-0 px-1 text-xs text-[#a03b3b]">刪除</button> : null}
+            </div>
+            <StaffLinks staff={s} slug={data.card?.slug ?? ''} reload={reload} />
             </div>
           ))}
         </div>
@@ -469,6 +472,47 @@ export function StaffTab({ data, reload }: { data: Data; reload: () => Promise<v
           </div>
         ) : <p className="text-xs text-[#a99e8f]">尚未設定(不限制床位)</p>}
       </section>
+    </div>
+  );
+}
+
+// 人員的兩個連結:預約連結(顧客直接預約這位人員)、專屬頁(人員自己看行程、填班表與休假,不用登入)
+function StaffLinks({ staff, slug, reload }: { staff: BkStaff; slug: string; reload: () => Promise<void> }) {
+  const [open, setOpen] = useState(false);
+  const origin = typeof window === 'undefined' ? '' : window.location.origin;
+  const bookUrl = slug ? `${origin}/@${slug}/book?staff=${staff.id}` : '';
+  const portalUrl = staff.portal_token ? `${origin}/staff/${staff.portal_token}` : '';
+  const copy = (t: string, msg: string) => { void navigator.clipboard?.writeText(t); uiToast(msg); };
+  async function portal(action: 'create' | 'reset' | 'off') {
+    if (action === 'reset' && !(await uiConfirm(`重設後,${staff.name} 舊的專屬頁連結會失效,要把新連結再傳給他。確定重設?`, { danger: true }))) return;
+    if (action === 'off' && !(await uiConfirm(`關閉後,${staff.name} 的專屬頁連結會失效。確定關閉?`, { danger: true }))) return;
+    try {
+      const r = await api<{ token: string | null }>('/api/mycard/booking/staff/portal', { method: 'POST', body: JSON.stringify({ id: staff.id, action }) });
+      if (r.token) copy(`${origin}/staff/${r.token}`, action === 'reset' ? '已重設並複製新連結' : '已複製專屬頁連結');
+      else uiToast('已關閉專屬頁');
+      await reload();
+    } catch (e) { void uiAlert(errMsg(e)); }
+  }
+  return (
+    <div className="mt-2 pl-12">
+      <div className="flex flex-wrap gap-1.5">
+        {bookUrl && staff.role !== 'assistant' ? <button type="button" onClick={() => copy(bookUrl, `已複製 ${staff.name} 的預約連結`)} className={btnSm}>複製預約連結</button> : null}
+        <button type="button" aria-expanded={open} onClick={() => (portalUrl ? setOpen(!open) : void portal('create'))} className={btnSm}>{portalUrl ? '專屬頁連結 ▾' : '產生專屬頁連結'}</button>
+      </div>
+      {open && portalUrl ? (
+        <div className="mt-2 space-y-2 rounded-xl bg-[#faf7f2] p-2.5">
+          <p className="text-[11px] leading-4 text-[#8a7f72]">傳給 {staff.name} 本人:打開就能看自己的預約行程、填每週班表與休假,不用登入。連結等同鑰匙,不要公開分享。</p>
+          <div className="flex min-w-0 items-center gap-1.5">
+            <span className="min-w-0 flex-1 truncate text-xs text-[#6b6156]">{portalUrl}</span>
+            <button type="button" onClick={() => copy(portalUrl, '已複製專屬頁連結')} className={btnSm}>複製</button>
+            <a href={portalUrl} target="_blank" rel="noopener noreferrer" className={btnSm}>開啟</a>
+          </div>
+          <div className="flex gap-3 text-xs">
+            <button type="button" onClick={() => void portal('reset')} className="text-[#1f6f8b]">重設連結</button>
+            <button type="button" onClick={() => void portal('off')} className="text-[#a03b3b]">關閉專屬頁</button>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

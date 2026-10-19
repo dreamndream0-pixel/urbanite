@@ -13,13 +13,16 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 }
 
 // 名片線上預約頁(對外網址 /@代稱/book)
-export default async function BookPage({ params }: { params: Promise<{ slug: string }> }) {
+export default async function BookPage({ params, searchParams }: { params: Promise<{ slug: string }>; searchParams: Promise<{ staff?: string }> }) {
   const { slug } = await params;
+  const { staff: staffParam } = await searchParams;
   const ctx = await getPublicBusiness(decodeURIComponent(slug).toLowerCase());
   if (!ctx) notFound();
   const sched = await loadSchedule(ctx.business.id);
   const b = ctx.business;
   const catalog = publicCatalog(sched);
+  // 人員專屬預約連結:人員要在職、可接主要服務
+  const locked = staffParam ? sched.staff.find((s) => s.id === staffParam && s.active && s.role !== 'assistant') : undefined;
   const open = sched.hours.length > 0 || sched.staffHours.length > 0;
   return (
     <BookingClient
@@ -33,6 +36,7 @@ export default async function BookPage({ params }: { params: Promise<{ slug: str
       services={catalog.services}
       staff={catalog.staff}
       branches={catalog.branches}
+      lockedStaff={locked ? { id: locked.id, name: locked.name } : null}
     />
   );
 }

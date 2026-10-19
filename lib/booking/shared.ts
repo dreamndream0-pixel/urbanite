@@ -63,7 +63,7 @@ export type BkService = {
 
 export type BkBranch = { id: string; name: string; address: string; active: boolean; sort_order: number };
 
-export type BkStaff = { id: string; business_id: string; name: string; title: string; avatar: string; active: boolean; use_business_hours: boolean; sort_order: number; role: 'stylist' | 'assistant'; commission_rate?: number; branch_ids?: string[] };
+export type BkStaff = { id: string; business_id: string; name: string; title: string; avatar: string; active: boolean; use_business_hours: boolean; sort_order: number; role: 'stylist' | 'assistant'; commission_rate?: number; branch_ids?: string[]; portal_token?: string | null };
 // 服務步驟:who = 主要人員 / 助理 / 不需人員(等待);seat = 這段是否占用座位
 export type BkServiceStep = { id?: string; service_id: string; seq: number; name: string; minutes: number; who: 'main' | 'assistant' | 'none'; seat: 'keep' | 'release' };
 export type BkAllocation = { id: string; booking_id: string; staff_id: string | null; resource_id: string | null; role: 'main' | 'assistant' | 'seat'; start_at: string; end_at: string; item_seq?: number };
