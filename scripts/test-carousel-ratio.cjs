@@ -6,6 +6,7 @@ const os = require('node:os');
 const { chromium, webkit } = require(process.argv[2] || 'playwright');
 const editorUrl = process.argv[3];
 if (!editorUrl) throw new Error('Provide a temporary local route mounting scripts/fixtures/StorefrontEditorFixture.tsx');
+const storefrontUrl = process.argv[4] || new URL('/', editorUrl).href;
 
 (async () => {
   for (const [engine, width] of [[chromium, 390], [webkit, 390], [chromium, 1440]]) {
@@ -78,7 +79,7 @@ if (!editorUrl) throw new Error('Provide a temporary local route mounting script
       await click('確定');
       assert.equal(stored.storefront.blocks[0].carouselRatio, 'portrait');
       assert.equal(stored.draft, undefined);
-      await page.goto(new URL('/', editorUrl).href);
+      await page.goto(storefrontUrl);
       await checkRatio(page, 'portrait');
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
       assert.deepEqual(errors, []);

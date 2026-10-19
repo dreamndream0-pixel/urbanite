@@ -5,6 +5,7 @@ const os = require('node:os');
 const { chromium, webkit } = require(process.argv[2] || 'playwright');
 const url = process.argv[3];
 if (!url) throw new Error('Provide a temporary local route mounting scripts/fixtures/BannerSyncFixture.tsx');
+const storefrontUrl = process.argv[4] || new URL('/', url).href;
 
 (async () => {
   for (const [engine, width] of [[chromium, 390], [webkit, 390], [chromium, 1440]]) {
@@ -89,7 +90,7 @@ if (!url) throw new Error('Provide a temporary local route mounting scripts/fixt
       await page.getByText('輸出尺寸 1600 × 900 px', { exact: true }).waitFor();
       await checkRatio(page.locator('img[src^="blob:"]').first(), 'wide');
       await click('取消');
-      await page.goto(new URL('/', url).href);
+      await page.goto(storefrontUrl);
       await checkBlocks(page, 'wide');
       settings.site_theme.storefront.enabled = false;
       await page.reload();

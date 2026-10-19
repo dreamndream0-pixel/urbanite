@@ -147,7 +147,7 @@ export default function FavoriteFoldButton({
           {/* 紙片:印上與下方對齊的同一張照片,折回原位時與原圖無縫接合(未收藏時不顯示) */}
           <g opacity={Math.min(progress * 40, 1)}>
             <path d={paper} fill="white" />
-            {imageUrl && frame.w > 0 && (
+            {imageUrl && frame.w > 0 && progress > 0 && (
               <g clipPath={`url(#${id}-sheet)`}>
                 <image
                   href={imageUrl}

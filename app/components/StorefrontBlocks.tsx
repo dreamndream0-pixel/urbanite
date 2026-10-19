@@ -51,6 +51,7 @@ export default function StorefrontBlocks({ blocks, products, categories, banners
 }) {
   const visible = blocks.filter((block) => block.visible);
   const firstProduct = visible.find((b) => b.type === 'products')?.id;
+  const firstCarousel = visible.find((b) => b.type === 'carousel')?.id;
   const topCategories = categories.filter((c) => c.slug !== 'all' && !c.parent_id && (c.sort_order === undefined || c.sort_order >= 0));
   const style = styles[designStyle] ?? '';
   // 分類沒上傳圖片時,用該分類第一件商品的圖
@@ -126,7 +127,7 @@ export default function StorefrontBlocks({ blocks, products, categories, banners
 
         {block.type === 'carousel' && (() => {
           const slides = banners.filter((b) => b.active && (b.group_no ?? 1) === block.group);
-          return slides.length ? <div className={styles.carousel}><HeroCarousel banners={slides} ratio={bannerRatioForGroup(bannerRatios, block.group, block.carouselRatio)} /></div>
+          return slides.length ? <div className={styles.carousel}><HeroCarousel banners={slides} ratio={bannerRatioForGroup(bannerRatios, block.group, block.carouselRatio)} priority={!preview && block.id === firstCarousel} /></div>
             : preview ? <div className={styles.inner}><p className={styles.empty}>輪播圖{block.group} 還沒有圖片,請到「系統設定 → 輪播圖」上傳</p></div> : null;
         })()}
 

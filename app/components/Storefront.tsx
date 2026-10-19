@@ -2,9 +2,11 @@
 
 import { type ReactNode, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { createBrowserSupabase } from '@/lib/supabase/client';
-import type { Product, Category, SiteSettings, Banner, Campaign } from '@/lib/types';
+import type { Product, Category, SiteSettings, Banner, Campaign, StorefrontBootstrap } from '@/lib/types';
+import { canOptimizeStoreImage } from '@/lib/store-image';
 import { uiAlert } from '@/lib/ui-dialog';
 import { computeShipping } from '@/lib/shipping';
 import { setShopHome } from '@/lib/shop-home';
@@ -108,7 +110,7 @@ function readCart(): CartItem[] {
 }
 
 // 主站首頁與一頁式活動頁共用同一個商店畫面;傳入 campaign 時只顯示該活動的商品。
-export default function Storefront({ campaign = null, preview = false }: { campaign?: Campaign | null; preview?: boolean }) {
+export default function Storefront({ campaign = null, preview = false, initialData = null }: { campaign?: Campaign | null; preview?: boolean; initialData?: StorefrontBootstrap | null }) {
   const router = useRouter();
   const homeHref = campaign ? campaignHomeHref(campaign.slug) : '/';
   const [query, setQuery] = useState('');
@@ -117,10 +119,12 @@ export default function Storefront({ campaign = null, preview = false }: { campa
   const [cached] = useState(() => (typeof window === 'undefined' ? undefined : cachedStore(cacheKey, !!campaign)));
   const [initialReturn] = useState(() => (cached ? peekReturnState() : null));
   const [products, setProducts] = useState<Product[]>(cached?.products ?? []);
-  const [banners, setBanners] = useState<Banner[]>(cached?.banners ?? []);
+  const [banners, setBanners] = useState<Banner[]>(initialData?.banners ?? cached?.banners ?? []);
   const [dbCategories, setDbCategories] = useState<Category[]>(cached?.categories ?? []);
-  const [logoUrl, setLogoUrl] = useState(cached?.settings?.logo_url ?? '');
-  const [settings, setSettings] = useState<SiteSettings | null>(cached?.settings ?? null);
+  const [logoUrl, setLogoUrl] = useState(initialData?.settings.logo_url ?? cached?.settings?.logo_url ?? '');
+  const [settings, setSettings] = useState<SiteSettings | null>(initialData?.settings ?? cached?.settings ?? null);
+  const [presentationReady, setPresentationReady] = useState(!!(initialData || cached?.settings));
+  const [presentationFailed, setPresentationFailed] = useState(false);
   const [loading, setLoading] = useState(!cached);
   // 使用者選的分類;空字串 = 還沒選,首頁 / 活動頁預設停在分類列最左邊的分類(見下方 category)
   const [pickedCategory, setCategory] = useState(() => initialReturn?.category ?? '');
@@ -220,6 +224,7 @@ export default function Storefront({ campaign = null, preview = false }: { campa
   }, [homeHref]);
 
   useEffect(() => {
+    let active = true;
     fetch(campaign ? `/api/products?campaign=${encodeURIComponent(campaign.id)}` : '/api/products')
       .then((res) => (res.ok ? res.json() : []))
       .then((data: Product[]) => { setProducts(data); cacheStore(cacheKey, { products: data }); })
@@ -236,23 +241,24 @@ export default function Storefront({ campaign = null, preview = false }: { campa
       })
       .catch(() => setDbCategories([]));
 
-    fetch('/api/settings', { cache: 'no-store' })
-      .then((res) => (res.ok ? res.json() : null))
-      .then((s) => {
-        if (s?.logo_url) setLogoUrl(s.logo_url);
-        cacheStore(cacheKey, { settings: s ?? null });
-        if (s) {
-          setSettings(s);
-        }
-      })
-      .catch(() => {});
-
-    if (campaign) return; // 活動頁的輪播圖使用活動主視覺(見 heroBanners)
-    fetch('/api/banners')
-      .then((res) => (res.ok ? res.json() : []))
-      .then((data: Banner[]) => { setBanners(data); cacheStore(cacheKey, { banners: data }); })
-      .catch(() => setBanners([]));
-  }, [campaign, cacheKey]);
+    // Settings and banners must commit together: never paint a banner using a temporary default ratio.
+    const settingsRequest = fetch('/api/settings', { cache: 'no-store' }).then((res) => {
+      if (!res.ok) throw new Error('Settings unavailable');
+      return res.json() as Promise<SiteSettings>;
+    });
+    const bannersRequest: Promise<Banner[]> = campaign ? Promise.resolve([]) : initialData ? Promise.resolve(initialData.banners)
+      : fetch('/api/banners').then((res) => { if (!res.ok) throw new Error('Banners unavailable'); return res.json(); });
+    void Promise.all([settingsRequest, bannersRequest]).then(([nextSettings, nextBanners]) => {
+      if (!active) return;
+      setSettings(nextSettings);
+      setLogoUrl(nextSettings.logo_url ?? '');
+      setBanners(nextBanners);
+      cacheStore(cacheKey, { settings: nextSettings, banners: nextBanners });
+      setPresentationReady(true);
+      setPresentationFailed(false);
+    }).catch(() => { if (active) setPresentationFailed(true); });
+    return () => { active = false; };
+  }, [campaign, cacheKey, initialData]);
 
   // 掛載後才從 localStorage 載入購物車
   useEffect(() => {
@@ -576,6 +582,7 @@ export default function Storefront({ campaign = null, preview = false }: { campa
         onCart={() => setCartOpen(true)}
       />
 
+      {presentationReady ? <>
       {showBlocks ? <StorefrontBlocks designStyle={design.style} categoryImageStyle={settings?.category_image_style} onBrowseAll={browseAllProducts} blocks={design.blocks!} banners={banners.filter((b) => b.active)} bannerRatios={bannerRatios} products={products} categories={categoryTabs.filter((c) => c.slug !== 'all')} images={[...heroBanners.map((b) => b.image), ...liveProducts.map((p) => p.image)].filter(Boolean)} onCategory={browseCategory} loading={loading} renderProduct={(product) => <ProductCard product={product} favorited={favorites.has(product.id)} favoritePending={favoritePending.has(product.id)} favoritesLoaded={favoritesLoaded} onFavoriteChange={(next) => setFavoriteSaved(product.id, next)} onAdd={() => setQuickAdd(product)} />} /> : <>
       {customDesign && !modularDesign ? <StorefrontDesignHero design={design} image={heroBanners[0]?.image || products.find(isVisibleInStore)?.image} categories={categoryTabs.filter((c) => c.slug !== 'all')} onCategory={browseCategory} onBrowse={browseProducts} /> : !modularDesign ? <HeroCarousel banners={heroBanners} ratio={campaign ? campaign.hero_ratio ?? 'portrait' : bannerRatioForGroup(bannerRatios, 1)} /> : (() => {
         // 板塊模板切到某個分類時,和預設模板一樣保留上方的輪播 / 主視覺:
@@ -628,6 +635,9 @@ export default function Storefront({ campaign = null, preview = false }: { campa
       {customDesign && !modularDesign && <StorefrontDesignFeature design={design} image={heroBanners[1]?.image} onBrowse={browseProducts} />}
       </>}
       <Footer settings={settings} logoUrl={logoUrl} homeHref={homeHref} />
+      </> : <div role="status" aria-label="商店載入中" className="flex min-h-40 items-center justify-center gap-3 bg-[var(--c-surface)] px-4 text-sm text-[var(--c-muted)]">
+        {presentationFailed ? <><span>商店載入失敗</span><button type="button" onClick={() => window.location.reload()} className="rounded-md border border-[var(--c-border)] px-3 py-2">重新載入</button></> : '商店載入中…'}
+      </div>}
 
       {/* 左側分類選單 */}
       <SideMenu
@@ -1197,11 +1207,14 @@ export function ProductCard({
   return (
     <div className="product-card group flex flex-col overflow-hidden rounded-lg bg-[var(--c-card)] p-3 shadow-sm hover:shadow-md">
       <div className="relative aspect-[4/5] overflow-hidden rounded-[6px] bg-[var(--c-surface)]">
-        <Link href={productHref} aria-label={`查看 ${product.name}`}>
+        <Link href={productHref} aria-label={`查看 ${product.name}`} className="absolute inset-0">
           {product.image ? (
-            <img
+            <Image
               src={product.image}
               alt={product.name}
+              fill
+              sizes="(min-width: 1024px) 25vw, (min-width: 640px) 33vw, 50vw"
+              unoptimized={!canOptimizeStoreImage(product.image)}
               className={`h-full w-full object-contain drop-shadow-[0_14px_16px_rgba(31,27,25,0.22)] ${soldOut ? 'opacity-60' : ''}`}
             />
           ) : (

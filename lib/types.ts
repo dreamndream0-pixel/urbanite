@@ -96,6 +96,8 @@ export type SiteSettings = {
   updated_at?: string;
 };
 
+export type StorefrontBootstrap = { settings: SiteSettings; banners: Banner[] };
+
 export type Discount = {
   id: string;
   name?: string;

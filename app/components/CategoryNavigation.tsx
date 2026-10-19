@@ -2,6 +2,8 @@
 
 import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import Image from 'next/image';
+import { canOptimizeStoreImage } from '@/lib/store-image';
 
 type NavigationCategory = {
   slug: string;
@@ -120,9 +122,9 @@ export default function CategoryNavigation({ categories, value, onSelect, imageS
               }}
             >
               {withImages ? (
-                <span className="store-category-image" aria-hidden="true">
+                <span className="store-category-image relative" aria-hidden="true">
                   {category.image ? (
-                    <img src={category.image} alt="" loading="lazy" />
+                    <Image src={category.image} alt="" fill sizes="(min-width: 640px) 84px, 72px" unoptimized={!canOptimizeStoreImage(category.image)} />
                   ) : category.slug === 'all' ? (
                     <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="4" width="6.5" height="6.5" rx="1.5" /><rect x="13.5" y="4" width="6.5" height="6.5" rx="1.5" /><rect x="4" y="13.5" width="6.5" height="6.5" rx="1.5" /><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.5" /></svg>
                   ) : (

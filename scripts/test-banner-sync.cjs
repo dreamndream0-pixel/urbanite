@@ -51,7 +51,10 @@ if (!url) throw new Error('Provide a temporary local route mounting scripts/fixt
       const group = () => page.locator('section').filter({ has: page.locator('p').filter({ hasText: /^輪播圖1 / }) }).last();
       const preview = async () => { await tab('預覽'); return page.getByRole('dialog').locator('[data-block-type="carousel"]'); };
       const close = () => tab('關閉預覽');
-      const sources = (carousel) => carousel.locator('img').evaluateAll((imgs) => (imgs.length > 1 ? imgs.slice(1, -1) : imgs).map((img) => img.getAttribute('src')));
+      const sources = (carousel) => carousel.locator('img').evaluateAll((imgs) => (imgs.length > 1 ? imgs.slice(1, -1) : imgs).map((img) => {
+        const src = img.getAttribute('src');
+        return src?.startsWith('/_next/image?') ? new URL(src, location.origin).searchParams.get('url') : src;
+      }));
       const upload = async (input) => {
         await input.setInputFiles({ name: 'banner.png', mimeType: 'image/png', buffer: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jR1sAAAAASUVORK5CYII=', 'base64') });
         await tab('套用並上傳');
