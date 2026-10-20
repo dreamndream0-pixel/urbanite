@@ -1,12 +1,13 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { uiAlert } from '@/lib/ui-dialog';
 import { AUTO_COMPLETE_DAYS, resolveLoyalty, type LoyaltySettings } from '@/lib/loyalty-settings';
 import MembershipCardEditor from './MembershipCardEditor';
 import { membershipDesign } from '@/lib/membership-card';
 import { ChevronDown } from 'lucide-react';
 import styles from './LoyaltyManager.module.css';
+import { useMembershipFormScroll } from './useMembershipFormScroll';
 
 type Member = { user_id: string; name: string; email: string; phone: string; tier: string; tierKey: string; spend: number; balance: number; pending: number; orders: number };
 type Entry = { id: number; kind: string; amount: number; note: string; created_at: string };
@@ -132,6 +133,8 @@ function MemberDetail({ member, onClose, onChanged }: { member: Member; onClose:
 }
 
 function Settings() {
+  const form = useRef<HTMLDivElement>(null);
+  useMembershipFormScroll(form);
   const [s, setS] = useState<LoyaltySettings | null>(null);
   const [saved, setSaved] = useState('');
   const [busy, setBusy] = useState(false);
@@ -144,19 +147,22 @@ function Settings() {
   if (loadError) return <p role="alert" className={`${card} text-sm text-[#c0392b]`}>{loadError}</p>;
   if (!s) return <p className={`${card} text-sm text-[#8a7f72]`}>讀取中…</p>;
   const num = (v: string) => Number(v.replace(/[^\d.]/g, '')) || 0;
-  const setTier = (i: number, patch: Partial<LoyaltySettings['tiers'][number]>) => setS({ ...s, tiers: s.tiers.map((t, j) => (j === i ? { ...t, ...patch } : t)) });
+  const setTier = (key: string, patch: Partial<LoyaltySettings['tiers'][number]>) => setS((current) => current ? { ...current, tiers: current.tiers.map((t) => t.key === key ? { ...t, ...patch } : t) } : current);
   async function save() {
+    if (s!.tiers.some((tier) => !tier.name.trim())) return void uiAlert('請填寫每個會員等級的名稱');
+    if (!Number.isInteger(s!.keepMonths) || s!.keepMonths < 1 || s!.keepMonths > 36) return void uiAlert('累積消費週期請填寫 1 至 36 個月');
     setBusy(true); setSaved('');
     try {
       const r = await fetch('/api/admin/loyalty', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ settings: s }) });
       const d = await r.json();
       if (!r.ok) throw new Error(d.error ?? '儲存失敗');
       setS(resolveLoyalty(d.settings)); setSaved('已儲存');
+      window.dispatchEvent(new Event('loyalty-settings-updated'));
     } catch (e) { void uiAlert(e instanceof Error ? e.message : '儲存失敗'); }
     finally { setBusy(false); }
   }
   return (
-    <div className={`${styles.settings} space-y-4`}>
+    <div ref={form} className={`${styles.settings} space-y-4`}>
       <fieldset disabled={busy || imageBusy} className="min-w-0 space-y-4">
       <section className={card}>
         <label className="flex items-center justify-between gap-3">
@@ -170,11 +176,11 @@ function Settings() {
         <div className="mt-3 space-y-2">
           <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_4rem_1.5rem] gap-2 text-[11px] text-[#8a7f72]"><span>等級名稱</span><span>消費門檻</span><span>回饋 %</span><span /></div>
           {s.tiers.map((t, i) => (
-            <div key={t.key} className="space-y-2 border-b border-[#eee8df] pb-3">
+            <div key={t.key} data-membership-tier={t.key} className="space-y-2 border-b border-[#eee8df] pb-3">
               <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_4rem_1.5rem] items-center gap-2">
-              <input aria-label={`${t.name}等級名稱`} maxLength={20} value={t.name} onChange={(e) => setTier(i, { name: e.target.value })} className={input} />
-              <input aria-label={`${t.name}消費門檻`} value={i === 0 ? '0' : String(t.threshold)} disabled={i === 0} onChange={(e) => setTier(i, { threshold: num(e.target.value) })} inputMode="numeric" className={`${input} disabled:bg-[#f6f2ec]`} />
-              <input aria-label={`${t.name}回饋率`} value={String(t.rate)} onChange={(e) => setTier(i, { rate: num(e.target.value) })} inputMode="decimal" className={input} />
+              <input aria-label={`${t.name}等級名稱`} maxLength={20} value={t.name} onChange={(e) => setTier(t.key, { name: e.target.value })} className={input} />
+              <input aria-label={`${t.name}消費門檻`} value={i === 0 ? '0' : String(t.threshold)} disabled={i === 0} onChange={(e) => setTier(t.key, { threshold: num(e.target.value) })} inputMode="numeric" className={`${input} disabled:bg-[#f6f2ec]`} />
+              <input aria-label={`${t.name}回饋率`} value={String(t.rate)} onChange={(e) => setTier(t.key, { rate: num(e.target.value) })} inputMode="decimal" className={input} />
               {i > 0 ? <button type="button" onClick={() => setS({ ...s, tiers: s.tiers.filter((_, j) => j !== i) })} className="text-[#c0392b]" aria-label="刪除等級">×</button> : <span />}
               </div>
               <button type="button" className={styles.colorToggle} aria-label={`${t.name}卡片顏色`} aria-expanded={editingTier === t.key} aria-controls={`membership-editor-${t.key}`} onClick={() => setEditingTier((current) => current === t.key ? null : t.key)}>

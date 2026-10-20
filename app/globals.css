@@ -64,6 +64,12 @@ html[data-browser='ios-other'] body {
   scroll-padding-top: 80px;
 }
 
+/* Membership forms use one native document scroller for iOS keyboard focus. */
+html[data-document-form='membership'][data-browser='ios-chrome'],
+html[data-document-form='membership'][data-browser='ios-other'] { height: auto; overflow: visible; }
+html[data-document-form='membership'][data-browser='ios-chrome'] body,
+html[data-document-form='membership'][data-browser='ios-other'] body { height: auto; min-height: 100%; overflow: visible; -webkit-overflow-scrolling: auto; }
+
 /* 商品頁剩餘庫存數量:預設不顯示(網站外觀 → 商品頁剩餘庫存數量) */
 html:not([data-stock='show']) .product-stock-count { display: none; }
 

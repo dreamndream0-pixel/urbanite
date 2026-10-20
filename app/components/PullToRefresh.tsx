@@ -31,7 +31,7 @@ export default function PullToRefresh() {
     const set = (v: number) => { pullRef.current = v; setPull(v); };
 
     const onStart = (e: TouchEvent) => {
-      if (e.touches.length !== 1 || body.scrollTop > 0 || locked() || innerScrolled(e.target)) { startY = null; return; }
+      if (!bodyScrolls() || (e.target instanceof Element && e.target.closest('input,textarea,select,[contenteditable]')) || e.touches.length !== 1 || body.scrollTop > 0 || locked() || innerScrolled(e.target)) { startY = null; return; }
       startY = e.touches[0].clientY;
       pulling = false;
     };

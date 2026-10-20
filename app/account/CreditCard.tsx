@@ -29,7 +29,27 @@ export default function CreditCard() {
     setOpen((value) => !value);
   }
   useEffect(() => {
-    fetch('/api/me/credit', { cache: 'no-store' }).then((r) => (r.ok ? r.json() : null)).then(setData).catch(() => {});
+    let controller: AbortController | null = null;
+    const refresh = () => {
+      controller?.abort();
+      controller = new AbortController();
+      const signal = controller.signal;
+      fetch('/api/me/credit', { cache: 'no-store', signal }).then((r) => (r.ok ? r.json() : null))
+        .then((value) => { if (!signal.aborted) setData(value); }).catch(() => {});
+    };
+    const visible = () => { if (document.visibilityState === 'visible') refresh(); };
+    refresh();
+    window.addEventListener('focus', refresh);
+    window.addEventListener('pageshow', refresh);
+    window.addEventListener('loyalty-settings-updated', refresh);
+    document.addEventListener('visibilitychange', visible);
+    return () => {
+      controller?.abort();
+      window.removeEventListener('focus', refresh);
+      window.removeEventListener('pageshow', refresh);
+      window.removeEventListener('loyalty-settings-updated', refresh);
+      document.removeEventListener('visibilitychange', visible);
+    };
   }, []);
   const enabled = data?.enabled === true;
   const sub = !enabled ? '目前尚無回饋金。'
@@ -38,7 +58,7 @@ export default function CreditCard() {
     : data.balance > 0 ? '結帳時可折抵,1 元抵 NT$1。' : '訂單完成後依會員等級累積回饋金。';
   return (
     <div className="mt-7">
-      {enabled && data.card?.settings?.enabled ? <MembershipCard tier={data.tier} next={data.next} spend={data.spend} toNext={data.toNext} memberName={data.card.memberName} brandName={data.card.brandName} settings={data.card.settings} onAction={toggleDetails} expanded={open} detailsId={detailsId} animate revealKey={reveal} /> : null}
+      {enabled && data.card?.settings?.enabled ? <MembershipCard tier={data.tier} next={data.next} spend={data.spend} toNext={data.toNext} memberName={data.card.memberName} brandName={data.card.brandName} settings={data.card.settings} periodMonths={data.rules.keepMonths} onAction={toggleDetails} expanded={open} detailsId={detailsId} animate revealKey={reveal} /> : null}
       <div className="rounded-[22px] bg-[var(--c-surface)]/55 shadow-[0_8px_24px_rgba(64,52,43,0.06)] backdrop-blur-[2px]">
       <button type="button" onClick={toggleDetails} aria-expanded={open} aria-controls={enabled ? detailsId : undefined} className="flex w-full items-center gap-4 p-4 text-left sm:p-5">
         <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-[var(--c-surface)]/60 text-[var(--c-text2)]">

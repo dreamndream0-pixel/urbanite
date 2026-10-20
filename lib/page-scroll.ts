@@ -4,6 +4,7 @@
 // 讀寫捲動位置、監聽捲動請一律用這裡的函式,兩種模式都正確。
 export function bodyScrolls() {
   if (typeof document === 'undefined') return false;
+  if (document.documentElement.getAttribute('data-document-form') === 'membership') return false;
   const b = document.documentElement.getAttribute('data-browser');
   return b === 'ios-chrome' || b === 'ios-other';
 }

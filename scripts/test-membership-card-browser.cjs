@@ -12,7 +12,8 @@ const initial = () => ({ enabled: true, delayDays: 14, validDays: 180, maxRedeem
   for (const [engine, width] of [['chromium', 320], ['chromium', 390], ['webkit', 390], ['chromium', 768], ['chromium', 1440]]) {
     const browser = await playwright[engine].launch({ headless: true, ...(engine === 'chromium' ? { channel: 'chrome' } : {}) });
     try {
-      const page = await browser.newPage({ viewport: { width, height: 1000 }, deviceScaleFactor: 1 });
+      const page = await browser.newPage({ viewport: { width, height: 1000 }, deviceScaleFactor: 1,
+        ...(engine === 'webkit' ? { isMobile: true, hasTouch: true, userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/130.0.0.0 Mobile/15E148 Safari/604.1' } : {}) });
       const errors = []; page.on('pageerror', (error) => errors.push(error.message));
       let settings = initial(); let saves = 0; let failSettings = false;
       let spend = 1500;
@@ -42,23 +43,26 @@ const initial = () => ({ enabled: true, delayDays: 14, validDays: 180, maxRedeem
         const size = (el) => parseFloat(getComputedStyle(el).fontSize);
         const width = card.getBoundingClientRect().width;
         const paragraphs = art.querySelectorAll('p');
-        return { width, brand: size(art.querySelector('p')), tier: size(art.querySelector('h3')),
-          amount: size(art.querySelector('strong')), action: size(art.querySelector('button')),
+        return { width, brand: size(art.querySelector('p')), member: size(art.querySelector('h3')),
+          amount: size(art.querySelector('[data-card-amount]')), action: size(art.querySelector('button')),
           name: size(paragraphs[1]), upgrade: size(paragraphs[2]), subtitle: size(paragraphs[3]),
-          benefit: size(art.querySelector('span[aria-hidden="true"][title]')),
-          spendLabel: size(art.querySelector('strong').parentElement.querySelector('span')),
-          remaining: size(art.querySelector('small')),
+          benefit: size(art.querySelector('[data-card-benefit] strong')),
+          spendLabel: size(art.querySelector('[data-card-amount]').parentElement.parentElement.firstElementChild),
+          remaining: size(art.querySelector('[role="progressbar"]').parentElement.querySelector('small')),
           caption: size(card.lastElementChild.querySelector('p')),
           hitHeight: art.querySelector('button').getBoundingClientRect().height };
       });
       const desktop = typography.width >= 480, narrow = typography.width <= 310;
-      for (const [key, expected] of Object.entries({ brand: desktop ? 8.4 : 7, tier: desktop ? 28 : narrow ? 12.6 : 18.2,
+      for (const [key, expected] of Object.entries({ brand: desktop ? 8.4 : 7,
         amount: desktop ? 22.4 : narrow ? 9.8 : 14.7, action: desktop ? 10.5 : narrow ? 7 : 7.7,
         name: desktop ? 11.2 : 8.4, upgrade: desktop ? 9.1 : 7, subtitle: desktop ? 9.1 : 7,
         benefit: desktop ? 9.1 : 6.3, spendLabel: desktop ? 9.1 : 7, remaining: desktop ? 9.1 : 7, caption: 14 })) {
         assert.ok(Math.abs(typography[key] - expected) < .05, `${key} font must match the 70% card scale (outside caption unchanged)`);
       }
       assert.ok(typography.hitHeight >= 44, 'Smaller text must not shrink the touch target');
+      assert.ok(typography.member > typography.name * 1.5, 'Member name is the prominent heading');
+      assert.equal(await customerCard.locator('h3').innerText(), '王小美');
+      assert.equal(await customerCard.locator('[data-card-badge]').innerText(), 'CHAMPAGNE');
       const shine = customerCard.locator('[data-card-shine]');
       assert.equal(await shine.evaluate((el) => getComputedStyle(el).pointerEvents), 'none');
       assert.notEqual(await shine.evaluate((el) => getComputedStyle(el).animationName), 'none');
@@ -76,15 +80,33 @@ const initial = () => ({ enabled: true, delayDays: 14, validDays: 180, maxRedeem
       await customer.getByRole('button', { name: '查看權益', exact: true }).click();
       assert.equal(await customer.getByText('回饋金明細', { exact: true }).isVisible(), true);
       await page.getByRole('button', { name: '等級與回饋設定', exact: true }).click();
+      await page.getByRole('button', { name: '金卡會員卡片顏色', exact: true }).waitFor();
+      assert.equal(await page.locator('html').getAttribute('data-document-form'), 'membership');
+      if (engine === 'webkit') {
+        assert.equal(await page.locator('html').getAttribute('data-browser'), 'ios-chrome');
+        assert.equal(await page.locator('body').evaluate((el) => getComputedStyle(el).overflowY), 'visible', 'iPhone editor must not keep a nested body scroller');
+        await page.getByRole('button', { name: '會員列表', exact: true }).click();
+        assert.equal(await page.locator('html').getAttribute('data-document-form'), null, 'Restore scrolling when leaving the form');
+        assert.equal(await page.locator('html').evaluate((el) => getComputedStyle(el).overflowY), 'hidden');
+        await page.getByRole('button', { name: '等級與回饋設定', exact: true }).click();
+      }
       await page.getByRole('button', { name: '金卡會員卡片顏色', exact: true }).click();
       const admin = page.getByRole('region', { name: '會員卡樣式設定', exact: true });
       await admin.getByRole('button', { name: '選擇皇家藍卡面', exact: true }).click();
-      await page.getByRole('button', { name: '一般會員卡片顏色', exact: true }).click();
+      await page.locator('[data-membership-tier="normal"]').getByRole('button', { name: /卡片顏色/ }).click();
+      const tierName = page.locator('[data-membership-tier="normal"] input').first();
+      await tierName.fill('尊榮會員');
+      await tierName.pressSequentially(' VIP');
+      assert.equal(await tierName.inputValue(), '尊榮會員 VIP');
+      assert.equal(await tierName.evaluate((el) => document.activeElement === el), true);
+      assert.equal(await admin.locator('h3').innerText(), '尊榮會員 VIP', 'Tier edits update the default preview immediately without remounting its fields');
       assert.equal(await page.getByRole('button', { name: '金卡會員卡片顏色', exact: true }).getAttribute('aria-expanded'), 'false');
       assert.equal(await page.getByLabel('會員卡編輯等級', { exact: true }).count(), 0, 'Edit directly inside the tier, without a second tier selector');
       await admin.getByRole('button', { name: '選擇黑金卡面', exact: true }).waitFor();
       assert.equal(await admin.getByRole('group', { name: '選擇會員卡面' }).getByRole('button').count(), 10);
       await admin.getByRole('button', { name: '選擇翡翠綠卡面', exact: true }).click();
+      await admin.getByLabel('累積消費門檻週期(月)', { exact: true }).fill('6');
+      assert.equal(await admin.locator('[data-card-period]').innerText(), '/ 6個月');
       const heading = admin.getByLabel('權益區標題', { exact: true });
       await heading.fill(''); await heading.pressSequentially('VIP membership');
       assert.equal(await heading.inputValue(), 'VIP membership', 'English spaces must remain editable without resetting the caret');
@@ -93,6 +115,8 @@ const initial = () => ({ enabled: true, delayDays: 14, validDays: 180, maxRedeem
       await benefitLabel.fill(''); await benefitLabel.pressSequentially('VIP reward');
       assert.equal(await benefitLabel.inputValue(), 'VIP reward', 'Benefit drafts must retain spaces');
       await benefitLabel.fill('消費回饋 {rate}%');
+      await admin.getByLabel('權益 1 說明', { exact: true }).fill('消費享專屬回饋');
+      await admin.getByLabel('會員副標語', { exact: true }).fill('專屬會員・美好日常');
       await admin.getByLabel('卡片標語', { exact: true }).fill('為你珍藏的每一刻');
       const previewName = admin.getByLabel('預覽會員姓名', { exact: true });
       await previewName.fill('測試');
@@ -104,7 +128,11 @@ const initial = () => ({ enabled: true, delayDays: 14, validDays: 180, maxRedeem
         assert.ok(await previewName.evaluate((el) => parseFloat(getComputedStyle(el).fontSize) >= 16), 'No iPhone input auto-zoom');
         assert.equal(await page.locator('[data-membership-save]').evaluate((el) => getComputedStyle(el).position), 'static', 'Save button must not float over focused fields');
         await page.setViewportSize({ width, height: 500 });
-        await previewName.scrollIntoViewIfNeeded();
+        await page.waitForFunction(() => {
+          const box = document.querySelector('input[aria-label="預覽會員姓名"]').getBoundingClientRect();
+          const view = window.visualViewport;
+          return box.top >= (view?.offsetTop ?? 0) && box.bottom <= (view?.offsetTop ?? 0) + (view?.height ?? innerHeight);
+        });
         const visible = await previewName.boundingBox();
         assert.ok(visible.y >= 0 && visible.y + visible.height <= 500, 'Field stays reachable in a keyboard-sized viewport');
         if (width === 390) await page.screenshot({ path: path.join(os.tmpdir(), `urbanite-membership-keyboard-${engine}.png`) });
@@ -120,6 +148,12 @@ const initial = () => ({ enabled: true, delayDays: 14, validDays: 180, maxRedeem
       await page.getByRole('button', { name: '儲存設定', exact: true }).click();
       await page.getByText('已儲存', { exact: true }).waitFor();
       assert.equal(saves, 1); assert.equal(settings.tiers[0].cardDesign, 'emerald');
+      assert.equal(settings.tiers[0].name, '尊榮會員 VIP');
+      assert.equal(settings.keepMonths, 6);
+      await customer.locator('[data-membership-card="emerald"]').waitFor();
+      assert.equal(await customerCard.locator('h3').innerText(), '王小美', 'Tier rename must not replace the real member name');
+      assert.ok((await customer.innerText()).includes('尊榮會員 VIP'), 'Saved tier names update the visible member reward badge');
+      assert.equal(await customerCard.locator('[data-card-period]').innerText(), '/ 6個月', 'Mounted member view refreshes after saving');
       assert.equal(settings.tiers[0].benefits[0].icon, 'heart');
       assert.equal(settings.tiers[2].cardDesign, 'royal-blue');
       assert.equal(settings.tiers[1].threshold, 3000); assert.equal(settings.tiers[1].rate, 2);
@@ -134,7 +168,7 @@ const initial = () => ({ enabled: true, delayDays: 14, validDays: 180, maxRedeem
       spend = 1500;
       await page.reload(); await customerCard.waitFor();
       await page.getByRole('button', { name: '等級與回饋設定', exact: true }).click();
-      await page.getByRole('button', { name: '一般會員卡片顏色', exact: true }).click();
+      await page.locator('[data-membership-tier="normal"]').getByRole('button', { name: /卡片顏色/ }).click();
       await admin.getByLabel('上傳權益 1 圖示', { exact: true }).setInputFiles({ name: 'icon.png', mimeType: 'image/png', buffer: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/L9sAAAAASUVORK5CYII=', 'base64') });
       await admin.getByRole('button', { name: '移除權益 1 自訂圖示', exact: true }).waitFor();
       assert.ok(await admin.locator('img[src="https://assets.example/custom-icon.png"]').count() >= 1);
@@ -155,21 +189,31 @@ const initial = () => ({ enabled: true, delayDays: 14, validDays: 180, maxRedeem
       await customerCard.locator('img').first().evaluate((element) => element.decode());
       await page.evaluate(() => document.fonts.ready);
       const geometry = await page.locator('[data-membership-card]').evaluateAll((cards) => cards.map((card) => {
-        const art = card.firstElementChild, heading = card.querySelector('h3'), amount = card.querySelector('strong');
+        const art = card.firstElementChild, heading = card.querySelector('h3'), amount = card.querySelector('[data-card-amount]');
         const meter = card.querySelector('[role="progressbar"]');
         const panel = meter.parentElement.parentElement;
         const box = art.getBoundingClientRect(), cover = panel.getBoundingClientRect();
         const action = art.querySelector('button') || art.lastElementChild;
         const button = action.getBoundingClientRect();
+        const perks = [...art.querySelectorAll('[data-card-benefit]')].every((perk) => {
+          const [icon, copy] = [...perk.children].map((el) => el.getBoundingClientRect());
+          return Math.abs(icon.y + icon.height / 2 - copy.y - copy.height / 2) < 1;
+        });
+        const footer = art.querySelector('[data-card-footer]');
+        const [emblem, slogan] = [...footer.children].map((el) => el.getBoundingClientRect());
         return { titleFits: heading.scrollHeight <= heading.clientHeight + 1 && heading.scrollWidth <= heading.clientWidth + 1,
           serif: getComputedStyle(heading).fontFamily.includes('Noto Serif TC'),
           actionCentered: Math.abs((button.y + button.height / 2 - box.y) / box.height - .8) < .005,
           heading: art.querySelector('p').textContent,
+          perksAligned: perks, footerAligned: Math.abs(emblem.y + emblem.height / 2 - slogan.y - slogan.height / 2) < 1,
+          badge: art.querySelector('[data-card-badge]').textContent,
           amountFits: amount.scrollHeight <= amount.clientHeight + 1 && amount.scrollWidth <= amount.clientWidth + 1,
           originalMeterCovered: cover.top <= box.top + box.height * .63 && cover.bottom >= box.top + box.height * .66 && cover.left <= box.left + box.width * .49 && cover.right >= box.left + box.width * .9 };
       }));
       assert.ok(geometry.every((card) => card.titleFits), 'Long tier names must fit the artwork');
       assert.ok(geometry.every((card) => card.serif), 'Card typography uses the existing Chinese serif font');
+      assert.ok(geometry.every((card) => card.perksAligned && card.footerAligned), 'Perk and footer icon/copy must share horizontal centerlines');
+      assert.equal(new Set(geometry.map((card) => card.badge)).size, 10, 'All ten artwork badge names are preserved');
       assert.ok(geometry.every((card) => card.actionCentered), 'Action stays centered on the artwork button at every width');
       assert.ok(geometry.every((card) => card.heading === 'VIP membership'), 'Legacy headings migrate to VIP membership');
       assert.ok(geometry.every((card) => card.amountFits), 'Large spending amounts must fit without wrapping');

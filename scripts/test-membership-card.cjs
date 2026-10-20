@@ -43,6 +43,19 @@ assert.equal(card.resolveMembershipCard({ actionLabel: '' }).actionLabel, '查�
 assert.equal(card.resolveMembershipCard({}).title, 'VIP membership');
 assert.equal(card.resolveMembershipCard({ title: '會員專屬禮遇' }).title, 'VIP membership');
 assert.equal(card.resolveMembershipCard({ title: '品牌 VIP' }).title, '品牌 VIP', 'Preserve custom headings');
+assert.equal(card.resolveMembershipCard({ intro: '可編輯副標語' }).intro, '可編輯副標語');
+assert.equal(card.resolveMembershipBenefits([{ description: '專屬回饋' }])[0].description, '專屬回饋');
+for (const [months, label] of [[12, '年'], [6, '6個月'], [24, '2年'], [1, '1個月'], [NaN, '年']]) assert.equal(card.membershipPeriod(months), label);
+assert.equal(new Set(Object.values(card.MEMBERSHIP_BADGES)).size, 10);
+const scroll = load('lib/page-scroll.ts');
+const originalDocument = global.document;
+try {
+  let form = false;
+  global.document = { documentElement: { getAttribute: (key) => key === 'data-document-form' ? form ? 'membership' : null : 'ios-chrome' } };
+  assert.equal(scroll.bodyScrolls(), true);
+  form = true; assert.equal(scroll.bodyScrolls(), false, 'Native form mode disables nested body scrolling');
+  form = false; assert.equal(scroll.bodyScrolls(), true, 'Leaving the form restores the existing iPhone scrolling mode');
+} finally { if (originalDocument === undefined) delete global.document; else global.document = originalDocument; }
 
 (async () => {
   for (const design of card.MEMBERSHIP_DESIGNS) {

@@ -18,11 +18,15 @@ export const MEMBERSHIP_ICONS = [
 ] as const;
 export type MembershipDesignId = typeof MEMBERSHIP_DESIGNS[number]['id'];
 export type MembershipIconId = typeof MEMBERSHIP_ICONS[number]['id'];
-export type MembershipBenefit = { label: string; icon: MembershipIconId; image: string };
-export type MembershipCardSettings = { enabled: boolean; title: string; subtitle: string; actionLabel: string };
+export type MembershipBenefit = { label: string; description?: string; icon: MembershipIconId; image: string };
+export type MembershipCardSettings = { enabled: boolean; title: string; intro?: string; subtitle: string; actionLabel: string };
+export const MEMBERSHIP_BADGES: Record<MembershipDesignId, string> = {
+  'black-gold': 'BLACK', silver: 'SILVER', gold: 'GOLD', platinum: 'PLATINUM', diamond: 'DIAMOND',
+  'royal-blue': 'ROYAL BLUE', emerald: 'EMERALD', 'rose-gold': 'ROSE GOLD', amethyst: 'AMETHYST', champagne: 'CHAMPAGNE',
+};
 
 export const DEFAULT_MEMBERSHIP_CARD: MembershipCardSettings = {
-  enabled: true, title: 'VIP membership', subtitle: '每一次相遇，都值得珍藏', actionLabel: '查看權益',
+  enabled: true, title: 'VIP membership', intro: '專屬禮遇・美好日常', subtitle: '每一次相遇，都值得珍藏', actionLabel: '查看權益',
 };
 export const defaultMembershipBenefits = (): MembershipBenefit[] => [
   { label: '消費回饋 {rate}%', icon: 'coins', image: '' },
@@ -47,6 +51,7 @@ export function resolveMembershipCard(value: unknown): MembershipCardSettings {
   return {
     enabled: v.enabled !== false,
     title: v.title === '會員專屬禮遇' ? DEFAULT_MEMBERSHIP_CARD.title : text(v.title, DEFAULT_MEMBERSHIP_CARD.title, 24),
+    intro: text(v.intro, DEFAULT_MEMBERSHIP_CARD.intro ?? '', 40),
     subtitle: text(v.subtitle, DEFAULT_MEMBERSHIP_CARD.subtitle, 40),
     actionLabel: text(v.actionLabel, DEFAULT_MEMBERSHIP_CARD.actionLabel, 12) || DEFAULT_MEMBERSHIP_CARD.actionLabel,
   };
@@ -57,6 +62,7 @@ export function resolveMembershipBenefits(value: unknown): MembershipBenefit[] {
     const v = record(Array.isArray(value) ? value[index] : null);
     return {
       label: text(v.label, fallback.label, 60),
+      description: text(v.description, '', 60),
       icon: MEMBERSHIP_ICONS.some((icon) => icon.id === v.icon) ? v.icon as MembershipIconId : fallback.icon,
       image: membershipImage(v.image),
     };
@@ -69,4 +75,9 @@ export function membershipProgress(spend: number, nextThreshold: number | null) 
   if (nextThreshold === null) return 100;
   if (!Number.isFinite(spend) || !Number.isFinite(nextThreshold) || nextThreshold <= 0) return 0;
   return Math.min(100, Math.max(0, Math.round(spend / nextThreshold * 100)));
+}
+
+export function membershipPeriod(months: number) {
+  const value = Number.isFinite(months) ? Math.max(1, Math.min(36, Math.floor(months))) : 12;
+  return value % 12 === 0 ? value === 12 ? '年' : `${value / 12}年` : `${value}個月`;
 }
