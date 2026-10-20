@@ -37,6 +37,28 @@ const initial = () => ({ enabled: true, delayDays: 14, validDays: 180, maxRedeem
       const customer = page.getByRole('region', { name: '會員中心', exact: true });
       const customerCard = customer.locator('[data-membership-card]');
       await customerCard.waitFor();
+      const typography = await customerCard.evaluate((card) => {
+        const art = card.firstElementChild;
+        const size = (el) => parseFloat(getComputedStyle(el).fontSize);
+        const width = card.getBoundingClientRect().width;
+        const paragraphs = art.querySelectorAll('p');
+        return { width, brand: size(art.querySelector('p')), tier: size(art.querySelector('h3')),
+          amount: size(art.querySelector('strong')), action: size(art.querySelector('button')),
+          name: size(paragraphs[1]), upgrade: size(paragraphs[2]), subtitle: size(paragraphs[3]),
+          benefit: size(art.querySelector('span[aria-hidden="true"][title]')),
+          spendLabel: size(art.querySelector('strong').parentElement.querySelector('span')),
+          remaining: size(art.querySelector('small')),
+          caption: size(card.lastElementChild.querySelector('p')),
+          hitHeight: art.querySelector('button').getBoundingClientRect().height };
+      });
+      const desktop = typography.width >= 480, narrow = typography.width <= 310;
+      for (const [key, expected] of Object.entries({ brand: desktop ? 8.4 : 7, tier: desktop ? 28 : narrow ? 12.6 : 18.2,
+        amount: desktop ? 22.4 : narrow ? 9.8 : 14.7, action: desktop ? 10.5 : narrow ? 7 : 7.7,
+        name: desktop ? 11.2 : 8.4, upgrade: desktop ? 9.1 : 7, subtitle: desktop ? 9.1 : 7,
+        benefit: desktop ? 9.1 : 6.3, spendLabel: desktop ? 9.1 : 7, remaining: desktop ? 9.1 : 7, caption: 14 })) {
+        assert.ok(Math.abs(typography[key] - expected) < .05, `${key} font must match the 70% card scale (outside caption unchanged)`);
+      }
+      assert.ok(typography.hitHeight >= 44, 'Smaller text must not shrink the touch target');
       const shine = customerCard.locator('[data-card-shine]');
       assert.equal(await shine.evaluate((el) => getComputedStyle(el).pointerEvents), 'none');
       assert.notEqual(await shine.evaluate((el) => getComputedStyle(el).animationName), 'none');

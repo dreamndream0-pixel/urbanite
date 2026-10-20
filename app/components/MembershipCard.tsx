@@ -30,7 +30,10 @@ export default function MembershipCard({ tier, next, spend, toNext, memberName, 
       for (const node of nodes) {
         node.style.fontSize = '';
         let size = parseFloat(getComputedStyle(node).fontSize);
-        while ((node.scrollHeight > node.clientHeight + 1 || node.scrollWidth > node.clientWidth + 1) && size > 9) node.style.fontSize = `${--size}px`;
+        while ((node.scrollHeight > node.clientHeight + 1 || node.scrollWidth > node.clientWidth + 1) && size > 6.3) {
+          size = Math.max(6.3, size - 0.7);
+          node.style.fontSize = `${size}px`;
+        }
       }
     };
     const observer = new ResizeObserver(fit); nodes.forEach((node) => observer.observe(node));

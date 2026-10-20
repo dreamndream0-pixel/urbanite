@@ -42,6 +42,9 @@ The zero-progress and highest-tier cases do not show the decorative static fill.
 Backgrounds have stable 4:3 geometry and use Next Image responsive delivery.
 Small icon images are standalone SVG/raster files, not copied into the artwork.
 Card copy uses the site's existing Noto Serif TC with Chinese serif fallbacks.
+All text inside the artwork is scaled to 70% of its original font sizes at every
+breakpoint. Card geometry, icons, external benefit copy and admin fields are not
+scaled; long-name/amount fitting uses the same proportionally reduced minimum.
 The action's touch target remains centered on the original pill even when its
 44px hit area is taller than the artwork button. Thin presentation overlays reuse
 adjacent clean texture from the same loaded image to hide the empty title/slogan
