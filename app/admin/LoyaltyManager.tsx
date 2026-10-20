@@ -2,7 +2,9 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { uiAlert } from '@/lib/ui-dialog';
-import { AUTO_COMPLETE_DAYS, DEFAULT_LOYALTY, resolveLoyalty, type LoyaltySettings } from '@/lib/loyalty-settings';
+import { AUTO_COMPLETE_DAYS, resolveLoyalty, type LoyaltySettings } from '@/lib/loyalty-settings';
+import MembershipCardEditor from './MembershipCardEditor';
+import { MEMBERSHIP_DESIGNS, membershipDesign } from '@/lib/membership-card';
 
 type Member = { user_id: string; name: string; email: string; phone: string; tier: string; tierKey: string; spend: number; balance: number; pending: number; orders: number };
 type Entry = { id: number; kind: string; amount: number; note: string; created_at: string };
@@ -131,9 +133,12 @@ function Settings() {
   const [s, setS] = useState<LoyaltySettings | null>(null);
   const [saved, setSaved] = useState('');
   const [busy, setBusy] = useState(false);
+  const [imageBusy, setImageBusy] = useState(false);
+  const [loadError, setLoadError] = useState('');
   useEffect(() => {
-    fetch('/api/admin/loyalty', { cache: 'no-store' }).then((r) => r.json()).then((d) => setS(resolveLoyalty(d.settings))).catch(() => setS(DEFAULT_LOYALTY));
+    fetch('/api/admin/loyalty', { cache: 'no-store' }).then(async (r) => { const data = await r.json(); if (!r.ok) throw new Error(data.error || '讀取設定失敗'); return data; }).then((d) => setS(resolveLoyalty(d.settings))).catch((e) => setLoadError(e instanceof Error ? e.message : '讀取設定失敗'));
   }, []);
+  if (loadError) return <p role="alert" className={`${card} text-sm text-[#c0392b]`}>{loadError}</p>;
   if (!s) return <p className={`${card} text-sm text-[#8a7f72]`}>讀取中…</p>;
   const num = (v: string) => Number(v.replace(/[^\d.]/g, '')) || 0;
   const setTier = (i: number, patch: Partial<LoyaltySettings['tiers'][number]>) => setS({ ...s, tiers: s.tiers.map((t, j) => (j === i ? { ...t, ...patch } : t)) });
@@ -149,6 +154,7 @@ function Settings() {
   }
   return (
     <div className="space-y-4">
+      <fieldset disabled={busy || imageBusy} className="min-w-0 space-y-4">
       <section className={card}>
         <label className="flex items-center justify-between gap-3">
           <div><p className="font-semibold">開啟會員回饋金</p><p className="text-xs text-[#8a7f72]">開啟後,已完成的訂單依會員等級累積回饋金,結帳時可折抵(等同現金,可和優惠券併用)。</p></div>
@@ -159,18 +165,22 @@ function Settings() {
         <p className="font-semibold">消費等級</p>
         <p className="mt-1 text-xs text-[#8a7f72]">依近 {s.keepMonths} 個月有效消費(已完成訂單的商品實付金額,扣除運費、回饋金折抵與退款)自動升級;升級後保級 {s.keepMonths} 個月。</p>
         <div className="mt-3 space-y-2">
-          <div className="grid grid-cols-[minmax(0,1fr)_7rem_5rem_2rem] gap-2 text-[11px] text-[#8a7f72]"><span>等級名稱</span><span>消費門檻</span><span>回饋 %</span><span /></div>
+          <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_4rem_1.5rem] gap-2 text-[11px] text-[#8a7f72]"><span>等級名稱</span><span>消費門檻</span><span>回饋 %</span><span /></div>
           {s.tiers.map((t, i) => (
-            <div key={i} className="grid grid-cols-[minmax(0,1fr)_7rem_5rem_2rem] items-center gap-2">
-              <input value={t.name} onChange={(e) => setTier(i, { name: e.target.value })} className={input} />
-              <input value={i === 0 ? '0' : String(t.threshold)} disabled={i === 0} onChange={(e) => setTier(i, { threshold: num(e.target.value) })} inputMode="numeric" className={`${input} disabled:bg-[#f6f2ec]`} />
-              <input value={String(t.rate)} onChange={(e) => setTier(i, { rate: num(e.target.value) })} inputMode="decimal" className={input} />
+            <div key={t.key} className="space-y-2 border-b border-[#eee8df] pb-3">
+              <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_4rem_1.5rem] items-center gap-2">
+              <input aria-label={`${t.name}等級名稱`} maxLength={20} value={t.name} onChange={(e) => setTier(i, { name: e.target.value })} className={input} />
+              <input aria-label={`${t.name}消費門檻`} value={i === 0 ? '0' : String(t.threshold)} disabled={i === 0} onChange={(e) => setTier(i, { threshold: num(e.target.value) })} inputMode="numeric" className={`${input} disabled:bg-[#f6f2ec]`} />
+              <input aria-label={`${t.name}回饋率`} value={String(t.rate)} onChange={(e) => setTier(i, { rate: num(e.target.value) })} inputMode="decimal" className={input} />
               {i > 0 ? <button type="button" onClick={() => setS({ ...s, tiers: s.tiers.filter((_, j) => j !== i) })} className="text-[#c0392b]" aria-label="刪除等級">×</button> : <span />}
+              </div>
+              <label className="flex min-w-0 items-center gap-3 text-xs text-[#6b6156]"><span className="shrink-0">卡片顏色</span><select aria-label={`${t.name}卡片顏色`} value={membershipDesign(t.cardDesign).id} onChange={(e) => setTier(i, { cardDesign: membershipDesign(e.target.value).id })} className={`${input} max-w-xs`}>{MEMBERSHIP_DESIGNS.map((design) => <option key={design.id} value={design.id}>{design.name}</option>)}</select></label>
             </div>
           ))}
           {s.tiers.length < 6 ? <button type="button" onClick={() => setS({ ...s, tiers: [...s.tiers, { key: `t${Date.now().toString(36)}`, name: '新等級', threshold: (s.tiers.at(-1)?.threshold ?? 0) + 10000, rate: (s.tiers.at(-1)?.rate ?? 1) + 1 }] })} className="rounded-full border border-[#d7c9bd] px-3 py-1 text-xs">＋ 新增等級</button> : null}
         </div>
       </section>
+      <MembershipCardEditor settings={s} onChange={(update) => setS((current) => current ? update(current) : current)} onBusyChange={setImageBusy} />
       <section className={card}>
         <p className="font-semibold">回饋金規則</p>
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
@@ -187,8 +197,9 @@ function Settings() {
           <li>取消或退款:依比例退回用掉的回饋金,並追回該筆訂單的回饋;已用掉的列為待扣回,由之後的回饋抵扣。</li>
         </ul>
       </section>
+      </fieldset>
       <div className="sticky bottom-3 flex items-center justify-center gap-3">
-        <button type="button" disabled={busy} onClick={() => void save()} className="w-full max-w-xs rounded-full bg-[#1f1b19] py-3 text-sm font-semibold text-white shadow-lg disabled:opacity-50">{busy ? '儲存中…' : '儲存設定'}</button>
+        <button type="button" disabled={busy || imageBusy} onClick={() => void save()} className="w-full max-w-xs rounded-full bg-[#1f1b19] py-3 text-sm font-semibold text-white shadow-lg disabled:opacity-50">{busy ? '儲存中…' : imageBusy ? '圖片上傳中…' : '儲存設定'}</button>
         {saved ? <span className="text-sm text-[#1f7a44]">{saved}</span> : null}
       </div>
     </div>

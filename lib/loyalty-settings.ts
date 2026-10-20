@@ -1,5 +1,7 @@
 // 會員回饋金與消費等級的設定(前後台共用,純函式)。
-export type LoyaltyTier = { key: string; name: string; threshold: number; rate: number };
+import { membershipDesign, resolveMembershipBenefits, resolveMembershipCard, type MembershipBenefit, type MembershipCardSettings, type MembershipDesignId } from './membership-card';
+
+export type LoyaltyTier = { key: string; name: string; threshold: number; rate: number; cardDesign?: MembershipDesignId; benefits?: MembershipBenefit[] };
 export type LoyaltySettings = {
   enabled: boolean;
   tiers: LoyaltyTier[]; // 依門檻由低到高
@@ -7,6 +9,7 @@ export type LoyaltySettings = {
   validDays: number; // 入帳後可用天數
   maxRedeemPct: number; // 每筆最多折抵商品金額的百分比
   keepMonths: number; // 等級計算區間與保級月數
+  card?: MembershipCardSettings;
 };
 
 export const DEFAULT_TIERS: LoyaltyTier[] = [
@@ -31,8 +34,10 @@ export function resolveLoyalty(raw: unknown): LoyaltySettings {
         name: String(t?.name || `等級 ${i + 1}`).slice(0, 20),
         threshold: i === 0 ? 0 : int(t?.threshold, 0, 100_000_000, 0),
         rate: Math.min(100, Math.max(0, Math.round(Number(t?.rate) * 10) / 10 || 0)),
+        cardDesign: membershipDesign(t?.cardDesign || (i === 0 ? 'champagne' : i === 1 ? 'silver' : i === 2 ? 'gold' : 'black-gold')).id,
+        benefits: resolveMembershipBenefits(t?.benefits),
       })).sort((a, b) => a.threshold - b.threshold)
-    : DEFAULT_TIERS;
+    : DEFAULT_TIERS.map((tier, i) => ({ ...tier, cardDesign: membershipDesign(i === 0 ? 'champagne' : i === 1 ? 'silver' : 'gold').id, benefits: resolveMembershipBenefits(null) }));
   tiers[0] = { ...tiers[0], threshold: 0 };
   return {
     enabled: d.enabled === true,
@@ -41,6 +46,7 @@ export function resolveLoyalty(raw: unknown): LoyaltySettings {
     validDays: int(d.validDays, 7, 3650, DEFAULT_LOYALTY.validDays),
     maxRedeemPct: int(d.maxRedeemPct, 1, 100, DEFAULT_LOYALTY.maxRedeemPct),
     keepMonths: int(d.keepMonths, 1, 36, DEFAULT_LOYALTY.keepMonths),
+    card: resolveMembershipCard(d.card),
   };
 }
 

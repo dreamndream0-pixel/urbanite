@@ -1,0 +1,52 @@
+.root { container-type: inline-size; width: 100%; max-width: 760px; margin-inline: auto; color: var(--mc-ink); }
+.art { position: relative; width: 100%; aspect-ratio: 4 / 3; isolation: isolate; overflow: hidden; border-radius: 8px; background: var(--mc-surface); }
+.background { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; z-index: -1; }
+.shine { position: absolute; left: 4%; right: 4%; top: 13%; bottom: 13%; z-index: 2; overflow: hidden; border-radius: 8px; pointer-events: none; animation: membershipEdge 2s ease-out both; }
+.shine::after { content: ''; position: absolute; inset: 0; background: linear-gradient(110deg, transparent 34%, rgb(255 224 150 / .08) 42%, rgb(255 241 195 / .45) 48%, rgb(255 216 125 / .2) 52%, transparent 62%); background-size: 250% 100%; mix-blend-mode: screen; animation: membershipShine 2s ease-in-out both; }
+@keyframes membershipShine { 0% { background-position: 150% 0; opacity: 0; } 20% { opacity: .8; } 75% { opacity: .65; } 100% { background-position: -60% 0; opacity: 0; } }
+@keyframes membershipEdge { 0%, 100% { box-shadow: none; } 35% { box-shadow: inset 0 0 10px rgb(255 220 145 / .5), 0 0 12px rgb(255 220 145 / .25); } }
+@media (prefers-reduced-motion: reduce) { .shine { display: none; animation: none; } .shine::after { animation: none; } }
+.brand, .name, .tier, .subtitle { position: absolute; margin: 0; overflow: hidden; overflow-wrap: anywhere; }
+.brand { left: 33.8%; top: 19.7%; width: 46%; font-size: 10px; line-height: 1.2; white-space: nowrap; text-overflow: ellipsis; }
+.tier { left: 33.8%; top: 23%; width: 48%; height: 9.4%; font-size: 22px; font-weight: 650; line-height: 1.1; }
+.name { left: 33.8%; top: 34%; width: 50%; height: 5.4%; font-size: 12px; line-height: 1.35; white-space: nowrap; text-overflow: ellipsis; }
+.iconMask { position: absolute; top: 45.6%; width: 4.9%; aspect-ratio: 1; transform: translate(-50%, -50%); display: grid; place-items: center; border-radius: 50%; background: var(--mc-surface); }
+.iconMask img { width: 76%; height: 76%; object-fit: contain; }
+.lightIcon .svgIcon { filter: brightness(.38); }
+.benefitLabel { position: absolute; top: 42.8%; width: 10.4%; height: 8%; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; overflow-wrap: anywhere; font-size: 9px; line-height: 1.15; font-weight: 550; }
+/* Cover the entire baked-in meter so 0%, partial and top-tier states are truthful. */
+.finances { position: absolute; left: 7.4%; top: 54.5%; width: 85.5%; height: 19.5%; display: grid; grid-template-columns: 42% minmax(0, 1fr); gap: 4%; align-items: center; padding: 2.3% 3%; border: 1px solid var(--mc-accent); border-radius: 8px; background: var(--mc-surface); }
+.spend { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.spend > span { font-size: 10px; line-height: 1.2; }
+.spend strong { display: block; height: 22px; font-size: 17px; line-height: 1.15; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.upgrade { min-width: 0; }
+.upgrade p { margin: 0 0 5px; white-space: nowrap; text-overflow: ellipsis; overflow: hidden; font-size: 10px; line-height: 1.2; }
+.track { width: 100%; height: 6px; overflow: hidden; border: 1px solid var(--mc-accent); border-radius: 4px; background: color-mix(in srgb, var(--mc-ink) 15%, var(--mc-surface)); }
+.track > span { display: block; height: 100%; background: var(--mc-accent); }
+.upgrade small { display: block; margin-top: 4px; font-size: 10px; line-height: 1.2; overflow-wrap: anywhere; }
+.subtitle { left: 14%; top: 77.5%; width: 54%; height: 6.2%; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; font-size: 10px; line-height: 1.4; }
+.action { position: absolute; left: 72.9%; top: 75%; width: 19.5%; height: 9.7%; min-height: 44px; display: flex; align-items: center; justify-content: center; padding: 4px; border: 0; background: transparent; color: #342515; font-size: 11px; font-weight: 650; line-height: 1.15; text-align: center; overflow-wrap: anywhere; cursor: pointer; }
+.action:focus-visible { outline: 2px solid var(--mc-ink); outline-offset: -2px; border-radius: 8px; }
+.details { padding: 16px 0; color: var(--c-text, #242424); }
+.caption { margin: 0 0 10px; font-size: 14px; font-weight: 600; overflow-wrap: anywhere; }
+.details ul { list-style: none; display: flex; flex-wrap: wrap; gap: 10px 20px; margin: 0; padding: 0; }
+.details li { display: flex; align-items: flex-start; gap: 7px; min-width: 0; max-width: 100%; font-size: 13px; line-height: 1.5; overflow-wrap: anywhere; }
+.details li img { flex-shrink: 0; margin-top: 1px; object-fit: contain; }
+.details li .svgIcon { filter: brightness(.4); }
+@container (min-width: 480px) {
+  .brand { font-size: 12px; }
+  .tier { font-size: 32px; }
+  .name { font-size: 16px; }
+  .benefitLabel { font-size: 13px; }
+  .spend > span, .upgrade p, .upgrade small { font-size: 13px; }
+  .spend strong { height: 32px; font-size: 26px; }
+  .track { height: 9px; }
+  .subtitle { font-size: 13px; }
+  .action { font-size: 15px; }
+}
+@container (max-width: 310px) {
+  .tier { font-size: 18px; }
+  .spend strong { font-size: 14px; }
+  .benefitLabel { font-size: 9px; }
+  .action { font-size: 10px; }
+}

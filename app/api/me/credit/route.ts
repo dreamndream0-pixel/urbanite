@@ -12,7 +12,11 @@ export async function GET() {
   if (!shop) return NextResponse.json({ enabled: false });
   const settings = await getLoyalty(shop.id);
   if (!settings.enabled) return NextResponse.json({ enabled: false });
-  const [summary, member] = await Promise.all([creditSummary(shop.id, user.id), memberTier(scopedClient(shop.id), user.id, settings)]);
+  const db = scopedClient(shop.id);
+  const [summary, member, { data: customer }] = await Promise.all([
+    creditSummary(shop.id, user.id), memberTier(db, user.id, settings),
+    db.from('customers').select('name').eq('user_id', user.id).maybeSingle(),
+  ]);
   return NextResponse.json({
     enabled: true,
     ...summary,
@@ -21,6 +25,7 @@ export async function GET() {
     spend: member.spend,
     toNext: member.toNext,
     keptUntil: member.keptUntil,
+    card: { settings: settings.card, brandName: shop.name, memberName: [customer?.name, user.user_metadata?.name, user.user_metadata?.full_name].find((name) => typeof name === 'string' && name.trim()) || '會員' },
     rules: { tiers: settings.tiers, delayDays: settings.delayDays, validDays: settings.validDays, maxRedeemPct: settings.maxRedeemPct, keepMonths: settings.keepMonths },
   }, { headers: { 'Cache-Control': 'private, no-store' } });
 }

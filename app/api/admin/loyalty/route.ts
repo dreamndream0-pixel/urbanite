@@ -14,7 +14,7 @@ async function context() {
 export async function GET() {
   const ctx = await context();
   if (!ctx) return NextResponse.json({ error: '未授權' }, { status: 401 });
-  return NextResponse.json({ settings: await getLoyalty(ctx.shop.id) });
+  return NextResponse.json({ settings: await getLoyalty(ctx.shop.id) }, { headers: { 'Cache-Control': 'private, no-store' } });
 }
 
 // PUT /api/admin/loyalty { settings }
