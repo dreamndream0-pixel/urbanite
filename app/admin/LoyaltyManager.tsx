@@ -4,7 +4,9 @@ import { useEffect, useMemo, useState } from 'react';
 import { uiAlert } from '@/lib/ui-dialog';
 import { AUTO_COMPLETE_DAYS, resolveLoyalty, type LoyaltySettings } from '@/lib/loyalty-settings';
 import MembershipCardEditor from './MembershipCardEditor';
-import { MEMBERSHIP_DESIGNS, membershipDesign } from '@/lib/membership-card';
+import { membershipDesign } from '@/lib/membership-card';
+import { ChevronDown } from 'lucide-react';
+import styles from './LoyaltyManager.module.css';
 
 type Member = { user_id: string; name: string; email: string; phone: string; tier: string; tierKey: string; spend: number; balance: number; pending: number; orders: number };
 type Entry = { id: number; kind: string; amount: number; note: string; created_at: string };
@@ -13,7 +15,7 @@ type Summary = { balance: number; pending: number; expiringSoon: number; entries
 const money = (n: number) => `NT$${Math.round(n).toLocaleString('en-US')}`;
 const KIND_LABEL: Record<string, string> = { earn: '回饋入帳', redeem: '結帳折抵', return: '退回', expire: '到期', clawback: '退款追回', adjust: '人工調整' };
 const card = 'rounded-xl border border-[#e5ded4] bg-white p-5';
-const input = 'w-full rounded-lg border border-[#e5ded4] bg-white px-3 py-2 text-sm outline-none focus:border-[#1f1b19]/40';
+const input = 'w-full min-w-0 rounded-lg border border-[#e5ded4] bg-white px-3 py-2 text-base sm:text-sm outline-none focus:border-[#1f1b19]/40';
 
 // 後台「會員回饋」:會員列表(等級、消費、回饋金)與回饋/等級設定
 export default function LoyaltyManager() {
@@ -135,6 +137,7 @@ function Settings() {
   const [busy, setBusy] = useState(false);
   const [imageBusy, setImageBusy] = useState(false);
   const [loadError, setLoadError] = useState('');
+  const [editingTier, setEditingTier] = useState<string | null>(null);
   useEffect(() => {
     fetch('/api/admin/loyalty', { cache: 'no-store' }).then(async (r) => { const data = await r.json(); if (!r.ok) throw new Error(data.error || '讀取設定失敗'); return data; }).then((d) => setS(resolveLoyalty(d.settings))).catch((e) => setLoadError(e instanceof Error ? e.message : '讀取設定失敗'));
   }, []);
@@ -153,7 +156,7 @@ function Settings() {
     finally { setBusy(false); }
   }
   return (
-    <div className="space-y-4">
+    <div className={`${styles.settings} space-y-4`}>
       <fieldset disabled={busy || imageBusy} className="min-w-0 space-y-4">
       <section className={card}>
         <label className="flex items-center justify-between gap-3">
@@ -174,13 +177,18 @@ function Settings() {
               <input aria-label={`${t.name}回饋率`} value={String(t.rate)} onChange={(e) => setTier(i, { rate: num(e.target.value) })} inputMode="decimal" className={input} />
               {i > 0 ? <button type="button" onClick={() => setS({ ...s, tiers: s.tiers.filter((_, j) => j !== i) })} className="text-[#c0392b]" aria-label="刪除等級">×</button> : <span />}
               </div>
-              <label className="flex min-w-0 items-center gap-3 text-xs text-[#6b6156]"><span className="shrink-0">卡片顏色</span><select aria-label={`${t.name}卡片顏色`} value={membershipDesign(t.cardDesign).id} onChange={(e) => setTier(i, { cardDesign: membershipDesign(e.target.value).id })} className={`${input} max-w-xs`}>{MEMBERSHIP_DESIGNS.map((design) => <option key={design.id} value={design.id}>{design.name}</option>)}</select></label>
+              <button type="button" className={styles.colorToggle} aria-label={`${t.name}卡片顏色`} aria-expanded={editingTier === t.key} aria-controls={`membership-editor-${t.key}`} onClick={() => setEditingTier((current) => current === t.key ? null : t.key)}>
+                <span>卡片顏色 <span className="ml-2 text-[#6b6156]">{membershipDesign(t.cardDesign).name}</span></span>
+                <ChevronDown size={18} className={editingTier === t.key ? 'rotate-180' : ''} />
+              </button>
+              <div id={`membership-editor-${t.key}`} className={styles.editor} hidden={editingTier !== t.key}>
+                {editingTier === t.key ? <MembershipCardEditor tierKey={t.key} settings={s} onChange={(update) => setS((current) => current ? update(current) : current)} onBusyChange={setImageBusy} /> : null}
+              </div>
             </div>
           ))}
           {s.tiers.length < 6 ? <button type="button" onClick={() => setS({ ...s, tiers: [...s.tiers, { key: `t${Date.now().toString(36)}`, name: '新等級', threshold: (s.tiers.at(-1)?.threshold ?? 0) + 10000, rate: (s.tiers.at(-1)?.rate ?? 1) + 1 }] })} className="rounded-full border border-[#d7c9bd] px-3 py-1 text-xs">＋ 新增等級</button> : null}
         </div>
       </section>
-      <MembershipCardEditor settings={s} onChange={(update) => setS((current) => current ? update(current) : current)} onBusyChange={setImageBusy} />
       <section className={card}>
         <p className="font-semibold">回饋金規則</p>
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
@@ -198,7 +206,7 @@ function Settings() {
         </ul>
       </section>
       </fieldset>
-      <div className="sticky bottom-3 flex items-center justify-center gap-3">
+      <div className={styles.saveBar} data-membership-save>
         <button type="button" disabled={busy || imageBusy} onClick={() => void save()} className="w-full max-w-xs rounded-full bg-[#1f1b19] py-3 text-sm font-semibold text-white shadow-lg disabled:opacity-50">{busy ? '儲存中…' : imageBusy ? '圖片上傳中…' : '儲存設定'}</button>
         {saved ? <span className="text-sm text-[#1f7a44]">{saved}</span> : null}
       </div>

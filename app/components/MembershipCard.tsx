@@ -22,6 +22,7 @@ export default function MembershipCard({ tier, next, spend, toNext, memberName, 
   const title = useRef<HTMLHeadingElement>(null);
   const amount = useRef<HTMLElement>(null);
   const [loadedDesign, setLoadedDesign] = useState('');
+  const [textureSource, setTextureSource] = useState('');
   // Fit unusually long tier names inside the original artwork's title region.
   useEffect(() => {
     const nodes = [title.current, amount.current].filter((node): node is HTMLElement => node !== null);
@@ -40,9 +41,13 @@ export default function MembershipCard({ tier, next, spend, toNext, memberName, 
   const action = <>{card.actionLabel}</>;
   return <section className={styles.root} style={vars} data-membership-card={design.id} aria-label={`${memberName}的${tier.name}`}>
     <div className={styles.art}>
-      <Image className={styles.background} src={`/membership/cards/${design.file}.webp`} width={1448} height={1086} sizes="(max-width: 700px) 100vw, 700px" loading={onAction ? 'eager' : 'lazy'} onLoad={() => setLoadedDesign(design.id)} alt="" />
+      <Image className={styles.background} src={`/membership/cards/${design.file}.webp`} width={1448} height={1086} sizes="(max-width: 700px) 100vw, 700px" loading={onAction ? 'eager' : 'lazy'} onLoad={(event) => { setLoadedDesign(design.id); setTextureSource(event.currentTarget.currentSrc); }} alt="" />
+      {loadedDesign === design.id && textureSource ? <>
+        <span className={`${styles.decorationMask} ${styles.headingMask}`} style={{ backgroundImage: `url("${textureSource}")` }} aria-hidden="true" />
+        <span className={`${styles.decorationMask} ${styles.sloganMask}`} style={{ backgroundImage: `url("${textureSource}")` }} aria-hidden="true" />
+      </> : null}
       {animate && loadedDesign === design.id ? <span key={revealKey} className={styles.shine} data-card-shine="true" aria-hidden="true" /> : null}
-      <p className={styles.brand} title={brandName || card.title}>{brandName || card.title}</p>
+      <p className={styles.brand} title={brandName ? `${brandName} · ${card.title}` : card.title}>{card.title}</p>
       <h3 ref={title} className={styles.tier}>{tier.name}</h3>
       <p className={styles.name} title={memberName}>{memberName}</p>
       {benefits.map((benefit, index) => <div key={index}>

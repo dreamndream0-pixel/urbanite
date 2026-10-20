@@ -40,6 +40,9 @@ assert.equal(card.membershipImage('https://user:password@assets.example/icon.png
 assert.equal(card.membershipImage('data:image/svg+xml,evil'), '');
 assert.equal(card.membershipDesign('invalid').id, 'black-gold');
 assert.equal(card.resolveMembershipCard({ actionLabel: '' }).actionLabel, '查看權益');
+assert.equal(card.resolveMembershipCard({}).title, 'VIP membership');
+assert.equal(card.resolveMembershipCard({ title: '會員專屬禮遇' }).title, 'VIP membership');
+assert.equal(card.resolveMembershipCard({ title: '品牌 VIP' }).title, '品牌 VIP', 'Preserve custom headings');
 
 (async () => {
   for (const design of card.MEMBERSHIP_DESIGNS) {

@@ -9,10 +9,14 @@ stored alongside the existing shop-scoped LOYALTY JSON configuration.
 ## Editable Fields
 
 - Each existing tier has a card design and three benefit labels/icons.
-- The color selector is also directly available on each tier row. The mapping
+- Each tier's `卡片顏色` disclosure contains its design picker, SVG/upload controls,
+  copy settings and live preview. Only one tier editor is expanded at a time.
+  The mapping
   follows the stable tier key, not its display name; a gold-named tier may use
   royal blue, and the highest tier may use any of the ten designs.
-- The card title, subtitle and action label are editable for the shop.
+- The card title, subtitle and action label are shared, editable shop settings.
+  The default heading is `VIP membership`; the old default heading is migrated
+  when settings are resolved, without replacing custom headings.
 - Labels support `{rate}` and `{threshold}` placeholders from the actual tier.
 - Names and thresholds still use the existing tier editor. The member's name
   comes from their existing customer profile, not from the design or preview.
@@ -37,6 +41,16 @@ its fill and accessible text use the existing server-calculated spend/next tier.
 The zero-progress and highest-tier cases do not show the decorative static fill.
 Backgrounds have stable 4:3 geometry and use Next Image responsive delivery.
 Small icon images are standalone SVG/raster files, not copied into the artwork.
+Card copy uses the site's existing Noto Serif TC with Chinese serif fallbacks.
+The action's touch target remains centered on the original pill even when its
+44px hit area is taller than the artwork button. Thin presentation overlays reuse
+adjacent clean texture from the same loaded image to hide the empty title/slogan
+rules; source artwork files are unchanged and no second full-size URL is fetched.
+Mobile editor inputs use at least 16px text, preserve untrimmed typing drafts,
+and move the save control into normal flow while a field has focus, so it does
+not cover the active field above the on-screen keyboard. No global scroll locking
+or forced scrolling is added. Real iPhone keyboard behavior still needs physical
+device verification; automated tests cover WebKit and a shortened viewport.
 On initial display and opening member details, a two-second gold sweep and soft
 edge glow play once. The animation does not intercept input, stops after the
 reveal, and is disabled with `prefers-reduced-motion`. Admins can replay it in

@@ -7,17 +7,17 @@ import MembershipCard from '@/app/components/MembershipCard';
 import { nextTier, resolveLoyalty, type LoyaltySettings, type LoyaltyTier } from '@/lib/loyalty-settings';
 import { MEMBERSHIP_DESIGNS, MEMBERSHIP_ICONS, membershipDesign, resolveMembershipBenefits, resolveMembershipCard, type MembershipBenefit } from '@/lib/membership-card';
 
-const field = 'w-full min-w-0 rounded-lg border border-[#dedbd5] bg-white px-3 py-2 text-sm';
-type Props = { settings: LoyaltySettings; onChange: (update: (settings: LoyaltySettings) => LoyaltySettings) => void; onBusyChange: (busy: boolean) => void };
+const field = 'w-full min-w-0 rounded-lg border border-[#dedbd5] bg-white px-3 py-2 text-base sm:text-sm';
+type Props = { tierKey: string; settings: LoyaltySettings; onChange: (update: (settings: LoyaltySettings) => LoyaltySettings) => void; onBusyChange: (busy: boolean) => void };
 
-export default function MembershipCardEditor({ settings, onChange, onBusyChange }: Props) {
-  const [tierKey, setTierKey] = useState(settings.tiers[0].key);
+export default function MembershipCardEditor({ tierKey, settings, onChange, onBusyChange }: Props) {
   const [previewName, setPreviewName] = useState('會員姓名');
   const [spend, setSpend] = useState(1500);
   const [uploading, setUploading] = useState<number | null>(null);
   const [error, setError] = useState('');
   const [reveal, setReveal] = useState(0);
   const normalized = resolveLoyalty(settings);
+  const draftTier = settings.tiers.find((tier) => tier.key === tierKey);
   const tier = normalized.tiers.find((tier) => tier.key === tierKey) ?? normalized.tiers[0];
   const next = nextTier(normalized, tier);
   const card = resolveMembershipCard(settings.card);
@@ -37,19 +37,18 @@ export default function MembershipCardEditor({ settings, onChange, onBusyChange 
     } catch (e) { setError(e instanceof Error ? e.message : '圖示上傳失敗'); }
     finally { setUploading(null); onBusyChange(false); }
   }
-  return <section className="border-y border-[#e5ded4] bg-white px-4 py-5 sm:px-5" aria-label="會員卡樣式設定">
+  return <section className="border-t border-[#e5ded4] bg-white py-4" aria-label="會員卡樣式設定">
     <fieldset disabled={uploading !== null} className="min-w-0 space-y-5 disabled:opacity-70">
       <label className="flex items-center justify-between gap-3"><span className="font-semibold">圖片會員卡</span><input aria-label="啟用圖片會員卡" type="checkbox" checked={card.enabled} onChange={(e) => onChange((s) => ({ ...s, card: { ...resolveMembershipCard(s.card), enabled: e.target.checked } }))} className="h-5 w-5 accent-[#1f1b19]" /></label>
       <div className="grid min-w-0 gap-3 sm:grid-cols-3">
-        {([['title', '權益區標題', 24], ['subtitle', '卡片標語', 40], ['actionLabel', '按鈕文字', 12]] as const).map(([key, label, max]) => <label key={key} className="min-w-0 text-sm">{label}<input aria-label={label} maxLength={max} value={card[key]} onChange={(e) => onChange((s) => ({ ...s, card: { ...resolveMembershipCard(s.card), [key]: e.target.value } }))} className={`${field} mt-1`} /></label>)}
+        {([['title', '權益區標題', 24], ['subtitle', '卡片標語', 40], ['actionLabel', '按鈕文字', 12]] as const).map(([key, label, max]) => <label key={key} className="min-w-0 text-sm">{label}<input aria-label={label} maxLength={max} value={settings.card?.[key] ?? card[key]} onChange={(e) => onChange((s) => ({ ...s, card: { ...resolveMembershipCard(s.card), [key]: e.target.value } }))} className={`${field} mt-1`} /></label>)}
       </div>
-      <label className="block text-sm">編輯等級<select aria-label="會員卡編輯等級" value={tier.key} onChange={(e) => setTierKey(e.target.value)} className={`${field} mt-1`}>{settings.tiers.map((tier) => <option key={tier.key} value={tier.key}>{tier.name}</option>)}</select></label>
       <div role="group" aria-label="選擇會員卡面" className="grid min-w-0 grid-cols-2 gap-2 sm:grid-cols-5">
         {MEMBERSHIP_DESIGNS.map((design) => <button key={design.id} type="button" aria-label={`選擇${design.name}卡面`} aria-pressed={membershipDesign(tier.cardDesign).id === design.id} onClick={() => changeTier({ cardDesign: design.id })} className={`min-w-0 overflow-hidden rounded-lg border-2 text-left ${membershipDesign(tier.cardDesign).id === design.id ? 'border-[#1f1b19]' : 'border-transparent'}`}><Image src={`/membership/cards/${design.file}.thumb.webp`} width={320} height={240} unoptimized alt="" className="aspect-[4/3] w-full object-contain" /><span className="block px-2 py-1 text-xs">{design.name}</span></button>)}
       </div>
       <div className="divide-y divide-[#e5ded4]">
         {benefits.map((benefit, index) => <div key={index} className="grid min-w-0 items-end gap-3 py-3 sm:grid-cols-[minmax(0,1fr)_9rem_auto]">
-          <label className="min-w-0 text-sm">權益 {index + 1}<input aria-label={`權益 ${index + 1} 文字`} maxLength={60} value={benefit.label} onChange={(e) => changeBenefit(index, { label: e.target.value })} className={`${field} mt-1`} placeholder="消費回饋 {rate}%" /></label>
+          <label className="min-w-0 text-sm">權益 {index + 1}<input aria-label={`權益 ${index + 1} 文字`} maxLength={60} value={draftTier?.benefits?.[index]?.label ?? benefit.label} onChange={(e) => changeBenefit(index, { label: e.target.value })} className={`${field} mt-1`} placeholder="消費回饋 {rate}%" /></label>
           <label className="min-w-0 text-sm">SVG 圖示<select aria-label={`權益 ${index + 1} SVG 圖示`} value={benefit.icon} onChange={(e) => changeBenefit(index, { icon: e.target.value as MembershipBenefit['icon'], image: '' })} className={`${field} mt-1`}>{MEMBERSHIP_ICONS.map((icon) => <option key={icon.id} value={icon.id}>{icon.name}</option>)}</select></label>
           <div className="flex items-center gap-2">
             <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-[#dedbd5] px-3 py-2 text-xs"><Upload size={15} />{uploading === index ? '上傳中…' : '上傳圖示'}<input aria-label={`上傳權益 ${index + 1} 圖示`} type="file" accept="image/png,image/jpeg,image/webp,image/gif" className="sr-only" onChange={(e) => { const file = e.currentTarget.files?.[0]; e.currentTarget.value = ''; if (file) void upload(file, index); }} /></label>

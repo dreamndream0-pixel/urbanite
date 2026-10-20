@@ -22,7 +22,7 @@ export type MembershipBenefit = { label: string; icon: MembershipIconId; image: 
 export type MembershipCardSettings = { enabled: boolean; title: string; subtitle: string; actionLabel: string };
 
 export const DEFAULT_MEMBERSHIP_CARD: MembershipCardSettings = {
-  enabled: true, title: '會員專屬禮遇', subtitle: '每一次相遇，都值得珍藏', actionLabel: '查看權益',
+  enabled: true, title: 'VIP membership', subtitle: '每一次相遇，都值得珍藏', actionLabel: '查看權益',
 };
 export const defaultMembershipBenefits = (): MembershipBenefit[] => [
   { label: '消費回饋 {rate}%', icon: 'coins', image: '' },
@@ -46,7 +46,7 @@ export function resolveMembershipCard(value: unknown): MembershipCardSettings {
   const v = record(value);
   return {
     enabled: v.enabled !== false,
-    title: text(v.title, DEFAULT_MEMBERSHIP_CARD.title, 24),
+    title: v.title === '會員專屬禮遇' ? DEFAULT_MEMBERSHIP_CARD.title : text(v.title, DEFAULT_MEMBERSHIP_CARD.title, 24),
     subtitle: text(v.subtitle, DEFAULT_MEMBERSHIP_CARD.subtitle, 40),
     actionLabel: text(v.actionLabel, DEFAULT_MEMBERSHIP_CARD.actionLabel, 12) || DEFAULT_MEMBERSHIP_CARD.actionLabel,
   };
