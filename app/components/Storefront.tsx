@@ -1463,10 +1463,11 @@ function CartDrawer({
                   href={`/products/${encodeURIComponent(item.productId)}`}
                   onClick={onClose}
                   aria-label={`查看 ${item.name}`}
-                  className="aspect-[4/5] w-16 shrink-0 self-start overflow-hidden rounded-md bg-[var(--c-bg)]"
+                  data-cart-thumbnail
+                  className="aspect-square h-16 w-16 shrink-0 self-start overflow-hidden rounded-md bg-[var(--c-bg)]"
                 >
                   {imageOf(item) ? (
-                    <img src={imageOf(item)} alt="" className="h-full w-full object-cover" />
+                    <img src={imageOf(item)} alt="" className="h-full w-full object-contain object-center" />
                   ) : null}
                 </Link>
                 <div className="min-w-0 flex-1">

@@ -672,9 +672,10 @@ export default function CheckoutPage() {
                       <Link
                         href={`/products/${encodeURIComponent(item.productId)}`}
                         aria-label={`查看 ${item.name}`}
-                        className="aspect-[4/5] w-16 shrink-0 overflow-hidden rounded-md bg-[var(--c-bg)]"
+                        data-cart-thumbnail
+                        className="aspect-square h-16 w-16 shrink-0 self-start overflow-hidden rounded-md bg-[var(--c-bg)]"
                       >
-                        {image ? <img src={image} alt="" className="h-full w-full object-cover" /> : null}
+                        {image ? <img src={image} alt="" className="h-full w-full object-contain object-center" /> : null}
                       </Link>
                       <div className="min-w-0 flex-1">
                         <h3 className="font-medium">{item.name}</h3>
