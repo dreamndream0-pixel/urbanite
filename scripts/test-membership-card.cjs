@@ -115,5 +115,38 @@ try {
   assert.equal(data.spend, 1500); assert.equal(data.toNext, 1500); assert.equal(data.balance, 30);
   assert.deepEqual(scopes, [['user_id', 'user-a']]);
   assert.ok(!JSON.stringify(data).includes('accessToken'));
+  let admin = null, profileName = '店主姓名', authName = '店主登入姓名', failOwner = false;
+  const shop = { id: 'shop-a', owner_user_id: 'owner-a', name: '測試店家' };
+  const ownerQueries = [], authQueries = [];
+  const adminRoute = load('app/api/admin/loyalty/route.ts', {
+    'next/server': { NextResponse: { json: (value, init) => Response.json(value, init) } },
+    '@/lib/supabase/server': { getAdminUser: async () => admin },
+    '@/lib/shop': { getCurrentShop: async () => shop, isPlatformShop: (value) => value.id === 'platform', scopedClient: (id) => {
+      assert.equal(id, shop.id);
+      return { from: (table) => { assert.equal(table, 'customers'); const chain = { select: (columns) => { assert.equal(columns, 'name'); return chain; }, eq: (column, value) => { assert.equal(column, 'user_id'); ownerQueries.push([id, value]); return chain; }, maybeSingle: async () => { if (failOwner) throw new Error('Unavailable'); return { data: { name: profileName } }; } }; return chain; } };
+    } },
+    '@/lib/supabase/admin': { createAdminClient: () => ({ auth: { admin: { getUserById: async (id) => { authQueries.push(id); return { data: { user: { user_metadata: { name: authName }, email: 'private@example.test' } } }; } } } }) },
+    '@/lib/loyalty': { getLoyalty: async (id) => { assert.equal(id, shop.id); return legacy; }, saveLoyalty: async (_id, settings) => settings },
+  });
+  assert.equal((await adminRoute.GET()).status, 401);
+  assert.equal(ownerQueries.length, 0, 'Unauthorized readers cannot look up the shop owner');
+  admin = { id: 'staff-a', user_metadata: { name: '員工姓名' } };
+  let ownerResponse = await adminRoute.GET();
+  assert.equal(ownerResponse.headers.get('cache-control'), 'private, no-store');
+  assert.equal((await ownerResponse.json()).ownerName, '店主姓名');
+  assert.deepEqual(ownerQueries, [['shop-a', 'owner-a']]);
+  assert.equal(authQueries.length, 0, 'A profile name avoids an extra auth lookup');
+  profileName = '';
+  ownerResponse = await adminRoute.GET();
+  const ownerData = await ownerResponse.json();
+  assert.equal(ownerData.ownerName, '店主登入姓名', 'Staff must preview the actual owner, not themselves');
+  assert.deepEqual(authQueries, ['owner-a']);
+  assert.ok(!JSON.stringify(ownerData).includes('private@example.test'), 'Only the owner display name is returned');
+  authName = ''; assert.equal((await (await adminRoute.GET()).json()).ownerName, '測試店家');
+  failOwner = true; assert.equal((await (await adminRoute.GET()).json()).ownerName, '測試店家', 'An optional name lookup must not block settings');
+  failOwner = false; shop.owner_user_id = null;
+  assert.equal((await (await adminRoute.GET()).json()).ownerName, '測試店家', 'An ownerless tenant must not use an employee name');
+  shop.id = 'platform';
+  assert.equal((await (await adminRoute.GET()).json()).ownerName, '員工姓名', 'A platform shop without an owner ID uses its authorized administrator');
   console.log('Membership cards: ten original backgrounds, safe SVG assets, legacy settings, configurable styles/benefits, actual member data, tenant/user scope, upgrade progress and unchanged credit calculations passed. All API data mocked.');
 })().catch((error) => { console.error(error); process.exitCode = 1; });

@@ -136,13 +136,14 @@ function Settings() {
   const form = useRef<HTMLDivElement>(null);
   useMembershipFormScroll(form);
   const [s, setS] = useState<LoyaltySettings | null>(null);
+  const [ownerName, setOwnerName] = useState('店主');
   const [saved, setSaved] = useState('');
   const [busy, setBusy] = useState(false);
   const [imageBusy, setImageBusy] = useState(false);
   const [loadError, setLoadError] = useState('');
   const [editingTier, setEditingTier] = useState<string | null>(null);
   useEffect(() => {
-    fetch('/api/admin/loyalty', { cache: 'no-store' }).then(async (r) => { const data = await r.json(); if (!r.ok) throw new Error(data.error || '讀取設定失敗'); return data; }).then((d) => setS(resolveLoyalty(d.settings))).catch((e) => setLoadError(e instanceof Error ? e.message : '讀取設定失敗'));
+    fetch('/api/admin/loyalty', { cache: 'no-store' }).then(async (r) => { const data = await r.json(); if (!r.ok) throw new Error(data.error || '讀取設定失敗'); return data; }).then((d) => { setS(resolveLoyalty(d.settings)); setOwnerName(typeof d.ownerName === 'string' && d.ownerName.trim() ? d.ownerName : '店主'); }).catch((e) => setLoadError(e instanceof Error ? e.message : '讀取設定失敗'));
   }, []);
   if (loadError) return <p role="alert" className={`${card} text-sm text-[#c0392b]`}>{loadError}</p>;
   if (!s) return <p className={`${card} text-sm text-[#8a7f72]`}>讀取中…</p>;
@@ -188,7 +189,7 @@ function Settings() {
                 <ChevronDown size={18} className={editingTier === t.key ? 'rotate-180' : ''} />
               </button>
               <div id={`membership-editor-${t.key}`} className={styles.editor} hidden={editingTier !== t.key}>
-                {editingTier === t.key ? <MembershipCardEditor tierKey={t.key} settings={s} onChange={(update) => setS((current) => current ? update(current) : current)} onBusyChange={setImageBusy} /> : null}
+                {editingTier === t.key ? <MembershipCardEditor tierKey={t.key} ownerName={ownerName} settings={s} onChange={(update) => setS((current) => current ? update(current) : current)} onBusyChange={setImageBusy} /> : null}
               </div>
             </div>
           ))}

@@ -23,9 +23,12 @@ stored alongside the existing shop-scoped LOYALTY JSON configuration.
   comes from their existing customer profile, not from the design or preview.
 - The card's main heading is the member's name, not a second tier label. English
   shield names (BLACK through CHAMPAGNE) follow the selected artwork independently
-  of the editable business tier name. Before overriding a preview member name,
-  its default follows the edited tier name immediately; preview overrides never
-  rename a real member. Saves and returning to the member page refresh the data.
+  of the editable business tier name. The admin preview uses the current shop
+  owner's profile name, falling back to owner login metadata and then shop name.
+  Staff do not replace the preview name with their own. Saves and returning to
+  the member page refresh the data.
+  A tenant without an owner ID falls back to its shop name; only the platform
+  shop may use its authorized platform administrator when no owner ID is set.
 - The accumulation period input edits the existing shared `keepMonths` setting
   (1-36 months), not a separate cosmetic period. It also controls retention under
   the existing business rules. The card's left panel shows the real available
@@ -35,10 +38,17 @@ stored alongside the existing shop-scoped LOYALTY JSON configuration.
 - Nine trusted Lucide SVG files can be selected. The glyph regions of the baked
   artwork are covered by independent icon layers; the original circular frames
   and surrounding artwork remain visible.
+- Card thumbnails form a horizontal, swipeable Embla carousel with previous/next
+  arrow controls and keyboard navigation. Browsing does not change the selected
+  card; clicking a thumbnail updates only that tier's chosen design.
+- Each of the three benefits has its own disclosure. Its icon settings expand
+  into a visual grid of nine SVG choices, with upload/remove controls below it.
+  No native icon dropdown is used, and folding a section retains draft edits.
 - Custom icon uploads reuse the authenticated, raster-sanitizing image upload
   endpoint. Arbitrary SVG uploads and inline SVG source are not accepted.
-- Preview name/spend/credit are local preview inputs only; they never change customer
-  transactions, balances, eligibility or progress. Benefit copy is descriptive;
+- Preview spend and credit are fixed at NT$10,000, with no preview text inputs or
+  replay-gold button. These sample values never change customer transactions,
+  balances, eligibility or progress. Benefit copy is descriptive;
   writing a new benefit does not create a new automatic checkout entitlement.
 - Disable `圖片會員卡` to retain the classic credit view. Disabling loyalty also
   keeps the existing no-rewards behavior.
@@ -104,8 +114,8 @@ physical device verification; tests include iPhone Chrome UA/WebKit, shortened
 viewports without manually scrolling fields into view, and scroll-mode cleanup.
 On initial display and opening member details, a two-second gold sweep and soft
 edge glow play once. The animation does not intercept input, stops after the
-reveal, and is disabled with `prefers-reduced-motion`. Admins can replay it in
-the preview without changing member data.
+reveal, and is disabled with `prefers-reduced-motion`. The simplified admin
+preview remains static; the customer-facing reveal is unchanged.
 
 If artwork must be regenerated from the attachment:
 

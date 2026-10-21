@@ -9,6 +9,24 @@ new Function('exports', ts.transpileModule(fs.readFileSync(path.join(__dirname, 
 const circles = cardModule.exports.MEMBERSHIP_BENEFIT_CIRCLES;
 const playwright = require(process.argv[2] || 'playwright');
 const url = process.argv[3] || 'http://localhost:3014/membership-card-test';
+async function chooseDesign(admin, name) {
+  const viewport = admin.getByRole('group', { name: '選擇會員卡面', exact: true });
+  const option = admin.getByRole('button', { name: `選擇${name}卡面`, exact: true });
+  await viewport.focus(); await viewport.press('Home');
+  for (let i = 0; i < 10; i++) {
+    if (await option.evaluate((el) => { const box = el.getBoundingClientRect(), view = el.closest('[role="group"]').getBoundingClientRect(); return box.left >= view.left - 1 && box.right <= view.right + 1; })) break;
+    await admin.getByRole('button', { name: '向右滑動會員卡', exact: true }).click();
+  }
+  await option.click();
+}
+async function expandBenefit(admin, index, icons = false) {
+  const benefit = admin.locator(`[data-membership-benefit="${index}"]`);
+  if (!(await benefit.evaluate((el) => el.open))) await benefit.locator('> summary').click();
+  if (icons) {
+    const picker = benefit.locator('[data-membership-icon-picker]');
+    if (!(await picker.evaluate((el) => el.open))) await picker.locator('> summary').click();
+  }
+}
 const initial = () => ({ enabled: true, delayDays: 14, validDays: 180, maxRedeemPct: 20, keepMonths: 12,
   tiers: [{ key: 'normal', name: '一般會員', threshold: 0, rate: 1, cardDesign: 'champagne' }, { key: 'silver', name: '銀卡會員', threshold: 3000, rate: 2, cardDesign: 'silver' }, { key: 'gold', name: '金卡會員', threshold: 10000, rate: 3, cardDesign: 'gold' }],
   card: { enabled: true, title: '會員專屬禮遇', subtitle: '每一次相遇，都值得珍藏', actionLabel: '查看權益' },
@@ -28,7 +46,7 @@ const initial = () => ({ enabled: true, delayDays: 14, validDays: 180, maxRedeem
         if (pathname === '/api/admin/loyalty') {
           if (failSettings) return route.fulfill({ status: 503, json: { error: '設定暫時無法讀取' } });
           if (request.method() === 'PUT') { settings = request.postDataJSON().settings; saves++; }
-          return route.fulfill({ json: { settings } });
+          return route.fulfill({ json: { settings, ownerName: '測試店主' } });
         }
         if (pathname === '/api/products/image') return route.fulfill({ json: { image_url: 'https://assets.example/custom-icon.png' } });
         if (pathname === '/api/me/credit') {
@@ -109,60 +127,90 @@ const initial = () => ({ enabled: true, delayDays: 14, validDays: 180, maxRedeem
       }
       await page.getByRole('button', { name: '金卡會員卡片顏色', exact: true }).click();
       const admin = page.getByRole('region', { name: '會員卡樣式設定', exact: true });
-      await admin.getByRole('button', { name: '選擇皇家藍卡面', exact: true }).click();
+      await chooseDesign(admin, '皇家藍');
       await page.locator('[data-membership-tier="normal"]').getByRole('button', { name: /卡片顏色/ }).click();
       const tierName = page.locator('[data-membership-tier="normal"] input').first();
       await tierName.fill('尊榮會員');
       await tierName.pressSequentially(' VIP');
       assert.equal(await tierName.inputValue(), '尊榮會員 VIP');
       assert.equal(await tierName.evaluate((el) => document.activeElement === el), true);
-      assert.equal(await admin.locator('h3').innerText(), '尊榮會員 VIP', 'Tier edits update the default preview immediately without remounting its fields');
+      assert.equal(await admin.locator('h3').innerText(), '測試店主', 'Tier edits must not replace the store owner preview name');
       assert.equal(await page.getByRole('button', { name: '金卡會員卡片顏色', exact: true }).getAttribute('aria-expanded'), 'false');
       assert.equal(await page.getByLabel('會員卡編輯等級', { exact: true }).count(), 0, 'Edit directly inside the tier, without a second tier selector');
       await admin.getByRole('button', { name: '選擇黑金卡面', exact: true }).waitFor();
       assert.equal(await admin.getByRole('group', { name: '選擇會員卡面' }).getByRole('button').count(), 10);
-      await admin.getByRole('button', { name: '選擇翡翠綠卡面', exact: true }).click();
+      const viewport = admin.getByRole('group', { name: '選擇會員卡面', exact: true });
+      await viewport.focus(); await viewport.press('Home');
+      const transform = await admin.locator('[data-membership-carousel-track]').evaluate((el) => getComputedStyle(el).transform);
+      await admin.getByRole('button', { name: '向右滑動會員卡', exact: true }).click();
+      await page.waitForFunction((previous) => getComputedStyle(document.querySelector('[data-membership-carousel-track]')).transform !== previous, transform);
+      assert.equal(await admin.getByRole('button', { name: '選擇香檳金卡面', exact: true }).getAttribute('aria-pressed'), 'true', 'Browsing must not change the selected card');
+      await viewport.focus(); await viewport.press('Home'); await viewport.scrollIntoViewIfNeeded();
+      assert.equal(await viewport.locator('button').evaluateAll((buttons) => new Set(buttons.map((button) => Math.round(button.getBoundingClientRect().top))).size), 1, 'All ten card thumbnails stay in one horizontal row');
+      const beforeDrag = await admin.locator('[data-membership-carousel-track]').evaluate((el) => getComputedStyle(el).transform);
+      const dragBox = await viewport.boundingBox();
+      await page.mouse.move(dragBox.x + dragBox.width * .65, dragBox.y + dragBox.height * .35);
+      await page.mouse.down();
+      await page.mouse.move(dragBox.x + dragBox.width * .2, dragBox.y + dragBox.height * .35, { steps: 12 });
+      await page.mouse.up();
+      await page.waitForFunction((previous) => getComputedStyle(document.querySelector('[data-membership-carousel-track]')).transform !== previous, beforeDrag);
+      assert.equal(await admin.getByRole('button', { name: '選擇香檳金卡面', exact: true }).getAttribute('aria-pressed'), 'true', 'Dragging browses without accidentally selecting a card');
+      await chooseDesign(admin, '翡翠綠');
+      assert.equal(await admin.locator('select').count(), 0, 'Icons use an expandable visual grid, not a native select');
+      assert.equal(await admin.locator('[data-membership-benefit]').count(), 3);
+      assert.equal(await admin.locator('[data-membership-benefit][open]').count(), 0);
+      for (const label of ['預覽會員姓名', '預覽消費金額', '預覽回饋金']) assert.equal(await admin.getByLabel(label, { exact: true }).count(), 0);
+      assert.equal(await admin.getByRole('button', { name: '預覽會員卡金光', exact: true }).count(), 0);
+      assert.equal(await admin.locator('[data-card-shine]').count(), 0, 'Removing admin gold preview does not remove the customer reveal');
       await admin.getByLabel('累積消費門檻週期(月)', { exact: true }).fill('6');
       assert.ok((await admin.locator('[data-card-spend]').innerText()).includes('近 6 個月'));
       const heading = admin.getByLabel('權益區標題', { exact: true });
       await heading.fill(''); await heading.pressSequentially('VIP membership');
       assert.equal(await heading.inputValue(), 'VIP membership', 'English spaces must remain editable without resetting the caret');
-      await admin.getByLabel('權益 1 SVG 圖示', { exact: true }).selectOption('heart');
+      await expandBenefit(admin, 0, true);
+      assert.equal(await admin.getByRole('group', { name: '權益 1 圖示選擇', exact: true }).getByRole('button').count(), 9);
+      if (width === 390) await admin.locator('[data-membership-benefit="0"]').screenshot({ path: path.join(os.tmpdir(), `urbanite-membership-icon-grid-${engine}.png`) });
+      await admin.getByRole('button', { name: '權益 1 圖示：愛心', exact: true }).click();
       const benefitLabel = admin.getByLabel('權益 1 文字', { exact: true });
       await benefitLabel.fill(''); await benefitLabel.pressSequentially('VIP reward');
       assert.equal(await benefitLabel.inputValue(), 'VIP reward', 'Benefit drafts must retain spaces');
       await benefitLabel.fill('消費回饋 {rate}%');
-      await admin.getByLabel('權益 1 說明', { exact: true }).fill('消費享專屬回饋');
+      const benefitDescription = admin.getByLabel('權益 1 說明', { exact: true });
+      await benefitDescription.fill('消費享專屬回饋');
       await admin.getByLabel('會員副標語', { exact: true }).fill('專屬會員・美好日常');
       await admin.getByLabel('卡片標語', { exact: true }).fill('為你珍藏的每一刻');
-      const previewName = admin.getByLabel('預覽會員姓名', { exact: true });
-      await previewName.fill('測試');
-      await previewName.press('End');
-      await previewName.pressSequentially('ABC');
-      assert.equal(await previewName.inputValue(), '測試ABC');
-      assert.equal(await previewName.evaluate((el) => document.activeElement === el), true, 'Typing must retain focus and caret');
+      await benefitDescription.press('End');
+      await benefitDescription.pressSequentially('ABC');
+      assert.equal(await benefitDescription.inputValue(), '消費享專屬回饋ABC');
+      assert.equal(await benefitDescription.evaluate((el) => document.activeElement === el), true, 'Typing must retain focus and caret');
       if (width < 768) {
-        assert.ok(await previewName.evaluate((el) => parseFloat(getComputedStyle(el).fontSize) >= 16), 'No iPhone input auto-zoom');
+        assert.ok(await benefitDescription.evaluate((el) => parseFloat(getComputedStyle(el).fontSize) >= 16), 'No iPhone input auto-zoom');
         assert.equal(await page.locator('[data-membership-save]').evaluate((el) => getComputedStyle(el).position), 'static', 'Save button must not float over focused fields');
         await page.setViewportSize({ width, height: 500 });
         await page.waitForFunction(() => {
-          const box = document.querySelector('input[aria-label="預覽會員姓名"]').getBoundingClientRect();
+          const box = document.querySelector('input[aria-label="權益 1 說明"]').getBoundingClientRect();
           const view = window.visualViewport;
           return box.top >= (view?.offsetTop ?? 0) && box.bottom <= (view?.offsetTop ?? 0) + (view?.height ?? innerHeight);
         });
-        const visible = await previewName.boundingBox();
+        const visible = await benefitDescription.boundingBox();
         assert.ok(visible.y >= 0 && visible.y + visible.height <= 500, 'Field stays reachable in a keyboard-sized viewport');
         if (width === 390) await page.screenshot({ path: path.join(os.tmpdir(), `urbanite-membership-keyboard-${engine}.png`) });
         await page.setViewportSize({ width, height: 1000 });
       }
-      await admin.getByLabel('預覽消費金額', { exact: true }).fill('0');
-      await admin.getByLabel('預覽回饋金', { exact: true }).fill('125');
-      assert.equal(await admin.locator('[data-card-amount]').innerText(), 'NT$125');
-      assert.equal(await admin.getByRole('progressbar').getAttribute('aria-valuenow'), '0');
-      assert.equal(await admin.locator('[role="progressbar"] > span').evaluate((el) => el.getBoundingClientRect().width), 0);
+      await benefitDescription.fill('消費享專屬回饋');
+      assert.equal(await admin.locator('[data-card-amount]').innerText(), 'NT$10,000');
+      assert.ok((await admin.locator('[data-card-spend]').innerText()).includes('NT$10,000'));
+      assert.equal(await admin.getByRole('progressbar').getAttribute('aria-valuenow'), '100');
       assert.equal(await admin.locator('[data-membership-card]').getAttribute('data-membership-card'), 'emerald');
-      assert.ok(await admin.locator('img[src="/membership/icons/heart.svg"]').count() >= 1);
-      await admin.getByRole('button', { name: '預覽會員卡金光', exact: true }).focus();
+      assert.equal(await admin.locator('[data-membership-card] img[src="/membership/icons/heart.svg"]').count(), 1);
+      await admin.locator('[data-membership-benefit="0"] > summary').click();
+      await expandBenefit(admin, 1);
+      assert.equal(await admin.getByLabel('權益 1 文字', { exact: true }).isVisible(), false);
+      assert.equal(await admin.getByLabel('權益 2 文字', { exact: true }).isVisible(), true);
+      assert.equal(await benefitLabel.inputValue(), '消費回饋 {rate}%', 'Collapsed benefit edits are retained');
+      await expandBenefit(admin, 2);
+      assert.equal(await admin.locator('[data-membership-benefit][open]').count(), 2, 'Benefits 2 and 3 expand independently');
+      await admin.locator('[data-membership-benefit="2"] > summary').click();
       await admin.screenshot({ path: path.join(os.tmpdir(), `urbanite-membership-editor-${engine}-${width}.png`) });
       await page.getByRole('button', { name: '儲存設定', exact: true }).click();
       await page.getByText('已儲存', { exact: true }).waitFor();
@@ -176,6 +224,7 @@ const initial = () => ({ enabled: true, delayDays: 14, validDays: 180, maxRedeem
       assert.equal(settings.tiers[0].benefits[0].icon, 'heart');
       assert.equal(settings.tiers[2].cardDesign, 'royal-blue');
       assert.equal(settings.tiers[1].threshold, 3000); assert.equal(settings.tiers[1].rate, 2);
+      assert.equal('ownerName' in settings, false, 'Preview identity is not persisted as loyalty settings');
       await page.reload(); await customerCard.waitFor();
       assert.equal(await customerCard.getAttribute('data-membership-card'), 'emerald');
       assert.ok((await customerCard.innerText()).includes('王小美'));
@@ -184,15 +233,20 @@ const initial = () => ({ enabled: true, delayDays: 14, validDays: 180, maxRedeem
       await page.reload(); await customerCard.waitFor();
       assert.equal(await customerCard.getAttribute('data-membership-card'), 'royal-blue', 'Highest tier must follow its chosen color, not the tier name');
       assert.equal(await customer.getByRole('progressbar').getAttribute('aria-valuenow'), '100');
+      spend = 0;
+      await page.reload(); await customerCard.waitFor();
+      assert.equal(await customer.getByRole('progressbar').getAttribute('aria-valuenow'), '0');
+      assert.equal(await customer.locator('[role="progressbar"] > span').evaluate((el) => el.getBoundingClientRect().width), 0);
       spend = 1500;
       await page.reload(); await customerCard.waitFor();
       await page.getByRole('button', { name: '等級與回饋設定', exact: true }).click();
       await page.locator('[data-membership-tier="normal"]').getByRole('button', { name: /卡片顏色/ }).click();
+      await expandBenefit(admin, 0, true);
       await admin.getByLabel('上傳權益 1 圖示', { exact: true }).setInputFiles({ name: 'icon.png', mimeType: 'image/png', buffer: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/L9sAAAAASUVORK5CYII=', 'base64') });
       await admin.getByRole('button', { name: '移除權益 1 自訂圖示', exact: true }).waitFor();
-      assert.ok(await admin.locator('img[src="https://assets.example/custom-icon.png"]').count() >= 1);
+      assert.equal(await admin.locator('[data-membership-card] img[src="https://assets.example/custom-icon.png"]').count(), 1);
       await admin.getByRole('button', { name: '移除權益 1 自訂圖示', exact: true }).click();
-      assert.ok(await admin.locator('img[src="/membership/icons/heart.svg"]').count() >= 1);
+      assert.equal(await admin.locator('[data-membership-card] img[src="/membership/icons/heart.svg"]').count(), 1);
       await admin.getByLabel('啟用圖片會員卡', { exact: true }).uncheck();
       await page.getByRole('button', { name: '儲存設定', exact: true }).click();
       await page.getByText('已儲存', { exact: true }).waitFor();
