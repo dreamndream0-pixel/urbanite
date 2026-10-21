@@ -60,6 +60,14 @@ centered inside fixed-aspect-ratio masks and cannot force a minimum flex size,
 so long labels, optional descriptions and uploaded images cannot shift them.
 Tests validate circle edges against the actual source pixels and check all 30
 positions and all nine SVG choices across mobile, WebKit and desktop widths.
+All twenty original benefit dividers are separately measured in
+`MEMBERSHIP_BENEFIT_DIVIDERS` and covered with adjacent horizontal texture before
+the HTML copy is painted. This removes lines from the text columns without
+moving the circle frames, narrowing the copy or editing the source image files.
+Browser pixel tests compare the source line with its masked rendering for every
+card, in addition to geometry and long-copy checks.
+The artwork becomes visible in the same render as its cleanup overlays, so
+loading a background cannot briefly expose its original lines through the copy.
 The duplicate external VIP heading/benefit list and external credit summary are
 removed when an image card is active. Its action still opens the existing tier
 and transaction details, including available, pending and expiring balances.
@@ -115,4 +123,5 @@ local route and intercept all API reads/writes. Do not deploy the fixture route.
 node scripts/test-membership-card.cjs
 node scripts/test-membership-card-browser.cjs <playwright-module> <fixture-url>
 node scripts/test-member-rewards-loading-browser.cjs <playwright-module> <fixture-url>
+node scripts/test-membership-dividers-browser.cjs <playwright-module> <fixture-url>
 ```

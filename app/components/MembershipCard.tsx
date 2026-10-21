@@ -4,7 +4,7 @@ import Image from 'next/image';
 import { ArrowRight } from 'lucide-react';
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import type { LoyaltyTier } from '@/lib/loyalty-settings';
-import { MEMBERSHIP_BADGES, MEMBERSHIP_BENEFIT_CIRCLES, membershipBenefitLabel, membershipDesign, membershipProgress, resolveMembershipBenefits, resolveMembershipCard, type MembershipCardSettings } from '@/lib/membership-card';
+import { MEMBERSHIP_BADGES, MEMBERSHIP_BENEFIT_CIRCLES, MEMBERSHIP_BENEFIT_DIVIDERS, membershipBenefitLabel, membershipDesign, membershipProgress, resolveMembershipBenefits, resolveMembershipCard, type MembershipCardSettings } from '@/lib/membership-card';
 import styles from './MembershipCard.module.css';
 
 type Props = {
@@ -15,9 +15,9 @@ type Props = {
   credit?: { balance: number; status: string }; immersive?: boolean;
 };
 const money = (value: number) => `NT$${Math.max(0, Math.round(value)).toLocaleString('en-US')}`;
-const texturePatch = (source: string, left: number, top: number, width: number, height: number, sampleY: number): CSSProperties => ({
+const texturePatch = (source: string, left: number, top: number, width: number, height: number, sampleY: number, sampleX = left): CSSProperties => ({
   backgroundImage: `url("${source}")`, left: `${left}%`, top: `${top}%`, width: `${width}%`, height: `${height}%`,
-  backgroundSize: `${10000 / width}% ${10000 / height}%`, backgroundPosition: `${left / (100 - width) * 100}% ${sampleY / (100 - height) * 100}%`,
+  backgroundSize: `${10000 / width}% ${10000 / height}%`, backgroundPosition: `${sampleX / (100 - width) * 100}% ${sampleY / (100 - height) * 100}%`,
 });
 
 export default function MembershipCard({ tier, next, spend, toNext, memberName, brandName, settings, periodMonths = 12, onAction, expanded, detailsId, animate = false, revealKey = 0, credit, immersive = false }: Props) {
@@ -56,13 +56,14 @@ export default function MembershipCard({ tier, next, spend, toNext, memberName, 
   const vars = { '--mc-ink': design.ink, '--mc-surface': design.surface, '--mc-accent': design.accent } as CSSProperties;
   const action = <><span>{card.actionLabel}</span><ArrowRight aria-hidden="true" /></>;
   return <section className={`${styles.root} ${immersive ? styles.immersive : ''}`} style={vars} data-membership-card={design.id} aria-label={`${memberName}的${tier.name}`}>
-    <div className={styles.art}>
+    <div className={styles.art} data-card-art-ready={loadedDesign === design.id}>
       <Image className={styles.background} src={`/membership/cards/${design.file}.webp`} width={1448} height={1086} sizes="(max-width: 700px) 100vw, 700px" loading={onAction ? 'eager' : 'lazy'} onLoad={(event) => { setLoadedDesign(design.id); setTextureSource(event.currentTarget.currentSrc); }} alt="" />
       {loadedDesign === design.id && textureSource ? <>
         <span className={`${styles.decorationMask} ${styles.headingMask}`} style={{ backgroundImage: `url("${textureSource}")` }} aria-hidden="true" />
         <span className={`${styles.decorationMask} ${styles.sloganMask}`} style={{ backgroundImage: `url("${textureSource}")` }} aria-hidden="true" />
         {emptyRules.map((y) => <span key={y} className={styles.decorationMask} style={texturePatch(textureSource, 33.3, y - 1.2, design.id === 'diamond' ? 35 : 29, 2.4, y + 1.8)} aria-hidden="true" />)}
         {perkRule !== null ? [40, 60.8, 81.4].map((x) => <span key={x} className={styles.decorationMask} style={texturePatch(textureSource, x, perkRule - 1.2, 12, 2.4, perkRule + 2)} aria-hidden="true" />) : null}
+        {MEMBERSHIP_BENEFIT_DIVIDERS[design.id].map(([x, top, bottom]) => <span key={x} data-card-divider-mask className={`${styles.decorationMask} ${styles.dividerMask}`} style={texturePatch(textureSource, (x - 8) / 1448 * 100, (top - 8) / 1086 * 100, 16 / 1448 * 100, (bottom - top + 17) / 1086 * 100, (top - 8) / 1086 * 100, (x - 32) / 1448 * 100)} aria-hidden="true" />)}
       </> : null}
       {animate && loadedDesign === design.id ? <span key={revealKey} className={styles.shine} data-card-shine="true" aria-hidden="true" /> : null}
       <span className={styles.badge} data-card-badge>{MEMBERSHIP_BADGES[design.id]}</span>

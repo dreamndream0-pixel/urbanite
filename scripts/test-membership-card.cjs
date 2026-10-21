@@ -68,8 +68,8 @@ try {
     const circles = card.MEMBERSHIP_BENEFIT_CIRCLES[design.id];
     assert.equal(circles.length, 3, `${design.id}: each original ring has its own placement`);
     const { data: rgb, info } = await sharp(file).removeAlpha().raw().toBuffer({ resolveWithObject: true });
+    const pixel = (px, py, channel) => rgb[(Math.round(py) * info.width + Math.round(px)) * info.channels + channel];
     for (const [x, y, radius] of circles) {
-      const pixel = (px, py, channel) => rgb[(Math.round(py) * info.width + Math.round(px)) * info.channels + channel];
       const edges = Array.from({ length: 96 }, (_, index) => {
         const angle = index * Math.PI / 48;
         let squared = 0;
@@ -81,6 +81,13 @@ try {
         return Math.sqrt(squared);
       }).sort((a, b) => a - b);
       assert.ok(edges.slice(12, 84).reduce((a, b) => a + b) / 72 > 85, `${design.id}: (${x}, ${y}) must match an actual circular border in the source image`);
+    }
+    const dividers = card.MEMBERSHIP_BENEFIT_DIVIDERS[design.id];
+    assert.equal(dividers.length, 2);
+    for (const [x, top, bottom] of dividers) {
+      let contrast = 0;
+      for (let y = top; y <= bottom; y++) for (let c = 0; c < 3; c++) contrast += Math.abs(pixel(x, y, c) - (pixel(x - 4, y, c) + pixel(x + 4, y, c)) / 2);
+      assert.ok(contrast / ((bottom - top + 1) * 3) > 50, `${design.id}: measured divider must match the source pixels`);
     }
     if (process.argv[2]) {
       const original = await sharp(path.join(process.argv[2], `${design.file}.png`)).ensureAlpha().raw().toBuffer();

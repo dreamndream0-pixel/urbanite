@@ -41,6 +41,19 @@ export const MEMBERSHIP_BENEFIT_CIRCLES: Record<MembershipDesignId, readonly [nu
   amethyst: [[524, 493, 42], [822, 493, 42], [1123, 493, 42]],
   champagne: [[521, 495, 38], [820, 496, 39], [1123, 496, 39]],
 };
+// Baked-in dividers do not match the editable copy columns (notably diamond).
+export const MEMBERSHIP_BENEFIT_DIVIDERS: Record<MembershipDesignId, readonly [number, number, number][]> = {
+  'black-gold': [[749, 465, 527], [1051, 465, 527]],
+  silver: [[756, 470, 527], [1058, 470, 527]],
+  gold: [[754, 462, 527], [1055, 462, 527]],
+  platinum: [[760, 477, 535], [1066, 477, 535]],
+  diamond: [[680, 457, 532], [969, 457, 532]],
+  'royal-blue': [[752, 466, 529], [1055, 466, 529]],
+  emerald: [[753, 466, 529], [1053, 466, 528]],
+  'rose-gold': [[751, 463, 524], [1053, 463, 524]],
+  amethyst: [[752, 465, 524], [1053, 465, 524]],
+  champagne: [[750, 467, 530], [1051, 467, 530]],
+};
 
 export const DEFAULT_MEMBERSHIP_CARD: MembershipCardSettings = {
   enabled: true, title: 'VIP membership', intro: '專屬禮遇・美好日常', subtitle: '每一次相遇，都值得珍藏', actionLabel: '查看權益',
