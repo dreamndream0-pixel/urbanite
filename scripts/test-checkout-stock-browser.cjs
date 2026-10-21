@@ -149,8 +149,17 @@ const settings = { logo_url: '', enabled_shipping_methods: ['宅配到府', '全
       await decrease(); await click('重新選擇');
       assert.equal(await page.locator('[data-selected-coupon]').count(), 0);
       await page.getByRole('button', { name: /^PERCENT10/ }).click(); await applied('PERCENT10');
+      assert.equal(await page.getByRole('button', { name: /^PERCENT10/ }).getAttribute('aria-pressed'), 'true');
+      assert.equal(await page.getByRole('button', { name: /^PERCENT10/ }).getAttribute('data-selected-coupon'), '');
+      assert.equal(await page.locator('[data-selected-coupon]').count(), 1, 'Selected state must live on the coupon itself, not a duplicate panel');
+      await page.getByRole('button', { name: /^PERCENT10/ }).screenshot({ path: path.join(os.tmpdir(), `urbanite-coupon-selected-${engine.name()}-${width}.png`) });
       await page.getByRole('button', { name: /^PERCENT10/ }).click();
       assert.equal(await page.locator('[data-selected-coupon]').count(), 0, 'Selected member coupon can be toggled off');
+      const memberPending = hold((body) => body.user_coupon_id === 'owned-PERCENT10');
+      await page.getByRole('button', { name: /^PERCENT10/ }).click(); await memberPending.began;
+      assert.equal(await page.getByRole('button', { name: /^PERCENT10/ }).isEnabled(), true);
+      await page.getByRole('button', { name: /^PERCENT10/ }).click(); await memberPending.release();
+      assert.equal(await page.locator('[data-selected-coupon]').count(), 0, 'A coupon can be toggled off even before its check completes');
 
       await visit([cartLine('1入', 9)]);
       await page.getByText('目前最多可購 3 件，請調整數量。', { exact: true }).waitFor();
@@ -203,6 +212,52 @@ const settings = { logo_url: '', enabled_shipping_methods: ['宅配到府', '全
       await page.waitForFunction(() => [...document.querySelectorAll('aside')].some((el) => !el.inert && el.getBoundingClientRect().right <= innerWidth + 1));
       await page.screenshot({ path: path.join(os.tmpdir(), `urbanite-stock-cart-${engine.name()}-${width}.png`) });
 
+      const standardProduct = structuredClone(products[0]);
+      const matrix = { ...standardProduct, inventory: 3,
+        specs: [{ name: '顏色', options: ['紅色', '藍色', '白色'], display: 'image' }, { name: '尺寸', options: ['S', 'M'] }],
+        color_images: { 紅色: '/card/demo-fashion.webp', 藍色: '/card/demo-creator.webp' },
+        variants: [{ options: ['紅色', 'S'], inventory: 0, price: 200 }, { options: ['紅色', 'M'], inventory: 2, price: 250 }, { options: ['藍色', 'S'], inventory: 1, price: 500 }, { options: ['藍色', 'M'], inventory: 0, price: 550 }, { options: ['白色', 'S'], inventory: 0 }],
+      };
+      const pickerSnapshots = [];
+      for (const mode of ['detail', 'store']) {
+        products[0] = structuredClone(matrix);
+        await visit([], mode);
+        if (mode === 'store') await page.getByRole('button', { name: `將 ${fixture.name} 加入購物車`, exact: true }).click();
+        const picker = page.locator('[data-product-spec-picker]');
+        await picker.getByRole('group', { name: '顏色', exact: true }).waitFor();
+        assert.equal(await picker.getByRole('button', { name: '紅色', exact: true }).getAttribute('aria-pressed'), 'true');
+        assert.equal(await picker.getByRole('button', { name: 'M', exact: true }).getAttribute('aria-pressed'), 'true');
+        assert.equal(await picker.getByRole('button', { name: '白色', exact: true }).isDisabled(), true);
+        assert.equal(await picker.getByRole('button', { name: '藍色', exact: true }).locator('img').getAttribute('src'), '/card/demo-creator.webp');
+        pickerSnapshots.push(await picker.locator('button').evaluateAll((buttons) => buttons.map((button) => ({ label: button.getAttribute('aria-label'), selected: button.getAttribute('aria-pressed'), disabled: button.disabled, image: button.querySelector('img')?.getAttribute('src') ?? null }))));
+        await picker.getByRole('button', { name: '藍色', exact: true }).click();
+        assert.equal(await picker.getByRole('button', { name: 'S', exact: true }).getAttribute('aria-pressed'), 'true', 'Select the available size when the chosen color has no M stock');
+        await page.getByText(mode === 'detail' ? 'NT $500' : '$500', { exact: true }).waitFor();
+        assert.equal(await page.locator('[data-product-spec-image]').getAttribute('src'), '/card/demo-creator.webp');
+        await page.waitForFunction(() => { const img = document.querySelector('[data-product-spec-image]'); return img?.complete && img.naturalWidth > 0; });
+        assert.equal(await page.getByRole('button', { name: '增加數量', exact: true }).isDisabled(), true);
+        await picker.getByRole('button', { name: 'M', exact: true }).click();
+        assert.equal(await picker.getByRole('button', { name: '紅色', exact: true }).getAttribute('aria-pressed'), 'true');
+        await page.getByText(mode === 'detail' ? 'NT $250' : '$250', { exact: true }).waitFor();
+        if (mode === 'store') {
+          const dialog = page.getByRole('dialog', { name: `${fixture.name} 規格選擇`, exact: true });
+          await dialog.screenshot({ path: path.join(os.tmpdir(), `urbanite-quick-specs-${engine.name()}-${width}.png`) });
+          const bounds = await dialog.boundingBox(); assert.ok(bounds.x >= 0 && bounds.x + bounds.width <= width + 1);
+        }
+        products[0] = { ...standardProduct, specs: [{ name: '入數', options: ['1入', '5入'], display: 'image' }], color_images: { '5入': '/card/demo-collection.webp' }, variants: [{ options: ['1入'], inventory: 0, price: 120 }, { options: ['5入'], inventory: 2, price: 480 }] };
+        await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+        await picker.getByRole('group', { name: '入數', exact: true }).waitFor();
+        assert.equal(await picker.getByRole('group', { name: '顏色', exact: true }).count(), 0);
+        await picker.getByRole('button', { name: '5入', exact: true }).click();
+        await page.getByText(mode === 'detail' ? 'NT $480' : '$480', { exact: true }).waitFor();
+        assert.equal(await page.locator('[data-product-spec-image]').getAttribute('src'), '/card/demo-collection.webp');
+        await click('加入購物車');
+        const chosen = await page.evaluate(() => JSON.parse(localStorage.cart));
+        assert.equal(chosen[0].variant, '5入'); assert.equal(chosen[0].price, 480); assert.equal(chosen[0].quantity, 1);
+      }
+      assert.deepEqual(pickerSnapshots[0], pickerSnapshots[1], 'Homepage quick add and product detail must share the same options, images, selection and availability');
+      products[0] = standardProduct;
+
       await visit([cartLine()]);
       await apply('SAVE100'); await applied('SAVE100');
       await decrease(); await page.getByRole('button', { name: '重新選擇', exact: true }).waitFor();
@@ -212,7 +267,7 @@ const settings = { logo_url: '', enabled_shipping_methods: ['宅配到府', '全
       assert.deepEqual(errors, []);
       assert.deepEqual(orderCalls, [], 'No orders/payments may be created by the test');
       assert.ok(responses.length > 10);
-      console.log(`${engine.name()} ${width}: stock caps, variant switching, existing-cart limits, plain/missing/overstock items, code/member coupons, live amount/shipping/category checks, removal, network failure and stale-response races passed. All API traffic mocked; no orders created.`);
+      console.log(`${engine.name()} ${width}: stock caps, shared detail/quick-add specs/images/prices/schema refresh, existing-cart limits, plain/missing/overstock items, direct coupon-card toggles (including pending checks), live amount/shipping/category checks, network failure and stale-response races passed. All API traffic mocked; no orders created.`);
     } catch (error) {
       console.error((await page.locator('body').innerText()).slice(-4500));
       throw error;

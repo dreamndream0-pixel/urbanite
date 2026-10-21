@@ -9,6 +9,8 @@ import type { Product, Category, SiteSettings, Banner, Campaign, StorefrontBoots
 import { canOptimizeStoreImage } from '@/lib/store-image';
 import { formatProductPrice, productPrice, repriceCart } from '@/lib/product-price';
 import { cartItemLimit, remainingStock, stockOf } from '@/lib/cart-stock';
+import { initialSpecSelection, resolveSpecSelection, selectedSpecImage } from '@/lib/product-selection';
+import ProductSpecPicker from '@/app/components/ProductSpecPicker';
 import { uiAlert } from '@/lib/ui-dialog';
 import { computeShipping } from '@/lib/shipping';
 import { setShopHome } from '@/lib/shop-home';
@@ -1606,17 +1608,9 @@ function QuickAddModal({
   const imgRef = useRef<HTMLImageElement>(null);
   const [color, setColor] = useState(product.colors[0] ?? '');
   const [size, setSize] = useState(product.sizes[0] ?? '');
-  // 預設規格:第一組合沒貨時,自動改選「第一個還有庫存」的組合,
-  // 避免商品明明還有貨,卻因為預設卡在售完組合而整個顯示已售完。
-  const [specSel, setSpecSel] = useState<string[]>(() => {
-    const first = specs.map((d) => d.options[0] ?? '');
-    if (!specs.length) return first;
-    const variants = product.variants ?? [];
-    const firstVariant = variants.find((v) => v.options.join(' / ') === first.join(' / '));
-    if ((firstVariant?.inventory ?? 0) > 0) return first;
-    const inStock = variants.find((v) => (v.inventory ?? 0) > 0);
-    return inStock ? [...inStock.options] : first;
-  });
+  const [storedSpecSel, setSpecSel] = useState<string[]>(() => initialSpecSelection(product));
+  const specSel = useMemo(() => resolveSpecSelection(product, storedSpecSel), [product, storedSpecSel]);
+  const [imageOption, setImageOption] = useState('');
   const [requestedQuantity, setQuantity] = useState(1);
 
   const variantLabel = hasSpecs
@@ -1627,15 +1621,7 @@ function QuickAddModal({
   const soldOut = allChosen && inv <= 0;
   const maxQty = allChosen ? remainingStock(product, variantLabel, cart) : 0;
   const quantity = Math.min(requestedQuantity, Math.max(1, maxQty));
-
-  // 某規格選項在「其他維度目前選擇」下有沒有庫存;沒有就反白
-  function optionAvailable(dimIndex: number, opt: string) {
-    if (!hasSpecs) return true;
-    const candidate = specSel.map((v, idx) => (idx === dimIndex ? opt : v));
-    const key = candidate.join(' / ');
-    const found = (product.variants ?? []).find((v) => v.options.join(' / ') === key);
-    return (found?.inventory ?? 0) > 0;
-  }
+  const activeImage = selectedSpecImage(product, hasSpecs ? specSel : [color, size], imageOption) || product.image || product.images?.[0] || '';
 
   return (
     <div
@@ -1643,6 +1629,7 @@ function QuickAddModal({
       onClick={onClose}
     >
       <div
+        role="dialog" aria-modal="true" aria-label={`${product.name} 規格選擇`}
         className="max-h-[90vh] w-full max-w-lg overflow-auto rounded-t-2xl bg-[var(--c-surface)] p-5 sm:rounded-2xl sm:p-6"
         onClick={(e) => e.stopPropagation()}
       >
@@ -1654,8 +1641,8 @@ function QuickAddModal({
 
         <div className="flex gap-4">
           <div className="h-40 w-40 shrink-0 overflow-hidden rounded-lg bg-[var(--c-border)]">
-            {product.image ? (
-              <img ref={imgRef} src={product.image} alt={product.name} className="h-full w-full object-contain drop-shadow-[0_12px_14px_rgba(31,27,25,0.2)]" />
+            {activeImage ? (
+              <img data-product-spec-image ref={imgRef} src={activeImage} alt={product.name} className="h-full w-full object-contain drop-shadow-[0_12px_14px_rgba(31,27,25,0.2)]" />
             ) : (
               <div className="flex h-full w-full items-center justify-center text-sm text-[#a99]">無圖片</div>
             )}
@@ -1678,43 +1665,17 @@ function QuickAddModal({
 
         {hasSpecs ? (
           <>
-            {specs.map((dim, i) => (
-              <section key={dim.name} className="mt-4">
-                <p className="mb-2 text-sm text-[var(--c-muted)]">
-                  {dim.name}：{specSel[i] || '請選擇'}
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {dim.options.map((opt) => {
-                    const selected = specSel[i] === opt;
-                    const available = optionAvailable(i, opt);
-                    const grayed = selected ? soldOut : !available;
-                    return (
-                      <button
-                        key={opt}
-                        disabled={!selected && !available}
-                        onClick={() => setSpecSel((prev) => prev.map((v, idx) => (idx === i ? opt : v)))}
-                        className={`min-w-14 border px-4 py-2 text-sm font-semibold ${
-                          grayed
-                            ? 'cursor-not-allowed border-[var(--c-border)] bg-[var(--c-bg)] text-[var(--c-text)] line-through opacity-30'
-                            : selected
-                              ? 'border-[var(--c-sale)] text-[var(--c-sale)]'
-                              : 'border-[var(--c-border)] bg-[var(--c-bg)] text-[var(--c-text)]'
-                        }`}
-                      >
-                        {opt}
-                      </button>
-                    );
-                  })}
-                </div>
-              </section>
-            ))}
+            <ProductSpecPicker product={product} selected={specSel} onChange={(next, option) => {
+              setSpecSel(next);
+              setImageOption(option);
+            }} />
             <p className="mt-3 text-sm">
               {!allChosen ? (
                 <span className="text-[var(--c-muted)]">請選擇完整規格</span>
               ) : soldOut ? (
                 <span className="font-semibold text-[#c0392b]">此規格已售完</span>
               ) : (
-                <span className="text-[var(--c-muted)]">庫存：{inv} 件</span>
+                <span className="product-stock-count text-[var(--c-muted)]">庫存：{inv} 件</span>
               )}
             </p>
           </>
@@ -1727,7 +1688,7 @@ function QuickAddModal({
                   {product.colors.map((c) => (
                     <button
                       key={c}
-                      onClick={() => setColor(c)}
+                      onClick={() => { setColor(c); setImageOption(c); }}
                       className={`min-w-14 border px-4 py-2 text-sm font-semibold ${
                         color === c ? 'border-[var(--c-sale)] text-[var(--c-sale)]' : 'border-[var(--c-border)] bg-[var(--c-bg)] text-[var(--c-text)]'
                       }`}
@@ -1746,7 +1707,7 @@ function QuickAddModal({
                   {product.sizes.map((s) => (
                     <button
                       key={s}
-                      onClick={() => setSize(s)}
+                      onClick={() => { setSize(s); setImageOption(s); }}
                       className={`h-11 min-w-14 border text-sm font-semibold ${
                         size === s ? 'border-2 border-[var(--c-sale)] bg-[var(--c-surface)] text-[var(--c-text)]' : 'border-[#ece7e2] bg-[var(--c-bg)] text-[var(--c-text)]'
                       }`}
@@ -1781,7 +1742,7 @@ function QuickAddModal({
 
         <div className="mt-6 grid grid-cols-2 gap-3">
           <button
-            onClick={() => { onFly?.(product.image, imgRef.current?.getBoundingClientRect() ?? null); onAdd(variantLabel, quantity, false); }}
+            onClick={() => { onFly?.(activeImage, imgRef.current?.getBoundingClientRect() ?? null); onAdd(variantLabel, quantity, false); }}
             disabled={!allChosen || soldOut || maxQty <= 0}
             className="rounded-full bg-[var(--c-sale)] px-4 py-3 font-semibold text-white disabled:opacity-50"
           >

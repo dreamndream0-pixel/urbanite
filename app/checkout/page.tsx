@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { X } from 'lucide-react';
+import { Check, LoaderCircle } from 'lucide-react';
 import Link from 'next/link';
 import type { Product, Recipient, SiteSettings, UserCoupon } from '@/lib/types';
 import { isOnlinePayment } from '@/lib/payment';
@@ -733,21 +733,29 @@ export default function CheckoutPage() {
                     const coupon = item.coupon;
                     if (!coupon) return null;
                     const check = couponChecks[item.id];
+                    const selected = selectedCoupon?.userCouponId === item.id;
                     return (
                       <button
                         key={item.id}
                         type="button"
-                        onClick={() => selectedCoupon?.userCouponId === item.id ? removeDiscount() : applyDiscount(coupon.code, item.id)}
-                        disabled={selectedCoupon?.userCouponId !== item.id && (!check || !check.ok)}
+                        data-selected-coupon={selected ? '' : undefined}
+                        aria-pressed={selected}
+                        aria-busy={selected && checkingCoupon}
+                        title={selected ? '取消套用此優惠券' : '套用此優惠券'}
+                        onClick={() => selected ? removeDiscount() : applyDiscount(coupon.code, item.id)}
+                        disabled={!selected && (!check || !check.ok)}
                         className={`rounded-xl border p-3 text-left ${
-                          selectedCoupon?.userCouponId === item.id
+                          selected
                             ? 'border-[var(--c-text)] bg-[var(--c-header)]'
                             : check?.ok === false
                               ? 'border-[var(--c-border)] bg-[var(--c-bg)] opacity-70'
                               : 'border-[var(--c-border)] bg-[var(--c-surface)]'
                         }`}
                       >
-                        <span className="block font-mono font-bold">{coupon.code}</span>
+                        <span className="flex items-start justify-between gap-2">
+                          <span className="min-w-0 break-all font-mono font-bold">{coupon.code}{selected ? checkingCoupon ? '・確認中…' : '・已套用' : ''}</span>
+                          {selected ? checkingCoupon ? <LoaderCircle size={18} aria-hidden="true" className="mt-0.5 shrink-0 motion-safe:animate-spin" /> : <Check size={18} aria-hidden="true" className="mt-0.5 shrink-0" /> : null}
+                        </span>
                         <span className="mt-1 block text-xs text-[var(--c-muted)]">
                           {coupon.type === 'free_shipping' ? '免運' : coupon.type === 'percent' ? `${coupon.value}% 折扣` : `折抵 ${formatter.format(coupon.value)}`}
                           {coupon.min_spend > 0 ? ` / 滿 ${formatter.format(coupon.min_spend)}` : ''}
@@ -760,11 +768,11 @@ export default function CheckoutPage() {
                   })}
                 </div>
               )}
-              {selectedCoupon ? (
-                <div data-selected-coupon className="mb-3 flex items-center justify-between gap-2 rounded-lg border border-[var(--c-border)] px-3 py-2 text-sm">
+              {selectedCoupon && !selectedCoupon.userCouponId ? (
+                <button type="button" data-selected-coupon aria-label="移除優惠券" aria-pressed="true" title="取消套用此優惠券" onClick={removeDiscount} className="mb-3 flex min-h-12 w-full items-center justify-between gap-2 rounded-lg border border-[var(--c-text)] bg-[var(--c-header)] px-3 py-2 text-left text-sm">
                   <span className="min-w-0 break-all">{selectedCoupon.code}{checkingCoupon ? '・確認中…' : '・已套用'}</span>
-                  <button type="button" onClick={removeDiscount} aria-label="移除優惠券" title="移除優惠券" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md hover:bg-[var(--c-soft)]"><X size={18} aria-hidden="true" /></button>
-                </div>
+                  {checkingCoupon ? <LoaderCircle size={18} aria-hidden="true" className="shrink-0 motion-safe:animate-spin" /> : <Check size={18} aria-hidden="true" className="shrink-0" />}
+                </button>
               ) : null}
               <div className="flex gap-2">
                 <input

@@ -6,6 +6,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Product } from '@/lib/types';
 import { productPrice } from '@/lib/product-price';
 import { remainingStock, stockOf } from '@/lib/cart-stock';
+import { initialSpecSelection, resolveSpecSelection, selectedSpecImage } from '@/lib/product-selection';
+import ProductSpecPicker from '@/app/components/ProductSpecPicker';
 import { resolvePromoNotices, type PromoNotice } from '@/lib/promo-notices';
 import StoreHeader from '@/app/components/StoreHeader';
 import { useLoopCarousel } from '@/app/components/useLoopCarousel';
@@ -41,18 +43,8 @@ export default function ProductDetailClient({ product: initialProduct, homeHref 
   const activeImage = colorImage || gallery[carousel.realIndex] || '';
   const [selectedColor, setSelectedColor] = useState(product.colors[0] ?? '');
   const [selectedSize, setSelectedSize] = useState(product.sizes[0] ?? '');
-  // 預設規格:優先選每個維度的第一個選項;但若那個組合剛好沒庫存,
-  // 會讓商品一開頁就整個顯示「已售完」,即使其他組合明明還有貨。
-  // 改成:第一組合沒貨時,自動改選「第一個還有庫存」的組合。
-  const [specSel, setSpecSel] = useState<string[]>(() => {
-    const first = specs.map((d) => d.options[0] ?? '');
-    if (!specs.length) return first;
-    const variants = product.variants ?? [];
-    const firstVariant = variants.find((v) => v.options.join(' / ') === first.join(' / '));
-    if ((firstVariant?.inventory ?? 0) > 0) return first;
-    const inStock = variants.find((v) => (v.inventory ?? 0) > 0);
-    return inStock ? [...inStock.options] : first;
-  });
+  const [storedSpecSel, setSpecSel] = useState<string[]>(() => initialSpecSelection(product));
+  const specSel = useMemo(() => resolveSpecSelection(product, storedSpecSel), [product, storedSpecSel]);
   const [requestedQuantity, setQuantity] = useState(1);
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [tab, setTab] = useState<'description' | 'shipping'>('description');
@@ -223,15 +215,6 @@ export default function ProductDetailClient({ product: initialProduct, homeHref 
     addedTimer.current = setTimeout(() => setAdded(false), 3000);
   }
 
-  // 某規格選項在「其他維度目前的選擇」下是否有庫存;沒有就反白(不可選)
-  function optionAvailable(dimIndex: number, opt: string) {
-    if (!hasSpecs) return true;
-    const candidate = specSel.map((v, idx) => (idx === dimIndex ? opt : v));
-    const key = candidate.join(' / ');
-    const variant = (product.variants ?? []).find((v) => v.options.join(' / ') === key);
-    return (variant?.inventory ?? 0) > 0;
-  }
-
   function addToCart(action: 'cart' | 'buy') {
     if (hasSpecs && !allSpecsChosen) {
       showToast('請先選擇完整規格');
@@ -318,6 +301,7 @@ export default function ProductDetailClient({ product: initialProduct, homeHref 
                 <img
                   key={`${url}-${i}`}
                   ref={!colorImage && i === carousel.pos ? mainImgRef : undefined}
+                  data-product-spec-image={!colorImage && i === carousel.pos ? '' : undefined}
                   src={url}
                   alt={product.name}
                   draggable={false}
@@ -332,6 +316,7 @@ export default function ProductDetailClient({ product: initialProduct, homeHref 
           {colorImage && (
             <img
               ref={mainImgRef}
+              data-product-spec-image
               src={colorImage}
               alt={product.name}
               className="pointer-events-none absolute inset-0 h-full w-full bg-[#eee8e1] object-contain drop-shadow-[0_18px_22px_rgba(31,27,25,0.22)]"
@@ -408,45 +393,11 @@ export default function ProductDetailClient({ product: initialProduct, homeHref 
 
           {hasSpecs ? (
             <>
-              {specs.map((dim, i) => (
-                <section key={dim.name} className="mt-3">
-                  <p className="mb-1.5 text-xs text-[var(--c-muted)]">
-                    {dim.name}：{specSel[i] || '請選擇'}
-                  </p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {dim.options.map((opt) => {
-                      const selected = specSel[i] === opt;
-                      const available = optionAvailable(i, opt);
-                      // 選中但整組售完也反白;非選中則看該搭配有沒有庫存
-                      const grayed = selected ? soldOut : !available;
-                      return (
-                        <button
-                          key={opt}
-                          disabled={!selected && !available}
-                          onClick={() => {
-                            setSpecSel((prev) => prev.map((v, idx) => (idx === i ? opt : v)));
-                            // 任何規格(顏色、款式…)有上傳規格圖,點選就在上方顯示大圖
-                            if (product.color_images?.[opt]) {
-                              showImage(product.color_images[opt]);
-                            }
-                          }}
-                          title={opt}
-                          aria-label={opt}
-                          className={`relative bg-transparent ${dim.display === 'image' && product.color_images?.[opt] ? 'h-11 w-11 overflow-hidden p-0' : 'min-w-10 px-3 py-[7px] text-xs! font-semibold'} ${
-                            grayed
-                              ? 'spec-sold-out cursor-not-allowed border-[0.5px] border-[var(--c-border)] text-[var(--c-text)] opacity-40'
-                              : selected
-                                ? 'border border-[var(--c-sale)] text-[var(--c-sale)]'
-                                : 'border-[0.5px] border-[var(--c-border-strong)] text-[var(--c-text)]'
-                          }`}
-                        >
-                          {dim.display === 'image' && product.color_images?.[opt] ? <img src={product.color_images[opt]} alt="" className="h-full w-full object-cover" /> : opt}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </section>
-              ))}
+              <ProductSpecPicker product={product} selected={specSel} onChange={(next, option) => {
+                setSpecSel(next);
+                const image = selectedSpecImage(product, next, option);
+                if (image) showImage(image);
+              }} />
               <p className="mt-2 text-xs">
                 {!allSpecsChosen ? (
                   <span className="text-[var(--c-muted)]">請選擇完整規格</span>

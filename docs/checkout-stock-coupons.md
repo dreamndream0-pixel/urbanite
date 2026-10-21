@@ -18,7 +18,8 @@
 - Still-eligible percentage/free-shipping discounts are recalculated automatically.
 - An invalid coupon is removed from both selection and input. A notice states that the order no longer meets the threshold or usage conditions and asks the customer to choose again.
 - Temporary validation failures remove the unconfirmed discount with a distinct retry notice, not a misleading eligibility message.
-- The remove icon remains available during validation. Clicking the selected member coupon also removes it.
+- A member coupon displays its selected/checking state and checkmark directly on that coupon. Clicking it applies it; clicking the same coupon again cancels, including during validation. There is no duplicate selected-coupon panel for member coupons.
+- A manually entered code has a selectable applied-coupon row; clicking that row cancels it.
 - Obsolete responses cannot restore a removed coupon, replace a newer selection or display an old rejection.
 - Order submission is disabled while coupon validation is pending. Server-side validation and coupon consumption are unchanged.
 
@@ -26,6 +27,7 @@
 
 ```powershell
 node scripts/test-cart-stock.cjs
+node scripts/test-product-selection.cjs
 node scripts/test-checkout-stock-browser.cjs <playwright-module-path> http://localhost:<port>/checkout-stock-test
 npm run build
 ```
@@ -33,3 +35,11 @@ npm run build
 For browser tests only, temporarily mount `scripts/fixtures/CheckoutStockFixture.tsx` from a local route. Remove that route before the final production build. The tests intercept all browser API traffic and never create real orders or payments.
 
 Coverage includes 320/390 px Chromium, iPhone-sized WebKit, desktop, stock caps, shared stock, low-stock variants, existing cart deductions, stale quantities, missing items, member/manual coupon removal, changed category/product eligibility at the same subtotal, shipping/percentage recalculation, unavailable validation and delayed-response races.
+
+## Shared Spec Picker
+
+- Product detail and the homepage/campaign quick-add dialog render `ProductSpecPicker` and use `lib/product-selection.ts`.
+- Both honor the same option order, text/photo display settings and option images. The selected option updates the image, variant price and stock-limited quantity.
+- If a color/size is available only in another combination, choosing it keeps other choices where possible and moves to an available combination rather than trapping the buyer between disabled options.
+- Changed backend spec definitions are resolved against current options, not an old cached selection. Sold-out choices remain unavailable; no-spec products keep the existing simple flow.
+- Browser tests compare both rendered pickers and verify image assets, schema refreshes and exact variant/price/quantity written to the cart.
