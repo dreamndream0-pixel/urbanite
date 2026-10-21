@@ -60,7 +60,7 @@ export default function CreditCard({ onDesignChange }: { onDesignChange?: (desig
     : data.expiringSoon > 0 ? `${money(data.expiringSoon)} 將在 30 天內到期`
     : data.balance > 0 ? '結帳時可折抵,1 元抵 NT$1。' : '訂單完成後依會員等級累積回饋金。';
   return (
-    <div className="mt-7">
+    <div>
       {imageCard && data.card ? <MembershipCard tier={data.tier} next={data.next} spend={data.spend} toNext={data.toNext} memberName={data.card.memberName} brandName={data.card.brandName} settings={data.card.settings} periodMonths={data.rules.keepMonths} credit={{ balance: data.balance, status: sub }} immersive onAction={toggleDetails} expanded={open} detailsId={detailsId} animate revealKey={reveal} /> : null}
       <div className={imageCard ? 'text-[var(--c-text)]' : 'rounded-[22px] bg-[var(--c-surface)]/55 shadow-[0_8px_24px_rgba(64,52,43,0.06)] backdrop-blur-[2px]'}>
       {!imageCard ? <button type="button" onClick={toggleDetails} aria-expanded={open} aria-controls={enabled ? detailsId : undefined} className="flex w-full items-center gap-4 p-4 text-left sm:p-5">

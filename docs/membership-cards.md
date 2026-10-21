@@ -63,8 +63,10 @@ positions and all nine SVG choices across mobile, WebKit and desktop widths.
 The duplicate external VIP heading/benefit list and external credit summary are
 removed when an image card is active. Its action still opens the existing tier
 and transaction details, including available, pending and expiring balances.
-The entire upper rewards band uses a matching backdrop for each of ten designs;
-the artwork's outer backdrop fades into that color without changing the physical
+The entire upper rewards band uses a matching backdrop for each of ten designs.
+It starts with the membership card, without the old coupons heading, English
+subtitle or promotional copy. The former heading gap is removed as well.
+The artwork's outer backdrop fades into that color without changing the physical
 card or source pixels. Disabling image cards restores the classic rewards view
 and the shop's existing coupon hero image.
 Card copy uses the site's existing Noto Serif TC with Chinese serif fallbacks.

@@ -43,6 +43,14 @@ const initial = () => ({ enabled: true, delayDays: 14, validDays: 180, maxRedeem
       const customer = page.getByRole('region', { name: '會員中心', exact: true });
       const customerCard = customer.locator('[data-membership-card]');
       await customerCard.waitFor();
+      for (const text of ['我的優惠', 'MY COUPONS', '收藏喜歡的優惠，享受更好的購物體驗。']) {
+        assert.equal(await customer.getByText(text, { exact: true }).count(), 0, 'Remove the header copy above the membership card');
+      }
+      assert.ok(await customerCard.evaluate((card) => {
+        const hero = card.closest('[data-rewards-hero]');
+        const gap = card.getBoundingClientRect().top - hero.getBoundingClientRect().top;
+        return gap >= 0 && gap <= 16;
+      }), 'Card starts directly below the tabs without the old heading gap');
       const typography = await customerCard.evaluate((card) => {
         const art = card.firstElementChild;
         const size = (el) => parseFloat(getComputedStyle(el).fontSize);
