@@ -8,6 +8,7 @@ import { createBrowserSupabase } from '@/lib/supabase/client';
 import type { Product, Category, SiteSettings, Banner, Campaign, StorefrontBootstrap } from '@/lib/types';
 import { canOptimizeStoreImage } from '@/lib/store-image';
 import { formatProductPrice, productPrice, repriceCart } from '@/lib/product-price';
+import { cartItemLimit, remainingStock, stockOf } from '@/lib/cart-stock';
 import { uiAlert } from '@/lib/ui-dialog';
 import { computeShipping } from '@/lib/shipping';
 import { setShopHome } from '@/lib/shop-home';
@@ -60,18 +61,6 @@ function cacheStore(key: string, patch: StoreData) {
 function cachedStore(key: string, campaign: boolean) {
   const c = storeCache.get(key);
   return c && c.products && c.categories && c.settings !== undefined && (campaign || c.banners) ? c : undefined;
-}
-
-// 依商品/規格計算目前可加入的庫存;預購商品不受限。
-function stockOf(product: Product | undefined, variant: string): number {
-  if (!product) return Number.POSITIVE_INFINITY;
-  if ((product.sale_mode || '').includes('預購')) return Number.POSITIVE_INFINITY;
-  const vs = product.variants ?? [];
-  if (vs.length > 0) {
-    const v = vs.find((vv) => vv.options.join(' / ') === variant);
-    return Math.max(0, v?.inventory ?? 0);
-  }
-  return Math.max(0, product.inventory ?? 0);
 }
 
 type CartItem = {
@@ -150,8 +139,9 @@ export default function Storefront({ campaign = null, preview = false, initialDa
   // 購物車一律先以空陣列渲染,掛載後再從 localStorage 載入,
   // 這樣伺服器與瀏覽器第一次渲染一致,避免 hydration 不匹配警告。
   const [storedCart, setCart] = useState<CartItem[]>(() => (cached ? readCart() : []));
-  const [cartCatalog, setCartCatalog] = useState<Product[]>([]);
-  const cart = useMemo(() => repriceCart(storedCart, [...cartCatalog, ...products]), [storedCart, cartCatalog, products]);
+  const [cartCatalog, setCartCatalog] = useState<Product[] | null>(null);
+  const stockCatalog = cartCatalog ?? products;
+  const cart = useMemo(() => repriceCart(storedCart, stockCatalog), [storedCart, stockCatalog]);
   const [cartHydrated, setCartHydrated] = useState(!!cached);
   const [user, setUser] = useState<{ email: string; name: string; isAdmin: boolean } | null>(null);
   const [quickAdd, setQuickAdd] = useState<Product | null>(null);
@@ -265,11 +255,15 @@ export default function Storefront({ campaign = null, preview = false, initialDa
 
   // 掛載後才從 localStorage 載入購物車
   useEffect(() => {
-    if (cached) return;
-    Promise.resolve().then(() => {
+    const refresh = () => {
       setCart(readCart());
       setCartHydrated(true);
-    });
+    };
+    if (!cached) Promise.resolve().then(refresh);
+    const onStorage = (event: StorageEvent) => { if (event.key === CART_KEY || event.key === null) refresh(); };
+    window.addEventListener('storage', onStorage);
+    window.addEventListener('focus', refresh);
+    return () => { window.removeEventListener('storage', onStorage); window.removeEventListener('focus', refresh); };
   }, [cached]);
 
   useEffect(() => {
@@ -425,18 +419,27 @@ export default function Storefront({ campaign = null, preview = false, initialDa
 
   const activeCategory = categoryTabs.flatMap((c) => [c, ...(c.children ?? [])]).find((c) => c.slug === category) ?? ALL_TAB;
 
-  // 購物車縮圖:購物車可能有另一個商店(主站/活動頁)的商品,不在本頁清單時另外查詢
-  const missingCartIds = cart.some((item) => !products.some((p) => p.id === item.productId) && !cartCatalog.some((p) => p.id === item.productId));
+  // Opening cart/quick add bypasses the cached storefront stock, including campaign items.
   useEffect(() => {
-    if (!cartOpen || !missingCartIds) return;
-    fetch('/api/products?cart=1')
-      .then((res) => (res.ok ? res.json() : []))
-      .then((data: Product[]) => setCartCatalog(data))
-      .catch(() => {});
-  }, [cartOpen, missingCartIds]);
+    if (!cartOpen && !quickAdd) return;
+    let alive = true;
+    let stockRequest = 0;
+    const refresh = async () => {
+      const request = ++stockRequest;
+      try {
+        const res = await fetch('/api/products?cart=1', { cache: 'no-store' });
+        if (!res.ok) throw new Error('Stock unavailable');
+        const data: Product[] = await res.json();
+        if (alive && request === stockRequest) setCartCatalog(data);
+      } catch { /* Keep the last known stock; checkout requires a fresh read. */ }
+    };
+    void refresh();
+    window.addEventListener('focus', refresh);
+    return () => { alive = false; window.removeEventListener('focus', refresh); };
+  }, [cartOpen, quickAdd]);
 
   function cartImage(item: CartItem) {
-    const product = products.find((p) => p.id === item.productId) ?? cartCatalog.find((p) => p.id === item.productId);
+    const product = stockCatalog.find((p) => p.id === item.productId);
     if (!product) return '';
     // 有該顏色的專屬圖就用顏色圖
     const colorImage = item.variant.split(' / ').map((option) => product.color_images?.[option]).find(Boolean);
@@ -447,6 +450,9 @@ export default function Storefront({ campaign = null, preview = false, initialDa
     product: Product,
     opts?: { variant?: string; quantity?: number; openCart?: boolean },
   ) {
+    const latest = stockCatalog.find((entry) => entry.id === product.id);
+    if (!latest) { void uiAlert('此商品目前無法購買，請重新選擇。'); return false; }
+    product = latest;
     const quantity = opts?.quantity ?? 1;
     const variant =
       opts?.variant ??
@@ -457,17 +463,18 @@ export default function Storefront({ campaign = null, preview = false, initialDa
     const id = `${product.id}-${variant}`;
     const stock = stockOf(product, variant);
     const current = cart.find((item) => item.id === id)?.quantity ?? 0;
+    const available = remainingStock(product, variant, cart);
 
     if (stock <= 0) {
       void uiAlert('此商品目前無庫存,暫時無法加入購物車。');
-      return;
+      return false;
     }
     const desired = current + quantity;
-    const capped = Math.min(desired, stock);
+    const capped = current + Math.min(quantity, available);
     if (capped <= current) {
       void uiAlert(`此商品（${variant}）庫存僅剩 ${stock} 件,購物車已達可加入上限。`);
       if (opts?.openCart !== false) setCartOpen(true);
-      return;
+      return false;
     }
     if (capped < desired) {
       void uiAlert(`此商品（${variant}）庫存僅剩 ${stock} 件,已為你調整為最大可購數量。`);
@@ -484,6 +491,7 @@ export default function Storefront({ campaign = null, preview = false, initialDa
     });
     notifyAdded();
     if (opts?.openCart !== false) setCartOpen(true);
+    return true;
   }
 
   function updateCart(id: string, change: number) {
@@ -493,8 +501,9 @@ export default function Storefront({ campaign = null, preview = false, initialDa
           if (item.id !== id) return item;
           let next = item.quantity + change;
           if (change > 0) {
-            const stock = stockOf(products.find((p) => p.id === item.productId), item.variant);
+            const stock = cartItemLimit(item, items, stockCatalog.find((p) => p.id === item.productId));
             next = Math.min(next, stock);
+            if (next <= item.quantity) return item;
           }
           return { ...item, quantity: Math.max(0, next) };
         })
@@ -669,7 +678,8 @@ export default function Storefront({ campaign = null, preview = false, initialDa
         onClose={() => setCartOpen(false)}
         onUpdate={updateCart}
         onAdd={(product) => addToCart(product, { openCart: false })}
-        maxOf={(item) => stockOf(products.find((p) => p.id === item.productId), item.variant)}
+        maxOf={(item) => cartItemLimit(item, cart, stockCatalog.find((p) => p.id === item.productId))}
+        stockValid={cart.every((item) => item.quantity <= cartItemLimit(item, cart, stockCatalog.find((p) => p.id === item.productId)))}
         imageOf={cartImage}
         onCheckout={() => {
           setCartOpen(false);
@@ -692,7 +702,8 @@ export default function Storefront({ campaign = null, preview = false, initialDa
       {/* 快速加入購物車懸浮視窗 */}
       {quickAdd && (
         <QuickAddModal
-          product={quickAdd}
+          product={stockCatalog.find((product) => product.id === quickAdd.id) ?? { ...quickAdd, status: '已下架', inventory: 0, variants: [] }}
+          cart={cart}
           favorited={favorites.has(quickAdd.id)}
           favoritePending={favoritePending.has(quickAdd.id)}
           favoritesLoaded={favoritesLoaded}
@@ -701,7 +712,7 @@ export default function Storefront({ campaign = null, preview = false, initialDa
           onFly={flyToCart}
           onAdd={(variant, quantity, buyNow) => {
             // 商品卡加入購物車:只顯示飛入動畫與「已加入購物車」提示,不自動打開購物車清單
-            addToCart(quickAdd, { variant, quantity, openCart: false });
+            if (!addToCart(quickAdd, { variant, quantity, openCart: false })) return;
             setQuickAdd(null);
             if (buyNow) router.push('/checkout');
           }}
@@ -1400,6 +1411,7 @@ function CartDrawer({
   onUpdate,
   onAdd,
   maxOf,
+  stockValid,
   imageOf,
   onCheckout,
 }: {
@@ -1413,6 +1425,7 @@ function CartDrawer({
   onUpdate: (id: string, change: number) => void;
   onAdd: (product: Product) => void;
   maxOf: (item: CartItem) => number;
+  stockValid: boolean;
   imageOf: (item: CartItem) => string;
   onCheckout: () => void;
 }) {
@@ -1486,7 +1499,7 @@ function CartDrawer({
                     </button>
                   </div>
                   {Number.isFinite(maxOf(item)) && item.quantity >= maxOf(item) ? (
-                    <span className="text-xs text-[#c0392b]">已達庫存上限（{maxOf(item)}）</span>
+                    <span className="text-xs text-[#c0392b]">{maxOf(item) === 0 ? '目前無法購買，請移除' : item.quantity > maxOf(item) ? `目前最多可購 ${maxOf(item)} 件，請調整數量` : `已達庫存上限（${maxOf(item)}）`}</span>
                   ) : null}
                 </div>
                 </div>
@@ -1547,7 +1560,7 @@ function CartDrawer({
           <button
             className="mt-4 w-full rounded-full bg-[var(--c-sale)] px-5 py-3 font-semibold text-white disabled:opacity-50"
             onClick={onCheckout}
-            disabled={cart.length === 0}
+            disabled={cart.length === 0 || !stockValid}
           >
             訂單結帳
           </button>
@@ -1568,6 +1581,7 @@ function Row({ label, value, strong = false }: { label: string; value: string; s
 
 function QuickAddModal({
   product,
+  cart,
   favorited,
   favoritePending,
   favoritesLoaded,
@@ -1577,6 +1591,7 @@ function QuickAddModal({
   onFly,
 }: {
   product: Product;
+  cart: CartItem[];
   favorited: boolean;
   favoritePending: boolean;
   favoritesLoaded: boolean;
@@ -1595,26 +1610,23 @@ function QuickAddModal({
   // 避免商品明明還有貨,卻因為預設卡在售完組合而整個顯示已售完。
   const [specSel, setSpecSel] = useState<string[]>(() => {
     const first = specs.map((d) => d.options[0] ?? '');
-    if (!specs.length || (product.sale_mode || '').includes('預購')) return first;
+    if (!specs.length) return first;
     const variants = product.variants ?? [];
     const firstVariant = variants.find((v) => v.options.join(' / ') === first.join(' / '));
     if ((firstVariant?.inventory ?? 0) > 0) return first;
     const inStock = variants.find((v) => (v.inventory ?? 0) > 0);
     return inStock ? [...inStock.options] : first;
   });
-  const [quantity, setQuantity] = useState(1);
+  const [requestedQuantity, setQuantity] = useState(1);
 
   const variantLabel = hasSpecs
     ? specSel.filter(Boolean).join(' / ') || '標準款'
     : [color, size].filter(Boolean).join(' / ') || '標準款';
   const allChosen = !hasSpecs || specSel.every(Boolean);
-  const variant = hasSpecs
-    ? (product.variants ?? []).find((v) => v.options.join(' / ') === specSel.join(' / '))
-    : null;
-  const inv = hasSpecs ? variant?.inventory ?? 0 : product.inventory;
-  const preorder = (product.sale_mode || '').includes('預購');
-  const soldOut = /售完|完售|sold\s*out/i.test(product.status || '') || (!preorder && allChosen && inv <= 0);
-  const maxQty = preorder ? Number.POSITIVE_INFINITY : Math.max(0, hasSpecs ? (allChosen ? inv : 0) : product.inventory ?? 0);
+  const inv = stockOf(product, variantLabel);
+  const soldOut = allChosen && inv <= 0;
+  const maxQty = allChosen ? remainingStock(product, variantLabel, cart) : 0;
+  const quantity = Math.min(requestedQuantity, Math.max(1, maxQty));
 
   // 某規格選項在「其他維度目前選擇」下有沒有庫存;沒有就反白
   function optionAvailable(dimIndex: number, opt: string) {
@@ -1751,31 +1763,33 @@ function QuickAddModal({
         <section className="mt-4">
           <p className="mb-2 text-sm text-[var(--c-muted)]">數量</p>
           <div className="grid h-11 w-36 grid-cols-[40px_1fr_40px] border border-[var(--c-border)]">
-            <button onClick={() => setQuantity((q) => Math.max(1, q - 1))} className="text-xl font-bold">
+            <button aria-label="減少數量" disabled={quantity <= 1} onClick={() => setQuantity(Math.max(1, quantity - 1))} className="text-xl font-bold disabled:opacity-30">
               -
             </button>
-            <div className="flex items-center justify-center border-x border-[var(--c-border)]">{quantity}</div>
+            <div data-product-quantity className="flex items-center justify-center border-x border-[var(--c-border)]">{quantity}</div>
             <button
-              onClick={() => setQuantity((q) => Math.min(q + 1, Math.max(1, maxQty)))}
+              aria-label="增加數量"
+              onClick={() => setQuantity(Math.min(quantity + 1, Math.max(1, maxQty)))}
               disabled={quantity >= maxQty}
               className="text-xl font-bold disabled:cursor-not-allowed disabled:opacity-30"
             >
               +
             </button>
           </div>
+          {allChosen && !soldOut && quantity >= maxQty ? <p role="status" className="mt-2 text-xs text-[#c0392b]">{maxQty === 0 ? '購物車已達此規格的庫存上限' : `最多還可加入 ${maxQty} 件（已扣除購物車數量）`}</p> : null}
         </section>
 
         <div className="mt-6 grid grid-cols-2 gap-3">
           <button
             onClick={() => { onFly?.(product.image, imgRef.current?.getBoundingClientRect() ?? null); onAdd(variantLabel, quantity, false); }}
-            disabled={!allChosen || soldOut}
+            disabled={!allChosen || soldOut || maxQty <= 0}
             className="rounded-full bg-[var(--c-sale)] px-4 py-3 font-semibold text-white disabled:opacity-50"
           >
             {soldOut ? 'SOLD OUT' : '加入購物車'}
           </button>
           <button
             onClick={() => onAdd(variantLabel, quantity, true)}
-            disabled={!allChosen || soldOut}
+            disabled={!allChosen || soldOut || maxQty <= 0}
             className="rounded-full bg-[#ff761a] px-4 py-3 font-semibold text-white disabled:opacity-50"
           >
             立即購買

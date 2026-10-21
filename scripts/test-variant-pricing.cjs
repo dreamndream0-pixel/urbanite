@@ -38,7 +38,7 @@ assert.equal(pricing.productPriceError({ variants: [{ options: ['1入'] }, { opt
     let data;
     let patch;
     const chain = {
-      select: () => chain, eq: () => chain, in: () => chain, like: () => chain,
+      select: () => chain, eq: () => chain, in: () => chain, like: () => chain, order: () => chain, limit: () => chain, is: () => chain,
       insert: (value) => { data = value; writes.push({ table, value }); return chain; },
       update: (value) => { patch = value; writes.push({ table, value }); return chain; },
       maybeSingle: async () => ({ data: table === 'site_settings' ? { shipping_fees: [] } : null, error: null }),
@@ -54,6 +54,7 @@ assert.equal(pricing.productPriceError({ variants: [{ options: ['1入'] }, { opt
     '@/lib/shop': { shopAdminClient: async () => db, requireCurrentShop: async () => ({ slug: 'shop' }), isPlatformShop: () => true, getCurrentShop: async () => ({ id: 'shop' }), shopUrl: () => '' },
     '@/lib/campaign': { isCampaignLive: () => true },
     '@/lib/product-price': pricing,
+    '@/lib/product-order': load('lib/product-order.ts'),
   };
   const create = load('app/api/products/route.ts', shared);
   const edit = load('app/api/products/[id]/route.ts', shared);

@@ -5,6 +5,7 @@ import { cleanRichText } from '@/lib/rich-text';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Product } from '@/lib/types';
 import { productPrice } from '@/lib/product-price';
+import { remainingStock, stockOf } from '@/lib/cart-stock';
 import { resolvePromoNotices, type PromoNotice } from '@/lib/promo-notices';
 import StoreHeader from '@/app/components/StoreHeader';
 import { useLoopCarousel } from '@/app/components/useLoopCarousel';
@@ -25,7 +26,9 @@ type CartItem = {
 const ntd = (n: number) => `NT $${Math.round(Number(n) || 0).toLocaleString('en-US')}`;
 
 
-export default function ProductDetailClient({ product, homeHref = '/', categoryName = '' }: { product: Product; homeHref?: string; categoryName?: string }) {
+export default function ProductDetailClient({ product: initialProduct, homeHref = '/', categoryName = '' }: { product: Product; homeHref?: string; categoryName?: string }) {
+  const [liveProduct, setLiveProduct] = useState<Product | null>(null);
+  const product = liveProduct?.id === initialProduct.id ? liveProduct : initialProduct;
   const gallery = product.images?.length ? product.images : product.image ? [product.image] : [];
   const specs = product.specs ?? [];
   // 促銷管理 → 活動管理的商品頁促銷文字
@@ -43,14 +46,15 @@ export default function ProductDetailClient({ product, homeHref = '/', categoryN
   // 改成:第一組合沒貨時,自動改選「第一個還有庫存」的組合。
   const [specSel, setSpecSel] = useState<string[]>(() => {
     const first = specs.map((d) => d.options[0] ?? '');
-    if (!specs.length || (product.sale_mode || '').includes('預購')) return first;
+    if (!specs.length) return first;
     const variants = product.variants ?? [];
     const firstVariant = variants.find((v) => v.options.join(' / ') === first.join(' / '));
     if ((firstVariant?.inventory ?? 0) > 0) return first;
     const inStock = variants.find((v) => (v.inventory ?? 0) > 0);
     return inStock ? [...inStock.options] : first;
   });
-  const [quantity, setQuantity] = useState(1);
+  const [requestedQuantity, setQuantity] = useState(1);
+  const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [tab, setTab] = useState<'description' | 'shipping'>('description');
   // 畫面置中的提示(深灰 80% 半透明,3 秒後消失)
   const [toast, setToast] = useState('');
@@ -73,8 +77,10 @@ export default function ProductDetailClient({ product, homeHref = '/', categoryN
     try {
       const raw = localStorage.getItem(CART_KEY);
       const cart: CartItem[] = raw ? JSON.parse(raw) : [];
+      setCartItems(cart);
       setCartCount(cart.reduce((n, it) => n + it.quantity, 0));
     } catch {
+      setCartItems([]);
       setCartCount(0);
     }
   }
@@ -85,6 +91,24 @@ export default function ProductDetailClient({ product, homeHref = '/', categoryN
 
   useEffect(() => {
     Promise.resolve().then(refreshCartCount);
+    let alive = true;
+    let stockRequest = 0;
+    const refresh = () => {
+      const request = ++stockRequest;
+      refreshCartCount();
+      void fetch('/api/products?cart=1', { cache: 'no-store' })
+        .then((res) => { if (!res.ok) throw new Error('Stock unavailable'); return res.json(); })
+        .then((products: Product[]) => {
+          if (!alive || request !== stockRequest) return;
+          const current = products.find((entry) => entry.id === initialProduct.id);
+          setLiveProduct(current ?? { ...initialProduct, status: '已下架', inventory: 0, variants: [] });
+        }).catch(() => {});
+    };
+    const onStorage = (event: StorageEvent) => { if (event.key === CART_KEY || event.key === null) refreshCartCount(); };
+    refresh();
+    window.addEventListener('focus', refresh);
+    window.addEventListener('pageshow', refresh);
+    window.addEventListener('storage', onStorage);
 
     fetch('/api/settings')
       .then((res) => (res.ok ? res.json() : null))
@@ -100,10 +124,16 @@ export default function ProductDetailClient({ product, homeHref = '/', categoryN
       .then((data: { productIds?: string[] }) => {
         const ids = data.productIds ?? [];
         setFavoriteCount(ids.length);
-        setFavorite(ids.includes(product.id));
+        setFavorite(ids.includes(initialProduct.id));
       })
       .catch(() => {});
-  }, [product.id]);
+    return () => {
+      alive = false;
+      window.removeEventListener('focus', refresh);
+      window.removeEventListener('pageshow', refresh);
+      window.removeEventListener('storage', onStorage);
+    };
+  }, [initialProduct]);
 
   // 收藏/取消收藏,存在會員帳號(與首頁商品卡的愛心同一份清單)
   async function toggleFavorite() {
@@ -141,22 +171,13 @@ export default function ProductDetailClient({ product, homeHref = '/', categoryN
   }, [hasSpecs, specSel, selectedColor, selectedSize]);
   const selectedPrice = productPrice(product, variantLabel);
 
-  // 依所選規格找到對應的庫存組合
-  const selectedVariant = useMemo(() => {
-    if (!hasSpecs) return null;
-    const key = specSel.join(' / ');
-    return (product.variants ?? []).find((v) => v.options.join(' / ') === key) ?? null;
-  }, [hasSpecs, specSel, product.variants]);
-
   const allSpecsChosen = !hasSpecs || specSel.every(Boolean);
-  const variantInventory = hasSpecs ? selectedVariant?.inventory ?? 0 : product.inventory;
-  const preorder = (product.sale_mode || '').includes('預購');
+  const variantInventory = stockOf(product, variantLabel);
   const soldOut =
     /售完|完售|sold\s*out/i.test(product.status || '') ||
-    (!preorder && allSpecsChosen && variantInventory <= 0);
-  const maxQty = preorder
-    ? Number.POSITIVE_INFINITY
-    : Math.max(0, hasSpecs ? (allSpecsChosen ? variantInventory : 0) : product.inventory ?? 0);
+    (allSpecsChosen && variantInventory <= 0);
+  const maxQty = allSpecsChosen ? remainingStock(product, variantLabel, cartItems) : 0;
+  const quantity = Math.min(requestedQuantity, Math.max(1, maxQty));
 
   const cartIconRef = useRef<HTMLButtonElement>(null);
   const mainImgRef = useRef<HTMLImageElement>(null);
@@ -226,13 +247,15 @@ export default function ProductDetailClient({ product, homeHref = '/', categoryN
       const cart: CartItem[] = raw ? JSON.parse(raw) : [];
       const existing = cart.find((it) => it.id === id);
       const current = existing?.quantity ?? 0;
-      const capped = Math.min(current + quantity, maxQty);
+      const stock = stockOf(product, variantLabel);
+      const capped = current + Math.min(quantity, remainingStock(product, variantLabel, cart));
       if (capped <= current) {
-        showToast(`此商品（${variantLabel}）庫存僅剩 ${maxQty} 件,已達可加入上限。`);
+        refreshCartCount();
+        showToast(`此商品（${variantLabel}）庫存僅剩 ${stock} 件,已達可加入上限。`);
         return;
       }
       if (capped < current + quantity) {
-        showToast(`此商品（${variantLabel}）庫存僅剩 ${maxQty} 件,已為你調整數量。`);
+        showToast(`此商品（${variantLabel}）庫存僅剩 ${stock} 件,已為你調整數量。`);
       }
       if (existing) {
         existing.quantity = capped;
@@ -484,31 +507,33 @@ export default function ProductDetailClient({ product, homeHref = '/', categoryN
           <section className="mt-4">
             <p className="mb-1.5 text-xs text-[var(--c-muted)]">數量</p>
             <div className="grid h-8 grid-cols-[32px_1fr_32px] border border-[var(--c-border)] text-sm">
-              <button onClick={() => setQuantity((q) => Math.max(1, q - 1))} className="text-lg! font-bold">
+              <button aria-label="減少數量" disabled={quantity <= 1} onClick={() => setQuantity(Math.max(1, quantity - 1))} className="text-lg! font-bold disabled:opacity-30">
                 -
               </button>
-              <div className="flex items-center justify-center border-x border-[var(--c-border)]">{quantity}</div>
+              <div data-product-quantity className="flex items-center justify-center border-x border-[var(--c-border)]">{quantity}</div>
               <button
-                onClick={() => setQuantity((q) => Math.min(q + 1, Math.max(1, maxQty)))}
+                aria-label="增加數量"
+                onClick={() => setQuantity(Math.min(quantity + 1, Math.max(1, maxQty)))}
                 disabled={quantity >= maxQty}
                 className="text-lg! font-bold disabled:cursor-not-allowed disabled:opacity-30"
               >
                 +
               </button>
             </div>
+            {allSpecsChosen && !soldOut && quantity >= maxQty ? <p role="status" className="mt-2 text-xs text-[#c0392b]">{maxQty === 0 ? '購物車已達此規格的庫存上限' : `最多還可加入 ${maxQty} 件（已扣除購物車數量）`}</p> : null}
           </section>
 
           <div className="mt-3 grid grid-cols-2 gap-2">
             <button
               onClick={() => addToCart('cart')}
-              disabled={soldOut}
+              disabled={soldOut || !allSpecsChosen || maxQty <= 0}
               className="bg-[var(--c-cart-button)] px-3 py-2 text-sm! font-semibold text-white disabled:opacity-50"
             >
               {soldOut ? 'SOLD OUT' : '加入購物車'}
             </button>
             <button
               onClick={() => addToCart('buy')}
-              disabled={soldOut}
+              disabled={soldOut || !allSpecsChosen || maxQty <= 0}
               className="bg-[var(--c-buy-button)] px-3 py-2 text-sm! font-semibold text-white disabled:opacity-50"
             >
               立即購買

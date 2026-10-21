@@ -1,10 +1,13 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { X } from 'lucide-react';
 import Link from 'next/link';
 import type { Product, Recipient, SiteSettings, UserCoupon } from '@/lib/types';
 import { isOnlinePayment } from '@/lib/payment';
 import { repriceCart } from '@/lib/product-price';
+import { cartItemLimit } from '@/lib/cart-stock';
+import { uiAlert } from '@/lib/ui-dialog';
 import { TW_CITIES, TW_REGIONS } from '@/lib/tw-regions';
 import { computeShipping, resolveMethodFee } from '@/lib/shipping';
 import ShopHeader from '@/app/components/ShopHeader';
@@ -28,6 +31,9 @@ type CartItem = {
   price: number;
   quantity: number;
 };
+
+type CouponSelection = { code: string; userCouponId: string };
+type CouponCheck = { selection: CouponSelection; context: string; amount: number };
 
 type PickupStore = {
   store_id: string;
@@ -115,8 +121,9 @@ export default function CheckoutPage() {
   const [paymentMethod, setPaymentMethod] = useState(PAYMENT_METHODS[0]);
   const [discountInput, setDiscountInput] = useState('');
   const [memberCoupons, setMemberCoupons] = useState<UserCoupon[]>([]);
-  const [applied, setApplied] = useState<{ code: string; amount: number; userCouponId?: string } | null>(null);
-  const [couponChecks, setCouponChecks] = useState<Record<string, { ok: boolean; discount: number; error?: string; label?: string }>>({});
+  const [selectedCoupon, setSelectedCoupon] = useState<CouponSelection | null>(null);
+  const [validatedCoupon, setValidatedCoupon] = useState<CouponCheck | null>(null);
+  const [checkedCoupons, setCheckedCoupons] = useState<{ context: string; checks: Record<string, { ok: boolean; discount: number; error?: string; label?: string }> } | null>(null);
   const [discountMsg, setDiscountMsg] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
@@ -128,6 +135,8 @@ export default function CheckoutPage() {
   const [useCredit, setUseCredit] = useState(false);
 
   useEffect(() => {
+    let active = true;
+    let productRequest = 0;
     Promise.resolve().then(() => {
       setCart(readCart());
       try {
@@ -169,10 +178,21 @@ export default function CheckoutPage() {
       })
       .catch(() => {});
 
-    fetch('/api/products?cart=1', { cache: 'no-store' })
-      .then((res) => { if (!res.ok) throw new Error('Product prices unavailable'); return res.json(); })
-      .then((data: Product[]) => { setProducts(data); setPriceState('ready'); })
-      .catch(() => setPriceState('error'));
+    const refreshProducts = async () => {
+      const request = ++productRequest;
+      try {
+        const res = await fetch('/api/products?cart=1', { cache: 'no-store' });
+        if (!res.ok) throw new Error('Product prices unavailable');
+        const data: Product[] = await res.json();
+        if (active && request === productRequest) { setProducts(data); setPriceState('ready'); }
+      } catch { if (active && request === productRequest) setPriceState('error'); }
+    };
+    void refreshProducts();
+    const refreshCart = () => { setCart(readCart()); void refreshProducts(); };
+    const onStorage = (event: StorageEvent) => { if (event.key === CART_KEY || event.key === null) refreshCart(); };
+    window.addEventListener('focus', refreshCart);
+    window.addEventListener('pageshow', refreshCart);
+    window.addEventListener('storage', onStorage);
 
     fetch('/api/settings')
       .then((res) => (res.ok ? res.json() : null))
@@ -188,6 +208,12 @@ export default function CheckoutPage() {
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => setMemberCoupons((data?.owned ?? []).filter((item: UserCoupon) => item.status === 'available')))
       .catch(() => setMemberCoupons([]));
+    return () => {
+      active = false;
+      window.removeEventListener('focus', refreshCart);
+      window.removeEventListener('pageshow', refreshCart);
+      window.removeEventListener('storage', onStorage);
+    };
   }, []);
 
   const subtotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
@@ -214,6 +240,14 @@ export default function CheckoutPage() {
     ? shippingMethod
     : availableShippingMethods[0] ?? '';
   const shipping = computeShipping(subtotal, cart, products, selectedShippingMethod, resolveMethodFee(settings, selectedShippingMethod));
+  const couponContext = JSON.stringify({ subtotal, shipping, items: cart.map(({ productId, name, variant, price, quantity }) => ({ productId, name, variant, price, quantity })) });
+  const couponChecks = checkedCoupons?.context === couponContext ? checkedCoupons.checks : {};
+  // A response is only usable for the exact cart and selection that were checked.
+  const applied = selectedCoupon && validatedCoupon?.selection === selectedCoupon && validatedCoupon.context === couponContext
+    ? { ...selectedCoupon, amount: validatedCoupon.amount } : null;
+  const checkingCoupon = Boolean(selectedCoupon && !applied);
+  const itemLimit = (item: CartItem) => cartItemLimit(item, cart, products.find((product) => product.id === item.productId));
+  const stockInvalid = cart.some((item) => item.quantity > itemLimit(item));
   // 回饋金上限:商品折扣後金額 × 店家設定 %(運費不可折抵),最終金額以伺服器計算為準
   const creditMax = credit ? Math.max(0, Math.min(credit.balance, Math.floor((Math.max(0, subtotal - (applied?.amount ?? 0)) * credit.maxPct) / 100))) : 0;
   const creditUsed = useCredit ? creditMax : 0;
@@ -270,7 +304,6 @@ export default function CheckoutPage() {
   useEffect(() => {
     let alive = true;
     if (!loaded || priceState !== 'ready' || memberCoupons.length === 0 || subtotal <= 0) {
-      setCouponChecks({});
       return;
     }
     Promise.all(
@@ -302,12 +335,52 @@ export default function CheckoutPage() {
         }
       }),
     ).then((entries) => {
-      if (alive) setCouponChecks(Object.fromEntries(entries));
+      if (alive) setCheckedCoupons({ context: couponContext, checks: Object.fromEntries(entries) });
     });
     return () => {
       alive = false;
     };
-  }, [cart, loaded, priceState, memberCoupons, shipping, subtotal]);
+  }, [cart, loaded, priceState, memberCoupons, shipping, subtotal, couponContext]);
+
+  useEffect(() => {
+    if (!selectedCoupon || !loaded || priceState !== 'ready') return;
+    let alive = true;
+    const invalidate = (text: string) => {
+      setSelectedCoupon(null);
+      setValidatedCoupon(null);
+      setDiscountInput('');
+      setDiscountMsg(text);
+      void uiAlert(text, { title: '優惠券無法使用', confirmText: '重新選擇' });
+    };
+    const check = async () => {
+      try {
+        const context = JSON.parse(couponContext);
+        if (!context.items.length) {
+          invalidate('購物車已變更，不符合優惠券門檻，請重新選擇。');
+          return;
+        }
+        const res = await fetch('/api/discounts/validate', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...context, code: selectedCoupon.code, user_coupon_id: selectedCoupon.userCouponId }),
+        });
+        const data = await res.json();
+        if (!alive) return;
+        if (!res.ok) {
+          invalidate(res.status >= 500
+            ? '暫時無法確認優惠券資格，已取消套用，請重新選擇或稍後再試。'
+            : `不符合優惠券門檻或使用條件${data.error ? `（${data.error}）` : ''}，已取消套用，請重新選擇。`);
+          return;
+        }
+        if (!Number.isFinite(data.discount) || data.discount < 0) throw new Error('Invalid discount');
+        setValidatedCoupon({ selection: selectedCoupon, context: couponContext, amount: data.discount });
+        setDiscountMsg(`已套用 ${selectedCoupon.code}，此訂單省 ${formatter.format(data.discount)}`);
+      } catch {
+        if (alive) invalidate('暫時無法確認優惠券資格，已取消套用，請重新選擇或稍後再試。');
+      }
+    };
+    void check();
+    return () => { alive = false; };
+  }, [selectedCoupon, couponContext, loaded, priceState]);
 
   // 開超商門市地圖:電腦用彈出視窗(選完由回傳頁 postMessage 帶回);手機或彈窗被擋時同頁開,回來再帶回已填資料
   function openStoreMap(shipType: string) {
@@ -418,7 +491,13 @@ export default function CheckoutPage() {
   function updateQty(id: string, change: number) {
     setCart((items) => {
       const next = items
-        .map((item) => (item.id === id ? { ...item, quantity: Math.max(0, item.quantity + change) } : item))
+        .map((item) => {
+          if (item.id !== id) return item;
+          const limit = cartItemLimit(item, items, products.find((product) => product.id === item.productId));
+          const next = change > 0 ? Math.min(item.quantity + change, limit) : item.quantity + change;
+          // A disabled increment must never remove an existing cart line.
+          return change > 0 && next <= item.quantity ? item : { ...item, quantity: Math.max(0, next) };
+        })
         .filter((item) => item.quantity > 0);
       try {
         localStorage.setItem(CART_KEY, JSON.stringify(next));
@@ -429,44 +508,28 @@ export default function CheckoutPage() {
     });
   }
 
-  async function applyDiscount(code = discountInput, userCouponId = '') {
+  function applyDiscount(code = discountInput, userCouponId = '') {
     setDiscountMsg('');
-    if (!code.trim()) return;
-    try {
-      const res = await fetch('/api/discounts/validate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          code,
-          subtotal,
-          shipping,
-          user_coupon_id: userCouponId,
-          items: cart.map((item) => ({
-            productId: item.productId,
-            name: item.name,
-            variant: item.variant,
-            price: item.price,
-            quantity: item.quantity,
-          })),
-        }),
-      });
-      const data = await res.json();
-      if (res.ok) {
-        setApplied({ code: data.code, amount: data.discount, userCouponId: data.user_coupon_id });
-        setDiscountInput(data.code);
-        setDiscountMsg(`已套用 ${data.code}，此訂單省 ${formatter.format(data.discount)}`);
-      } else {
-        setApplied(null);
-        setDiscountMsg(data.error ?? '折扣碼無效');
-      }
-    } catch {
-      setDiscountMsg('連線發生問題');
-    }
+    const normalized = code.trim().toUpperCase();
+    if (!normalized || priceState !== 'ready') return;
+    setDiscountInput(normalized);
+    setSelectedCoupon({ code: normalized, userCouponId });
+  }
+
+  function removeDiscount() {
+    setSelectedCoupon(null);
+    setValidatedCoupon(null);
+    setDiscountInput('');
+    setDiscountMsg('已移除優惠券，可重新選擇。');
   }
 
   async function submitOrder() {
     setMessage(null);
     if (priceState !== 'ready') return;
+    if (checkingCoupon || stockInvalid) {
+      setMessage({ type: 'err', text: checkingCoupon ? '正在確認優惠券資格，請稍候。' : '購物車數量超過目前庫存，請先調整或移除商品。' });
+      return;
+    }
     if (cart.length === 0) {
       setMessage({ type: 'err', text: '購物車是空的' });
       return;
@@ -599,13 +662,13 @@ export default function CheckoutPage() {
         ) : (
           <div className="space-y-6">
             {/* 購買明細 */}
-            <section className="rounded-2xl bg-[var(--c-surface)] p-5 shadow-sm">
+            <section data-checkout-items className="rounded-2xl bg-[var(--c-surface)] p-5 shadow-sm">
               <h2 className="mb-4 font-semibold">購買明細（{cart.length} 件）</h2>
               <div className="space-y-4">
                 {cart.map((item) => {
                   const image = itemImage(item);
                   return (
-                    <div key={item.id} className="flex gap-3 border-b border-[#f0eae1] pb-4 last:border-0 last:pb-0">
+                    <div key={item.id} data-cart-item={item.id} className="flex gap-3 border-b border-[#f0eae1] pb-4 last:border-0 last:pb-0">
                       <Link
                         href={`/products/${encodeURIComponent(item.productId)}`}
                         aria-label={`查看 ${item.name}`}
@@ -618,11 +681,11 @@ export default function CheckoutPage() {
                         <p className="text-sm text-[var(--c-muted)]">{item.variant}</p>
                         <div className="mt-2 flex items-center justify-between gap-3">
                           <div className="inline-flex items-center rounded-full border border-[var(--c-border)]">
-                            <button className="px-3 py-1" onClick={() => updateQty(item.id, -1)}>
+                            <button aria-label={`減少 ${item.name} ${item.variant} 數量`} className="px-3 py-1" onClick={() => updateQty(item.id, -1)}>
                               -
                             </button>
-                            <span className="w-8 text-center text-sm">{item.quantity}</span>
-                            <button className="px-3 py-1" onClick={() => updateQty(item.id, 1)}>
+                            <span data-cart-quantity className="w-8 text-center text-sm">{item.quantity}</span>
+                            <button aria-label={`增加 ${item.name} ${item.variant} 數量`} disabled={item.quantity >= itemLimit(item)} className="px-3 py-1 disabled:cursor-not-allowed disabled:opacity-30" onClick={() => updateQty(item.id, 1)}>
                               +
                             </button>
                           </div>
@@ -630,6 +693,12 @@ export default function CheckoutPage() {
                             {formatter.format(item.price * item.quantity)}
                           </span>
                         </div>
+                        {item.quantity >= itemLimit(item) ? (
+                          <p role={item.quantity > itemLimit(item) ? 'alert' : 'status'} className="mt-2 text-xs text-[#c0392b]">
+                            {itemLimit(item) === 0 ? '此商品或規格目前無法購買，請移除。' : item.quantity > itemLimit(item) ? `目前最多可購 ${itemLimit(item)} 件，請調整數量。` : `已達庫存上限（${itemLimit(item)} 件）`}
+                          </p>
+                        ) : null}
+                        <button type="button" aria-label={`移除 ${item.name} ${item.variant}`} onClick={() => updateQty(item.id, -item.quantity)} className="mt-2 text-xs text-[var(--c-muted)] underline">移除</button>
                       </div>
                     </div>
                   );
@@ -668,10 +737,10 @@ export default function CheckoutPage() {
                       <button
                         key={item.id}
                         type="button"
-                        onClick={() => applyDiscount(coupon.code, item.id)}
-                        disabled={check ? !check.ok : false}
+                        onClick={() => selectedCoupon?.userCouponId === item.id ? removeDiscount() : applyDiscount(coupon.code, item.id)}
+                        disabled={selectedCoupon?.userCouponId !== item.id && (!check || !check.ok)}
                         className={`rounded-xl border p-3 text-left ${
-                          applied?.userCouponId === item.id
+                          selectedCoupon?.userCouponId === item.id
                             ? 'border-[var(--c-text)] bg-[var(--c-header)]'
                             : check?.ok === false
                               ? 'border-[var(--c-border)] bg-[var(--c-bg)] opacity-70'
@@ -691,12 +760,19 @@ export default function CheckoutPage() {
                   })}
                 </div>
               )}
+              {selectedCoupon ? (
+                <div data-selected-coupon className="mb-3 flex items-center justify-between gap-2 rounded-lg border border-[var(--c-border)] px-3 py-2 text-sm">
+                  <span className="min-w-0 break-all">{selectedCoupon.code}{checkingCoupon ? '・確認中…' : '・已套用'}</span>
+                  <button type="button" onClick={removeDiscount} aria-label="移除優惠券" title="移除優惠券" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md hover:bg-[var(--c-soft)]"><X size={18} aria-hidden="true" /></button>
+                </div>
+              ) : null}
               <div className="flex gap-2">
                 <input
                   value={discountInput}
                   onChange={(e) => setDiscountInput(e.target.value)}
                   placeholder="輸入優惠代碼"
-                  className="flex-1 rounded-lg border border-[var(--c-border)] px-4 py-2.5 text-sm"
+                  aria-label="優惠代碼"
+                  className="min-w-0 flex-1 rounded-lg border border-[var(--c-border)] px-4 py-2.5 text-base sm:text-sm"
                 />
                 <button
                   onClick={() => applyDiscount()}
@@ -706,7 +782,7 @@ export default function CheckoutPage() {
                 </button>
               </div>
               {discountMsg && (
-                <p className={`mt-2 text-xs ${applied ? 'text-[#1f7a44]' : 'text-[#c0392b]'}`}>{discountMsg}</p>
+                <p role="status" className={`mt-2 text-xs ${applied ? 'text-[#1f7a44]' : 'text-[#c0392b]'}`}>{checkingCoupon ? '正在確認優惠券資格…' : discountMsg}</p>
               )}
             </section>
 
@@ -938,7 +1014,7 @@ export default function CheckoutPage() {
                 )}
                 <div className="flex justify-between pt-2 text-lg font-semibold">
                   <span>合計</span>
-                  <span className="text-[var(--c-sale)]">{formatter.format(total)}</span>
+                  <span data-checkout-total className="text-[var(--c-sale)]">{formatter.format(total)}</span>
                 </div>
               </div>
 
@@ -992,7 +1068,7 @@ export default function CheckoutPage() {
               <button
                 className="mt-5 w-full rounded-full bg-[var(--c-sale)] px-5 py-3.5 font-semibold text-white disabled:opacity-60"
                 onClick={submitOrder}
-                disabled={submitting}
+                disabled={submitting || checkingCoupon || stockInvalid}
               >
                 {submitting
                   ? '送出中…'

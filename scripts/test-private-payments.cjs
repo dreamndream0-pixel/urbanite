@@ -35,6 +35,8 @@ async function main() {
     '@/lib/supabase/server': { getSessionUser: async () => user, getAdminUser: async () => admin },
     '@/lib/shop': { shopAdminClient: async () => db },
     '@/lib/payment-proof': proof, '@/lib/safe-image': {}, '@/lib/limited-form': {},
+    '@/lib/order-notifications': { sendOrderNoticeNow: () => { throw new Error('GET must not send notices'); } },
+    '@/lib/order-notification-kick': { kickOrderNotifications: () => { throw new Error('GET must not send notices'); } },
   });
   const get = () => route.GET(new Request('https://shop-a.test/api'), { params: Promise.resolve({ id: 'order-a' }) });
   equal((await get()).status, 404);
