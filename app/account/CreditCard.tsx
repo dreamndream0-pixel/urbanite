@@ -1,14 +1,14 @@
 'use client';
 
-import { useEffect, useId, useState } from 'react';
+import { useId, useState } from 'react';
 import MembershipCard from '@/app/components/MembershipCard';
 import type { LoyaltyTier } from '@/lib/loyalty-settings';
-import { membershipDesign, type MembershipCardSettings, type MembershipDesignId } from '@/lib/membership-card';
+import type { MembershipCardSettings } from '@/lib/membership-card';
 
 type Entry = { id: number; kind: string; amount: number; note: string; created_at: string };
 type Tier = LoyaltyTier;
-type Credit = {
-  enabled: boolean; balance: number; pending: number; expiringSoon: number; nextAvailableAt: string | null; entries: Entry[];
+export type MemberCredit = { enabled: false } | {
+  enabled: true; balance: number; pending: number; expiringSoon: number; nextAvailableAt: string | null; entries: Entry[];
   tier: Tier; next: Tier | null; spend: number; toNext: number; keptUntil: string | null;
   rules: { tiers: Tier[]; delayDays: number; validDays: number; maxRedeemPct: number; keepMonths: number };
   card?: { settings: MembershipCardSettings; brandName: string; memberName: string };
@@ -18,8 +18,7 @@ const money = (n: number) => `NT$${Math.round(n).toLocaleString('en-US')}`;
 const KIND_LABEL: Record<string, string> = { earn: '訂單回饋入帳', redeem: '結帳折抵', return: '退回', expire: '到期', clawback: '退款追回', adjust: '調整' };
 
 // 會員中心「我的優惠」:回饋金卡(可用、待入帳、即將到期)+ 會員等級與明細
-export default function CreditCard({ onDesignChange }: { onDesignChange?: (design: MembershipDesignId | null) => void }) {
-  const [data, setData] = useState<Credit | null>(null);
+export default function CreditCard({ data }: { data: MemberCredit }) {
   const [open, setOpen] = useState(false);
   const [reveal, setReveal] = useState(0);
   const detailsId = useId();
@@ -28,35 +27,10 @@ export default function CreditCard({ onDesignChange }: { onDesignChange?: (desig
     if (!open) setReveal((value) => value + 1);
     setOpen((value) => !value);
   }
-  useEffect(() => {
-    let controller: AbortController | null = null;
-    const refresh = () => {
-      controller?.abort();
-      controller = new AbortController();
-      const signal = controller.signal;
-      fetch('/api/me/credit', { cache: 'no-store', signal }).then((r) => (r.ok ? r.json() : null))
-        .then((value) => { if (!signal.aborted) setData(value); }).catch(() => {});
-    };
-    const visible = () => { if (document.visibilityState === 'visible') refresh(); };
-    refresh();
-    window.addEventListener('focus', refresh);
-    window.addEventListener('pageshow', refresh);
-    window.addEventListener('loyalty-settings-updated', refresh);
-    document.addEventListener('visibilitychange', visible);
-    return () => {
-      controller?.abort();
-      window.removeEventListener('focus', refresh);
-      window.removeEventListener('pageshow', refresh);
-      window.removeEventListener('loyalty-settings-updated', refresh);
-      document.removeEventListener('visibilitychange', visible);
-    };
-  }, []);
-  const enabled = data?.enabled === true;
-  const imageCard = enabled && data?.card?.settings?.enabled === true;
-  const designId = imageCard ? membershipDesign(data.tier.cardDesign).id : null;
-  useEffect(() => { onDesignChange?.(designId); }, [designId, onDesignChange]);
-  const sub = !enabled ? '目前尚無回饋金。'
-    : data.pending > 0 ? `待入帳 ${money(data.pending)}${data.nextAvailableAt ? `,${new Date(data.nextAvailableAt).toLocaleDateString('zh-TW')} 起可用` : ''}`
+  const enabled = data.enabled === true;
+  if (!enabled) return null;
+  const imageCard = data.card?.settings?.enabled === true;
+  const sub = data.pending > 0 ? `待入帳 ${money(data.pending)}${data.nextAvailableAt ? `,${new Date(data.nextAvailableAt).toLocaleDateString('zh-TW')} 起可用` : ''}`
     : data.expiringSoon > 0 ? `${money(data.expiringSoon)} 將在 30 天內到期`
     : data.balance > 0 ? '結帳時可折抵,1 元抵 NT$1。' : '訂單完成後依會員等級累積回饋金。';
   return (
@@ -73,7 +47,7 @@ export default function CreditCard({ onDesignChange }: { onDesignChange?: (desig
             {enabled ? <span className="rounded-full bg-[#efe4d2] px-2 py-0.5 text-[11px] font-semibold text-[#8a6a3c]">{data.tier.name}・回饋 {data.tier.rate}%</span> : null}
           </p>
           <p className="flex items-center gap-2 text-[34px] font-bold leading-tight text-[var(--c-text)]">
-            {money(enabled ? data.balance : 0)}
+            {money(data.balance)}
             {enabled ? <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#a2957f" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className={open ? 'rotate-90 transition' : 'transition'}><path d="M9 6l6 6-6 6" /></svg> : null}
           </p>
           <p className="mt-1 text-xs text-[#7d7264] sm:text-sm">{sub}</p>

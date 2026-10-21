@@ -66,6 +66,13 @@ and transaction details, including available, pending and expiring balances.
 The entire upper rewards band uses a matching backdrop for each of ten designs.
 It starts with the membership card, without the old coupons heading, English
 subtitle or promotional copy. The former heading gap is removed as well.
+The rewards band owns the credit read and derives the theme from the same
+response as the card. Initial reads reserve the card's 4:3 dimensions on a
+neutral background, never the old classic zero-balance card. Failed initial
+reads offer retry without inventing a balance. Background refresh failures keep
+the last successful card, while authorization failures clear it. Disabled loyalty
+hides the band; classic rewards render only after a successful response selects
+that mode. No member balances are stored in local/session storage or a shared cache.
 The artwork's outer backdrop fades into that color without changing the physical
 card or source pixels. Disabling image cards restores the classic rewards view
 and the shop's existing coupon hero image.
@@ -107,4 +114,5 @@ local route and intercept all API reads/writes. Do not deploy the fixture route.
 ```sh
 node scripts/test-membership-card.cjs
 node scripts/test-membership-card-browser.cjs <playwright-module> <fixture-url>
+node scripts/test-member-rewards-loading-browser.cjs <playwright-module> <fixture-url>
 ```
