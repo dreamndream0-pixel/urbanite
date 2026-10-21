@@ -4,7 +4,7 @@ import { createContext, useContext, useEffect, useMemo, useRef, useState, type R
 import QRCode from 'qrcode';
 import ProfileCardView, { type CardProduct } from '@/app/components/ProfileCardView';
 import ProfileBookingButtonEditor from './ProfileBookingButtonEditor';
-import { DEFAULT_BOOKING_BUTTON, resolveBookingButton } from '@/lib/profile-booking-button';
+import { BOOKING_EDITOR_ID, DEFAULT_BOOKING_BUTTON, profileContentItems, profileContentOrder, resolveBookingButton, type BookingButton, type ProfileContentItem } from '@/lib/profile-booking-button';
 import { LayoutThumb } from '@/app/components/ProfileImageBlock';
 import LinkIcon, { ICON_PREFIX, isIconImage, LINK_ICONS } from '@/app/components/LinkIcon';
 import SocialIcon from '@/app/components/SocialIcon';
@@ -113,15 +113,16 @@ function Icon({ children, size = 18 }: { children: ReactNode; size?: number }) {
   );
 }
 
-function Toggle({ on, onChange, label }: { on: boolean; onChange: (v: boolean) => void; label: string }) {
+function Toggle({ on, onChange, label, disabled = false }: { on: boolean; onChange: (v: boolean) => void; label: string; disabled?: boolean }) {
   return (
     <button
       type="button"
       role="switch"
       aria-checked={on}
       aria-label={label}
+      disabled={disabled}
       onClick={(e) => { e.stopPropagation(); onChange(!on); }}
-      className={`relative h-6 w-11 shrink-0 rounded-full transition ${on ? 'bg-[#8cc97c]' : 'bg-[#ddd6cc]'}`}
+      className={`relative h-6 w-11 shrink-0 rounded-full transition disabled:opacity-50 ${on ? 'bg-[#8cc97c]' : 'bg-[#ddd6cc]'}`}
     >
       <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-all ${on ? 'left-[22px]' : 'left-0.5'}`} />
     </button>
@@ -402,6 +403,7 @@ export default function ProfileCardManager({ products, lineUrl = '', upgradeHref
   const [bookingHref, setBookingHref] = useState('');
   const [bookingSaving, setBookingSaving] = useState(false);
   const [bookingError, setBookingError] = useState('');
+  const [orderSaving, setOrderSaving] = useState(false);
   const [loadError, setLoadError] = useState('');
   const [mainTab, setMainTab] = useState<MainTab>('content');
   const [contentTab, setContentTab] = useState<'links' | 'profile'>('links');
@@ -505,6 +507,7 @@ export default function ProfileCardManager({ products, lineUrl = '', upgradeHref
 
   // ---------- 區塊 ----------
   async function addBlock(type: BlockType) {
+    if (orderSaving) return;
     setPicker(false);
     const res = await fetch('/api/profile-card/blocks', {
       method: 'POST',
@@ -530,23 +533,45 @@ export default function ProfileCardManager({ products, lineUrl = '', upgradeHref
   }
 
   async function deleteBlock(id: string) {
+    if (orderSaving) return;
     if (!(await uiConfirm('確定刪除這個區塊?', { danger: true }))) return;
     const res = await fetch(`/api/profile-card/blocks/${id}`, { method: 'DELETE' });
     if (!res.ok) return void uiAlert('刪除失敗');
     setBlocks((list) => list.filter((b) => b.id !== id));
   }
 
-  async function saveOrder(list: ProfileCardBlock[]) {
-    await fetch('/api/profile-card/blocks', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ids: list.map((b) => b.id) }),
-    });
+  async function saveOrder(items: ProfileContentItem[]) {
+    if (!draft || !card || orderSaving || bookingSaving || saving) return;
+    const previous = blocks;
+    const previousAfter = resolveBookingButton(draft.theme.bookingButton).after;
+    const savedAfter = resolveBookingButton(card.theme.bookingButton).after;
+    const next = profileContentOrder(items);
+    const setAfter = (after: string, saved: boolean) => {
+      setDraft((current) => current ? { ...current, theme: { ...current.theme, bookingButton: { ...resolveBookingButton(current.theme.bookingButton), after } } } : current);
+      if (saved) setCard((current) => current ? { ...current, theme: { ...current.theme, bookingButton: { ...resolveBookingButton(current.theme.bookingButton), after } } } : current);
+    };
+    setOrderSaving(true);
+    setBlocks(next.blocks);
+    setAfter(next.after, false);
+    try {
+      const res = await fetch('/api/profile-card/blocks', {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: next.blocks.map((block) => block.id), booking_after: next.after }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? '排序儲存失敗');
+      setAfter(next.after, true);
+    } catch (error) {
+      setBlocks(previous);
+      setAfter(previousAfter, false);
+      setCard((current) => current ? { ...current, theme: { ...current.theme, bookingButton: { ...resolveBookingButton(current.theme.bookingButton), after: savedAfter } } } : current);
+      void uiAlert(error instanceof Error ? error.message : '排序儲存失敗，請再試一次');
+    } finally { setOrderSaving(false); }
   }
 
   // ---------- 名片資料(簡介 / 外觀 / 設定) ----------
   async function saveCard() {
-    if (!draft) return;
+    if (!draft || orderSaving || bookingSaving) return;
     if (!SLUG_PATTERN.test(draft.slug)) return void uiAlert('網址代稱只能用小寫英文、數字、點、底線、連字號(2–30 字)');
     setSaving(true);
     try {
@@ -566,14 +591,14 @@ export default function ProfileCardManager({ products, lineUrl = '', upgradeHref
     }
   }
 
-  async function saveBookingButton() {
-    if (!draft || bookingSaving) return;
+  async function saveBookingButton(value = draft?.theme.bookingButton) {
+    if (!draft || bookingSaving || orderSaving || saving) return;
     setBookingSaving(true);
     setBookingError('');
     try {
       const res = await fetch('/api/profile-card', {
         method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ booking_button: draft.theme.bookingButton ?? DEFAULT_BOOKING_BUTTON }),
+        body: JSON.stringify({ booking_button: value ?? DEFAULT_BOOKING_BUTTON }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? '儲存失敗');
@@ -663,11 +688,6 @@ export default function ProfileCardManager({ products, lineUrl = '', upgradeHref
             </div>
             {contentTab === 'links' ? (
               <div className="space-y-3">
-                <ProfileBookingButtonEditor card={draft} blocks={blocks} value={draft.theme.bookingButton ?? DEFAULT_BOOKING_BUTTON}
-                  onChange={(bookingButton) => setDraft({ ...draft, theme: { ...draft.theme, bookingButton } })}
-                  onSave={() => void saveBookingButton()} saving={bookingSaving || saving} error={bookingError}
-                  dirty={JSON.stringify(draft.theme.bookingButton ?? DEFAULT_BOOKING_BUTTON) !== JSON.stringify(resolveBookingButton(card.theme.bookingButton))}
-                  available={Boolean(bookingHref)} customStyle={plan.limits.customStyle} upgradeHref={upgradeHref} />
                 {picker ? (
                   <div className="rounded-2xl border border-[#e5ded4] bg-white p-3">
                     <div className="mb-2 flex items-center justify-between px-1">
@@ -708,26 +728,33 @@ export default function ProfileCardManager({ products, lineUrl = '', upgradeHref
                 )}
                 {blocks.length === 0 ? (
                   <p className="py-10 text-center text-sm text-[#a99e8f]">還沒有區塊,先新增一個連結按鈕吧。</p>
-                ) : (
+                ) : null}
                   <BlockList
-                    blocks={blocks}
-                    onReorder={(list) => { setBlocks(list); void saveOrder(list); }}
-                    render={(b, handle) => (
+                    blocks={profileContentItems(blocks, resolveBookingButton(draft.theme.bookingButton).after)}
+                    disabled={orderSaving || bookingSaving || saving}
+                    onReorder={(list) => void saveOrder(list)}
+                    render={(item, handle) => item.block ? (
                       <BlockRow
-                        block={b}
+                        block={item.block}
                         handle={handle}
-                        open={openId === b.id}
+                        open={openId === item.id}
                         products={products}
                         productMap={productMap}
                         lineUrl={lineUrl}
-                        onToggleOpen={() => setOpenId(openId === b.id ? null : b.id)}
-                        onPatch={(patch) => patchBlock(b.id, patch)}
-                        onLocalChange={(patch) => setBlocks((list) => list.map((x) => (x.id === b.id ? { ...x, ...patch } : x)))}
-                        onDelete={() => deleteBlock(b.id)}
+                        onToggleOpen={() => setOpenId(openId === item.id ? null : item.id)}
+                        onPatch={(patch) => patchBlock(item.id, patch)}
+                        onLocalChange={(patch) => setBlocks((list) => list.map((x) => (x.id === item.id ? { ...x, ...patch } : x)))}
+                        onDelete={() => deleteBlock(item.id)}
                       />
-                    )}
+                    ) : <ProfileBookingButtonEditor card={draft} value={draft.theme.bookingButton ?? DEFAULT_BOOKING_BUTTON}
+                      handle={handle} open={openId === BOOKING_EDITOR_ID} onToggleOpen={() => setOpenId(openId === BOOKING_EDITOR_ID ? null : BOOKING_EDITOR_ID)}
+                      toggle={<Toggle on={resolveBookingButton(draft.theme.bookingButton).visible} disabled={bookingSaving || orderSaving || saving} label="顯示線上預約"
+                        onChange={(visible) => { const value: BookingButton = { ...resolveBookingButton(draft.theme.bookingButton), visible }; setDraft({ ...draft, theme: { ...draft.theme, bookingButton: value } }); void saveBookingButton(value); }} />}
+                      onChange={(bookingButton) => setDraft({ ...draft, theme: { ...draft.theme, bookingButton } })}
+                      onSave={() => void saveBookingButton()} saving={bookingSaving || saving || orderSaving} error={bookingError}
+                      dirty={JSON.stringify(draft.theme.bookingButton ?? DEFAULT_BOOKING_BUTTON) !== JSON.stringify(resolveBookingButton(card.theme.bookingButton))}
+                      available={Boolean(bookingHref)} customStyle={plan.limits.customStyle} upgradeHref={upgradeHref} />}
                   />
-                )}
               </div>
             ) : (
               <ProfileEditor draft={draft} setDraft={setDraft} />
@@ -744,7 +771,7 @@ export default function ProfileCardManager({ products, lineUrl = '', upgradeHref
             <button
               type="button"
               onClick={saveCard}
-              disabled={saving || bookingSaving || !dirty}
+              disabled={saving || bookingSaving || orderSaving || !dirty}
               className="w-full max-w-xs rounded-full bg-[#1f1b19] py-3 text-sm font-semibold text-white shadow-lg transition disabled:opacity-40"
             >
               {saving ? '儲存中…' : dirty ? '儲存' : '已儲存'}
@@ -803,66 +830,93 @@ export default function ProfileCardManager({ products, lineUrl = '', upgradeHref
 }
 
 // 可拖曳排序的清單(按住左側把手拖曳;手機與滑鼠皆可)
-function BlockList({
+function BlockList<T extends { id: string }>({
   blocks,
   onReorder,
   render,
+  disabled = false,
 }: {
-  blocks: ProfileCardBlock[];
-  onReorder: (list: ProfileCardBlock[]) => void;
-  render: (block: ProfileCardBlock, handle: ReactNode) => ReactNode;
+  blocks: T[];
+  onReorder: (list: T[]) => void;
+  render: (block: T, handle: ReactNode) => ReactNode;
+  disabled?: boolean;
 }) {
   const [dragId, setDragId] = useState<string | null>(null);
-  const [dragOrder, setDragOrder] = useState<ProfileCardBlock[] | null>(null);
+  const [dragOrder, setDragOrder] = useState<T[] | null>(null);
   const rowRefs = useRef(new Map<string, HTMLDivElement>());
+  const gesture = useRef<{ id: string; pointerId: number; items: T[] } | null>(null);
   const order = dragOrder ?? blocks;
 
-  function onMove(clientY: number) {
-    if (!dragId || !dragOrder) return;
-    const from = dragOrder.findIndex((b) => b.id === dragId);
-    let to = from;
-    dragOrder.forEach((b, i) => {
-      const el = rowRefs.current.get(b.id);
-      if (!el || b.id === dragId) return;
-      const r = el.getBoundingClientRect();
-      const mid = r.top + r.height / 2;
-      if (i < from && clientY < mid) to = Math.min(to, i);
-      if (i > from && clientY > mid) to = Math.max(to, i);
-    });
-    if (to !== from) {
-      const next = [...dragOrder];
+  useEffect(() => {
+    if (!dragId) return;
+    // Listen outside the moved row so DOM reordering cannot lose the pointer-up event.
+    function move(event: PointerEvent) {
+      const current = gesture.current;
+      if (!current || event.pointerId !== current.pointerId) return;
+      const from = current.items.findIndex((item) => item.id === current.id);
+      let to = from;
+      current.items.forEach((item, i) => {
+        const row = rowRefs.current.get(item.id);
+        if (!row || item.id === current.id) return;
+        const box = row.getBoundingClientRect();
+        const mid = box.top + box.height / 2;
+        if (i < from && event.clientY < mid) to = Math.min(to, i);
+        if (i > from && event.clientY > mid) to = Math.max(to, i);
+      });
+      if (to === from) return;
+      const next = [...current.items];
       const [moved] = next.splice(from, 1);
       next.splice(to, 0, moved);
+      current.items = next;
       setDragOrder(next);
     }
-  }
-
-  function end() {
-    if (!dragId || !dragOrder) return;
-    const changed = dragOrder.some((b, i) => b.id !== blocks[i]?.id);
-    if (changed) onReorder(dragOrder);
-    setDragId(null);
-    setDragOrder(null);
-  }
+    function finish(event: PointerEvent) {
+      const current = gesture.current;
+      if (!current || event.pointerId !== current.pointerId) return;
+      gesture.current = null;
+      setDragId(null);
+      setDragOrder(null);
+      if (event.type === 'pointerup' && current.items.some((item, i) => item.id !== blocks[i]?.id)) onReorder(current.items);
+    }
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', finish);
+    window.addEventListener('pointercancel', finish);
+    return () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', finish);
+      window.removeEventListener('pointercancel', finish);
+    };
+  }, [dragId, blocks, onReorder]);
 
   return (
-    <div className="space-y-2.5" onPointerMove={(e) => onMove(e.clientY)} onPointerUp={end} onPointerCancel={end}>
+    <div data-profile-content-list aria-busy={disabled} className="space-y-2.5">
       {order.map((b) => {
         const handle = (
-          <span
-            role="button"
+          <button
+            type="button"
             aria-label="拖曳排序"
-            onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); setDragId(b.id); setDragOrder(blocks); }}
-            className="flex h-full cursor-grab touch-none select-none items-center px-1 text-[#c4b8aa] active:cursor-grabbing"
+            title="拖曳排序"
+            disabled={disabled}
+            onPointerDown={(e) => { if (e.button !== 0) return; e.preventDefault(); e.stopPropagation(); gesture.current = { id: b.id, pointerId: e.pointerId, items: blocks }; setDragId(b.id); setDragOrder(blocks); }}
+            onKeyDown={(e) => {
+              if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
+              e.preventDefault();
+              const from = blocks.findIndex((item) => item.id === b.id);
+              const to = from + (e.key === 'ArrowUp' ? -1 : 1);
+              if (to < 0 || to >= blocks.length || disabled) return;
+              const next = [...blocks]; const [item] = next.splice(from, 1); next.splice(to, 0, item); onReorder(next);
+            }}
+            className="flex h-full min-h-11 cursor-grab touch-none select-none items-center px-1 text-[#c4b8aa] active:cursor-grabbing disabled:opacity-40"
           >
             <svg width="14" height="18" viewBox="0 0 14 18" fill="currentColor" aria-hidden="true">
               {[3, 9, 15].map((y) => [4, 10].map((x) => <circle key={`${x}-${y}`} cx={x} cy={y} r="1.4" />))}
             </svg>
-          </span>
+          </button>
         );
         return (
           <div
             key={b.id}
+            data-profile-content-id={b.id}
             ref={(el) => { if (el) rowRefs.current.set(b.id, el); else rowRefs.current.delete(b.id); }}
             className={`transition-shadow ${dragId === b.id ? 'relative z-10 rounded-2xl shadow-lg' : ''}`}
           >

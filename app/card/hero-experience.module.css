@@ -4,9 +4,9 @@
   position: relative;
   isolation: isolate;
   display: grid;
-  grid-template-rows: auto auto minmax(300px, 1fr) auto auto;
+  grid-template-rows: auto auto minmax(300px, 1fr) auto auto auto;
   gap: 10px;
-  min-height: 730px;
+  min-height: 810px;
   height: min(980px, calc(100svh - var(--above-hero) - 26px));
   padding: 22px 32px 14px;
   color: var(--ink);
@@ -61,13 +61,13 @@
 .profileContent { display: flex; flex-direction: column; align-items: center; text-align: center; height: 100%; animation: reveal 400ms both; }
 .avatar { width: 30%; height: auto; aspect-ratio: 1; object-fit: cover; border-radius: 50%; margin-bottom: 5px; }
 .profileContent h2 { font: 700 9cqi/1.1 Arial, sans-serif; margin: 2px 0 5px; }
-.profileContent > p { font-size: 4.5cqi; color: #8e867c; margin: 0 0 9px; }
+.profileContent > p { font-size: 4.5cqi; line-height: 1.3; color: #8e867c; margin: 0 0 9px; }
 .profileLinks { width: 100%; display: grid; gap: 3px; }
-.profileLinks a, .profileLinks button { display: flex; align-items: center; gap: 6px; min-height: 26px; width: 100%; padding: 6px 8px; border: 1px solid transparent; border-radius: 8px; background: #fffdf9; font: 5.5cqi/1.3 Arial, sans-serif; color: #373530; text-align: left; }
+.profileLinks a, .profileLinks button { display: flex; align-items: center; gap: 6px; min-height: 24px; width: 100%; padding: 5px 8px; border: 1px solid transparent; border-radius: 8px; background: #fffdf9; font: 5.5cqi/1.3 Arial, sans-serif; color: #373530; text-align: left; }
 .profileLinks svg, .profileLinks button > span { width: 12px !important; height: 12px !important; flex: 0 0 12px; }
 .profileLinks svg:last-child { margin-left: auto; width: 10px !important; height: 10px !important; flex-basis: 10px; }
 .profileLinks button[aria-pressed=true] { border-color: #b9a4d2; background: #eee3f5; }
-.profileFooter { display: block; margin-top: auto; padding-top: 7px; color: #888178; font-size: 4.5cqi; }
+.profileFooter { display: block; margin-top: auto; padding-top: 7px; color: #888178; font-size: 4.5cqi; line-height: 1.3; flex-shrink: 0; }
 .bookingScreen { height: 100%; display: flex; flex-direction: column; align-items: center; text-align: center; gap: 6px; animation: reveal 400ms both; }
 .bookingScreen > svg { width: 18cqi; height: 18cqi; margin-top: 6px; color: #9d80b1; }
 .bookingScreen > small { font-size: 4.5cqi; color: #8e8173; }
@@ -118,26 +118,20 @@
 .featureTabs button svg { width: 25px; height: 25px; stroke-width: 1.7; }
 .featureTabs button[aria-selected=true] { background: #fff; box-shadow: 0 0 0 1px #bba7c3, 0 6px 24px #4d413410; }
 .bottom { width: min(100%, 680px); display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; margin: 0 auto; }
+.hero .importBubble { position: relative; inset: auto; translate: none; transform: none; justify-self: center; width: min(100%, 520px); max-width: none; min-height: 64px; padding: 9px 12px 9px 24px; margin: 2px 0; gap: 10px; }
+.hero .importBubble small { font-size: 11px; letter-spacing: 0; white-space: normal; }
+.hero .importBubble input { font-size: 16px; }
+.hero .importBubble button { width: 44px; height: 44px; flex: 0 0 44px; }
 .bottom a, .bottom button { font-size: 12px; color: #676367; }
-.importTrigger, .begin { display: flex; align-items: center; gap: 5px; width: fit-content; background: none; border: 0; padding: 10px 0; }
-.importTrigger svg, .begin svg { width: 14px; height: 14px; }
+.begin { display: flex; align-items: center; gap: 5px; width: fit-content; background: none; border: 0; padding: 10px 0; }
+.begin svg { width: 14px; height: 14px; }
 .begin { justify-self: end; }
 .scroll { display: flex; flex-direction: column; align-items: center; gap: 1px; border: 0; background: none; padding: 2px 18px; }
 .scroll svg { width: 25px; height: 25px; animation: nudge 2s ease-in-out infinite; }
 .scroll span { font: 8px Arial, sans-serif; }
 .hero[data-visible=false] .widget, .hero[data-visible=false] .scroll svg { animation-play-state: paused; }
 .hero:focus-within .widget, .hero[data-interacting=true] .widget { animation-play-state: paused; }
-.hero[data-headline-visible=false] .headlineTrack, .hero[data-page-hidden=true] .headlineTrack, .hero:has(dialog[open]) .headlineTrack { animation-play-state: paused; }
-.importDialog { position: fixed; inset: 0; margin: auto; border: 1px solid #e4dcd2; border-radius: 8px; width: min(90%, 530px); max-height: 85svh; padding: 0; background: #faf7f2; color: #252b40; box-shadow: 0 25px 100px #0003; overflow: auto; }
-.importDialog::backdrop { background: #10162966; backdrop-filter: blur(6px); }
-.dialogContent { padding: 26px; }
-.dialogHeading { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.dialogHeading h2 { font-size: 20px; font-weight: 600; margin: 0; }
-.dialogHeading button { background: none; border: 0; padding: 8px; border-radius: 50%; }
-.dialogContent > p { margin: 8px 0 24px; color: #79716b; font-size: 13px; }
-.importDialog .importForm { position: relative; inset: auto; translate: none; transform: none; width: 100%; max-width: none; margin: 0; min-height: 80px; padding: 14px; gap: 10px; }
-.importForm input { font-size: 16px !important; }
-.importForm small { font-size: 11px !important; white-space: normal; }
+.hero[data-headline-visible=false] .headlineTrack, .hero[data-page-hidden=true] .headlineTrack { animation-play-state: paused; }
 .srOnly { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
 @keyframes float { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-9px); } }
 @keyframes reveal { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
@@ -170,14 +164,14 @@
   .socialRail button:hover { transform: scale(1.12); }
   .profileLinks button:hover, .times button:hover, .phoneTimes button:hover { background: #eaddf5; }
   .integration:hover { box-shadow: 0 0 28px #e8c7eea0; }
-  .importTrigger:hover, .begin:hover { color: #0d132b; text-decoration: underline; }
+  .begin:hover { color: #0d132b; text-decoration: underline; }
 }
 @media (min-width: 1200px) and (min-height: 980px) {
   .hero { min-height: 840px; }
   .copy h1 { font-size: 76px; }
 }
 @media (max-width: 760px) {
-  .hero { min-height: 645px; grid-template-rows: auto auto minmax(285px, 1fr) auto auto; gap: 8px; padding: 18px 18px 10px; }
+  .hero { min-height: 725px; grid-template-rows: auto auto minmax(285px, 1fr) auto auto auto; gap: 8px; padding: 18px 18px 10px; }
   .eyebrow { font-size: 7px; gap: 18px; max-width: 390px; }
   .eyebrow i { max-width: 70px; }
   .copy h1 { font-size: 48px; margin-bottom: 15px; }
@@ -224,11 +218,9 @@
   .bottom .begin { display: none; }
   .bookingScreen { gap: 5px; }
   .bookingScreen > svg { margin-top: 2px; }
-  .dialogContent { padding: 18px; }
-  .importDialog .importForm { padding: 10px; min-height: 72px; }
 }
 @media (max-width: 374px) {
-  .hero { min-height: 610px; padding-inline: 12px; grid-template-rows: auto auto minmax(265px,1fr) auto auto; }
+  .hero { min-height: 690px; padding-inline: 12px; grid-template-rows: auto auto minmax(265px,1fr) auto auto auto; }
   .copy h1 { font-size: 40px; }
   .copy > p { font-size: 12px; }
   .featureTabs { gap: 14px; }

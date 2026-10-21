@@ -6,7 +6,7 @@ export type CustomerCase = {
   categoryLabel: string;
   kind: 'live' | 'demo' | 'pending' | 'redacted';
   image: string;
-  /** 手機版截圖(案例頁以手機外框呈現) */
+  /** 手機版截圖備用素材 */
   mobile?: string;
   gallery?: { image: string; label: string }[];
   description: string;

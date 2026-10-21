@@ -20,7 +20,7 @@ export default function CaseGallery() {
   const filtered = customerCases.filter(item => category === 'all' || item.category === category);
   const selected = customerCases.find(item => item.id === selectedId);
   const index = filtered.findIndex(item => item.id === selectedId);
-  const shots = selected?.gallery ?? (selected ? [{ image: selected.mobile ?? selected.image, label: selected.name }] : []);
+  const shots = selected?.gallery ?? (selected ? [{ image: selected.image, label: selected.name }] : []);
   const shot = shots[shotIndex];
   useScrollLock(Boolean(selected));
 
@@ -60,7 +60,7 @@ export default function CaseGallery() {
       <div className={styles.results}><p role="status">共 {filtered.length} 個案例與示意</p><span>實際網站與示意設計分別標示</span></div>
       <div className={styles.galleryGrid}>{filtered.map(item => <article className={styles.caseCard} id={item.id} key={item.id}>
         <button className={styles.caseImage} type="button" aria-label={`預覽 ${item.name}`} onClick={event => openPreview(item, event.currentTarget)}>
-          {item.mobile ? <span className={styles.phone}><span className={styles.phoneScreen}><Image src={item.mobile} alt={`${item.name} 手機版實際網站截圖`} fill sizes="240px" /></span></span> : <Image src={item.image} alt={item.kind === 'pending' ? '租屋網公開頁面，非代管後台畫面' : `${item.name} ${item.kind === 'demo' ? '示意設計' : item.kind === 'redacted' ? '後台截圖，個資及財務數值已遮蔽' : '實際網站截圖'}`} fill sizes="(max-width: 640px) 92vw, (max-width: 1000px) 46vw, 360px" />}
+          <Image src={item.image} alt={item.kind === 'pending' ? '租屋網公開頁面，非代管後台畫面' : `${item.name} ${item.kind === 'demo' ? '示意設計' : item.kind === 'redacted' ? '後台截圖，個資及財務數值已遮蔽' : '完整網頁截圖'}`} fill sizes="(max-width: 640px) 92vw, (max-width: 1000px) 46vw, 360px" />
           <span className={styles.caseBadge} data-kind={item.kind}>{status(item)}</span><span className={styles.zoom}><ZoomIn size={18} /></span>
         </button>
         <div className={styles.caseInfo}><small>{item.categoryLabel}</small><h2>{item.name}</h2><p>{item.description}</p><div className={styles.tags}>{item.tags.map(tag => <span key={tag}>{tag}</span>)}</div>

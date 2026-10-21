@@ -3,10 +3,9 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
-import { ArrowRight, CalendarDays, ChartNoAxesColumnIncreasing, Check, ChevronDown, ChevronRight, Layers, Link2, Mail, Menu, Monitor, Search, ShoppingBag, Users, X } from 'lucide-react';
+import { ArrowRight, CalendarDays, ChartNoAxesColumnIncreasing, Check, ChevronDown, ChevronRight, Layers, Link2, Mail, Menu, Monitor, Search, ShoppingBag, Users } from 'lucide-react';
 import SocialIcon from '@/app/components/SocialIcon';
 import SocialBrandIcon, { type SocialBrand } from '@/app/components/SocialBrandIcon';
-import { useScrollLock } from '@/app/components/useScrollLock';
 import { getScrollY, onPageScroll } from '@/lib/page-scroll';
 import HeroImportBubble from './HeroImportBubble';
 import styles from './hero-experience.module.css';
@@ -31,14 +30,9 @@ export default function HeroExperience({ startHref, loggedIn }: { startHref: str
   const [confirmed, setConfirmed] = useState(false);
   const [social, setSocial] = useState<SocialBrand>('instagram');
   const [period, setPeriod] = useState<'month' | 'week'>('month');
-  const [importOpen, setImportOpen] = useState(false);
   const hero = useRef<HTMLElement>(null);
-  const dialog = useRef<HTMLDialogElement>(null);
-  const importTrigger = useRef<HTMLButtonElement>(null);
   const tabs = useRef<(HTMLButtonElement | null)[]>([]);
   const reduced = useRef(false);
-
-  useScrollLock(importOpen);
 
   useEffect(() => {
     const element = hero.current;
@@ -112,11 +106,6 @@ export default function HeroExperience({ startHref, loggedIn }: { startHref: str
     event.preventDefault();
     setFeature(features[next].key);
     tabs.current[next]?.focus();
-  }
-
-  function closeImport() {
-    dialog.current?.close();
-    setImportOpen(false);
   }
 
   return (
@@ -218,19 +207,13 @@ export default function HeroExperience({ startHref, loggedIn }: { startHref: str
       <div className={styles.featureTabs} role="tablist" aria-label="探索 URBANLINKS">
         {features.map(({ key, label, Icon }, index) => <button ref={node => { tabs.current[index] = node; }} key={key} type="button" role="tab" id={`hero-tab-${key}`} aria-controls="hero-preview-panel" aria-selected={feature === key} tabIndex={feature === key ? 0 : -1} onKeyDown={event => switchTab(event, index)} onClick={() => setFeature(key)}><span><Icon /></span>{label}</button>)}
       </div>
+      <HeroImportBubble loggedIn={loggedIn} className={styles.importBubble} embedded />
       <div className={styles.bottom}>
-        <button className={styles.importTrigger} ref={importTrigger} type="button" onClick={() => { setImportOpen(true); dialog.current?.showModal(); }}><Link2 />一鍵搬家</button>
+        <span />
         <button className={styles.scroll} type="button" aria-label="往下探索產品服務" onClick={() => document.getElementById('spaces')?.scrollIntoView({ behavior: reduced.current ? 'auto' : 'smooth', block: 'start' })}><ChevronDown /><span>SCROLL</span></button>
         <Link href={startHref} className={styles.begin}>免費開始<ArrowRight /></Link>
       </div>
 
-      <dialog ref={dialog} className={styles.importDialog} aria-labelledby="hero-import-title" onClose={() => { setImportOpen(false); importTrigger.current?.focus({ preventScroll: true }); }} onClick={event => { if (event.target === event.currentTarget) closeImport(); }}>
-        <div className={styles.dialogContent}>
-          <div className={styles.dialogHeading}><h2 id="hero-import-title">把你的世界搬過來</h2><button autoFocus type="button" aria-label="關閉一鍵搬家" onClick={closeImport}><X /></button></div>
-          <p>保留你的連結，換一個新的開始。</p>
-          <HeroImportBubble loggedIn={loggedIn} className={styles.importForm} embedded onPreviewOpen={closeImport} />
-        </div>
-      </dialog>
       <span className={styles.srOnly} aria-live="polite">{feature === 'booking' ? `預約示範，已選擇 ${slot}${confirmed ? '，已確認' : ''}` : feature === 'social' ? `正在展示 ${socials.find(item => item.key === social)?.label} 社群整合` : '正在展示品牌官網'}</span>
     </section>
   );

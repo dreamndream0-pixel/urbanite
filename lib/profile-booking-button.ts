@@ -13,6 +13,8 @@ export type BookingButton = {
 };
 
 export const BOOKING_BUTTON_END = '__end__';
+export const BOOKING_EDITOR_ID = '__booking_button__';
+export type ProfileContentItem = { id: string; block: ProfileCardBlock | null };
 export const DEFAULT_BOOKING_BUTTON: BookingButton = {
   visible: true, after: '', label: '線上預約', style: 'accent', shape: 'inherit',
   color: '', textColor: '', showIcon: true, shadow: true,
@@ -48,4 +50,15 @@ export function bookingButtonIndex(blocks: ProfileCardBlock[], visible: ProfileC
   if (index < 0) return visible.length;
   const preceding = new Set(blocks.slice(0, index + 1).map((b) => b.id));
   return visible.filter((b) => preceding.has(b.id)).length;
+}
+
+export function profileContentItems(blocks: ProfileCardBlock[], after: string): ProfileContentItem[] {
+  const items: ProfileContentItem[] = blocks.map((block) => ({ id: block.id, block }));
+  items.splice(bookingButtonIndex(blocks, blocks, after), 0, { id: BOOKING_EDITOR_ID, block: null });
+  return items;
+}
+
+export function profileContentOrder(items: ProfileContentItem[]) {
+  const index = items.findIndex((item) => item.id === BOOKING_EDITOR_ID);
+  return { blocks: items.flatMap((item) => item.block ? [item.block] : []), after: index > 0 ? items[index - 1].id : '' };
 }

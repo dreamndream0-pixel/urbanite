@@ -30,6 +30,19 @@ assert.equal(index(blocks, visible, 'image'), 2);
 assert.equal(index(blocks, visible, 'deleted'), 3);
 assert.equal(index(blocks, visible, booking.BOOKING_BUTTON_END), 3);
 assert.equal(index([], [], 'deleted'), 0);
+const editorIds = (items) => items.map(item => item.id);
+const unified = booking.profileContentItems(blocks, 'image');
+assert.deepEqual(editorIds(unified), ['a', 'hidden', 'image', booking.BOOKING_EDITOR_ID, 'c']);
+assert.equal(booking.profileContentOrder(unified).after, 'image');
+assert.deepEqual(booking.profileContentOrder(unified).blocks, blocks);
+for (const after of ['', 'hidden', 'deleted', booking.BOOKING_BUTTON_END]) {
+  const items = booking.profileContentItems(blocks, after);
+  assert.equal(items.filter(item => !item.block).length, 1);
+  assert.equal(booking.profileContentOrder(items).blocks.length, blocks.length);
+}
+assert.equal(booking.profileContentOrder(booking.profileContentItems([], 'deleted')).after, '');
+const moved = [unified[0], unified[1], unified[3], unified[2], unified[4]];
+assert.equal(booking.profileContentOrder(moved).after, 'hidden');
 const config = resolve({ after: 'image', label: '預約美甲', style: 'outline', shape: 'square', color: '#123456', shadow: false });
 const theme = profile.resolveTheme({ bookingButton: config, bgColor: '#abcdef' });
 assert.deepEqual(theme.bookingButton, config);
