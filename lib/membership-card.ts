@@ -24,6 +24,23 @@ export const MEMBERSHIP_BADGES: Record<MembershipDesignId, string> = {
   'black-gold': 'BLACK', silver: 'SILVER', gold: 'GOLD', platinum: 'PLATINUM', diamond: 'DIAMOND',
   'royal-blue': 'ROYAL BLUE', emerald: 'EMERALD', 'rose-gold': 'ROSE GOLD', amethyst: 'AMETHYST', champagne: 'CHAMPAGNE',
 };
+export const MEMBERSHIP_BACKDROPS: Record<MembershipDesignId, string> = {
+  'black-gold': '#24221c', silver: '#cbd0d4', gold: '#c6b18b', platinum: '#b7bdc6', diamond: '#303130',
+  'royal-blue': '#142c43', emerald: '#143c2c', 'rose-gold': '#4b2e29', amethyst: '#352343', champagne: '#ded0bb',
+};
+// Circle centers/radii measured on each original 1448 x 1086 artwork.
+export const MEMBERSHIP_BENEFIT_CIRCLES: Record<MembershipDesignId, readonly [number, number, number][]> = {
+  'black-gold': [[522, 495, 42], [821, 495, 42], [1123, 495, 42]],
+  silver: [[526, 498, 38], [825, 498, 39], [1133, 497, 41]],
+  gold: [[523, 492, 39], [827, 492, 40], [1124, 493, 41]],
+  platinum: [[533, 502, 41], [828, 501, 43], [1131, 501, 42]],
+  diamond: [[523, 493, 42], [821, 492, 42], [1123, 492, 42]],
+  'royal-blue': [[527, 496, 43], [826, 496, 43], [1128, 496, 43]],
+  emerald: [[525, 496, 41], [824, 496, 42], [1126, 496, 42]],
+  'rose-gold': [[521, 492, 41], [820, 492, 42], [1123, 492, 41]],
+  amethyst: [[524, 493, 42], [822, 493, 42], [1123, 493, 42]],
+  champagne: [[521, 495, 38], [820, 496, 39], [1123, 496, 39]],
+};
 
 export const DEFAULT_MEMBERSHIP_CARD: MembershipCardSettings = {
   enabled: true, title: 'VIP membership', intro: '專屬禮遇・美好日常', subtitle: '每一次相遇，都值得珍藏', actionLabel: '查看權益',

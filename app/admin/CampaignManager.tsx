@@ -7,6 +7,7 @@ import { useLongPressReorder } from './useLongPressReorder';
 import CampaignCategoryManager from './CampaignCategoryManager';
 import { uiConfirm } from '@/lib/ui-dialog';
 import FixedBannerCropModal from './FixedBannerCropModal';
+import { compareProductOrder } from '@/lib/product-order';
 
 type CampaignDraft = Omit<Campaign, 'id' | 'created_at' | 'updated_at'>;
 
@@ -74,7 +75,7 @@ export default function CampaignManager({
     return products
       .filter((product) => product.campaign_id === selectedId)
       .filter((product) => !q || [product.name, product.id, product.category].join(' ').toLowerCase().includes(q))
-      .sort((a, b) => a.sort_order - b.sort_order);
+      .sort(compareProductOrder);
   }, [products, query, selectedId]);
 
   // 活動專屬分類(和主站分類分開)
@@ -212,7 +213,7 @@ export default function CampaignManager({
             <section className="min-w-0 border border-[#e5ded4] bg-white p-4 sm:p-5">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div><h3 className="text-lg font-bold">活動商品</h3><p className="text-xs text-[#8a7f72]">欄位與主站商品相同；不會出現在主站商品列表或主站搜尋。</p></div>
-                <button type="button" onClick={() => onNewProduct(selected.id)} className="rounded-md bg-[#702838] px-4 py-2 text-sm font-semibold text-white">＋ 新增活動商品</button>
+                <button type="button" onClick={() => { setCatTab('all'); setQuery(''); onNewProduct(selected.id); }} className="rounded-md bg-[#702838] px-4 py-2 text-sm font-semibold text-white">＋ 新增活動商品</button>
               </div>
               <div className="mt-4 rounded-md bg-[#faf7f2] p-3">
                 <div className="flex items-start justify-between gap-3">
@@ -239,7 +240,7 @@ export default function CampaignManager({
               <p className="mt-2 text-xs text-[#8a7f72]">{sortable ? '長按商品(或按住左側 ⋮⋮)上下拖曳排序,活動頁依這個順序顯示。' : '切到「全部」並清除搜尋後可以拖曳排序。'}</p>
               <div ref={reorder.listRef} className="mt-2 divide-y divide-[#eee7de] border-y border-[#eee7de]">
                 {shownProducts.map((product) => (
-                  <div key={product.id} data-sort-row onPointerDown={sortable ? (e) => reorder.start(e, product.id) : undefined} onContextMenu={(e) => e.preventDefault()} className={`grid grid-cols-[18px_64px_minmax(0,1fr)_auto] items-center gap-3 py-3 select-none [-webkit-touch-callout:none] ${reorder.sorting === product.id ? 'bg-[#faf3ea] shadow-md' : ''}`}>
+                  <div key={product.id} data-admin-product={product.id} data-sort-row onPointerDown={sortable ? (e) => reorder.start(e, product.id) : undefined} onContextMenu={(e) => e.preventDefault()} className={`grid grid-cols-[18px_64px_minmax(0,1fr)_auto] items-center gap-3 py-3 select-none [-webkit-touch-callout:none] ${reorder.sorting === product.id ? 'bg-[#faf3ea] shadow-md' : ''}`}>
                     <span onPointerDown={sortable ? (e) => { e.stopPropagation(); reorder.start(e, product.id, true); } : undefined} className={`touch-none text-center text-[#b3a897] ${sortable ? 'cursor-grab' : 'opacity-30'}`} aria-hidden="true">⋮⋮</span>
                     <div className="h-16 bg-[#f5f1eb]">{product.image ? <img src={product.image} alt="" className="h-full w-full object-contain" /> : null}</div>
                     <div className="min-w-0"><p className="truncate font-semibold">{product.name}</p><p className="mt-1 text-xs text-[#8a7f72]">{product.id} · {catName(product.category)} · NT$ {product.price.toLocaleString()} · 庫存 {product.inventory} · {product.status}</p></div>

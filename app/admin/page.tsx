@@ -57,7 +57,7 @@ export default async function AdminPage() {
     { data: couponUsages },
     { data: campaigns },
   ] = await Promise.all([
-    supabase.from('products').select('*').order('sort_order', { ascending: true }),
+    supabase.from('products').select('*').order('sort_order', { ascending: true }).order('created_at', { ascending: false }),
     supabase.from('orders').select('*').order('created_at', { ascending: false }),
     supabase.from('shipments').select('*').order('created_at', { ascending: false }),
     supabase.from('categories').select('*').order('sort_order', { ascending: true }),

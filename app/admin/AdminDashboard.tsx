@@ -36,6 +36,7 @@ import NumberInput from './NumberInput';
 import ProductImportModal from './ProductImportModal';
 import { PackagePlus } from 'lucide-react';
 import { formatProductPrice, productPriceError } from '@/lib/product-price';
+import { compareProductOrder, nextProductSortOrder } from '@/lib/product-order';
 import DraggableChips from './DraggableChips';
 import { useLongPressReorder } from './useLongPressReorder';
 import { cleanRichText } from '@/lib/rich-text';
@@ -152,6 +153,7 @@ type Draft = {
   variantSafety: Record<string, number>; // 各規格安全庫存
   is_featured: boolean;
   sort_order: number;
+  insert_at_start?: boolean;
   campaign_id: string | null; // 一頁式活動頁商品;null = 主站商品
 };
 
@@ -370,7 +372,7 @@ function suggestProductCode(products: Pick<Product, 'id'>[]) {
   return '';
 }
 
-function blankDraft(campaignId: string | null = null, products: Pick<Product, 'id'>[] = []): Draft {
+function blankDraft(campaignId: string | null = null, products: Pick<Product, 'id' | 'campaign_id' | 'sort_order'>[] = []): Draft {
   return {
     id: suggestProductCode(products),
     name: '',
@@ -396,7 +398,8 @@ function blankDraft(campaignId: string | null = null, products: Pick<Product, 'i
     variantPrice: {},
     variantSafety: {},
     is_featured: false,
-    sort_order: 0,
+    sort_order: nextProductSortOrder(products, campaignId),
+    insert_at_start: true,
     campaign_id: campaignId,
   };
 }
@@ -869,7 +872,8 @@ export default function AdminDashboard({
       });
       const data = await res.json();
       if (res.ok) {
-        setProducts((l) => [...l, data as Product]);
+        setProducts((l) => [data as Product, ...l]);
+        if (!data.campaign_id) setProductListTab(adminProductTab(data as Product));
         setEditing(null);
       } else void uiAlert(data.error ?? '新增失敗');
     } else {
@@ -2178,9 +2182,10 @@ export default function AdminDashboard({
                   {products.filter((product) => !product.campaign_id && adminProductTab(product) === productListTab).length === 0 && (
                     <p className="py-8 text-center text-sm text-[#a99e8f]">沒有{productListTab}的商品。</p>
                   )}
-                  {products.filter((product) => !product.campaign_id && adminProductTab(product) === productListTab).map((product) => (
+                  {products.filter((product) => !product.campaign_id && adminProductTab(product) === productListTab).sort(compareProductOrder).map((product) => (
                     <div
                       key={product.id}
+                      data-admin-product={product.id}
                       className="flex items-center gap-4 rounded-lg border border-[#e5ded4] p-3"
                     >
                       {/* 點縮圖開啟前台商品頁 */}
@@ -3458,7 +3463,7 @@ export default function AdminDashboard({
         </div>
       </div>
 
-      {productImportOpen && <ProductImportModal categories={categories} onClose={() => setProductImportOpen(false)} onImported={(product) => setProducts((list) => list.some((p) => p.id === product.id) ? list.map((p) => p.id === product.id ? product : p) : [...list, product])} />}
+      {productImportOpen && <ProductImportModal categories={categories} onClose={() => setProductImportOpen(false)} onImported={(product) => setProducts((list) => list.some((p) => p.id === product.id) ? list.map((p) => p.id === product.id ? product : p) : [product, ...list])} />}
       {editing && (
         <ProductModal
           draft={editing}
@@ -6938,7 +6943,7 @@ function ProductModal({
 
 	  return (
 	    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-	      <div className="max-h-[90vh] w-full max-w-5xl overflow-auto rounded-2xl bg-[#f2f5f8] p-4 sm:p-6">
+	      <div role="dialog" aria-modal="true" aria-label={isNew ? '新增商品' : '編輯商品'} className="max-h-[90vh] w-full max-w-5xl overflow-auto rounded-2xl bg-[#f2f5f8] p-4 sm:p-6">
 	        <h2 className="text-xl font-semibold">{isNew ? '新增商品' : '編輯商品'}</h2>
 	        <div className="mt-4 grid gap-5">
 	          <section className="rounded-2xl bg-white p-5">
@@ -7356,7 +7361,7 @@ function ProductModal({
               <NumberInput
                 className="w-full rounded-lg border border-[#e5ded4] px-3 py-2"
                 value={draft.sort_order}
-                onChange={(e) => set('sort_order', Number(e.target.value))}
+                onChange={(e) => onChange({ ...draft, sort_order: Number(e.target.value), insert_at_start: false })}
               />
             </Field>
 	            <label className="flex items-end gap-2 pb-2">

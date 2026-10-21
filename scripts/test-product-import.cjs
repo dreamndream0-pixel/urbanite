@@ -115,16 +115,17 @@ assert.deepEqual(catalog.products, ['https://merchant.example/product-detail?id=
 
   const image = await sharp({ create: { width: 50, height: 50, channels: 3, background: '#eeeeee' } }).jpeg().toBuffer();
   const imageFetch = { ...safe, fetchPublic: async (url) => ({ url, res: new Response(image, { headers: { 'content-type': 'image/jpeg' } }) }) };
-  const apply = load('lib/product-import-apply.ts', { './public-fetch': imageFetch, './product-import-parse': parse, './product-import-types': types });
+  const productOrder = load('lib/product-order.ts');
+  const apply = load('lib/product-import-apply.ts', { './public-fetch': imageFetch, './product-import-parse': parse, './product-import-types': types, './product-order': productOrder });
   const shop = { id: 'shop-1', slug: 'merchant' };
   let existing = null; let failUpload = false; let failInsert = false;
   const inserted = []; const uploads = []; const removed = []; const journals = [];
   const db = { from(table) {
     let payload;
-    const chain = { select: () => chain, eq: () => chain, insert: (data) => { payload = data; return chain; },
+    const chain = { select: () => chain, eq: () => chain, is: () => chain, order: () => chain, limit: () => chain, insert: (data) => { payload = data; return chain; },
       maybeSingle: async () => ({ data: table === 'products' ? existing : { slug: 'gifts' }, error: null }),
       single: async () => { if (!failInsert) inserted.push(payload); return { data: failInsert ? null : payload, error: failInsert ? { message: 'Insert failed' } : null }; },
-      then: (done) => { if (table === 'stock_movements') journals.push(payload); return Promise.resolve({ error: null }).then(done); },
+      then: (done) => { if (table === 'stock_movements') journals.push(payload); return Promise.resolve({ data: table === 'products' ? [{ sort_order: -2, campaign_id: null }] : null, error: null }).then(done); },
     }; return chain;
   }, storage: { from() { return {
     upload: async (path, bytes) => { if (failUpload) return { error: { message: 'Image failed' } }; uploads.push(path); assert.equal((await sharp(bytes).metadata()).format, 'webp'); return { error: null }; },
@@ -138,6 +139,7 @@ assert.deepEqual(catalog.products, ['https://merchant.example/product-detail?id=
   assert.deepEqual(inserted[0].variants.map((v) => v.inventory), [3, 7]);
   assert.deepEqual(inserted[0].variants.map((v) => v.price), [100, 450]);
   assert.equal(inserted[0].inventory, 10); assert.equal(inserted[0].status, '上架中');
+  assert.equal(inserted[0].sort_order, -3, 'New imports must precede the existing head');
   assert.ok(inserted[0].images.every((src) => src.startsWith('https://assets.example/')));
   assert.ok(!inserted[0].tagline.includes('merchant.example/detail.jpg'));
   assert.equal(journals[0].length, 2);

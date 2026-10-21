@@ -47,6 +47,8 @@ assert.equal(card.resolveMembershipCard({ intro: '可編輯副標語' }).intro, 
 assert.equal(card.resolveMembershipBenefits([{ description: '專屬回饋' }])[0].description, '專屬回饋');
 for (const [months, label] of [[12, '年'], [6, '6個月'], [24, '2年'], [1, '1個月'], [NaN, '年']]) assert.equal(card.membershipPeriod(months), label);
 assert.equal(new Set(Object.values(card.MEMBERSHIP_BADGES)).size, 10);
+assert.equal(new Set(Object.values(card.MEMBERSHIP_BACKDROPS)).size, 10);
+assert.ok(card.MEMBERSHIP_DESIGNS.every((design) => /^#[0-9a-f]{6}$/i.test(card.MEMBERSHIP_BACKDROPS[design.id])));
 const scroll = load('lib/page-scroll.ts');
 const originalDocument = global.document;
 try {
@@ -63,6 +65,23 @@ try {
     const metadata = await sharp(file).metadata();
     assert.equal(metadata.width, 1448); assert.equal(metadata.height, 1086);
     assert.ok(fs.existsSync(file.replace('.webp', '.thumb.webp')));
+    const circles = card.MEMBERSHIP_BENEFIT_CIRCLES[design.id];
+    assert.equal(circles.length, 3, `${design.id}: each original ring has its own placement`);
+    const { data: rgb, info } = await sharp(file).removeAlpha().raw().toBuffer({ resolveWithObject: true });
+    for (const [x, y, radius] of circles) {
+      const pixel = (px, py, channel) => rgb[(Math.round(py) * info.width + Math.round(px)) * info.channels + channel];
+      const edges = Array.from({ length: 96 }, (_, index) => {
+        const angle = index * Math.PI / 48;
+        let squared = 0;
+        for (let c = 0; c < 3; c++) {
+          const delta = pixel(x + (radius + 2) * Math.cos(angle), y + (radius + 2) * Math.sin(angle), c)
+            - pixel(x + (radius - 2) * Math.cos(angle), y + (radius - 2) * Math.sin(angle), c);
+          squared += delta * delta;
+        }
+        return Math.sqrt(squared);
+      }).sort((a, b) => a - b);
+      assert.ok(edges.slice(12, 84).reduce((a, b) => a + b) / 72 > 85, `${design.id}: (${x}, ${y}) must match an actual circular border in the source image`);
+    }
     if (process.argv[2]) {
       const original = await sharp(path.join(process.argv[2], `${design.file}.png`)).ensureAlpha().raw().toBuffer();
       const stored = await sharp(file).ensureAlpha().raw().toBuffer();

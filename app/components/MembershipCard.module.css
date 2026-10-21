@@ -1,6 +1,8 @@
 .root { container-type: inline-size; width: 100%; max-width: 760px; margin-inline: auto; color: var(--mc-ink); }
 .art { position: relative; width: 100%; aspect-ratio: 4 / 3; isolation: isolate; overflow: hidden; border-radius: 8px; background: var(--mc-surface); font-family: 'Noto Serif TC', 'Songti TC', 'PMingLiU', 'Times New Roman', serif; letter-spacing: 0; }
 .background { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; z-index: -1; }
+.immersive .art { background: transparent; border-radius: 0; }
+.immersive .background { mask-image: linear-gradient(to right, transparent, #000 3.5%, #000 96.5%, transparent), linear-gradient(to bottom, transparent, #000 11%, #000 89%, transparent); mask-composite: intersect; }
 /* Reuse adjacent clean texture from the already-loaded background behind HTML copy. */
 .decorationMask { position: absolute; pointer-events: none; background-repeat: no-repeat; mask-image: linear-gradient(transparent, #000 25%, #000 75%, transparent); }
 .headingMask { left: 32%; top: 17.5%; width: 27%; height: 3%; background-size: 370.3704% 3333.3333%; background-position: 43.8356% 21.134%; }
@@ -16,9 +18,9 @@
 .intro { left: 33.8%; top: 34%; width: 55%; height: 5.4%; font-size: 8.4px; line-height: 1.35; white-space: nowrap; text-overflow: ellipsis; }
 .badge { left: 10%; top: 41.7%; width: 19%; height: 5.3%; display: flex; align-items: center; justify-content: center; font-family: 'Times New Roman', serif; font-size: 8px; line-height: 1.05; text-align: center; }
 .root[data-membership-card='platinum'] .badge { color: #fff3d8; }
-.benefit { position: absolute; top: 41.6%; width: 20.5%; height: 8%; display: flex; align-items: center; gap: 7.5%; }
-.iconMask { flex: 0 0 23.9024%; aspect-ratio: 1; display: grid; place-items: center; border-radius: 50%; background: var(--mc-surface); }
-.iconMask img { width: 76%; height: 76%; object-fit: contain; }
+.benefit { position: absolute; width: 20.5%; height: 8%; display: flex; align-items: center; gap: 7.5%; }
+.iconMask { position: relative; flex: 0 0 var(--mc-icon-size); min-width: 0; min-height: 0; aspect-ratio: 1; overflow: hidden; border-radius: 50%; background: var(--mc-surface); }
+.iconMask img { position: absolute; inset: 12%; display: block; width: 76%; height: 76%; object-fit: contain; }
 .lightIcon .svgIcon { filter: brightness(.38); }
 .root[data-membership-card='platinum'] .iconMask { background: #222326; }
 .root[data-membership-card='platinum'] .lightIcon .svgIcon { filter: brightness(1.7) saturate(.15); }
@@ -26,13 +28,14 @@
 .benefitCopy strong, .benefitCopy small { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: inherit; }
 .benefitCopy strong { font-weight: 600; }
 /* Cover the entire baked-in meter so 0%, partial and top-tier states are truthful. */
-.finances { position: absolute; left: 7.4%; top: 54.5%; width: 85.5%; height: 19.5%; display: grid; grid-template-columns: 42% minmax(0, 1fr); gap: 4%; align-items: center; padding: 2.3% 3%; border: 1px solid var(--mc-accent); border-radius: 8px; background: var(--mc-surface); }
-.spend { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.finances { position: absolute; left: 7.4%; top: 54.5%; width: 85.5%; height: 19.5%; display: grid; grid-template-columns: 42% minmax(0, 1fr); gap: 4%; align-items: center; padding: 1.2% 3%; border: 1px solid var(--mc-accent); border-radius: 8px; background: var(--mc-surface); }
+.spend { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .spend > span { font-size: 7px; line-height: 1.2; }
-.thresholdLabel { display: flex; align-items: center; gap: 4px; white-space: nowrap; }
-.thresholdLabel svg { width: 1em; height: 1em; }
+.creditLabel { display: flex; align-items: center; gap: 4px; white-space: nowrap; }
+.creditLabel small { min-width: 0; font-size: 6.3px; overflow: hidden; text-overflow: ellipsis; }
+.creditStatus { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 6.3px; line-height: 1.2; }
 .amount { display: flex; align-items: baseline; gap: 4px; min-width: 0; }
-.amount strong { display: block; min-width: 0; max-width: 100%; height: 24px; font-family: 'Times New Roman', 'Noto Serif TC', serif; font-size: 14.7px; font-weight: 600; line-height: 1.1; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.amount strong { display: block; min-width: 0; max-width: 100%; height: 18px; font-family: 'Times New Roman', 'Noto Serif TC', serif; font-size: 14.7px; font-weight: 600; line-height: 1.1; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .amount > span { flex-shrink: 0; font-size: 7px; }
 .upgrade { min-width: 0; border-left: 1px solid color-mix(in srgb, var(--mc-accent) 65%, transparent); padding-left: 9%; }
 .upgradeHeading { display: flex; justify-content: space-between; align-items: baseline; gap: 4px; }
@@ -49,13 +52,6 @@
 .action { gap: 4px; }
 .action span { min-width: 0; }
 .action svg { flex-shrink: 0; width: 1em; height: 1em; }
-.details { padding: 16px 0; color: var(--c-text, #242424); }
-.caption { margin: 0 0 10px; font-size: 14px; font-weight: 600; overflow-wrap: anywhere; }
-.details ul { list-style: none; display: flex; flex-wrap: wrap; gap: 10px 20px; margin: 0; padding: 0; }
-.details li { display: flex; align-items: flex-start; gap: 7px; min-width: 0; max-width: 100%; font-size: 13px; line-height: 1.5; overflow-wrap: anywhere; }
-.details li img { flex-shrink: 0; margin-top: 1px; object-fit: contain; }
-.details li .svgIcon { filter: brightness(.4); }
-.description { display: block; font-size: 12px; font-weight: 400; }
 @container (min-width: 480px) {
   .brand { font-size: 8.4px; }
   .memberName { font-size: 42px; }
@@ -63,7 +59,8 @@
   .badge { font-size: 14px; }
   .benefitCopy { font-size: 9.1px; }
   .spend > span, .upgrade p, .upgrade small, .amount > span { font-size: 9.1px; }
-  .amount strong { height: 36px; font-size: 22.4px; }
+  .amount strong { height: 26px; font-size: 22.4px; }
+  .creditLabel small, .creditStatus { font-size: 8px; }
   .upgradeHeading > span { font-size: 14px; }
   .track { height: 9px; }
   .subtitle { font-size: 9.1px; }
@@ -71,7 +68,8 @@
 }
 @container (max-width: 310px) {
   .memberName { font-size: 18px; }
-  .amount strong { font-size: 9.8px; }
+  .amount strong { height: 13px; font-size: 9.8px; }
+  .spend { gap: 1px; }
   .benefitCopy { font-size: 6.3px; }
   .action { font-size: 7px; }
 }

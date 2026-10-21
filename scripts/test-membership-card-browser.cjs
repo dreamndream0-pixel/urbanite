@@ -2,6 +2,11 @@
 const assert = require('node:assert/strict');
 const path = require('node:path');
 const os = require('node:os');
+const fs = require('node:fs');
+const ts = require('typescript');
+const cardModule = { exports: {} };
+new Function('exports', ts.transpileModule(fs.readFileSync(path.join(__dirname, '../lib/membership-card.ts'), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText)(cardModule.exports);
+const circles = cardModule.exports.MEMBERSHIP_BENEFIT_CIRCLES;
 const playwright = require(process.argv[2] || 'playwright');
 const url = process.argv[3] || 'http://localhost:3014/membership-card-test';
 const initial = () => ({ enabled: true, delayDays: 14, validDays: 180, maxRedeemPct: 20, keepMonths: 12,
@@ -49,20 +54,24 @@ const initial = () => ({ enabled: true, delayDays: 14, validDays: 180, maxRedeem
           benefit: size(art.querySelector('[data-card-benefit] strong')),
           spendLabel: size(art.querySelector('[data-card-amount]').parentElement.parentElement.firstElementChild),
           remaining: size(art.querySelector('[role="progressbar"]').parentElement.querySelector('small')),
-          caption: size(card.lastElementChild.querySelector('p')),
           hitHeight: art.querySelector('button').getBoundingClientRect().height };
       });
       const desktop = typography.width >= 480, narrow = typography.width <= 310;
       for (const [key, expected] of Object.entries({ brand: desktop ? 8.4 : 7,
         amount: desktop ? 22.4 : narrow ? 9.8 : 14.7, action: desktop ? 10.5 : narrow ? 7 : 7.7,
         name: desktop ? 11.2 : 8.4, upgrade: desktop ? 9.1 : 7, subtitle: desktop ? 9.1 : 7,
-        benefit: desktop ? 9.1 : 6.3, spendLabel: desktop ? 9.1 : 7, remaining: desktop ? 9.1 : 7, caption: 14 })) {
+        benefit: desktop ? 9.1 : 6.3, spendLabel: desktop ? 9.1 : 7, remaining: desktop ? 9.1 : 7 })) {
         assert.ok(Math.abs(typography[key] - expected) < .05, `${key} font must match the 70% card scale (outside caption unchanged)`);
       }
       assert.ok(typography.hitHeight >= 44, 'Smaller text must not shrink the touch target');
       assert.ok(typography.member > typography.name * 1.5, 'Member name is the prominent heading');
       assert.equal(await customerCard.locator('h3').innerText(), '王小美');
       assert.equal(await customerCard.locator('[data-card-badge]').innerText(), 'CHAMPAGNE');
+      assert.equal(await customerCard.locator('[data-card-credit] [data-card-amount]').innerText(), 'NT$80');
+      assert.ok((await customerCard.locator('[data-card-credit]').innerText()).includes('待入帳 NT$10'));
+      assert.ok(!(await customer.innerText()).includes('累積消費門檻'), 'The old card threshold is removed');
+      assert.equal(await customer.getByText('VIP membership', { exact: true }).count(), 1, 'No external duplicate VIP benefit section');
+      assert.equal(await customer.getByText('NT$80', { exact: true }).count(), 1, 'Balance appears only inside the card before expanding details');
       const shine = customerCard.locator('[data-card-shine]');
       assert.equal(await shine.evaluate((el) => getComputedStyle(el).pointerEvents), 'none');
       assert.notEqual(await shine.evaluate((el) => getComputedStyle(el).animationName), 'none');
@@ -106,7 +115,7 @@ const initial = () => ({ enabled: true, delayDays: 14, validDays: 180, maxRedeem
       assert.equal(await admin.getByRole('group', { name: '選擇會員卡面' }).getByRole('button').count(), 10);
       await admin.getByRole('button', { name: '選擇翡翠綠卡面', exact: true }).click();
       await admin.getByLabel('累積消費門檻週期(月)', { exact: true }).fill('6');
-      assert.equal(await admin.locator('[data-card-period]').innerText(), '/ 6個月');
+      assert.ok((await admin.locator('[data-card-spend]').innerText()).includes('近 6 個月'));
       const heading = admin.getByLabel('權益區標題', { exact: true });
       await heading.fill(''); await heading.pressSequentially('VIP membership');
       assert.equal(await heading.inputValue(), 'VIP membership', 'English spaces must remain editable without resetting the caret');
@@ -139,6 +148,8 @@ const initial = () => ({ enabled: true, delayDays: 14, validDays: 180, maxRedeem
         await page.setViewportSize({ width, height: 1000 });
       }
       await admin.getByLabel('預覽消費金額', { exact: true }).fill('0');
+      await admin.getByLabel('預覽回饋金', { exact: true }).fill('125');
+      assert.equal(await admin.locator('[data-card-amount]').innerText(), 'NT$125');
       assert.equal(await admin.getByRole('progressbar').getAttribute('aria-valuenow'), '0');
       assert.equal(await admin.locator('[role="progressbar"] > span').evaluate((el) => el.getBoundingClientRect().width), 0);
       assert.equal(await admin.locator('[data-membership-card]').getAttribute('data-membership-card'), 'emerald');
@@ -153,7 +164,7 @@ const initial = () => ({ enabled: true, delayDays: 14, validDays: 180, maxRedeem
       await customer.locator('[data-membership-card="emerald"]').waitFor();
       assert.equal(await customerCard.locator('h3').innerText(), '王小美', 'Tier rename must not replace the real member name');
       assert.ok((await customer.innerText()).includes('尊榮會員 VIP'), 'Saved tier names update the visible member reward badge');
-      assert.equal(await customerCard.locator('[data-card-period]').innerText(), '/ 6個月', 'Mounted member view refreshes after saving');
+      assert.ok((await customerCard.locator('[data-card-spend]').innerText()).includes('近 6 個月'), 'Mounted member view refreshes after saving');
       assert.equal(settings.tiers[0].benefits[0].icon, 'heart');
       assert.equal(settings.tiers[2].cardDesign, 'royal-blue');
       assert.equal(settings.tiers[1].threshold, 3000); assert.equal(settings.tiers[1].rate, 2);
@@ -181,6 +192,26 @@ const initial = () => ({ enabled: true, delayDays: 14, validDays: 180, maxRedeem
       assert.equal(await customer.locator('[data-membership-card]').count(), 0, 'Classic credit view remains available');
       settings.card.enabled = true;
       await page.reload(); await customerCard.waitFor();
+      if (engine === 'chromium' && width === 390) {
+        const backdrops = new Set();
+        for (const id of ['black-gold', 'silver', 'gold', 'platinum', 'diamond', 'royal-blue', 'emerald', 'rose-gold', 'amethyst', 'champagne']) {
+          settings.tiers[0].cardDesign = id;
+          await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+          await customer.locator(`[data-rewards-hero="${id}"]`).waitFor();
+          const backdrop = await customer.locator('[data-rewards-hero]').evaluate((el) => {
+            const box = el.getBoundingClientRect();
+            return { color: getComputedStyle(el).backgroundColor, width: box.width, left: box.left };
+          });
+          assert.ok(Math.abs(backdrop.left) < 1 && Math.abs(backdrop.width - width) < 1, 'Theme fills the entire upper band to both mobile edges');
+          backdrops.add(backdrop.color);
+          await customerCard.locator('img').first().evaluate((el) => el.decode());
+          await customer.screenshot({ path: path.join(os.tmpdir(), `urbanite-rewards-${id}.png`) });
+        }
+        assert.equal(backdrops.size, 10, 'All ten card colors have a corresponding full-width backdrop');
+        settings.tiers[0].cardDesign = 'emerald';
+        await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+        await customer.locator('[data-rewards-hero="emerald"]').waitFor();
+      }
       const gallery = page.getByRole('region', { name: '十款卡面預覽', exact: true });
       for (const image of await gallery.locator('[data-membership-card] > div:first-child > img').all()) {
         await image.scrollIntoViewIfNeeded();
@@ -188,16 +219,28 @@ const initial = () => ({ enabled: true, delayDays: 14, validDays: 180, maxRedeem
       }
       await customerCard.locator('img').first().evaluate((element) => element.decode());
       await page.evaluate(() => document.fonts.ready);
-      const geometry = await page.locator('[data-membership-card]').evaluateAll((cards) => cards.map((card) => {
+      assert.equal(new Set(await gallery.locator('[data-card-icon] img').evaluateAll((images) => images.map((el) => el.getAttribute('src')))).size, 9, 'Exercise every available SVG icon');
+      const geometry = await page.locator('[data-membership-card]').evaluateAll((cards, circles) => cards.map((card) => {
         const art = card.firstElementChild, heading = card.querySelector('h3'), amount = card.querySelector('[data-card-amount]');
         const meter = card.querySelector('[role="progressbar"]');
         const panel = meter.parentElement.parentElement;
         const box = art.getBoundingClientRect(), cover = panel.getBoundingClientRect();
+        const credit = art.querySelector('[data-card-credit]').getBoundingClientRect();
         const action = art.querySelector('button') || art.lastElementChild;
         const button = action.getBoundingClientRect();
         const perks = [...art.querySelectorAll('[data-card-benefit]')].every((perk) => {
           const [icon, copy] = [...perk.children].map((el) => el.getBoundingClientRect());
           return Math.abs(icon.y + icon.height / 2 - copy.y - copy.height / 2) < 1;
+        });
+        const iconsCentered = [...art.querySelectorAll('[data-card-icon]')].every((icon, index) => {
+          const [x, y, radius] = circles[card.dataset.membershipCard][index];
+          const mask = icon.getBoundingClientRect(), image = icon.querySelector('img').getBoundingClientRect();
+          return Math.abs(mask.x + mask.width / 2 - box.x - box.width * x / 1448) < .08
+            && Math.abs(mask.y + mask.height / 2 - box.y - box.height * y / 1086) < .08
+            && Math.abs(mask.width - box.width * (radius - 3) * 2 / 1448) < .08
+            && Math.abs(mask.width - mask.height) < .05
+            && Math.abs(image.x + image.width / 2 - mask.x - mask.width / 2) < .05
+            && Math.abs(image.y + image.height / 2 - mask.y - mask.height / 2) < .05;
         });
         const footer = art.querySelector('[data-card-footer]');
         const [emblem, slogan] = [...footer.children].map((el) => el.getBoundingClientRect());
@@ -205,11 +248,14 @@ const initial = () => ({ enabled: true, delayDays: 14, validDays: 180, maxRedeem
           serif: getComputedStyle(heading).fontFamily.includes('Noto Serif TC'),
           actionCentered: Math.abs((button.y + button.height / 2 - box.y) / box.height - .8) < .005,
           heading: art.querySelector('p').textContent,
-          perksAligned: perks, footerAligned: Math.abs(emblem.y + emblem.height / 2 - slogan.y - slogan.height / 2) < 1,
+          perksAligned: perks, iconsCentered, creditFits: credit.top >= cover.top && credit.bottom <= cover.bottom,
+          footerAligned: Math.abs(emblem.y + emblem.height / 2 - slogan.y - slogan.height / 2) < 1,
           badge: art.querySelector('[data-card-badge]').textContent,
           amountFits: amount.scrollHeight <= amount.clientHeight + 1 && amount.scrollWidth <= amount.clientWidth + 1,
           originalMeterCovered: cover.top <= box.top + box.height * .63 && cover.bottom >= box.top + box.height * .66 && cover.left <= box.left + box.width * .49 && cover.right >= box.left + box.width * .9 };
-      }));
+      }), circles);
+      assert.ok(geometry.every((card) => card.iconsCentered), 'Every icon and mask must be centered on its own source-artwork ring at every viewport width');
+      assert.ok(geometry.every((card) => card.creditFits), 'Credit balance and status must stay inside their panel, including mid-width desktop cards');
       assert.ok(geometry.every((card) => card.titleFits), 'Long tier names must fit the artwork');
       assert.ok(geometry.every((card) => card.serif), 'Card typography uses the existing Chinese serif font');
       assert.ok(geometry.every((card) => card.perksAligned && card.footerAligned), 'Perk and footer icon/copy must share horizontal centerlines');

@@ -28,15 +28,16 @@ stored alongside the existing shop-scoped LOYALTY JSON configuration.
   rename a real member. Saves and returning to the member page refresh the data.
 - The accumulation period input edits the existing shared `keepMonths` setting
   (1-36 months), not a separate cosmetic period. It also controls retention under
-  the existing business rules. Cards show the next-tier threshold (current-tier
-  threshold at the highest level), `/ 年` for 12 months or the configured period,
-  actual accumulated spend and upgrade percentage.
+  the existing business rules. The card's left panel shows the real available
+  credit balance, tier/rate and pending/expiry status, not a spending threshold.
+  The right panel still uses actual accumulated spend and the next tier's
+  threshold for upgrade progress and shows the configured accumulation period.
 - Nine trusted Lucide SVG files can be selected. The glyph regions of the baked
   artwork are covered by independent icon layers; the original circular frames
   and surrounding artwork remain visible.
 - Custom icon uploads reuse the authenticated, raster-sanitizing image upload
   endpoint. Arbitrary SVG uploads and inline SVG source are not accepted.
-- Preview name/spend are local preview inputs only; they never change customer
+- Preview name/spend/credit are local preview inputs only; they never change customer
   transactions, balances, eligibility or progress. Benefit copy is descriptive;
   writing a new benefit does not create a new automatic checkout entitlement.
 - Disable `圖片會員卡` to retain the classic credit view. Disabling loyalty also
@@ -52,6 +53,20 @@ its fill and accessible text use the existing server-calculated spend/next tier.
 The zero-progress and highest-tier cases do not show the decorative static fill.
 Backgrounds have stable 4:3 geometry and use Next Image responsive delivery.
 Small icon images are standalone SVG/raster files, not copied into the artwork.
+All 30 benefit circles have separately measured centers/radii in
+`MEMBERSHIP_BENEFIT_CIRCLES`; the ten artworks do not share identical coordinates.
+Masks leave the original metallic ring visible. Icon images are absolutely
+centered inside fixed-aspect-ratio masks and cannot force a minimum flex size,
+so long labels, optional descriptions and uploaded images cannot shift them.
+Tests validate circle edges against the actual source pixels and check all 30
+positions and all nine SVG choices across mobile, WebKit and desktop widths.
+The duplicate external VIP heading/benefit list and external credit summary are
+removed when an image card is active. Its action still opens the existing tier
+and transaction details, including available, pending and expiring balances.
+The entire upper rewards band uses a matching backdrop for each of ten designs;
+the artwork's outer backdrop fades into that color without changing the physical
+card or source pixels. Disabling image cards restores the classic rewards view
+and the shop's existing coupon hero image.
 Card copy uses the site's existing Noto Serif TC with Chinese serif fallbacks.
 Supporting card copy retains the reduced text sizes. The member's name is larger
 in the original heading region. Benefits and their icon masks are horizontal flex

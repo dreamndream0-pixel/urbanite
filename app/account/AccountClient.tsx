@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import LineBindingRow from './LineBindingCard';
-import CreditCard from './CreditCard';
+import MemberRewardsHero from './MemberRewardsHero';
 import ManualFulfillmentAction from '@/app/components/ManualFulfillmentAction';
 import LineCouponBanner from './LineCouponBanner';
 import Link from 'next/link';
@@ -814,31 +814,7 @@ function CouponsTab({ coupons, heroImage = '', platform }: { coupons: Discount[]
   return (
     <div className="space-y-9">
       {/* HERO:全出血標題 + 購物金卡 */}
-      <section className="relative -mx-4 -mt-8 overflow-hidden bg-[#e9dfd0] sm:-mx-6">
-        <div
-          className="pointer-events-none absolute inset-y-0 right-0 w-[52%] bg-[#e4d9c8] bg-cover bg-center"
-          style={heroImage ? {
-            backgroundImage: `url("${heroImage}")`,
-            WebkitMaskImage: 'linear-gradient(to right, transparent, #000 42%)',
-            maskImage: 'linear-gradient(to right, transparent, #000 42%)',
-          } : {
-            backgroundImage: 'radial-gradient(circle at 60% 15%, rgba(255,255,255,.55), transparent 34%), linear-gradient(135deg, #d8cab9, #efe6d9 52%, #cdbba9)',
-          }}
-        >
-          {heroImage ? null : (
-            <p className="font-script absolute right-6 top-8 text-right text-[34px] leading-[1.15] text-[#b0a08a] sm:text-[42px]">
-              Good<br />Outfit<br />Brighter<br />Days.
-            </p>
-          )}
-        </div>
-        <div className="relative px-5 pb-5 pt-9 sm:px-8 sm:pb-7 sm:pt-11">
-          <h2 className="font-serif-tc text-[34px] font-semibold leading-none tracking-[0.22em] text-[var(--c-text)] sm:text-[40px]">我的優惠</h2>
-          <p className="mt-3 text-[11px] tracking-[0.4em] text-[#a2957f] sm:text-xs">MY COUPONS</p>
-          <p className="mt-3.5 text-sm text-[var(--c-text2)] sm:text-base">收藏喜歡的優惠，享受更好的購物體驗。</p>
-
-          <CreditCard />
-        </div>
-      </section>
+      <MemberRewardsHero heroImage={heroImage} />
 
       {platform ? <LineCouponBanner /> : null}
 

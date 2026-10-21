@@ -6,6 +6,7 @@ import type { Product } from './types';
 import { fetchPublic, publicUrl } from './public-fetch';
 import { canonicalProductUrl, descriptionImageUrls, importMoney, replaceDescriptionImages, sanitizeProductDescription } from './product-import-parse';
 import { importProblems, IMPORT_MAX_VARIANTS, type ImportedProduct } from './product-import-types';
+import { readProductHeadOrder } from './product-order';
 
 const string = (v: unknown, max: number) => typeof v === 'string' ? v.trim().slice(0, max) : '';
 const record = (v: unknown): Record<string, unknown> => v && typeof v === 'object' && !Array.isArray(v) ? v as Record<string, unknown> : {};
@@ -77,7 +78,7 @@ export async function applyImportedProduct(db: SupabaseClient, shop: Shop, input
       inventory, status: settings.publish === true ? '上架中' : '已下架', category, image: images[0], images,
       specs: product.specs, variants, colors: product.specs.find((s) => /顏色|color/i.test(s.name))?.options ?? [], sizes: product.specs.find((s) => /尺寸|size/i.test(s.name))?.options ?? [],
       color_images: Object.fromEntries(Object.entries(product.colorImages).map(([key, src]) => [key, stored.get(src)!])),
-      unit: '', sale_mode: '現貨', is_featured: false, sort_order: 0, campaign_id: null,
+      unit: '', sale_mode: '現貨', is_featured: false, sort_order: await readProductHeadOrder(db), campaign_id: null,
       available_payment_methods: [], available_shipping_methods: [], shipping_fee_overrides: {},
     };
     const inserted = await db.from('products').insert(data).select().single();

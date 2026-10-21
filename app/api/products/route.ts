@@ -3,6 +3,7 @@ import { getAdminUser } from '@/lib/supabase/server';
 import { isCampaignLive } from '@/lib/campaign';
 import type { Campaign, Product } from '@/lib/types';
 import { productPriceError } from '@/lib/product-price';
+import { readProductHeadOrder } from '@/lib/product-order';
 import { isPlatformShop, requireCurrentShop, shopAdminClient } from '@/lib/shop';
 
 // GET /api/products — 取得商品(前台與後台共用)
@@ -13,7 +14,7 @@ export async function GET(request: NextRequest) {
   const supabase = (await shopAdminClient());
   const campaignId = request.nextUrl.searchParams.get('campaign') ?? '';
   const forCart = request.nextUrl.searchParams.get('cart') === '1';
-  let query = supabase.from('products').select('*').order('sort_order', { ascending: true });
+  let query = supabase.from('products').select('*').order('sort_order', { ascending: true }).order('created_at', { ascending: false });
   if (campaignId) query = query.eq('campaign_id', campaignId);
   else if (!forCart) query = query.is('campaign_id', null);
   const { data, error } = await query;
@@ -51,6 +52,11 @@ export async function POST(request: Request) {
   const shop = await requireCurrentShop();
   const rawId = String(body.id).trim();
   const productId = isPlatformShop(shop) || rawId.startsWith(`${shop.slug}-`) ? rawId : `${shop.slug}-${rawId}`;
+  let sortOrder = body.sort_order;
+  if (body.insert_at_start === true || sortOrder == null) {
+    try { sortOrder = await readProductHeadOrder(supabase, body.campaign_id || null); }
+    catch (error) { return NextResponse.json({ error: error instanceof Error ? error.message : '讀取商品排序失敗' }, { status: 500 }); }
+  }
   const { data, error } = await supabase
     .from('products')
     .insert({
@@ -81,7 +87,7 @@ export async function POST(request: Request) {
       sale_mode: body.sale_mode ?? '現貨',
       color_images: body.color_images ?? {},
       is_featured: body.is_featured ?? false,
-      sort_order: body.sort_order ?? 0,
+      sort_order: sortOrder,
       campaign_id: body.campaign_id || null,
     })
     .select()

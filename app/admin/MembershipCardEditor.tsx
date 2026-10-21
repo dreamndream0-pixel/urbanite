@@ -13,6 +13,7 @@ type Props = { tierKey: string; settings: LoyaltySettings; onChange: (update: (s
 export default function MembershipCardEditor({ tierKey, settings, onChange, onBusyChange }: Props) {
   const [previewName, setPreviewName] = useState<string | null>(null);
   const [spend, setSpend] = useState(1500);
+  const [balance, setBalance] = useState(0);
   const [uploading, setUploading] = useState<number | null>(null);
   const [error, setError] = useState('');
   const [reveal, setReveal] = useState(0);
@@ -62,9 +63,10 @@ export default function MembershipCardEditor({ tierKey, settings, onChange, onBu
       <div className="grid min-w-0 gap-3 sm:grid-cols-2">
         <label className="text-sm">預覽會員姓名<input aria-label="預覽會員姓名" maxLength={80} value={previewName ?? draftTier?.name ?? tier.name} onChange={(e) => setPreviewName(e.target.value)} className={`${field} mt-1`} /></label>
         <label className="text-sm">預覽消費金額<input aria-label="預覽消費金額" type="number" min={0} max={100000000} value={spend} onChange={(e) => setSpend(Math.max(0, Number(e.target.value) || 0))} className={`${field} mt-1`} /></label>
+        <label className="text-sm">預覽回饋金<input aria-label="預覽回饋金" type="number" min={0} max={100000000} value={balance} onChange={(e) => setBalance(Math.max(0, Number(e.target.value) || 0))} className={`${field} mt-1`} /></label>
       </div>
       <div className="flex justify-end"><button type="button" title="預覽開啟會員卡的金光效果" aria-label="預覽會員卡金光" onClick={() => setReveal((value) => value + 1)} className="inline-flex items-center gap-2 rounded-lg border border-[#dedbd5] px-3 py-2 text-sm"><Sparkles size={16} />預覽金光</button></div>
-      <MembershipCard tier={tier} next={next} spend={spend} toNext={next ? Math.max(0, next.threshold - spend) : 0} memberName={(previewName ?? draftTier?.name ?? tier.name) || '會員'} brandName="" settings={card} periodMonths={normalized.keepMonths} animate={reveal > 0} revealKey={reveal} />
+      <MembershipCard tier={tier} next={next} spend={spend} toNext={next ? Math.max(0, next.threshold - spend) : 0} memberName={(previewName ?? draftTier?.name ?? tier.name) || '會員'} brandName="" settings={card} periodMonths={normalized.keepMonths} credit={{ balance, status: '訂單完成後依會員等級累積回饋金。' }} animate={reveal > 0} revealKey={reveal} />
     </fieldset>
   </section>;
 }
