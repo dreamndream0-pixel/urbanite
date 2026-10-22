@@ -17,6 +17,7 @@ import { notifyShopOrder } from '@/lib/shop-line';
 import { getConfiguredSiteUrl } from '@/lib/site-url';
 import { kickOrderNotifications } from '@/lib/order-notification-kick';
 import { isValidPrice, productPrice } from '@/lib/product-price';
+import { fieldsForOrder, resolveCheckoutFields, validateAnswers } from '@/lib/checkout-fields';
 
 // GET /api/orders — 取得所有訂單(限管理員)
 export async function GET() {
@@ -113,6 +114,14 @@ export async function POST(request: Request) {
   const liveCampaigns = new Set(((campaignRows ?? []) as Campaign[]).filter((c) => isCampaignLive(c)).map((c) => c.id));
   const products = ((productRows ?? []) as Product[]).filter((p) => !p.campaign_id || liveCampaigns.has(p.campaign_id));
   const priceMap = new Map(products.map((p) => [p.id, p]));
+
+  // 結帳自訂欄位(系統設定 → 結帳欄位):依購物車商品、活動、配送方式決定要填哪些,必填沒填就擋下
+  const { data: fieldSettings } = await supabase.from('site_settings').select('checkout_fields').maybeSingle();
+  const orderFields = fieldsForOrder(resolveCheckoutFields(fieldSettings?.checkout_fields), {
+    categories: products.map((p) => p.category), campaignIds: products.map((p) => p.campaign_id).filter((x): x is string => Boolean(x)), shippingMethod,
+  });
+  const fieldCheck = validateAnswers(orderFields, body?.custom_fields);
+  if (fieldCheck.error) return NextResponse.json({ error: fieldCheck.error }, { status: 400 });
   const user = await getSessionUser();
 
   // 依資料庫價格組出明細並計算金額
@@ -287,6 +296,7 @@ export async function POST(request: Request) {
       phone,
       address,
       note,
+      custom_fields: fieldCheck.answers,
       items: orderItems,
       subtotal,
       shipping,

@@ -64,6 +64,7 @@ import LineBotManager from './line-bot/LineBotManager';
 import LoyaltyManager from './LoyaltyManager';
 import StocktakeManager, { type StocktakeApplied } from './StocktakeManager';
 import PromoActivitiesManager from './PromoActivitiesManager';
+import CheckoutFieldsManager from './CheckoutFieldsManager';
 import { downloadCsv } from '@/lib/stocktake';
 import { isCollectOnDelivery } from '@/lib/payment';
 import { buildReturnSteps, historyKind, isReturnOrder } from '@/lib/return-progress';
@@ -508,7 +509,7 @@ export default function AdminDashboard({
   const [customers] = useState<Customer[]>(initialCustomers);
   const [banners, setBanners] = useState<Banner[]>(initialBanners);
   const [uploadingBanner, setUploadingBanner] = useState(false);
-  const [settingsTab, setSettingsTab] = useState<'general' | 'templates' | 'banners' | 'footer' | 'payments' | 'shippings' | 'integrations' | 'shopline' | 'notifications'>('general');
+  const [settingsTab, setSettingsTab] = useState<'general' | 'templates' | 'banners' | 'footer' | 'payments' | 'shippings' | 'checkout' | 'integrations' | 'shopline' | 'notifications'>('general');
   const [orderFilter, setOrderFilter] = useState<string>('全部');
   const [orderSearch, setOrderSearch] = useState('');
   const [orderPaidFilter, setOrderPaidFilter] = useState<'全部' | '已付款' | '未付款'>('全部');
@@ -3038,6 +3039,7 @@ export default function AdminDashboard({
                   { key: 'footer', label: '頁尾資訊' },
                   { key: 'payments', label: '金流設定' },
                   { key: 'shippings', label: '物流設定' },
+                  { key: 'checkout', label: '結帳欄位' },
                   { key: 'integrations', label: '串接設定' },
                   { key: 'notifications', label: '通知' },
                 ] as const).filter((t) => platform || t.key !== 'integrations').map((t) => (
@@ -3413,6 +3415,7 @@ export default function AdminDashboard({
               )}
 
               {settingsTab === 'integrations' && <IntegrationSettings />}
+              {settingsTab === 'checkout' && <CheckoutFieldsManager />}
               {settingsTab === 'notifications' && <OrderNotificationSettingsPanel />}
               {settingsTab === 'shippings' && (
               <Card
@@ -4924,6 +4927,7 @@ th,td{border-bottom:1px solid #e5ded4;padding:8px;font-size:14px;text-align:left
 <p class="muted">小計 ${formatter.format(order.subtotal)}｜運費 ${order.shipping === 0 ? '免運' : formatter.format(order.shipping)}${order.discount > 0 ? `｜折扣 -${formatter.format(order.discount)}` : ''}</p>
 <p class="tot">合計 ${formatter.format(order.total)}</p>
 <div class="sec"><h2>收件資訊</h2><p class="muted">${escapeHtml(order.customer_name)}｜${escapeHtml(order.phone ?? '')}<br>${escapeHtml(order.address ?? '')}<br>${escapeHtml(order.shipping_method ?? '')}｜${escapeHtml(order.payment_method ?? '')}</p></div>
+${(order.custom_fields ?? []).length ? `<div class="sec"><h2>結帳欄位</h2><p class="muted">${(order.custom_fields ?? []).map((cf) => `${escapeHtml(cf.label)}:${escapeHtml(cf.value)}`).join('<br>')}</p></div>` : ''}
 ${order.note ? `<div class="sec"><h2>備註</h2><p class="muted">${escapeHtml(order.note)}</p></div>` : ''}
 <script>window.onload=function(){window.print()}</script></body></html>`;
     const w = window.open('', '_blank', 'width=720,height=800');
@@ -5193,6 +5197,7 @@ ${order.note ? `<div class="sec"><h2>備註</h2><p class="muted">${escapeHtml(or
                   <button onClick={markRefund} className="rounded-full border border-[#d7c9bd] px-4 py-1.5 text-xs font-semibold text-[#6b6156] hover:bg-[#efe8dd]">標記退款</button>
                 ) : null}
               </div>
+              {(order.custom_fields ?? []).map((cf) => <div key={cf.id}>{row(cf.label, cf.value)}</div>)}
               {row('客人備註', order.note)}
             </div>
           </div>

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { resolvePromoNotices } from '@/lib/promo-notices';
+import { resolveCheckoutFields } from '@/lib/checkout-fields';
 import { getAdminUser } from '@/lib/supabase/server';
 import type { SiteSettings } from '@/lib/types';
 import { revalidateTag } from 'next/cache';
@@ -105,6 +106,7 @@ export async function PATCH(request: Request) {
   // 網站外觀:只保留合法的顏色與選項
   if ('site_theme' in body) update.site_theme = resolveSiteTheme(body.site_theme);
   if ('promo_notices' in body) update.promo_notices = resolvePromoNotices(body.promo_notices);
+  if ('checkout_fields' in body) update.checkout_fields = resolveCheckoutFields(body.checkout_fields);
   if ('category_image_style' in body) update.category_image_style = ['text', 'square', 'cutout'].includes(String(body.category_image_style)) ? String(body.category_image_style) : 'circle';
 
   const supabase = (await shopAdminClient());

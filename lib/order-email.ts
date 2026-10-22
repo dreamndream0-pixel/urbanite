@@ -60,6 +60,7 @@ function delivery(order: Order) {
     <p style="margin:4px 0"><b>配送方式:</b>${esc(order.shipping_method)}</p>
     ${store ? `<p style="margin:4px 0"><b>取貨門市:</b>${store}</p>` : order.address ? `<p style="margin:4px 0"><b>收件地址:</b>${esc(order.address)}</p>` : ''}
     <p style="margin:4px 0"><b>收件人:</b>${esc(order.customer_name)} ${esc(order.phone ?? '')}</p>
+    ${(order.custom_fields ?? []).map((cf) => `<p style="margin:4px 0"><b>${esc(cf.label)}:</b>${esc(cf.value)}</p>`).join('')}
     ${order.note ? `<p style="margin:4px 0"><b>備註:</b>${esc(order.note)}</p>` : ''}`;
 }
 

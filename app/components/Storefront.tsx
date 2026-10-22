@@ -118,7 +118,7 @@ export default function Storefront({ campaign = null, preview = false, initialDa
   const [presentationReady, setPresentationReady] = useState(!!(initialData || cached?.settings));
   const [presentationFailed, setPresentationFailed] = useState(false);
   const [loading, setLoading] = useState(!cached);
-  // 使用者選的分類;空字串 = 還沒選,首頁 / 活動頁預設停在分類列最左邊的分類(見下方 category)
+  // 使用者選的分類;空字串 = 還沒選,預設停在「全部商品」(見下方 category)
   const [pickedCategory, setCategory] = useState(() => initialReturn?.category ?? '');
   // 官網模板首頁按「查看更多」→ 改顯示全部商品列表
   const [browseAll, setBrowseAll] = useState(initialReturn?.browseAll ?? false);
@@ -347,12 +347,10 @@ export default function Storefront({ campaign = null, preview = false, initialDa
       })),
   ];
 
-  // 預設分類:板塊模板首頁 → 'all'(顯示首頁板塊);其他 → 分類列最左邊的分類(「全部商品」在最右邊)
+  // 預設分類:回到首頁 / 活動頁一律停在「全部商品」(分類列最左邊)
   const homeTheme = resolveSiteTheme(settings?.site_theme);
-  const homeDesign = resolveStorefront(homeTheme.storefront);
   const bannerRatios = homeTheme.bannerRatios;
-  const blocksHome = !campaign && homeDesign.enabled && homeDesign.blocks !== undefined;
-  const category = pickedCategory || (blocksHome ? 'all' : categoryTabs[1]?.slug ?? 'all');
+  const category = pickedCategory || 'all';
 
   // 未上架、以及售完的純現貨商品(自動下架)不顯示;預購商品售完仍顯示
   const liveProducts = products.filter(isVisibleInStore);

@@ -94,6 +94,7 @@ export type SiteSettings = {
   site_theme?: unknown;
   // 促銷管理 → 活動管理:商品頁促銷文字(lib/promo-notices)
   promo_notices?: unknown;
+  checkout_fields?: unknown; // 結帳自訂欄位(lib/checkout-fields)
   // 網頁頁籤圖示(512×512 PNG);空白 = 預設圖示
   favicon_url?: string;
   updated_at?: string;
@@ -289,6 +290,8 @@ export type Order = {
   net_amount?: number;
   // §22 後台備註
   admin_note?: string;
+  // 結帳自訂欄位的答案
+  custom_fields?: { id: string; label: string; value: string }[];
   // §25 庫存旗標
   stock_committed?: boolean;
   // 客人取消申請 → 賣家審核

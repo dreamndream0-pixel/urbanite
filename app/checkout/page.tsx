@@ -12,6 +12,7 @@ import { TW_CITIES, TW_REGIONS } from '@/lib/tw-regions';
 import { computeShipping, resolveFreeShippingThreshold, resolveMethodFee } from '@/lib/shipping';
 import ShopHeader from '@/app/components/ShopHeader';
 import { useShopHome } from '@/lib/shop-home';
+import { fieldsForOrder, resolveCheckoutFields } from '@/lib/checkout-fields';
 import LineContactCard from '@/app/components/LineContactCard';
 import { useScrollLock } from '@/app/components/useScrollLock';
 
@@ -112,6 +113,8 @@ export default function CheckoutPage() {
   const [city, setCity] = useState('');
   const [district, setDistrict] = useState('');
   const [note, setNote] = useState('');
+  // 結帳自訂欄位的答案(系統設定 → 結帳欄位)
+  const [extra, setExtra] = useState<Record<string, string>>({});
   const [recipients, setRecipients] = useState<Recipient[]>([]);
   const [isMember, setIsMember] = useState(false);
   // 訪客進結帳頁:提示加入會員領取折扣優惠券(每個瀏覽階段只跳一次)
@@ -247,6 +250,15 @@ export default function CheckoutPage() {
     () => allowedForCart(sitePaymentMethods, products, cart, 'available_payment_methods'),
     [sitePaymentMethods, products, cart],
   );
+  const selectedShippingMethodForFields = availableShippingMethods.includes(shippingMethod) ? shippingMethod : availableShippingMethods[0] ?? '';
+  const extraFields = useMemo(() => {
+    const cartProducts = cart.map((item) => products.find((p) => p.id === item.productId)).filter((p): p is Product => Boolean(p));
+    return fieldsForOrder(resolveCheckoutFields(settings?.checkout_fields), {
+      categories: cartProducts.map((p) => p.category),
+      campaignIds: cartProducts.map((p) => p.campaign_id).filter((x): x is string => Boolean(x)),
+      shippingMethod: selectedShippingMethodForFields,
+    });
+  }, [cart, products, settings?.checkout_fields, selectedShippingMethodForFields]);
   const selectedShippingMethod = availableShippingMethods.includes(shippingMethod)
     ? shippingMethod
     : availableShippingMethods[0] ?? '';
@@ -569,6 +581,11 @@ export default function CheckoutPage() {
       setMessage({ type: 'err', text: '請先選擇超商取貨門市' });
       return;
     }
+    const missing = extraFields.find((fld) => fld.required && !(extra[fld.id] ?? '').trim());
+    if (missing) {
+      setMessage({ type: 'err', text: `請填寫「${missing.label}」` });
+      return;
+    }
     setSubmitting(true);
     try {
       const res = await fetch('/api/orders', {
@@ -580,6 +597,7 @@ export default function CheckoutPage() {
           phone,
           address: finalAddress,
           note,
+          custom_fields: Object.fromEntries(extraFields.map((fld) => [fld.id, extra[fld.id] ?? ''])),
           shipping_method: selectedShippingMethod,
           expected_shipping: shipping,
           payment_method: selectedPaymentMethod,
@@ -1002,6 +1020,25 @@ export default function CheckoutPage() {
                     ＋ {needsPickupStore ? '加入常用取貨人' : '加入常用收件人'}
                   </button>
                 ) : null}
+
+                {extraFields.map((fld) => {
+                  const value = extra[fld.id] ?? '';
+                  const set = (v: string) => setExtra((x) => ({ ...x, [fld.id]: v }));
+                  const cls = 'w-full rounded-lg border border-[var(--c-border)] bg-white px-4 py-3';
+                  const hint = fld.placeholder || `${fld.label}${fld.required ? '' : '(選填)'}`;
+                  return (
+                    <label key={fld.id} className="block">
+                      <span className="mb-1 block text-sm text-[var(--c-muted)]">{fld.label}{fld.required ? <span className="text-[var(--c-sale)]"> *</span> : <span>(選填)</span>}</span>
+                      {fld.type === 'textarea' ? <textarea className={cls} rows={2} value={value} placeholder={hint} onChange={(e) => set(e.target.value)} />
+                        : fld.type === 'select' ? (
+                          <select className={cls} value={value} onChange={(e) => set(e.target.value)}>
+                            <option value="">請選擇{fld.required ? '' : '(選填)'}</option>
+                            {fld.options.map((o) => <option key={o} value={o}>{o}</option>)}
+                          </select>
+                        ) : <input className={cls} type={fld.type === 'date' ? 'date' : 'text'} value={value} placeholder={hint} onChange={(e) => set(e.target.value)} />}
+                    </label>
+                  );
+                })}
 
                 <textarea
                   className="rounded-lg border border-[var(--c-border)] px-4 py-3"

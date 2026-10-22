@@ -1559,6 +1559,7 @@ function OrderModal({
             <Row label="訂單電郵" value={order.email} />
             <Row label="訂單日期" value={dateStr} />
             <Row label="訂單狀態" value={order.status} />
+            {(order.custom_fields ?? []).map((cf) => <Row key={cf.id} label={cf.label} value={cf.value} />)}
             {order.note ? <Row label="備註" value={order.note} /> : null}
           </Section>
 
