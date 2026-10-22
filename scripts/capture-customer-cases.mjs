@@ -30,7 +30,7 @@ try {
       await page.waitForTimeout(600);
     }
     const screenshot = await page.screenshot({ path: `outputs/customer-cases/${name}-source.png`, animations: 'disabled' });
-    const filename = name === 'urbanite' ? 'urbanite-live.webp' : `${name}.webp`;
+    const filename = name === 'urbanite' ? 'urbanite-live-20261022.webp' : `${name}.webp`;
     await sharp(screenshot).resize({ width: 1440, withoutEnlargement: true }).webp({ quality: 86 }).toFile(`public/card/cases/${filename}`);
     sources.push({ name, source: page.url(), title: await page.title(), capturedAt: new Date().toISOString(), image: `/card/cases/${filename}` });
     console.log(`Captured ${name}: ${page.url()}`);

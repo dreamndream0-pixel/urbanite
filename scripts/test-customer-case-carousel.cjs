@@ -26,6 +26,7 @@ const url = process.argv[3] || 'http://localhost:3015/card';
           const track = document.querySelector('#customer-cases [aria-label="網站範例"]');
           return Math.abs(track.scrollLeft - (track.children[index].offsetLeft - track.children[0].offsetLeft)) < 2;
         }, { index: i });
+        await page.waitForFunction(index => document.querySelector('#customer-cases p[aria-live]').textContent === `${index + 1} / 3`, i);
         const image = track.locator('img').nth(i);
         await image.evaluate(el => el.decode());
         const geometry = await image.evaluate(el => {
@@ -55,7 +56,7 @@ const url = process.argv[3] || 'http://localhost:3015/card';
       await page.getByRole('button', { name: '預覽 URBANITE', exact: true }).click();
       const dialog = page.getByRole('dialog');
       await dialog.getByAltText('URBANITE URBANITE 實際網站').evaluate(el => el.decode());
-      assert.ok((await dialog.locator('img').getAttribute('src')).includes('urbanite-live'));
+      assert.ok((await dialog.locator('img').getAttribute('src')).includes('urbanite-live-20261022'), 'Preview must use the refreshed asset, not the cached old screenshot');
       await dialog.getByRole('button', { name: '下一個案例' }).click();
       assert.equal(await dialog.getByRole('heading').innerText(), 'CHUÉ');
       await page.keyboard.press('Escape');
