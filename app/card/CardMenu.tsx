@@ -79,6 +79,10 @@ export default function CardMenu({ variant = 'header', loggedIn, current, top = 
     { href: '/card/pricing', label: '方案價格' },
   ];
   if (!navigation.some(link => link.href === '/card/cases')) navigation.splice(Math.max(1, navigation.length - 1), 0, { href: '/card/cases', label: '客戶案例' });
+  const websiteLinks = me === undefined ? null : (me?.shops?.length ? me.shops.map(shop => (
+    <a key={shop.slug} href={shop.adminUrl} onClick={event => navigate(event, shop.adminUrl)}><Store /><span>進入官網後台<small>{shop.name || shop.slug}</small></span><ChevronRight /></a>
+  )) : me?.isAdmin ? <a href="/admin" onClick={event => navigate(event, '/admin')}><LayoutDashboard />進入官網後台<ChevronRight /></a>
+    : signedIn ? <Link href="/card/pricing" onClick={event => navigate(event, '/card/pricing')}><CreditCard />升級官網<ChevronRight /></Link> : null);
 
   return (
     <div className={variant === 'floating' ? styles.floating : styles.wrapper} style={variant === 'floating' ? { top } : undefined}>
@@ -133,7 +137,7 @@ export default function CardMenu({ variant = 'header', loggedIn, current, top = 
             <div className={styles.account}>
               <Link href="/card" onClick={event => navigate(event, '/card')}><House />首頁<ChevronRight /></Link>
               <Link href="/mycard" onClick={event => navigate(event, '/mycard')}><UserRound />我的名片<ChevronRight /></Link>
-              <Link href="/card/pricing" onClick={event => navigate(event, '/card/pricing')}><CreditCard />升級官網<ChevronRight /></Link>
+              {websiteLinks}
             </div>
           </div> : <div className={styles.navigation}>
             <h2 id={`${id}-title`} className={styles.srOnly}>主要選單</h2>
@@ -141,10 +145,9 @@ export default function CardMenu({ variant = 'header', loggedIn, current, top = 
               <small>{String(index + 1).padStart(2, '0')}</small><span>{link.label}{link.href === '/card/cases' && <small>服飾・租屋・美業・LINE AI</small>}</span><ArrowRight size={19} />
             </Link>)}</nav>
             {signedIn && <div className={styles.account}>
-              {me?.isAdmin && <a href="/admin" onClick={event => navigate(event, '/admin')}><LayoutDashboard />管理後台<ChevronRight /></a>}
-              {(me?.shops ?? []).filter(shop => !shop.current).map(shop => <a key={shop.slug} href={shop.adminUrl} onClick={event => navigate(event, shop.adminUrl)}><Store /><span>我的官網後台<small>{shop.name || shop.slug}</small></span><ChevronRight /></a>)}
               <Link href="/mycard" aria-current={current === 'mycard' ? 'page' : undefined} onClick={event => navigate(event, '/mycard')}><UserRound />我的名片<ChevronRight /></Link>
               <Link href="/mycard/booking" aria-current={current === 'booking' ? 'page' : undefined} onClick={event => navigate(event, '/mycard/booking')}><CalendarCheck />線上預約管理<ChevronRight /></Link>
+              {websiteLinks}
               {!navigation.some(link => link.href === '/card/pricing') && <Link href="/card/pricing" aria-current={current === 'upgrade' ? 'page' : undefined} onClick={event => navigate(event, '/card/pricing')}><CreditCard />方案價格<ChevronRight /></Link>}
               {!navigation.some(link => link.href === '/card') && <Link href="/card" onClick={event => navigate(event, '/card')}><House />URBANLINKS 首頁<ChevronRight /></Link>}
             </div>}
