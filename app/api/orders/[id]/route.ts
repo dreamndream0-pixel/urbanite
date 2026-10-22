@@ -81,6 +81,8 @@ export async function PATCH(
   const update: Record<string, unknown> = {};
   if (typeof body.status === 'string') update.status = body.status;
   if (typeof body.paid === 'boolean') update.paid = body.paid;
+  // 手動對帳:標記已付款時實收 = 訂單金額;改回未付款時歸零(線上付款由藍新入帳另外寫入)
+  if (typeof body.paid === 'boolean' && body.paid !== current.paid) update.paid_amount = body.paid ? Number(current.total) || 0 : 0;
   // 手動標記已付款:若訂單還停在「尚未付款」,推進到「待出貨」(與線上付款自動入帳一致)
   if (nextPaid && !current.paid && nextStatus === '尚未付款') {
     nextStatus = '待出貨';
