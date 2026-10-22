@@ -81,7 +81,7 @@ assert.equal(pricing.productPriceError({ variants: [{ options: ['1入'] }, { opt
     '@/lib/order-status': { deriveStatuses: () => ({}) },
     '@/lib/payment': { initialOrderStatus: () => '待出貨', isCollectOnDelivery: () => false, isOnlinePayment: () => false },
     '@/lib/order-access-token': { createOrderAccessToken: () => 'token', orderAccessCookieName: () => 'access', ORDER_ACCESS_MAX_AGE: 60 },
-    '@/lib/shipping': { computeShipping: () => 0, resolveMethodFee: () => 0 },
+    '@/lib/shipping': { computeShipping: () => 0, resolveMethodFee: () => 0, resolveFreeShippingThreshold: () => 2000 },
     '@/lib/supabase/admin': { createAdminClient: () => db },
     '@/lib/order-email': { sendOrderEmails() {} }, '@/lib/shop-line': { notifyShopOrder() {} },
     '@/lib/site-url': { getConfiguredSiteUrl: () => 'https://shop.test' }, '@/lib/order-notification-kick': { kickOrderNotifications() {} },

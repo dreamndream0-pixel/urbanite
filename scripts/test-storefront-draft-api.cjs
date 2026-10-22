@@ -33,6 +33,7 @@ function load(file, imports = {}) {
     '@/lib/site-theme': theme, '@/lib/site-theme-state': state,
     '@/lib/promo-notices': load('lib/promo-notices.ts'),
     '@/lib/banner-ratio': ratios,
+    '@/lib/shipping': load('lib/shipping.ts'),
     '@/lib/shop': { shopAdminClient: async () => db, getCurrentShop: async () => ({ name: 'Shop', slug: 'shop' }), isPlatformShop: () => false },
   });
   const request = (body) => new Request('https://shop.test/api/settings', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });

@@ -2,11 +2,11 @@
 // 前台購物車抽屜、結帳頁、後端下單一律呼叫這裡,確保所有入口的運費完全一致。
 // 規則:
 //   1. 小計為 0(空車)→ 不計運費
-//   2. 購物車內任一商品設定「此商品免運」→ 免運
-//   3. 小計達免運門檻 → 免運
-//   4. 其餘 → 收取固定運費
+//   2. 小計達啟用中的店家免運門檻 → 免運
+//   3. 其餘以需運費商品的最高運費計算;全部商品免運則為 0
 
-export const FREE_SHIPPING_THRESHOLD = 2000; // 消費滿此金額免運
+export const FREE_SHIPPING_THRESHOLD = 2000; // 尚未設定的店家維持原門檻
+export const MAX_FREE_SHIPPING_THRESHOLD = 1_000_000_000;
 export const SHIPPING_FEE = 120;             // 未設定時的預設運費
 
 type CartLike = { productId?: string };
@@ -15,7 +15,22 @@ type ProductLike = {
   available_shipping_methods?: string[] | null;
   shipping_fee_overrides?: Record<string, number> | null;
 };
-type SettingsLike = { shipping_fees?: { name: string; fee: number }[] | null };
+type SettingsLike = { shipping_fees?: { name: string; fee: number }[] | null; free_shipping_threshold?: unknown };
+
+export function isFreeShippingThreshold(value: unknown): value is number | null {
+  return value === null || (typeof value === 'number' && Number.isInteger(value) && value >= 0 && value <= MAX_FREE_SHIPPING_THRESHOLD);
+}
+
+// null disables only the store-wide threshold; zero makes every nonempty order free to ship.
+export function resolveFreeShippingThreshold(settings?: SettingsLike | null): number | null {
+  const value = settings?.free_shipping_threshold;
+  return isFreeShippingThreshold(value) ? value : FREE_SHIPPING_THRESHOLD;
+}
+
+export function freeShippingNotice(settings?: SettingsLike | null): string {
+  const threshold = resolveFreeShippingThreshold(settings);
+  return threshold === null ? '' : threshold === 0 ? '全店免運費' : `全店消費滿 $${threshold.toLocaleString('en-US')} 免運費`;
+}
 
 // 取得某物流方式的「後台預設運費」
 export function resolveMethodFee(settings: SettingsLike | null | undefined, method: string): number {
@@ -40,9 +55,10 @@ export function computeShipping(
   products: ProductLike[],
   method = '',
   baseFee: number = SHIPPING_FEE,
+  freeShippingThreshold: number | null = FREE_SHIPPING_THRESHOLD,
 ): number {
   if (subtotal <= 0) return 0;
-  if (subtotal >= FREE_SHIPPING_THRESHOLD) return 0;
+  if (freeShippingThreshold !== null && subtotal >= freeShippingThreshold) return 0;
   const fees = cart.map((item) => productShippingFee(products.find((p) => p.id === item.productId), method, baseFee));
   if (fees.length === 0) return baseFee;
   return Math.max(...fees);

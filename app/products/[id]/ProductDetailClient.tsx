@@ -9,6 +9,7 @@ import { remainingStock, stockOf } from '@/lib/cart-stock';
 import { initialSpecSelection, resolveSpecSelection, selectedSpecImage } from '@/lib/product-selection';
 import ProductSpecPicker from '@/app/components/ProductSpecPicker';
 import { resolvePromoNotices, type PromoNotice } from '@/lib/promo-notices';
+import { freeShippingNotice } from '@/lib/shipping';
 import StoreHeader from '@/app/components/StoreHeader';
 import { useLoopCarousel } from '@/app/components/useLoopCarousel';
 import { setShopHome } from '@/lib/shop-home';
@@ -102,11 +103,15 @@ export default function ProductDetailClient({ product: initialProduct, homeHref 
     window.addEventListener('pageshow', refresh);
     window.addEventListener('storage', onStorage);
 
-    fetch('/api/settings')
-      .then((res) => (res.ok ? res.json() : null))
+    fetch('/api/settings', { cache: 'no-store' })
+      .then((res) => { if (!res.ok) throw new Error('Settings unavailable'); return res.json(); })
       .then((settings) => {
+        if (!settings || typeof settings !== 'object' || Array.isArray(settings)) throw new Error('Invalid settings');
         if (settings?.logo_url) setLogoUrl(settings.logo_url);
-        setPromoNotices(resolvePromoNotices(settings?.promo_notices));
+        const shippingText = freeShippingNotice(settings);
+        setPromoNotices(resolvePromoNotices(settings?.promo_notices)
+          .filter((notice) => notice.id !== 'free-shipping' || Boolean(shippingText))
+          .map((notice) => notice.id === 'free-shipping' ? { ...notice, text: shippingText } : notice));
       })
       .catch(() => {});
 

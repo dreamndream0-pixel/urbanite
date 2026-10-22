@@ -82,6 +82,8 @@ export type SiteSettings = {
   payment_accounts?: { name: string; info: string }[];
   // 各物流方式的運費(name 對應 shipping_methods 內的名稱)
   shipping_fees?: { name: string; fee: number }[];
+  // null = 停用全店滿額免運;0 = 全店免運;未設定維持滿 2000。
+  free_shipping_threshold?: number | null;
   // 退貨收件資訊(賣家退貨寄回地址/聯絡方式,顯示給買家)
   return_info?: string;
   // 會員「優惠券及購物金」頁 hero 右側背景圖

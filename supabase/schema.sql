@@ -88,6 +88,7 @@ create table if not exists public.site_settings (
   shipping_methods     jsonb not null default '["綠界物流-超商取貨","綠界物流-宅配","7-11 取貨付款","全家 取貨付款"]',
   enabled_payment_methods  jsonb not null default '["綠界金流","Line Pay","Apple Pay","取貨付款","轉帳匯款"]',
   enabled_shipping_methods jsonb not null default '["綠界物流-超商取貨","綠界物流-宅配","7-11 取貨付款","全家 取貨付款"]',
+  free_shipping_threshold integer default 2000 check (free_shipping_threshold between 0 and 1000000000),
   updated_at           timestamptz default now(),
   constraint single_row check (id = 1)
 );

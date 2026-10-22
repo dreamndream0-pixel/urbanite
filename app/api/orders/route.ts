@@ -6,7 +6,7 @@ import { isStorePickup, shipTypeFromMethod } from '@/lib/newebpay-logistics';
 import { deriveStatuses } from '@/lib/order-status';
 import { initialOrderStatus } from '@/lib/payment';
 import { createOrderAccessToken, orderAccessCookieName, ORDER_ACCESS_MAX_AGE } from '@/lib/order-access-token';
-import { computeShipping, resolveMethodFee } from '@/lib/shipping';
+import { computeShipping, resolveFreeShippingThreshold, resolveMethodFee } from '@/lib/shipping';
 import { isCampaignLive } from '@/lib/campaign';
 import type { Campaign, Discount, Order, OrderItem, Product, Shipment } from '@/lib/types';
 import { getCurrentShop, isPlatformShop, shopAdminClient, shopUrl } from '@/lib/shop';
@@ -153,8 +153,10 @@ export async function POST(request: Request) {
     });
   }
 
-  const { data: shipSettings } = await supabase.from('site_settings').select('shipping_fees').maybeSingle();
-  const shipping = computeShipping(subtotal, items, products, shippingMethod, resolveMethodFee(shipSettings, shippingMethod));
+  const { data: shipSettings, error: shipError } = await supabase.from('site_settings').select('shipping_fees,free_shipping_threshold').maybeSingle();
+  if (shipError) return NextResponse.json({ error: '目前無法確認運費，請稍後再試' }, { status: 503 });
+  const shipping = computeShipping(subtotal, items, products, shippingMethod, resolveMethodFee(shipSettings, shippingMethod), resolveFreeShippingThreshold(shipSettings));
+  if ('expected_shipping' in body && body.expected_shipping !== shipping) return NextResponse.json({ error: '運費條件已更新，請確認最新金額後重新結帳', code: 'SHIPPING_CHANGED' }, { status: 409 });
 
   // 折扣碼(可選):由後端重新驗證計算,避免竄改
   let discount = 0;

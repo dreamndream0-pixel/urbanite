@@ -24,7 +24,7 @@ if (prior === undefined) delete process.env.NEXT_PUBLIC_SUPABASE_URL; else proce
   let shop = { id: 'shop-A', slug: 'shop-a', name: 'Shop A', status: 'active' };
   let failure = false;
   const calls = [];
-  const snapshot = { id: 1, logo_url: '/logo.png', category_image_style: 'circle', site_theme: { bannerRatios: { 1: 'wide' }, draft: { storefront: { title: 'PRIVATE DRAFT' } } }, secret: 'DO NOT SERIALIZE' };
+  const snapshot = { id: 1, logo_url: '/logo.png', free_shipping_threshold: 1500, category_image_style: 'circle', site_theme: { bannerRatios: { 1: 'wide' }, draft: { storefront: { title: 'PRIVATE DRAFT' } } }, secret: 'DO NOT SERIALIZE' };
   const bootstrap = load('lib/storefront-bootstrap.ts', {
     'server-only': {}, './site-theme': theme,
     './shop': {
@@ -42,6 +42,7 @@ if (prior === undefined) delete process.env.NEXT_PUBLIC_SUPABASE_URL; else proce
   });
   const result = await bootstrap.getStorefrontBootstrap();
   assert.equal(result.settings.shop_name, 'Shop A');
+  assert.equal(result.settings.free_shipping_threshold, 1500);
   assert.equal(result.settings.site_theme.bannerRatios[1], 'wide');
   assert.equal(result.banners.length, 1);
   assert.equal(JSON.stringify(result).includes('PRIVATE DRAFT'), false);

@@ -12,7 +12,7 @@ import { cartItemLimit, remainingStock, stockOf } from '@/lib/cart-stock';
 import { initialSpecSelection, resolveSpecSelection, selectedSpecImage } from '@/lib/product-selection';
 import ProductSpecPicker from '@/app/components/ProductSpecPicker';
 import { uiAlert } from '@/lib/ui-dialog';
-import { computeShipping } from '@/lib/shipping';
+import { computeShipping, resolveFreeShippingThreshold, SHIPPING_FEE } from '@/lib/shipping';
 import { setShopHome } from '@/lib/shop-home';
 import { campaignHomeHref } from '@/lib/campaign';
 import FavoriteFoldButton from '@/app/components/FavoriteFoldButton';
@@ -416,7 +416,7 @@ export default function Storefront({ campaign = null, preview = false, initialDa
 
   const cartCount = cart.reduce((sum, item) => sum + item.quantity, 0);
   const subtotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
-  const shipping = computeShipping(subtotal, cart, products);
+  const shipping = computeShipping(subtotal, cart, products, '', SHIPPING_FEE, resolveFreeShippingThreshold(settings));
   const total = subtotal + shipping;
 
   const activeCategory = categoryTabs.flatMap((c) => [c, ...(c.children ?? [])]).find((c) => c.slug === category) ?? ALL_TAB;
@@ -672,6 +672,7 @@ export default function Storefront({ campaign = null, preview = false, initialDa
         cart={cart}
         open={cartOpen}
         shipping={shipping}
+        shippingReady={Boolean(settings) && !presentationFailed}
         subtotal={subtotal}
         total={total}
         recommendations={liveProducts
@@ -1406,6 +1407,7 @@ function CartDrawer({
   cart,
   open,
   shipping,
+  shippingReady,
   subtotal,
   total,
   recommendations,
@@ -1420,6 +1422,7 @@ function CartDrawer({
   cart: CartItem[];
   open: boolean;
   shipping: number;
+  shippingReady: boolean;
   subtotal: number;
   total: number;
   recommendations: Product[];
@@ -1556,7 +1559,7 @@ function CartDrawer({
             <Row label="小計" value={formatter.format(subtotal)} />
             <div className="flex justify-between text-[var(--c-muted)]">
               <span>運費</span>
-              <span className="text-sm">結帳時依配送方式計算</span>
+              <span className="text-sm">{cart.length > 0 && shippingReady && shipping === 0 ? '免運' : '結帳時依配送方式計算'}</span>
             </div>
             <Row label="總計" value={formatter.format(subtotal)} strong />
           </div>

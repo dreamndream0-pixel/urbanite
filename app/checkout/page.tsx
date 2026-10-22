@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Check, LoaderCircle } from 'lucide-react';
 import Link from 'next/link';
 import type { Product, Recipient, SiteSettings, UserCoupon } from '@/lib/types';
@@ -9,7 +9,7 @@ import { repriceCart } from '@/lib/product-price';
 import { cartItemLimit } from '@/lib/cart-stock';
 import { uiAlert } from '@/lib/ui-dialog';
 import { TW_CITIES, TW_REGIONS } from '@/lib/tw-regions';
-import { computeShipping, resolveMethodFee } from '@/lib/shipping';
+import { computeShipping, resolveFreeShippingThreshold, resolveMethodFee } from '@/lib/shipping';
 import ShopHeader from '@/app/components/ShopHeader';
 import { useShopHome } from '@/lib/shop-home';
 import LineContactCard from '@/app/components/LineContactCard';
@@ -102,6 +102,8 @@ export default function CheckoutPage() {
   const [priceState, setPriceState] = useState<'pending' | 'ready' | 'error'>('pending');
   const cart = useMemo(() => repriceCart(storedCart, products), [storedCart, products]);
   const [settings, setSettings] = useState<SiteSettings | null>(null);
+  const [settingsState, setSettingsState] = useState<'pending' | 'ready' | 'error'>('pending');
+  const settingsRequest = useRef(0);
   const [loaded, setLoaded] = useState(false);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -133,6 +135,17 @@ export default function CheckoutPage() {
   // 會員回饋金(等同現金,可和優惠券併用)
   const [credit, setCredit] = useState<{ balance: number; maxPct: number; tierName: string; rate: number } | null>(null);
   const [useCredit, setUseCredit] = useState(false);
+
+  const refreshSettings = useCallback(async () => {
+    const request = ++settingsRequest.current;
+    try {
+      const res = await fetch('/api/settings', { cache: 'no-store' });
+      if (!res.ok) throw new Error('Shipping settings unavailable');
+      const data: SiteSettings | null = await res.json();
+      if (!data || typeof data !== 'object' || Array.isArray(data)) throw new Error('Invalid shipping settings');
+      if (request === settingsRequest.current) { setSettings(data); setSettingsState('ready'); }
+    } catch { if (request === settingsRequest.current) setSettingsState('error'); }
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -188,16 +201,13 @@ export default function CheckoutPage() {
       } catch { if (active && request === productRequest) setPriceState('error'); }
     };
     void refreshProducts();
-    const refreshCart = () => { setCart(readCart()); void refreshProducts(); };
+    const refreshCart = () => { setCart(readCart()); void refreshProducts(); void refreshSettings(); };
     const onStorage = (event: StorageEvent) => { if (event.key === CART_KEY || event.key === null) refreshCart(); };
     window.addEventListener('focus', refreshCart);
     window.addEventListener('pageshow', refreshCart);
     window.addEventListener('storage', onStorage);
 
-    fetch('/api/settings')
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data: SiteSettings | null) => setSettings(data))
-      .catch(() => setSettings(null));
+    void refreshSettings();
 
     fetch('/api/me/credit', { cache: 'no-store' })
       .then((res) => (res.ok ? res.json() : null))
@@ -210,11 +220,12 @@ export default function CheckoutPage() {
       .catch(() => setMemberCoupons([]));
     return () => {
       active = false;
+      settingsRequest.current++;
       window.removeEventListener('focus', refreshCart);
       window.removeEventListener('pageshow', refreshCart);
       window.removeEventListener('storage', onStorage);
     };
-  }, []);
+  }, [refreshSettings]);
 
   const subtotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
   const cartCount = cart.reduce((sum, item) => sum + item.quantity, 0);
@@ -239,7 +250,7 @@ export default function CheckoutPage() {
   const selectedShippingMethod = availableShippingMethods.includes(shippingMethod)
     ? shippingMethod
     : availableShippingMethods[0] ?? '';
-  const shipping = computeShipping(subtotal, cart, products, selectedShippingMethod, resolveMethodFee(settings, selectedShippingMethod));
+  const shipping = computeShipping(subtotal, cart, products, selectedShippingMethod, resolveMethodFee(settings, selectedShippingMethod), resolveFreeShippingThreshold(settings));
   const couponContext = JSON.stringify({ subtotal, shipping, items: cart.map(({ productId, name, variant, price, quantity }) => ({ productId, name, variant, price, quantity })) });
   const couponChecks = checkedCoupons?.context === couponContext ? checkedCoupons.checks : {};
   // A response is only usable for the exact cart and selection that were checked.
@@ -525,7 +536,7 @@ export default function CheckoutPage() {
 
   async function submitOrder() {
     setMessage(null);
-    if (priceState !== 'ready') return;
+    if (priceState !== 'ready' || settingsState !== 'ready') return;
     if (checkingCoupon || stockInvalid) {
       setMessage({ type: 'err', text: checkingCoupon ? '正在確認優惠券資格，請稍候。' : '購物車數量超過目前庫存，請先調整或移除商品。' });
       return;
@@ -570,6 +581,7 @@ export default function CheckoutPage() {
           address: finalAddress,
           note,
           shipping_method: selectedShippingMethod,
+          expected_shipping: shipping,
           payment_method: selectedPaymentMethod,
           store_id: needsPickupStore ? pickupStore?.store_id || (manualStore ? 'MANUAL' : '') : '',
           store_name: needsPickupStore ? pickupStore?.store_name ?? '' : '',
@@ -589,6 +601,10 @@ export default function CheckoutPage() {
       });
       const data = await res.json();
       if (!res.ok) {
+        if (data.code === 'SHIPPING_CHANGED') {
+          setSettingsState('pending');
+          await refreshSettings();
+        }
         setMessage({ type: 'err', text: data.error ?? '下單失敗，請稍後再試' });
       } else {
         setCart([]);
@@ -642,12 +658,12 @@ export default function CheckoutPage() {
               繼續購物
             </Link>
           </div>
-        ) : priceState === 'error' ? (
+        ) : priceState === 'error' || settingsState === 'error' ? (
           <div className="py-20 text-center">
-            <p role="alert">無法取得最新商品售價，請重新載入後再結帳。</p>
+            <p role="alert">{settingsState === 'error' ? '無法取得最新運費設定，請重新載入後再結帳。' : '無法取得最新商品售價，請重新載入後再結帳。'}</p>
             <button type="button" onClick={() => window.location.reload()} className="mt-4 rounded-lg border border-[var(--c-border)] px-4 py-2">重新載入</button>
           </div>
-        ) : !loaded || priceState === 'pending' ? (
+        ) : !loaded || priceState === 'pending' || settingsState === 'pending' ? (
           <p className="py-20 text-center text-[var(--c-muted)]">載入中…</p>
         ) : cart.length === 0 ? (
           <div className="rounded-2xl bg-[var(--c-surface)] p-8 text-center shadow-sm">
@@ -1077,7 +1093,7 @@ export default function CheckoutPage() {
               <button
                 className="mt-5 w-full rounded-full bg-[var(--c-sale)] px-5 py-3.5 font-semibold text-white disabled:opacity-60"
                 onClick={submitOrder}
-                disabled={submitting || checkingCoupon || stockInvalid}
+                disabled={submitting || checkingCoupon || stockInvalid || settingsState !== 'ready'}
               >
                 {submitting
                   ? '送出中…'

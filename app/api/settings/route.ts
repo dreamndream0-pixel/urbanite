@@ -7,6 +7,7 @@ import { resolveSiteTheme } from '@/lib/site-theme';
 import { draftSiteTheme } from '@/lib/site-theme-state';
 import { getCurrentShop, isPlatformShop, shopAdminClient } from '@/lib/shop';
 import { isBannerRatio } from '@/lib/banner-ratio';
+import { FREE_SHIPPING_THRESHOLD, isFreeShippingThreshold } from '@/lib/shipping';
 
 const DEFAULT_SETTINGS: SiteSettings = {
   id: 1,
@@ -33,6 +34,7 @@ const DEFAULT_SETTINGS: SiteSettings = {
   enabled_shipping_methods: ['全家取貨付款', '全家取貨不付款', '7-11取貨付款', '7-11取貨不付款', '宅配到府'],
   payment_accounts: [],
   shipping_fees: [],
+  free_shipping_threshold: FREE_SHIPPING_THRESHOLD,
   return_info: '',
   coupon_hero_image: '',
   member_stamp_image: '',
@@ -41,10 +43,12 @@ const DEFAULT_SETTINGS: SiteSettings = {
 // GET /api/settings — 取得網站設定(前台與後台共用,公開)
 export async function GET() {
   const supabase = (await shopAdminClient());
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('site_settings')
     .select('*')
-    .single();
+    .maybeSingle();
+
+  if (error) return NextResponse.json({ error: '無法讀取商店設定，請稍後再試' }, { status: 503 });
 
   const shop = await getCurrentShop();
   const shopInfo = { shop_name: shop?.name ?? '', shop_slug: shop?.slug ?? '', platform: isPlatformShop(shop) };
@@ -58,7 +62,9 @@ export async function PATCH(request: Request) {
   const admin = await getAdminUser();
   if (!admin) return NextResponse.json({ error: '未授權' }, { status: 401 });
 
-  const body = (await request.json()) as Record<string, unknown>;
+  const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
+  if (!body || typeof body !== 'object' || Array.isArray(body)) return NextResponse.json({ error: '資料格式錯誤' }, { status: 400 });
+  if ('free_shipping_threshold' in body && !isFreeShippingThreshold(body.free_shipping_threshold)) return NextResponse.json({ error: '免運門檻須為 0 至 1,000,000,000 的整數金額' }, { status: 400 });
   if ('site_theme_draft' in body && 'site_theme' in body) return NextResponse.json({ error: '請分別儲存草稿或發布' }, { status: 400 });
   const bannerPatch = body.banner_ratio as { group?: unknown; ratio?: unknown } | null;
   if ('banner_ratio' in body && (!bannerPatch || !Number.isInteger(bannerPatch.group) || Number(bannerPatch.group) < 1 || Number(bannerPatch.group) > 9 || !isBannerRatio(bannerPatch.ratio)
@@ -84,6 +90,7 @@ export async function PATCH(request: Request) {
     'enabled_shipping_methods',
     'payment_accounts',
     'shipping_fees',
+    'free_shipping_threshold',
     'return_info',
     'coupon_hero_image',
     'member_stamp_image',
