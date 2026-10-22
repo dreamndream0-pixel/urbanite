@@ -610,8 +610,8 @@ export default function Storefront({ campaign = null, preview = false, initialDa
           ? <StorefrontBlocks designStyle={design.style} categoryImageStyle={settings?.category_image_style} blocks={lead} banners={banners.filter((b) => b.active)} bannerRatios={bannerRatios} products={products} categories={[]} onCategory={browseCategory} onBrowseAll={browseAllProducts} renderProduct={() => null} />
           : <HeroCarousel banners={heroBanners} ratio={bannerRatioForGroup(bannerRatios, 1)} />;
       })()}
-      {/* 首頁分類列:「全部商品」放最右邊(左側漢堡選單仍在最上方) */}
-      <CategoryNavigation categories={[...categoryTabs.slice(1), categoryTabs[0]]} value={category} onSelect={setCategory} imageStyle={settings?.category_image_style ?? 'circle'} />
+      {/* 首頁分類列:「全部」放最左邊 */}
+      <CategoryNavigation categories={categoryTabs} value={category} onSelect={setCategory} imageStyle={settings?.category_image_style ?? 'circle'} />
 
       <div className="mx-auto max-w-6xl px-4 pb-8 sm:px-6">
         {/* 商品格狀排列 */}

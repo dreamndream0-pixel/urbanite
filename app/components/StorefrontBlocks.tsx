@@ -99,7 +99,7 @@ export default function StorefrontBlocks({ blocks, products, categories, banners
             </button>)}
           </nav> : <div className={styles.categoryStrip}>
             {/* 和首頁分類列一致:「全部商品」放最右邊 */}
-            <CategoryNavigation categories={[...topCategories, { slug: 'all', name: '全部商品' }]} value="" onSelect={onCategory} imageStyle={categoryImageStyle} />
+            <CategoryNavigation categories={[{ slug: 'all', name: '全部商品' }, ...topCategories]} value="" onSelect={onCategory} imageStyle={categoryImageStyle} />
           </div>}
         </div>}
 
