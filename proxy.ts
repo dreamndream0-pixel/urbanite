@@ -20,11 +20,21 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(target);
   }
 
+  // 從活動頁進來的顧客(2 小時內):站內任何回到首頁的連結都轉回那個活動頁,不會被帶回官網首頁
+  // 要看官網首頁:/?main=1(同時清除記錄)
+  let promoHome = '';
+  try { promoHome = decodeURIComponent(request.cookies.get('promo_home')?.value ?? ''); } catch { promoHome = ''; }
+  const wantsMain = request.nextUrl.pathname === '/' && request.nextUrl.searchParams.has('main');
+  if (request.method === 'GET' && request.nextUrl.pathname === '/' && !wantsMain && /^\/promo\/[A-Za-z0-9_-]+$/.test(promoHome)) {
+    return NextResponse.redirect(new URL(promoHome, request.url));
+  }
+  const done = (res: NextResponse) => { if (wantsMain && promoHome) res.cookies.delete('promo_home'); return res; };
+
   let response = NextResponse.next({ request });
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!url || !anon) return response;
+  if (!url || !anon) return done(response);
 
   const supabase = createServerClient(url, anon, {
     cookies: {
@@ -42,7 +52,7 @@ export async function proxy(request: NextRequest) {
   });
 
   await supabase.auth.getUser();
-  return response;
+  return done(response);
 }
 
 export const config = {

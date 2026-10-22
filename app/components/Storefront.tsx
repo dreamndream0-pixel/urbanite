@@ -215,8 +215,8 @@ export default function Storefront({ campaign = null, preview = false, initialDa
 
   // 記住目前所在的商店,購物車/結帳頁的「回商店」會帶回這裡
   useEffect(() => {
-    setShopHome(homeHref);
-  }, [homeHref]);
+    setShopHome(homeHref, !preview);
+  }, [homeHref, preview]);
 
   useEffect(() => {
     let active = true;

@@ -4,11 +4,22 @@ import { useEffect, useState } from 'react';
 // 購物車/結帳頁的「回商店」與 Logo 會依此帶回原本的商店。
 const SHOP_HOME_KEY = 'shop_home';
 
-export function setShopHome(href: string) {
+// 活動頁:另外寫一個 2 小時的 cookie(promo_home),proxy 會把站內任何回到 "/" 的連結轉回這個活動頁,
+// 顧客不會被帶回官網首頁;要看官網首頁可用 /?main=1。回到官網首頁(href = '/')時清除。
+export const PROMO_HOME_COOKIE = 'promo_home';
+
+export function setShopHome(href: string, lockPromo = false) {
   try {
     window.sessionStorage.setItem(SHOP_HOME_KEY, href);
   } catch {
     /* sessionStorage 不可用時略過 */
+  }
+  try {
+    const secure = location.protocol === 'https:' ? '; secure' : '';
+    if (href.startsWith('/promo/') && lockPromo) document.cookie = `${PROMO_HOME_COOKIE}=${encodeURIComponent(href)}; path=/; max-age=7200; samesite=lax${secure}`;
+    else if (href === '/') document.cookie = `${PROMO_HOME_COOKIE}=; path=/; max-age=0; samesite=lax${secure}`;
+  } catch {
+    /* cookie 不可用時略過 */
   }
 }
 
