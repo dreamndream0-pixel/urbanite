@@ -4,6 +4,7 @@ import { requireCardOwner } from '@/lib/card-access';
 import { FREE_TEMPLATE_KEYS, RESERVED_SLUGS } from '@/lib/card-plan';
 import { bookingButtonForPlan } from '@/lib/profile-booking-button';
 import { getCardBookingHref } from '@/lib/booking/card-link';
+import { businessSlugProblem } from '@/lib/business-identity';
 import { BIO_LIMIT, CARD_TEMPLATES, DEFAULT_THEME, MAX_TAGS, SLUG_PATTERN, type ProfileCard, type ProfileCardBlock, type SocialLink } from '@/lib/profile-card';
 
 export const dynamic = 'force-dynamic';
@@ -55,9 +56,16 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: '這個網址代稱不能使用,請換一個' }, { status: 400 });
     }
     update.slug = slug;
+    if (card.business_identity) {
+      const problem = await businessSlugProblem(slug, card.id, card.shop_id);
+      if (problem) return NextResponse.json({ error: problem }, { status: 400 });
+    }
   }
   for (const key of ['display_name', 'avatar_url', 'email'] as const) {
     if (typeof body[key] === 'string') update[key] = body[key].trim();
+  }
+  if (card.business_identity && typeof update.display_name === 'string' && (!update.display_name || update.display_name.length > 40)) {
+    return NextResponse.json({ error: '店家名稱請輸入 1–40 字' }, { status: 400 });
   }
   // 自訂分享預覽:Pro
   if (limits.seo) {

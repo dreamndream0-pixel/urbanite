@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getPlatformAdmin, getSessionUser } from '@/lib/supabase/server';
-import { getPlanInfo } from '@/lib/card-access';
+import { getOwnedCard, getPlanInfo } from '@/lib/card-access';
 import { tierRank } from '@/lib/card-plan';
 import { getCurrentShop, isPlatformShop, ROOT_DOMAIN, shopUrl } from '@/lib/shop';
 import { SITE_TEMPLATES } from '@/lib/site-theme';
@@ -17,6 +17,8 @@ export default async function NewShopPage() {
   if (!isPlatformShop(await getCurrentShop())) redirect(`https://www.${ROOT_DOMAIN}/shop/new`);
   const user = await getSessionUser();
   if (!user) redirect('/card/login?next=/shop/new');
+  const card = await getOwnedCard(user);
+  if (card?.onboarded === false) redirect('/mycard/setup');
 
   const platformAdmin = Boolean(await getPlatformAdmin());
   const plan = await getPlanInfo(user);
@@ -30,6 +32,7 @@ export default async function NewShopPage() {
       <div className="mx-auto max-w-2xl px-4 py-8 sm:py-12">
         <ShopWizard
           eligible={eligible}
+          identity={card?.business_identity ? { name: card.display_name, slug: card.slug } : undefined}
           promo={Boolean(plan.promo)}
           existing={existing && !platformAdmin ? { ...existing, url: shopUrl(existing.slug), adminUrl: shopUrl(existing.slug, '/admin') } : null}
           rootDomain={ROOT_DOMAIN}

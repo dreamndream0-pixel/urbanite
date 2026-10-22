@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import { getSessionUser } from '@/lib/supabase/server';
 import { Suspense } from 'react';
 import BookingManager from './BookingManager';
+import { getOwnedCard } from '@/lib/card-access';
 
 export const dynamic = 'force-dynamic';
 export const metadata: Metadata = { title: { absolute: '線上預約管理 | URBANLINKS' }, robots: { index: false } };
@@ -11,6 +12,7 @@ export const metadata: Metadata = { title: { absolute: '線上預約管理 | URB
 export default async function MyBookingPage() {
   const user = await getSessionUser();
   if (!user) redirect('/card/login?next=/mycard/booking');
+  if ((await getOwnedCard(user))?.onboarded === false) redirect('/mycard/setup');
   return (
     <main className="min-h-screen bg-[#f6f2ec] text-[#1f1b19]">
       <Suspense><BookingManager /></Suspense>

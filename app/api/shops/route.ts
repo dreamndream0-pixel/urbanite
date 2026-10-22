@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getPlatformAdmin, getSessionUser } from '@/lib/supabase/server';
-import { getPlanInfo } from '@/lib/card-access';
+import { getOwnedCard, getPlanInfo } from '@/lib/card-access';
 import { tierRank } from '@/lib/card-plan';
 import { RESERVED_SHOP_SLUGS, SHOP_SLUG_PATTERN, shopUrl } from '@/lib/shop';
 import { resolveSiteTheme, SITE_TEMPLATES } from '@/lib/site-theme';
@@ -13,10 +13,14 @@ const LOGO_FORMATS: Record<string, string> = { 'image/png': 'png', 'image/jpeg':
 export const dynamic = 'force-dynamic';
 
 // 網址代稱能不能用
-async function slugProblem(slug: string) {
+async function slugProblem(slug: string, userId?: string) {
   if (!SHOP_SLUG_PATTERN.test(slug)) return '網址只能用小寫英文、數字、連字號,3–30 字,開頭結尾不能是連字號';
   if (RESERVED_SHOP_SLUGS.has(slug)) return '這個網址是系統保留字,請換一個';
-  const { data } = await createAdminClient().from('shops').select('id').eq('slug', slug).maybeSingle();
+  const db = createAdminClient();
+  const { data, error } = await db.from('shops').select('id').eq('slug', slug).maybeSingle();
+  const card = await db.from('profile_cards').select('owner_user_id').eq('business_identity', true).eq('slug', slug).maybeSingle();
+  if (error || card.error) return '暫時無法檢查網址，請稍後再試';
+  if (card.data && card.data.owner_user_id !== userId) return '這個網址已經有人使用';
   return data ? '這個網址已經有人使用' : '';
 }
 
@@ -35,7 +39,7 @@ export async function GET(request: Request) {
   const slug = new URL(request.url).searchParams.get('slug');
   if (slug !== null) {
     const s = slug.trim().toLowerCase();
-    const problem = await slugProblem(s);
+    const problem = await slugProblem(s, (await getSessionUser())?.id);
     return NextResponse.json({ ok: !problem, problem, url: problem ? '' : shopUrl(s) });
   }
   const user = await getSessionUser();
@@ -50,6 +54,8 @@ export async function POST(request: Request) {
   const { user, ok, reason } = await eligibility();
   if (!user) return NextResponse.json({ error: reason }, { status: 401 });
   if (!ok) return NextResponse.json({ error: reason, upgrade: true }, { status: 403 });
+  const card = await getOwnedCard(user);
+  if (!card || card.onboarded === false) return NextResponse.json({ error: '請先確認店家名稱與網址', setup: true }, { status: 409 });
 
   let body: Record<string, unknown> = {};
   let logo: File | null = null;
@@ -73,7 +79,8 @@ export async function POST(request: Request) {
   const slug = String(body.slug ?? '').trim().toLowerCase();
   const bank = String(body.bank ?? '').trim().slice(0, 300);
   if (!name) return NextResponse.json({ error: '請輸入店名' }, { status: 400 });
-  const problem = await slugProblem(slug);
+  if (card.business_identity && (name !== card.display_name || slug !== card.slug)) return NextResponse.json({ error: '請沿用已確認的店家名稱與網址；需要修改請到名片設定' }, { status: 409 });
+  const problem = await slugProblem(slug, user.id);
   if (problem) return NextResponse.json({ error: problem }, { status: 400 });
 
   const supabase = createAdminClient();

@@ -6,9 +6,10 @@ import { getSessionUser } from '@/lib/supabase/server';
 import { getOwnedCard } from '@/lib/card-access';
 import CardServiceHeader from '@/app/card/CardServiceHeader';
 import SetupClient from './SetupClient';
+import { identityShop } from '@/lib/business-identity';
 
 export const dynamic = 'force-dynamic';
-export const metadata: Metadata = { title: { absolute: '設定你的個人網址 | URBANLINKS' }, robots: { index: false } };
+export const metadata: Metadata = { title: { absolute: '確認店家名稱與網址 | URBANLINKS' }, robots: { index: false } };
 
 // 第一次登入名片服務:暱稱+自訂網址
 export default async function CardSetupPage() {
@@ -16,11 +17,12 @@ export default async function CardSetupPage() {
   if (!user) redirect('/card/login');
   const card = await getOwnedCard(user);
   if (!card || card.onboarded !== false) redirect('/mycard');
+  const shop = await identityShop(user.id);
 
   return (
     <main className="min-h-screen bg-[#f6f2ec] text-[#1f1b19]">
       <CardServiceHeader loggedIn />
-      <SetupClient name={card.display_name} slug={card.slug} referrer={(await cookies()).get(REFERRAL_COOKIE)?.value ?? ''} />
+      <SetupClient name={shop?.name ?? card.display_name} slug={shop?.slug ?? card.slug.replace(/[._]+/g, '-')} existingShop={Boolean(shop)} referrer={(await cookies()).get(REFERRAL_COOKIE)?.value ?? ''} />
     </main>
   );
 }

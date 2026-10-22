@@ -14,9 +14,9 @@ const card = 'rounded-3xl border border-[#e5ded4] bg-white p-5 sm:p-7';
 const input = 'w-full rounded-xl border border-[#e5ded4] bg-white px-4 py-3 text-sm outline-none transition focus:border-[#121b33]';
 
 // 開店精靈:店名 → 網址 → 版型 → 收款帳號 → 完成
-export default function ShopWizard({ eligible, promo, existing, rootDomain, templates }: { eligible: boolean; promo: boolean; existing: Existing; rootDomain: string; templates: Tpl[] }) {
-  const [name, setName] = useState('');
-  const [slug, setSlug] = useState('');
+export default function ShopWizard({ eligible, promo, existing, rootDomain, templates, identity }: { eligible: boolean; promo: boolean; existing: Existing; rootDomain: string; templates: Tpl[]; identity?: { name: string; slug: string } }) {
+  const [name, setName] = useState(identity?.name ?? '');
+  const [slug, setSlug] = useState(identity?.slug ?? '');
   const [check, setCheck] = useState<{ state: 'idle' | 'checking' | 'ok' | 'bad'; message: string }>({ state: 'idle', message: '' });
   const [template, setTemplate] = useState(templates[0]?.key ?? 'urbanite');
   const [bank, setBank] = useState('');
@@ -145,13 +145,14 @@ export default function ShopWizard({ eligible, promo, existing, rootDomain, temp
         </div>
         <label className="mt-4 block">
           <span className="mb-1.5 block text-xs text-[#8a7f72]">店名</span>
-          <input value={name} onChange={(e) => setName(e.target.value)} maxLength={40} placeholder="例如:BON SUCRÉ 甜點" className={input} />
+          <input value={name} readOnly={Boolean(identity)} onChange={(e) => setName(e.target.value)} maxLength={40} placeholder="例如:BON SUCRÉ 甜點" className={input} />
         </label>
         <label className="mt-4 block">
           <span className="mb-1.5 block text-xs text-[#8a7f72]">官網網址</span>
           <div className="flex items-center overflow-hidden rounded-xl border border-[#e5ded4] focus-within:border-[#121b33]">
             <input
               value={slug}
+              readOnly={Boolean(identity)}
               onChange={(e) => setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
               maxLength={30}
               placeholder="yourshop"
@@ -166,6 +167,7 @@ export default function ShopWizard({ eligible, promo, existing, rootDomain, temp
             {check.state === 'idle' ? '小寫英文、數字、連字號,3–30 字' : check.state === 'checking' ? '檢查中…' : check.message}
           </span>
         </label>
+        {identity && <Link href="/mycard" className="mt-3 inline-block text-sm underline underline-offset-4">編輯店家名稱與網址</Link>}
       </section>
 
       <section className={card}>

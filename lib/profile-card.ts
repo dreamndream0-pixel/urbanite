@@ -230,6 +230,8 @@ export type ProfileCard = {
   seo_image: string;
   show_footer_logo: boolean;
   onboarded?: boolean; // 第一次設定暱稱與網址完成
+  business_identity?: boolean;
+  shop_id?: string | null;
   referred_by?: string; // 推薦人的名片 id
   referral_rewards?: number; // 已領取的推薦獎勵次數
   created_at?: string;

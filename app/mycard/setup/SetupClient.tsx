@@ -2,13 +2,13 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { SLUG_PATTERN } from '@/lib/profile-card';
+const BUSINESS_SLUG_PATTERN = /^[a-z0-9](?:[a-z0-9-]{1,28}[a-z0-9])$/;
 
 type Check = { state: 'idle' | 'checking' | 'ok' | 'bad'; message: string };
 
 const inputBox = 'flex items-center rounded-xl border bg-white transition focus-within:border-[#1f1b19]/50';
 
-export default function SetupClient({ name: initialName, slug: initialSlug, referrer: initialRef = '' }: { name: string; slug: string; referrer?: string }) {
+export default function SetupClient({ name: initialName, slug: initialSlug, existingShop = false, referrer: initialRef = '' }: { name: string; slug: string; existingShop?: boolean; referrer?: string }) {
   const router = useRouter();
   const [name, setName] = useState(initialName);
   const [slug, setSlug] = useState(initialSlug);
@@ -19,22 +19,23 @@ export default function SetupClient({ name: initialName, slug: initialSlug, refe
 
   // 輸入停下來 0.4 秒後檢查網址
   useEffect(() => {
+    const controller = new AbortController();
     const timer = setTimeout(() => {
       if (!slug) return setCheck({ state: 'idle', message: '' });
-      if (!SLUG_PATTERN.test(slug)) return setCheck({ state: 'bad', message: '只能用小寫英文、數字、點、底線、連字號,2–30 字,開頭結尾要是英數字' });
+      if (!BUSINESS_SLUG_PATTERN.test(slug)) return setCheck({ state: 'bad', message: '共用網址請使用小寫英文、數字、連字號，3–30 字' });
       setCheck({ state: 'checking', message: '' });
-      fetch(`/api/profile-card/setup?slug=${encodeURIComponent(slug)}`)
+      fetch(`/api/profile-card/setup?slug=${encodeURIComponent(slug)}`, { cache: 'no-store', signal: controller.signal })
         .then((r) => r.json())
-        .then((d) => setCheck(d.ok ? { state: 'ok', message: '可以使用' } : { state: 'bad', message: d.error }))
-        .catch(() => setCheck({ state: 'idle', message: '' }));
+        .then((d) => { if (!controller.signal.aborted) setCheck(d.ok ? { state: 'ok', message: '可以使用' } : { state: 'bad', message: d.error }); })
+        .catch(() => { if (!controller.signal.aborted) setCheck({ state: 'bad', message: '暫時無法檢查，請稍後再試' }); });
     }, 400);
-    return () => clearTimeout(timer);
+    return () => { clearTimeout(timer); controller.abort(); };
   }, [slug]);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     const next: typeof errors = {};
-    if (!name.trim()) next.name = '請輸入暱稱';
+    if (!name.trim()) next.name = '請輸入店家名稱';
     if (!slug) next.slug = '請輸入網址';
     else if (check.state === 'bad') next.slug = check.message;
     setErrors(next);
@@ -65,39 +66,39 @@ export default function SetupClient({ name: initialName, slug: initialSlug, refe
 
   return (
     <div className="mx-auto max-w-md px-4 py-10 sm:py-16">
-      <h1 className="text-center font-serif-tc text-2xl font-bold tracking-[0.06em]">設定你的個人網址</h1>
-      <p className="mt-2 text-center text-sm text-[#8a7f72]">之後都可以在「名片設定」裡修改</p>
+      <h1 className="text-center font-serif-tc text-2xl font-bold">確認店家名稱與網址</h1>
 
       <form onSubmit={submit} className="mt-8 space-y-5 rounded-2xl border border-[#e5ded4] bg-white p-5 sm:p-6" noValidate>
         <label className="block">
-          <span className="mb-1.5 block text-sm font-medium">暱稱 <span className="text-[#d9534f]">*</span></span>
+          <span className="mb-1.5 block text-sm font-medium">店家名稱 <span className="text-[#d9534f]">*</span></span>
           <div className={`${inputBox} ${border(Boolean(errors.name))}`}>
             <input
               value={name}
               onChange={(e) => setName(e.target.value)}
               maxLength={40}
-              placeholder="輸入暱稱"
-              className="min-w-0 flex-1 rounded-xl bg-transparent px-3.5 py-3 text-sm outline-none"
+              placeholder="輸入店家名稱"
+              className="min-w-0 flex-1 rounded-xl bg-transparent px-3.5 py-3 text-base outline-none"
             />
           </div>
           {errors.name ? <span className="mt-1 block text-xs text-[#d9534f]">{errors.name}</span> : null}
         </label>
 
         <label className="block">
-          <span className="mb-1.5 block text-sm font-medium">自訂你的網址 <span className="text-[#d9534f]">*</span></span>
+          <span className="mb-1.5 block text-sm font-medium">店家網址代稱 <span className="text-[#d9534f]">*</span></span>
           <div className={`${inputBox} ${border(Boolean(slugError))} pl-3.5`}>
-            <span className="shrink-0 text-sm text-[#a99e8f]">urbanite.com.tw/@</span>
+            <span className="shrink-0 text-sm text-[#a99e8f]">@</span>
             <input
               value={slug}
+              readOnly={existingShop}
               onChange={(e) => {
-                setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9._-]/g, '').slice(0, 30));
+                setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '').slice(0, 30));
                 setErrors((x) => ({ ...x, slug: undefined }));
               }}
-              placeholder="username"
+              placeholder="shop-name"
               autoCapitalize="none"
               autoCorrect="off"
               spellCheck={false}
-              className="min-w-0 flex-1 bg-transparent py-3 pr-3.5 text-sm outline-none"
+              className="min-w-0 flex-1 bg-transparent py-3 pr-3.5 text-base outline-none"
             />
           </div>
           {slugError ? (
@@ -107,9 +108,15 @@ export default function SetupClient({ name: initialName, slug: initialSlug, refe
           ) : check.state === 'checking' ? (
             <span className="mt-1 block text-xs text-[#a99e8f]">檢查中…</span>
           ) : (
-            <span className="mt-1 block text-xs text-[#a99e8f]">小寫英文、數字、點、底線、連字號</span>
+            <span className="mt-1 block text-xs text-[#a99e8f]">小寫英文、數字、連字號，3–30 字</span>
           )}
         </label>
+
+        <dl className="space-y-2 break-words text-xs text-[#6b6156]">
+          <div><dt className="font-medium">名片</dt><dd>urbanite.com.tw/@{slug || 'shop-name'}</dd></div>
+          <div><dt className="font-medium">預約</dt><dd>urbanite.com.tw/@{slug || 'shop-name'}/book</dd></div>
+          <div><dt className="font-medium">官網{existingShop ? '' : '（開通後）'}</dt><dd>{slug || 'shop-name'}.urbanite.com.tw</dd></div>
+        </dl>
 
         <label className="block">
           <span className="mb-1.5 block text-sm font-medium">推薦人的網址代稱 <span className="font-normal text-[#a99e8f]">(選填)</span></span>
@@ -124,7 +131,7 @@ export default function SetupClient({ name: initialName, slug: initialSlug, refe
               autoCapitalize="none"
               autoCorrect="off"
               spellCheck={false}
-              className="min-w-0 flex-1 bg-transparent py-3 pl-1 pr-3.5 text-sm outline-none"
+              className="min-w-0 flex-1 bg-transparent py-3 pl-1 pr-3.5 text-base outline-none"
             />
           </div>
           {errors.ref ? <span className="mt-1 block text-xs text-[#d9534f]">{errors.ref}</span> : null}

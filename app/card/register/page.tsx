@@ -17,5 +17,5 @@ export default async function CardRegisterPage({ searchParams }: { searchParams:
   const nextPath = normalizeNext((await searchParams).next);
   if (await getSessionUser()) redirect(nextPath);
   const configured = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
-  return <RegisterClient brand="card" configured={configured} nextPath={nextPath} logoUrl="/brand/u-logo.png" />;
+  return <RegisterClient brand="card" configured={configured} nextPath="/mycard/setup" logoUrl="/brand/u-logo.png" />;
 }
