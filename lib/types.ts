@@ -95,6 +95,7 @@ export type SiteSettings = {
   // 促銷管理 → 活動管理:商品頁促銷文字(lib/promo-notices)
   promo_notices?: unknown;
   checkout_fields?: unknown; // 結帳自訂欄位(lib/checkout-fields)
+  order_complete_texts?: unknown; // 訂單完成頁文字(lib/order-complete-texts)
   // 網頁頁籤圖示(512×512 PNG);空白 = 預設圖示
   favicon_url?: string;
   updated_at?: string;

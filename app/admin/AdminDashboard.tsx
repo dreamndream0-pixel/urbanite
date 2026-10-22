@@ -65,6 +65,7 @@ import LoyaltyManager from './LoyaltyManager';
 import StocktakeManager, { type StocktakeApplied } from './StocktakeManager';
 import PromoActivitiesManager from './PromoActivitiesManager';
 import CheckoutFieldsManager from './CheckoutFieldsManager';
+import OrderCompleteTextsEditor from './OrderCompleteTextsEditor';
 import { downloadCsv } from '@/lib/stocktake';
 import { isCollectOnDelivery } from '@/lib/payment';
 import { buildReturnSteps, historyKind, isReturnOrder } from '@/lib/return-progress';
@@ -3039,7 +3040,7 @@ export default function AdminDashboard({
                   { key: 'footer', label: '頁尾資訊' },
                   { key: 'payments', label: '金流設定' },
                   { key: 'shippings', label: '物流設定' },
-                  { key: 'checkout', label: '結帳欄位' },
+                  { key: 'checkout', label: '結帳設定' },
                   { key: 'integrations', label: '串接設定' },
                   { key: 'notifications', label: '通知' },
                 ] as const).filter((t) => platform || t.key !== 'integrations').map((t) => (
@@ -3415,7 +3416,7 @@ export default function AdminDashboard({
               )}
 
               {settingsTab === 'integrations' && <IntegrationSettings />}
-              {settingsTab === 'checkout' && <CheckoutFieldsManager />}
+              {settingsTab === 'checkout' && <div className="space-y-6"><CheckoutFieldsManager /><OrderCompleteTextsEditor /></div>}
               {settingsTab === 'notifications' && <OrderNotificationSettingsPanel />}
               {settingsTab === 'shippings' && (
               <Card

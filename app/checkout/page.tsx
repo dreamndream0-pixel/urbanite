@@ -13,6 +13,7 @@ import { computeShipping, resolveFreeShippingThreshold, resolveMethodFee } from 
 import ShopHeader from '@/app/components/ShopHeader';
 import { useShopHome } from '@/lib/shop-home';
 import { fieldsForOrder, resolveCheckoutFields } from '@/lib/checkout-fields';
+import { resolveOrderCompleteTexts } from '@/lib/order-complete-texts';
 import LineContactCard from '@/app/components/LineContactCard';
 import { useScrollLock } from '@/app/components/useScrollLock';
 
@@ -653,19 +654,19 @@ export default function CheckoutPage() {
       <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6">
         <h1 className="mb-6 text-2xl font-semibold tracking-wide">訂單結帳</h1>
 
-        {orderNo ? (
+        {orderNo ? (() => { const doneText = resolveOrderCompleteTexts(settings?.order_complete_texts); return (
           <div className="rounded-2xl bg-[var(--c-surface)] p-8 text-center shadow-sm">
-            <p className="text-lg font-semibold text-[#1f7a44]">訂單成立！</p>
+            <p className="text-lg font-semibold text-[#1f7a44]">{doneText.title}</p>
             <p className="mt-2 text-[var(--c-text2)]">單號：{orderNo}</p>
-            <p className="mt-1 text-sm text-[var(--c-muted)]">我們會盡快為你備貨，感謝購買。</p>
+            <p className="mt-1 whitespace-pre-line text-sm text-[var(--c-muted)]">{doneText.message}</p>
             {!isMember && (
-              <p className="mx-auto mt-3 max-w-sm rounded-lg bg-[#fff6e5] px-3 py-2 text-sm font-medium text-[#9a6412]">訪客結帳，請截圖此訂單編號，以利後續追蹤訂單</p>
+              <p className="mx-auto mt-3 max-w-sm whitespace-pre-line rounded-lg bg-[#fff6e5] px-3 py-2 text-sm font-medium text-[#9a6412]">{doneText.guestNote}</p>
             )}
             {showAccountInfo && paymentAccount ? (
               <div className="mx-auto mt-5 max-w-sm rounded-xl border border-[#d8c7a8] bg-[var(--c-header)] p-4 text-left">
                 <p className="text-sm font-semibold text-[var(--c-gold)]">{paymentAccount.name} — 收款資訊</p>
                 <p className="mt-1 whitespace-pre-wrap text-sm text-[var(--c-text2)]">{paymentAccount.info}</p>
-                <p className="mt-2 text-xs text-[var(--c-muted)]">請完成付款後保留交易明細，方便我們對帳。</p>
+                <p className="mt-2 whitespace-pre-line text-xs text-[var(--c-muted)]">{doneText.paymentNote}</p>
               </div>
             ) : null}
             <LineContactCard settings={settings ?? undefined} />
@@ -673,10 +674,10 @@ export default function CheckoutPage() {
               href={shopHome}
               className="mt-6 inline-block rounded-full bg-[var(--c-button)] px-6 py-3 font-semibold text-[var(--c-button-text)]"
             >
-              繼續購物
+              {doneText.continueButton}
             </Link>
           </div>
-        ) : priceState === 'error' || settingsState === 'error' ? (
+        ); })() : priceState === 'error' || settingsState === 'error' ? (
           <div className="py-20 text-center">
             <p role="alert">{settingsState === 'error' ? '無法取得最新運費設定，請重新載入後再結帳。' : '無法取得最新商品售價，請重新載入後再結帳。'}</p>
             <button type="button" onClick={() => window.location.reload()} className="mt-4 rounded-lg border border-[var(--c-border)] px-4 py-2">重新載入</button>

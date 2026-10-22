@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import type { SiteSettings } from '@/lib/types';
 import { formatLineId, getCheckoutLine, lineAddFriendUrl } from '@/lib/checkout-line';
 import { useLineMember } from '@/app/components/useLineMember';
+import { resolveOrderCompleteTexts } from '@/lib/order-complete-texts';
 
 // 訂單完成頁:引導加入官方 LINE 查詢出貨進度、聯絡客服(後台:系統設定 → 頁尾 → 結帳頁 LINE 設定)
 // 已登入會員:LINE 授權加好友並自動綁定會員;已綁定:提示可在 LINE 查詢訂單;訪客:一般加好友
@@ -25,6 +26,7 @@ export default function LineContactCard({ settings }: { settings?: SiteSettings 
   // 店家網站也一樣:會員可訂閱店家自己的官方 LINE 通知(/api/me/line 依網域回傳)
   const href = lineAddFriendUrl(line) || member.addFriendUrl;
   const lineId = formatLineId(line.id);
+  const texts = resolveOrderCompleteTexts(current?.order_complete_texts);
   const linkMember = member.loggedIn && !member.bound && member.linkUrl;
   if (!href && !linkMember) return null;
   if (member.loggedIn && member.bound && href) {
@@ -43,9 +45,9 @@ export default function LineContactCard({ settings }: { settings?: SiteSettings 
   return (
     <div className="mx-auto mt-6 max-w-sm rounded-xl border border-[#cfe9d6] bg-[#f3fbf5] p-4 text-center">
       <p className="text-sm leading-6 text-[#3d5a45]">
-        訂閱 LINE 通知
+        {texts.lineTitle}
         <br />
-        {linkMember ? '訂單出貨、到貨都會用 LINE 通知你,查詢訂單也更方便' : '加入官方 LINE,查詢出貨進度及聯絡客服人員'}
+        {linkMember ? '訂單出貨、到貨都會用 LINE 通知你,查詢訂單也更方便' : texts.lineText}
       </p>
       {lineId && (
         <p className="mt-2 text-sm font-semibold text-[#1f5a33]">
@@ -58,7 +60,7 @@ export default function LineContactCard({ settings }: { settings?: SiteSettings 
         className="mt-3 inline-flex items-center gap-2 rounded-full bg-[#06C755] px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#05b14c]"
       >
         <LineLogo />
-        訂閱 LINE 通知
+        {texts.lineButton}
       </a>
     </div>
   );
