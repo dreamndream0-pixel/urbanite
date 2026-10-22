@@ -23,6 +23,12 @@ export function setShopHome(href: string, lockPromo = false) {
   }
 }
 
+// 從商品頁按 Logo / 選單回商店:標記「返回」,商店頁會回到原本的分類與捲動位置(和瀏覽器返回鍵一樣)
+export const STORE_RETURN_KEY = 'urbanite-store-return';
+export function markStoreReturn() {
+  try { window.sessionStorage.setItem(STORE_RETURN_KEY, String(Date.now())); } catch { /* 略過 */ }
+}
+
 export function getShopHome(): string {
   try {
     const href = window.sessionStorage.getItem(SHOP_HOME_KEY) ?? '';

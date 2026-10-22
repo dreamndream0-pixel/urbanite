@@ -12,7 +12,7 @@ import { resolvePromoNotices, type PromoNotice } from '@/lib/promo-notices';
 import { freeShippingNotice } from '@/lib/shipping';
 import StoreHeader from '@/app/components/StoreHeader';
 import { useLoopCarousel } from '@/app/components/useLoopCarousel';
-import { setShopHome } from '@/lib/shop-home';
+import { markStoreReturn, setShopHome } from '@/lib/shop-home';
 
 const CART_KEY = 'cart';
 
@@ -281,7 +281,8 @@ export default function ProductDetailClient({ product: initialProduct, homeHref 
         cartIconRef={cartIconRef}
         searchOpen={searchOpen}
         query={query}
-        onMenu={() => router.push(homeHref)}
+        onMenu={() => { markStoreReturn(); router.push(homeHref, { scroll: false }); }}
+        onHome={markStoreReturn}
         onSearchToggle={() => setSearchOpen((v) => !v)}
         onQueryChange={setQuery}
         onSearchSubmit={() => {

@@ -22,6 +22,7 @@ export default function StoreHeader({
   onSearchSubmit,
   onFavorites,
   onCart,
+  onHome,
 }: {
   homeHref: string;
   logoUrl: string;
@@ -37,6 +38,7 @@ export default function StoreHeader({
   onSearchSubmit?: () => void;
   onFavorites: () => void;
   onCart: () => void;
+  onHome?: () => void; // 按 Logo 回商店前(商品頁用來標記「返回」)
 }) {
   return (
     <header className="page-header sticky top-0 z-30 bg-[var(--c-header)]">
@@ -52,7 +54,7 @@ export default function StoreHeader({
         </div>
 
         {/* 中:Logo(載入完成前先留白,避免先閃文字再換成 Logo 圖)*/}
-        <Link href={homeHref} className="justify-self-center px-2 text-center">
+        <Link href={homeHref} onClick={onHome} scroll={!onHome} className="justify-self-center px-2 text-center">
           {logoUrl ? (
             <img src={logoUrl} alt={brandName || STORE_NAME} className="site-logo mx-auto h-8 w-auto object-contain sm:h-10" />
           ) : brandName ? (

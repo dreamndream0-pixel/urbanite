@@ -13,7 +13,7 @@ import { initialSpecSelection, resolveSpecSelection, selectedSpecImage } from '@
 import ProductSpecPicker from '@/app/components/ProductSpecPicker';
 import { uiAlert } from '@/lib/ui-dialog';
 import { computeShipping, resolveFreeShippingThreshold, SHIPPING_FEE } from '@/lib/shipping';
-import { setShopHome } from '@/lib/shop-home';
+import { setShopHome, STORE_RETURN_KEY } from '@/lib/shop-home';
 import { campaignHomeHref } from '@/lib/campaign';
 import FavoriteFoldButton from '@/app/components/FavoriteFoldButton';
 import CategoryNavigation from '@/app/components/CategoryNavigation';
@@ -41,13 +41,16 @@ if (typeof window !== 'undefined') {
   window.addEventListener('popstate', () => { cameBack = true; });
   document.addEventListener('click', () => { cameBack = false; }, true);
 }
-function peekReturnState(): StoreState | null {
+// path:這個商店頁的路徑(站內連結換頁時,執行到這裡網址列可能還沒換成新頁)
+function peekReturnState(path: string): StoreState | null {
   const nav = performance.getEntriesByType?.('navigation')[0] as PerformanceNavigationTiming | undefined;
-  const back = cameBack || nav?.type === 'back_forward';
+  let marked = false;
+  try { marked = Date.now() - Number(sessionStorage.getItem(STORE_RETURN_KEY) || 0) < 60 * 1000; } catch { /* 略過 */ }
+  const back = cameBack || marked || nav?.type === 'back_forward';
   if (!back) return null;
   try {
     const saved = JSON.parse(sessionStorage.getItem(STORE_STATE_KEY) || 'null') as StoreState | null;
-    if (!saved || saved.path !== location.pathname + location.search || Date.now() - saved.at > 60 * 60 * 1000) return null;
+    if (!saved || saved.path.split('?')[0] !== path || Date.now() - saved.at > 60 * 60 * 1000) return null;
     return saved;
   } catch {
     return null;
@@ -109,7 +112,7 @@ export default function Storefront({ campaign = null, preview = false, initialDa
   const cacheKey = campaign ? `campaign:${campaign.id}` : 'main';
   // 只有站內換頁才會有快取(第一次開網頁沒有,伺服器與瀏覽器的初次畫面一致)
   const [cached] = useState(() => (typeof window === 'undefined' ? undefined : cachedStore(cacheKey, !!campaign)));
-  const [initialReturn] = useState(() => (cached ? peekReturnState() : null));
+  const [initialReturn] = useState(() => (cached ? peekReturnState(homeHref) : null));
   const [products, setProducts] = useState<Product[]>(cached?.products ?? []);
   const [banners, setBanners] = useState<Banner[]>(initialData?.banners ?? cached?.banners ?? []);
   const [dbCategories, setDbCategories] = useState<Category[]>(cached?.categories ?? []);
@@ -156,14 +159,17 @@ export default function Storefront({ campaign = null, preview = false, initialDa
   // 返回時先還原分類(商品載入完成後再還原數量與捲動位置)
   useLayoutEffect(() => {
     cameBack = false;
+    const clearMark = () => { try { sessionStorage.removeItem(STORE_RETURN_KEY); } catch { /* 略過 */ } };
     if (initialReturn) {
+      clearMark();
       const y = initialReturn.scrollY;
       scrollToY(y);
       requestAnimationFrame(() => { if (Math.abs(getScrollY() - y) > 2) scrollToY(y); });
       return;
     }
-    if (cached) return;
-    const saved = peekReturnState();
+    if (cached) { clearMark(); return; }
+    const saved = peekReturnState(homeHref);
+    clearMark();
     if (!saved) return;
     returnState.current = saved;
     Promise.resolve().then(() => {
