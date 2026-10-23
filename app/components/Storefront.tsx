@@ -14,6 +14,7 @@ import ProductSpecPicker from '@/app/components/ProductSpecPicker';
 import { uiAlert } from '@/lib/ui-dialog';
 import { computeShipping, resolveFreeShippingThreshold, SHIPPING_FEE } from '@/lib/shipping';
 import { setShopHome, STORE_RETURN_KEY } from '@/lib/shop-home';
+import { trackShop, trackShopVisit } from '@/lib/shop-track';
 import { campaignHomeHref } from '@/lib/campaign';
 import FavoriteFoldButton from '@/app/components/FavoriteFoldButton';
 import CategoryNavigation from '@/app/components/CategoryNavigation';
@@ -222,7 +223,9 @@ export default function Storefront({ campaign = null, preview = false, initialDa
   // 記住目前所在的商店,購物車/結帳頁的「回商店」會帶回這裡
   useEffect(() => {
     setShopHome(homeHref, !preview);
-  }, [homeHref, preview]);
+    // 流量分析:進站(同一次造訪只算一次;後台預覽不算)
+    if (!preview) trackShopVisit(homeHref, campaign?.id);
+  }, [homeHref, preview]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     let active = true;
@@ -401,7 +404,11 @@ export default function Storefront({ campaign = null, preview = false, initialDa
 
   // 點商品進入商品頁前,記下目前的分類與位置
   function rememberStoreState(e: React.MouseEvent) {
-    if (!(e.target as HTMLElement).closest?.('a[href^="/products/"]')) return;
+    const link = (e.target as HTMLElement).closest?.('a[href^="/products/"]');
+    if (!link) return;
+    // 流量分析:從列表點進商品
+    const productId = decodeURIComponent((link.getAttribute('href') ?? '').split('/')[2]?.split(/[?#]/)[0] ?? '');
+    if (productId && !preview) trackShop('product_click', { product_id: productId, campaign_id: campaign?.id ?? null, page: homeHref });
     try {
       const state: StoreState = { path: location.pathname + location.search, category, browseAll, displayCount, scrollY: getScrollY(), at: Date.now() };
       sessionStorage.setItem(STORE_STATE_KEY, JSON.stringify(state));
@@ -459,6 +466,7 @@ export default function Storefront({ campaign = null, preview = false, initialDa
     const latest = stockCatalog.find((entry) => entry.id === product.id);
     if (!latest) { void uiAlert('此商品目前無法購買，請重新選擇。'); return false; }
     product = latest;
+    if (!preview) trackShop('add_cart', { product_id: product.id, campaign_id: campaign?.id ?? null, page: homeHref });
     const quantity = opts?.quantity ?? 1;
     const variant =
       opts?.variant ??

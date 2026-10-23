@@ -66,6 +66,7 @@ import StocktakeManager, { type StocktakeApplied } from './StocktakeManager';
 import PromoActivitiesManager from './PromoActivitiesManager';
 import CheckoutFieldsManager from './CheckoutFieldsManager';
 import OrderCompleteTextsEditor from './OrderCompleteTextsEditor';
+import TrafficAnalytics from './TrafficAnalytics';
 import { downloadCsv } from '@/lib/stocktake';
 import { isCollectOnDelivery } from '@/lib/payment';
 import { buildReturnSteps, historyKind, isReturnOrder } from '@/lib/return-progress';
@@ -3006,6 +3007,8 @@ export default function AdminDashboard({
           {/* ===== 報表及分析 ===== */}
           {section === 'reports' && (
             <div className="space-y-6">
+              <TrafficAnalytics />
+              <h2 className="pt-2 text-lg font-semibold">銷售報表</h2>
               <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
                 <StatCard label="總營收(含運費)" value={formatter.format(report.totalRevenue)} />
                 <StatCard label="商品營收" value={formatter.format(report.productIncome)} />

@@ -13,6 +13,7 @@ import { freeShippingNotice } from '@/lib/shipping';
 import StoreHeader from '@/app/components/StoreHeader';
 import { useLoopCarousel } from '@/app/components/useLoopCarousel';
 import { markStoreReturn, setShopHome } from '@/lib/shop-home';
+import { trackShop, trackShopVisit } from '@/lib/shop-track';
 
 const CART_KEY = 'cart';
 
@@ -81,6 +82,15 @@ export default function ProductDetailClient({ product: initialProduct, homeHref 
   useEffect(() => {
     setShopHome(homeHref);
   }, [homeHref]);
+
+  // 流量分析:商品頁瀏覽;直接從外部連結進到商品頁也算一次進站
+  const viewTracked = useRef('');
+  useEffect(() => {
+    if (viewTracked.current === product.id) return;
+    viewTracked.current = product.id;
+    trackShopVisit(homeHref, product.campaign_id ?? null);
+    trackShop('product_view', { product_id: product.id, campaign_id: product.campaign_id ?? null, page: homeHref });
+  }, [product.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     Promise.resolve().then(refreshCartCount);
@@ -229,6 +239,7 @@ export default function ProductDetailClient({ product: initialProduct, homeHref 
       showToast('此規格已售完');
       return;
     }
+    trackShop('add_cart', { product_id: product.id, campaign_id: product.campaign_id ?? null, page: homeHref });
     const id = `${product.id}-${variantLabel}`;
     try {
       const raw = localStorage.getItem(CART_KEY);
