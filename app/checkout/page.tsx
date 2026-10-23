@@ -14,6 +14,7 @@ import ShopHeader from '@/app/components/ShopHeader';
 import { useShopHome } from '@/lib/shop-home';
 import { fieldsForOrder, resolveCheckoutFields } from '@/lib/checkout-fields';
 import { resolveOrderCompleteTexts } from '@/lib/order-complete-texts';
+import TransferReport from './TransferReport';
 import LineContactCard from '@/app/components/LineContactCard';
 import { useScrollLock } from '@/app/components/useScrollLock';
 
@@ -134,6 +135,7 @@ export default function CheckoutPage() {
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
   const [orderNo, setOrderNo] = useState('');
+  const [orderId, setOrderId] = useState('');
   const [transferOpen, setTransferOpen] = useState(true);
   const [pickupStore, setPickupStore] = useState<PickupStore | null>(null);
   // 會員回饋金(等同現金,可和優惠券併用)
@@ -639,6 +641,7 @@ export default function CheckoutPage() {
           return;
         }
         setOrderNo(data.order_no);
+        setOrderId(String(data.id ?? ''));
       }
     } catch {
       setMessage({ type: 'err', text: '連線發生問題，請稍後再試' });
@@ -669,6 +672,7 @@ export default function CheckoutPage() {
                 <p className="mt-2 whitespace-pre-line text-xs text-[var(--c-muted)]">{doneText.paymentNote}</p>
               </div>
             ) : null}
+            {showAccountInfo && paymentAccount && orderId ? <TransferReport orderId={orderId} /> : null}
             <LineContactCard settings={settings ?? undefined} />
             <Link
               href={shopHome}
@@ -1171,3 +1175,4 @@ export default function CheckoutPage() {
     </main>
   );
 }
+

@@ -92,6 +92,8 @@ const ORDER_TAB_KEYS = ['全部', CANCEL_REVIEW_TAB, '尚未付款', '待出貨'
 function orderMatchesTab(order: Order, tab: string) {
   if (tab === '全部') return true;
   if (tab === CANCEL_REVIEW_TAB) return order.cancel_status === 'REQUESTED';
+  // 客人申請取消、等待審核的訂單只放在「待審核取消」,不再出現在待出貨等其他分頁(審核完才回到原本的狀態)
+  if (order.cancel_status === 'REQUESTED') return false;
   if (tab === '尚未付款') return order.status === '尚未付款' && !order.paid;
   if (tab === '待出貨') return order.status === '待出貨' && order.fulfillment_status !== 'READY_TO_SHIP';
   if (tab === PROCESSED_TAB) return order.status === '待出貨' && order.fulfillment_status === 'READY_TO_SHIP';

@@ -8,6 +8,8 @@ import { sanitizeImage } from '@/lib/safe-image';
 import { limitedFormData } from '@/lib/limited-form';
 import { PAYMENT_PROOF_BUCKET, PRIVATE_PROOF_PREFIX, paymentProofPath, legacyPaymentProofPath } from '@/lib/payment-proof';
 import { kickOrderNotifications } from '@/lib/order-notification-kick';
+import { cookies } from 'next/headers';
+import { orderAccessCookieName, verifyOrderAccessToken } from '@/lib/order-access-token';
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const headers = { 'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff', 'Content-Security-Policy': "default-src 'none'; frame-ancestors 'none'" };
@@ -36,6 +38,7 @@ const EXT_BY_TYPE: Record<string, string> = {
 };
 
 // POST /api/orders/[id]/payment-proof — 買家回報付款(帳號後五碼 / 備註 / 截圖),限本人訂單
+// 訪客結帳:用下單時發的訂單存取憑證(httpOnly cookie,7 天)也可以回報
 // 接受 multipart/form-data:欄位 last5, note, file(選填)
 export async function POST(
   request: Request,
@@ -43,18 +46,19 @@ export async function POST(
 ) {
   kickOrderNotifications();
   const user = await getSessionUser();
-  if (!user) return NextResponse.json({ error: '請先登入' }, { status: 401 });
-
   const { id } = await params;
   const supabase = (await shopAdminClient());
   const { data: order } = await supabase
     .from('orders')
-    .select('id, shop_id, user_id, paid')
+    .select('id, shop_id, user_id, paid, order_no')
     .eq('id', id)
     .maybeSingle();
-  if (!order || order.user_id !== user.id) {
-    return NextResponse.json({ error: '找不到訂單' }, { status: 404 });
+  const owner = Boolean(order && user && order.user_id === user.id);
+  const guest = Boolean(order && !order.user_id && verifyOrderAccessToken((await cookies()).get(orderAccessCookieName(String(order.order_no)))?.value, String(order.order_no)));
+  if (!order || (!owner && !guest)) {
+    return NextResponse.json({ error: user ? '找不到訂單' : '請先登入' }, { status: user ? 404 : 401 });
   }
+  if (order.paid) return NextResponse.json({ error: '這筆訂單已確認付款' }, { status: 400 });
 
   let form: FormData;
   try { form = await limitedFormData(request); }
@@ -90,7 +94,7 @@ export async function POST(
     return NextResponse.json({ error: '請輸入帳號後五碼或上傳截圖' }, { status: 400 });
   }
 
-  const { data, error } = await supabase.from('orders').update(update).eq('id', id).eq('user_id', user.id).select().single();
+  const { data, error } = await supabase.from('orders').update(update).eq('id', id).select().single();
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
 
   await supabase.from('order_status_history').insert({
