@@ -4,7 +4,7 @@ import { getOrderNotificationConfig } from '@/lib/order-notification-config';
 import { noticeEnabled, ORDER_NOTICE_EVENTS, type OrderNoticeEvent, type NoticeAudience, type NoticeChannel } from '@/lib/order-notification-settings';
 import { getMessagingConfig } from '@/lib/line-messaging';
 import { getShopLineConfig } from '@/lib/shop-line';
-import { orderEmailHtml, orderNoticeEmailHtml, sellerRecipients, transferBlock } from '@/lib/order-email';
+import { orderEmailHtml, orderNoticeEmailHtml, sellerRecipients, shopLineUrl, transferBlock } from '@/lib/order-email';
 import { shopUrl, URBANITE_SHOP_ID } from '@/lib/shop';
 import type { Order } from '@/lib/types';
 import { orderFlexMessage } from '@/lib/order-flex';
@@ -45,7 +45,9 @@ async function prepare(job: Job, sender: string, notify: string): Promise<Payloa
   const platform = job.shop_id === URBANITE_SHOP_ID;
   const label = ORDER_NOTICE_EVENTS.find(e => e.key === job.event)!.label;
   const site = shopUrl(shop.slug, '').replace(/\/$/, '');
-  const link = `${site}${job.audience === 'seller' ? '/admin' : '/account?tab=orders'}`;
+  // 訪客訂單沒有會員中心,買家連結改到「訪客查詢訂單」
+  const guestBuyer = job.audience === 'buyer' && !order.user_id;
+  const link = `${site}${job.audience === 'seller' ? '/admin' : guestBuyer ? `/order-lookup?no=${encodeURIComponent(order.order_no)}` : '/account?tab=orders'}`;
   const subject = `【${shop.name}】${label} ${order.order_no}`;
   const sellerEmails = job.audience === 'seller' ? emails(await sellerRecipients(shop, platform, notify)) : [];
   // 補充欄位:Email 與 LINE 共用
@@ -64,11 +66,12 @@ async function prepare(job: Job, sender: string, notify: string): Promise<Payloa
   const seller = job.audience === 'seller';
   const title = seller && job.event === 'created' ? '新訂單' : seller && job.event === 'payment_reported' ? '買家已通知付款' : seller && job.event === 'cancel_requested' ? '買家申請取消' : label;
   const subtitle = (seller ? SELLER_TEXT : BUYER_TEXT)[job.event];
-  const buttonLabel = seller ? '到後台處理' : '查看訂單';
+  const buttonLabel = seller ? '到後台處理' : guestBuyer ? '查詢訂單' : '查看訂單';
   if (job.channel === 'email') {
     const to = job.audience === 'buyer' ? emails([order.email]) : sellerEmails;
     if (!to.length) throw new NoticeError('未設定有效的收件信箱', false, true);
-    let html = orderNoticeEmailHtml({ order, shopName: shop.name, title, subtitle, link, buttonLabel, rows: extra });
+    const lineUrl = job.audience === 'buyer' ? await shopLineUrl(job.shop_id).catch(() => '') : '';
+    let html = orderNoticeEmailHtml({ order, shopName: shop.name, title, subtitle, link, buttonLabel, rows: extra, lineUrl });
     if (job.event === 'created') {
       let transfer = '';
       if (/轉帳|匯款/.test(order.payment_method ?? '')) {
@@ -77,7 +80,7 @@ async function prepare(job: Job, sender: string, notify: string): Promise<Payloa
         const account = (settings?.payment_accounts as { name: string; info: string }[] | null)?.find(a => a.name === order.payment_method)?.info;
         if (account) transfer = transferBlock(account);
       }
-      html = orderEmailHtml(order, shop.name, transfer, !!order.user_id, site)[job.audience];
+      html = orderEmailHtml(order, shop.name, transfer, !!order.user_id, site, lineUrl)[job.audience];
     }
     return { endpoint: 'email', body: { from: `${String(shop.name).replace(/[<>"\r\n]/g, '')} <${sender}>`, to, subject, html } };
   }

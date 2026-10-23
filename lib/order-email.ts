@@ -5,6 +5,9 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { isOnlinePayment } from '@/lib/payment';
 import type { Order } from '@/lib/types';
 import { getOrderNotificationConfig } from '@/lib/order-notification-config';
+import { getCheckoutLine, lineAddFriendUrl } from '@/lib/checkout-line';
+import { URBANITE_SHOP_ID } from '@/lib/shop';
+import type { SiteSettings } from '@/lib/types';
 
 type Shop = { id: string; name: string; slug: string } | null;
 type Ctx = { order: Order; shop: Shop; platform: boolean; siteUrl: string; member: boolean };
@@ -64,6 +67,20 @@ function delivery(order: Order) {
     ${order.note ? `<p style="margin:4px 0"><b>備註:</b>${esc(order.note)}</p>` : ''}`;
 }
 
+// 買家信件底部:訪客的「查詢訂單」與「訂閱官方 LINE」按鈕
+const button = (href: string, label: string, bg = '#1f1b19') => `<a href="${esc(href)}" style="display:inline-block;background:${bg};color:#fff;text-decoration:none;padding:10px 20px;border-radius:999px;font-size:14px;margin:0 8px 8px 0">${esc(label)}</a>`;
+export function buyerExtras(order: Order, siteUrl: string, lineUrl: string, member: boolean) {
+  const lookup = member ? '' : `<div style="margin:20px 0 0;padding:12px 14px;background:#faf7f2;border-radius:8px;font-size:13px;color:#6b6156">訪客訂單可隨時查詢:輸入訂單編號 <b>${esc(order.order_no)}</b> 與下單時的手機或 Email。<br>${button(`${siteUrl}/order-lookup?no=${encodeURIComponent(order.order_no)}`, '查詢訂單')}</div>`;
+  const line = lineUrl ? `<div style="margin:16px 0 0;padding:12px 14px;background:#f3fbf5;border-radius:8px;font-size:13px;color:#3d5a45">加入官方 LINE,查詢出貨進度、聯絡客服更方便。<br>${button(lineUrl, '訂閱官方 LINE', '#06C755')}</div>` : '';
+  return lookup + line;
+}
+
+// 這家店結帳頁設定的官方 LINE(系統設定 → 頁尾 → 結帳頁 LINE 設定);沒設定回空字串
+export async function shopLineUrl(shopId: string) {
+  const { data } = await createAdminClient().from('site_settings').select('footer_sections').eq('shop_id', shopId).maybeSingle();
+  return lineAddFriendUrl(getCheckoutLine(data as Pick<SiteSettings, 'footer_sections'> | null));
+}
+
 const frame = (shopName: string, body: string) => `<div style="background:#f6f2ec;padding:24px 12px;font-family:-apple-system,'PingFang TC','Noto Sans TC',sans-serif;color:#1f1b19">
   <div style="max-width:560px;margin:auto;background:#fff;border-radius:12px;padding:28px 24px">
   <p style="margin:0 0 16px;font-size:18px;font-weight:700;letter-spacing:.08em">${esc(shopName)}</p>${body}</div></div>`;
@@ -85,7 +102,8 @@ export async function sendOrderEmails({ order, shop, platform, siteUrl, member }
     if (account) transfer = transferBlock(account);
   }
 
-  const { buyer, seller } = orderEmailHtml(order, shopName, transfer, member, siteUrl);
+  const lineUrl = await shopLineUrl(shop?.id ?? URBANITE_SHOP_ID).catch(() => '');
+  const { buyer, seller } = orderEmailHtml(order, shopName, transfer, member, siteUrl, lineUrl);
   await Promise.allSettled([
     send(cfg.RESEND_API_KEY, from, [order.email], `【${shopName}】訂單成立通知 ${order.order_no}`, buyer, sellers[0]),
     send(cfg.RESEND_API_KEY, from, sellers, `【新訂單】${order.order_no} ${money(order.total)}`, seller, order.email),
@@ -93,11 +111,12 @@ export async function sendOrderEmails({ order, shop, platform, siteUrl, member }
 }
 
 // 信件內容(純函式,方便預覽)
-export function orderEmailHtml(order: Order, shopName: string, transfer: string, member: boolean, siteUrl: string) {
+export function orderEmailHtml(order: Order, shopName: string, transfer: string, member: boolean, siteUrl: string, lineUrl = '') {
   const buyerBody = `<p style="margin:0 0 8px;font-size:16px">${esc(order.customer_name)} 您好,感謝您的訂購!</p>
     <p style="margin:0 0 16px;color:#6b6156;font-size:14px">我們已收到您的訂單,訂單編號 <b>${esc(order.order_no)}</b>。</p>
     ${transfer}${orderTable(order)}<div style="margin-top:16px;font-size:14px">${delivery(order)}</div>
-    ${member ? `<p style="margin:20px 0 0"><a href="${esc(siteUrl)}/account" style="display:inline-block;background:#1f1b19;color:#fff;text-decoration:none;padding:10px 20px;border-radius:999px;font-size:14px">查看訂單</a></p>` : ''}`;
+    ${member ? `<p style="margin:20px 0 0"><a href="${esc(siteUrl)}/account" style="display:inline-block;background:#1f1b19;color:#fff;text-decoration:none;padding:10px 20px;border-radius:999px;font-size:14px">查看訂單</a></p>` : ''}
+    ${buyerExtras(order, siteUrl, lineUrl, member)}`;
   const sellerBody = `<p style="margin:0 0 8px;font-size:16px">您有一筆新訂單</p>
     <p style="margin:0 0 16px;color:#6b6156;font-size:14px">訂單編號 <b>${esc(order.order_no)}</b>,買家 ${esc(order.customer_name)}(${esc(order.email)})。</p>
     ${orderTable(order)}<div style="margin-top:16px;font-size:14px">${delivery(order)}</div>
@@ -107,16 +126,17 @@ export function orderEmailHtml(order: Order, shopName: string, transfer: string,
 }
 
 // 訂單狀態通知信(出貨、到貨、取消、退貨、已通知付款…):標題、說明、商品圖與明細、配送資訊、補充欄位、按鈕
-export function orderNoticeEmailHtml({ order, shopName, title, subtitle, link, buttonLabel, rows = [] }: { order: Order; shopName: string; title: string; subtitle?: string; link: string; buttonLabel: string; rows?: [string, string][] }) {
+export function orderNoticeEmailHtml({ order, shopName, title, subtitle, link, buttonLabel, rows = [], lineUrl = '' }: { order: Order; shopName: string; title: string; subtitle?: string; link: string; buttonLabel: string; rows?: [string, string][]; lineUrl?: string }) {
   const extra = rows.filter(([, v]) => v).map(([k, v]) => `<p style="margin:4px 0"><b>${esc(k)}:</b>${esc(v)}</p>`).join('');
   const body = `<p style="margin:0 0 4px;font-size:18px;font-weight:700">${esc(title)}</p>
     <p style="margin:0 0 16px;color:#6b6156;font-size:14px">訂單編號 <b>${esc(order.order_no)}</b>${subtitle ? `<br>${esc(subtitle)}` : ''}</p>
     ${extra ? `<div style="margin:0 0 16px;padding:12px 14px;background:#faf7f2;border-radius:8px;font-size:14px">${extra}</div>` : ''}
     ${orderTable(order)}<div style="margin-top:16px;font-size:14px">${delivery(order)}</div>
-    <p style="margin:20px 0 0"><a href="${esc(link)}" style="display:inline-block;background:#1f1b19;color:#fff;text-decoration:none;padding:10px 20px;border-radius:999px;font-size:14px">${esc(buttonLabel)}</a></p>`;
+    <p style="margin:20px 0 0"><a href="${esc(link)}" style="display:inline-block;background:#1f1b19;color:#fff;text-decoration:none;padding:10px 20px;border-radius:999px;font-size:14px">${esc(buttonLabel)}</a></p>
+    ${lineUrl ? `<div style="margin:16px 0 0;padding:12px 14px;background:#f3fbf5;border-radius:8px;font-size:13px;color:#3d5a45">加入官方 LINE,查詢出貨進度、聯絡客服更方便。<br>${button(lineUrl, '訂閱官方 LINE', '#06C755')}</div>` : ''}`;
   return frame(shopName, body);
 }
 
 export function transferBlock(account: string) {
-  return `<div style="margin:16px 0;padding:12px 14px;background:#faf7f2;border-radius:8px;font-size:14px"><b>匯款資訊</b><br><span style="white-space:pre-line">${esc(account)}</span><br><span style="color:#8a7f72;font-size:12px">匯款後請到會員中心「我的訂單」回報匯款。</span></div>`;
+  return `<div style="margin:16px 0;padding:12px 14px;background:#faf7f2;border-radius:8px;font-size:14px"><b>匯款資訊</b><br><span style="white-space:pre-line">${esc(account)}</span><br><span style="color:#8a7f72;font-size:12px">匯款後請回報帳號後五碼:會員到「我的訂單」,訪客可在下方「查詢訂單」回報。</span></div>`;
 }

@@ -877,6 +877,12 @@ function Footer({ settings, logoUrl, homeHref }: { settings: SiteSettings | null
       items: section.items.filter((item) => !isPolicyItem(item.subtitle)),
     }))
     .filter((section) => section.title || section.items.length);
+  // 顧客服務區塊固定加「訪客查詢訂單」(沒有客服區塊時放在最後一個區塊)
+  if (!displaySections.some((section) => section.items.some((item) => item.url === '/order-lookup'))) {
+    const at = displaySections.findIndex((section) => /客服|顧客服務|SERVICE/i.test(section.title));
+    const target = at >= 0 ? at : displaySections.length - 1;
+    if (target >= 0) displaySections[target] = { ...displaySections[target], items: [...displaySections[target].items, { subtitle: '訪客查詢訂單 / Order Lookup', content: '', url: '/order-lookup' }] };
+  }
   const socialLinks = getFooterSocialLinks(settings);
   const followSection = {
     title: '尋找我們 FOLLOW US',

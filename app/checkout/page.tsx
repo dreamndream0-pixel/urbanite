@@ -15,6 +15,8 @@ import { useShopHome } from '@/lib/shop-home';
 import { fieldsForOrder, resolveCheckoutFields } from '@/lib/checkout-fields';
 import { resolveOrderCompleteTexts } from '@/lib/order-complete-texts';
 import TransferReport from './TransferReport';
+import OrderSummaryView from '@/app/components/OrderSummaryView';
+import { publicOrder, type PublicOrder } from '@/lib/order-public';
 import LineContactCard from '@/app/components/LineContactCard';
 import { useScrollLock } from '@/app/components/useScrollLock';
 
@@ -136,6 +138,9 @@ export default function CheckoutPage() {
   const [message, setMessage] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
   const [orderNo, setOrderNo] = useState('');
   const [orderId, setOrderId] = useState('');
+  // 訂單成立頁「展開訂單」:用下單 API 回傳的訂單內容
+  const [placedOrder, setPlacedOrder] = useState<PublicOrder | null>(null);
+  const [showOrder, setShowOrder] = useState(false);
   const [transferOpen, setTransferOpen] = useState(true);
   const [pickupStore, setPickupStore] = useState<PickupStore | null>(null);
   // 會員回饋金(等同現金,可和優惠券併用)
@@ -642,6 +647,7 @@ export default function CheckoutPage() {
         }
         setOrderNo(data.order_no);
         setOrderId(String(data.id ?? ''));
+        setPlacedOrder(publicOrder(data));
       }
     } catch {
       setMessage({ type: 'err', text: '連線發生問題，請稍後再試' });
@@ -661,6 +667,12 @@ export default function CheckoutPage() {
           <div className="rounded-2xl bg-[var(--c-surface)] p-8 text-center shadow-sm">
             <p className="text-lg font-semibold text-[#1f7a44]">{doneText.title}</p>
             <p className="mt-2 text-[var(--c-text2)]">單號：{orderNo}</p>
+            {placedOrder ? (
+              <div className="mx-auto mt-2 max-w-md">
+                <button type="button" aria-expanded={showOrder} onClick={() => setShowOrder(!showOrder)} className="inline-flex items-center gap-1 text-sm text-[var(--c-text2)] underline underline-offset-4">{showOrder ? '收合訂單' : '展開訂單'}<span aria-hidden="true" className={showOrder ? 'rotate-180' : ''}>▾</span></button>
+                {showOrder ? <div className="mt-3 rounded-xl border border-[var(--c-border)] bg-white p-4"><OrderSummaryView order={placedOrder} /></div> : null}
+              </div>
+            ) : null}
             <p className="mt-1 whitespace-pre-line text-sm text-[var(--c-muted)]">{doneText.message}</p>
             {!isMember && (
               <p className="mx-auto mt-3 max-w-sm whitespace-pre-line rounded-lg bg-[#fff6e5] px-3 py-2 text-sm font-medium text-[#9a6412]">{doneText.guestNote}</p>
