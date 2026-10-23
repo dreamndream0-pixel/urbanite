@@ -4973,8 +4973,10 @@ ${order.note ? `<div class="sec"><h2>備註</h2><p class="muted">${escapeHtml(or
         <div className="flex-1 space-y-5 overflow-y-auto overscroll-contain p-5">
           {/* 主要操作固定在內容最上方 */}
           <div className="flex flex-wrap gap-2">
-            <ManualFulfillmentAction order={order} action="arrived" onUpdated={(updated) => { onOrderChange?.(updated); void loadDetail(); }} />
-            {detail && isHomeDelivery && !hasShipment && order.status !== '取消' && order.status !== '退貨' ? (
+            {/* 「準備出貨」不等明細載入:依訂單本身的出貨狀態先顯示;只有「已建立出貨單」的情況要等明細確認,先佔位不讓其他按鈕移位 */}
+            {order.cancel_status === 'REQUESTED' ? null : isHomeDelivery && order.status !== '取消' && order.status !== '退貨' && !detail && order.fulfillment_status === 'READY_TO_SHIP' ? (
+              <span aria-hidden="true" className="invisible inline-flex h-10 items-center rounded-full px-6 text-sm font-semibold">準備出貨</span>
+            ) : isHomeDelivery && !hasShipment && order.status !== '取消' && order.status !== '退貨' ? (
               <button
                 onClick={() => {
                   if (!canShipHome) { void uiAlert('此訂單尚未收款,請先確認已收款(標記已付款)後再宅配出貨。'); return; }
@@ -4986,9 +4988,6 @@ ${order.note ? `<div class="sec"><h2>備註</h2><p class="muted">${escapeHtml(or
               </button>
             ) : null}
             <button onClick={printShippingDocument} className="inline-flex h-10 items-center rounded-full bg-[#1f1b19] px-6 text-sm font-semibold text-white hover:bg-black">列印出貨單</button>
-            {labelShipment ? (
-              <button onClick={printShippingLabel} className="inline-flex h-10 items-center rounded-full border border-[#1f1b19] px-6 text-sm font-semibold text-[#1f1b19] hover:bg-[#efe8dd]">列印寄件單</button>
-            ) : null}
             {order.status !== '取消' && order.status !== '退貨' ? (
               <button onClick={async () => {
                 if (!(await uiConfirm('確定要取消這筆訂單嗎?', { danger: true }))) return;
@@ -4996,6 +4995,11 @@ ${order.note ? `<div class="sec"><h2>備註</h2><p class="muted">${escapeHtml(or
                 onUpdate(refunded ? { status: '取消', refund_amount: order.total, shipping_refund: Number(order.shipping || 0) - Number(order.shipping_discount || 0) } : { status: '取消' });
               }} className="inline-flex h-10 items-center rounded-full border border-[#e0b4b4] px-6 text-sm font-semibold text-[#c0392b] hover:bg-[#fbf3f0]">取消訂單</button>
             ) : null}
+            {/* 讀取後才知道要不要顯示的按鈕放最後,出現時不會推動前面的按鈕 */}
+            {labelShipment ? (
+              <button onClick={printShippingLabel} className="inline-flex h-10 items-center rounded-full border border-[#1f1b19] px-6 text-sm font-semibold text-[#1f1b19] hover:bg-[#efe8dd]">列印寄件單</button>
+            ) : null}
+            <ManualFulfillmentAction order={order} action="arrived" onUpdated={(updated) => { onOrderChange?.(updated); void loadDetail(); }} />
           </div>
 
           {/* 退貨 / 退款(待處理的申請放在上方,方便核准) */}
