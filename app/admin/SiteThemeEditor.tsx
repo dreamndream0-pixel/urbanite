@@ -17,6 +17,8 @@ import type { Banner, CategoryImageStyle, Product } from '@/lib/types';
 import { cssVar } from '@/lib/site-theme';
 import {
   COLOR_FIELDS,
+  DEFAULT_COLORS,
+  DEFAULT_LAYOUT,
   LAYOUT_OPTIONS,
   resolveSiteTheme,
   SITE_TEMPLATES,
@@ -25,6 +27,7 @@ import {
   type SiteTheme,
 } from '@/lib/site-theme';
 import { uiAlert, uiConfirm } from '@/lib/ui-dialog';
+import { DEMO_BANNERS, DEMO_CATEGORIES, DEMO_IMAGES, DEMO_PRODUCTS, withDemoImages } from '@/lib/storefront-demo';
 
 // 後台 系統設定 → 一般設定 → 網站外觀:6 種樣板+全部顏色選擇器+版面配置,即時預覽
 export default function SiteThemeEditor({ initial, banners, onSaved, categoryImageStyle = 'circle', onCategoryImageStyle }: { initial: unknown; banners: Banner[]; onSaved?: (theme: unknown) => void; categoryImageStyle?: CategoryImageStyle; onCategoryImageStyle?: (style: CategoryImageStyle) => void }) {
@@ -146,7 +149,8 @@ export default function SiteThemeEditor({ initial, banners, onSaved, categoryIma
             <SwipeRow label="官網排版">
               {STOREFRONT_TEMPLATES.map((t) => {
                 const on = design.enabled && design.style === t.key;
-                const blocks = on ? resolveBlocks(design.blocks) ?? [] : starterBlocks({ style: t.key });
+                // 示意:每種排版都用預設板塊 + 示範商品圖與中性配色,看得出排版本身的效果(不是店家目前的內容)
+                const blocks = withDemoImages(starterBlocks({ style: t.key }), t.key);
                 return (
                   // 卡片內有真實商品卡(含按鈕),外層不能用 <button>,改用可聚焦的 div
                   <div
@@ -159,10 +163,13 @@ export default function SiteThemeEditor({ initial, banners, onSaved, categoryIma
                     onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pickLayout(t.key, on); } }}
                     className={`w-[172px] shrink-0 cursor-pointer snap-start overflow-hidden rounded-xl border text-left transition sm:w-[196px] ${on ? 'border-[#1f1b19] ring-2 ring-[#1f1b19]/15' : 'border-[#e5ded4] hover:border-[#1f1b19]/30'}`}
                   >
-                    {/* 用真實商品、分類、輪播圖縮小顯示這個排版 */}
-                    <div className={`${previewStyles.preview} pointer-events-none h-64 overflow-hidden bg-[var(--c-bg)] text-[var(--c-text)] sm:h-72`} data-card={draft.layout.card} data-radius={draft.layout.radius} data-heading={draft.layout.heading} style={themeVars(draft)} aria-hidden="true">
-                      <div className="origin-top-left" style={{ width: 390, transform: 'scale(var(--thumb-scale))' }}>
-                        <StorefrontBlocks designStyle={t.key} categoryImageStyle={categoryImageStyle} blocks={blocks} banners={previewBanners} bannerRatios={bannerRatios} products={previewProducts} categories={previewCategories} images={previewImages} onCategory={() => {}} preview renderProduct={(product) => <ProductCard product={product} favorited={false} favoritePending={false} favoritesLoaded onFavoriteChange={() => {}} onAdd={() => {}} />} />
+                    {/* 示意圖:手機畫面縮小,四周留白 */}
+                    <div className="relative bg-[#f3eee7] p-2" aria-hidden="true">
+                      <span className="absolute right-3 top-3 z-10 rounded-full bg-white/90 px-2 py-0.5 text-[10px] text-[#8a7f72] shadow-sm">示意</span>
+                      <div className={`${previewStyles.preview} pointer-events-none h-60 overflow-hidden rounded-lg bg-[var(--c-bg)] text-[var(--c-text)] shadow-[0_1px_6px_#0000001a] sm:h-[17rem]`} data-card={DEFAULT_LAYOUT.card} data-radius={DEFAULT_LAYOUT.radius} data-heading={DEFAULT_LAYOUT.heading} style={DEMO_VARS}>
+                        <div className="origin-top-left" style={{ width: 390, transform: 'scale(var(--thumb-inner))' }}>
+                          <StorefrontBlocks designStyle={t.key} categoryImageStyle="circle" blocks={blocks} banners={DEMO_BANNERS} bannerRatios={bannerRatios} products={DEMO_PRODUCTS} categories={DEMO_CATEGORIES} images={DEMO_IMAGES} onCategory={() => {}} preview renderProduct={(product) => <ProductCard product={product} favorited={false} favoritePending={false} favoritesLoaded onFavoriteChange={() => {}} onAdd={() => {}} />} />
+                        </div>
                       </div>
                     </div>
                     <div className="border-t border-[#efe8dd] bg-white px-3 py-2">
@@ -176,7 +183,7 @@ export default function SiteThemeEditor({ initial, banners, onSaved, categoryIma
                 );
               })}
             </SwipeRow>
-            <p className="text-xs text-[#a99e8f]">左右滑動看更多排版。換排版會保留你改過的文字、圖片和商品設定;按畫面下方「預覽」可以看手機和電腦的樣子。</p>
+            <p className="text-xs text-[#a99e8f]">左右滑動看更多排版。卡片是用示範圖片做的排版示意;換排版會保留你改過的文字、圖片和商品設定,按畫面下方「預覽」可以看套用你自己內容的樣子。</p>
             <div className="flex flex-wrap items-center gap-3">
               <label className="flex items-center gap-2 text-sm font-semibold">
                 2. 分類樣式
@@ -292,7 +299,8 @@ export default function SiteThemeEditor({ initial, banners, onSaved, categoryIma
   );
 }
 
-const themeVars = (theme: SiteTheme) => Object.fromEntries(COLOR_FIELDS.map((f) => [cssVar(f.key), theme.colors[f.key]])) as CSSProperties;
+// 排版示意用的中性配色(預設樣板)
+const DEMO_VARS = Object.fromEntries(COLOR_FIELDS.map((f) => [cssVar(f.key), DEFAULT_COLORS[f.key]])) as CSSProperties;
 
 // 左右滑動的卡片列:右側有漸層與箭頭提示還有內容,點箭頭往右(左)捲一張
 function SwipeRow({ label, children }: { label: string; children: ReactNode }) {
@@ -315,7 +323,7 @@ function SwipeRow({ label, children }: { label: string; children: ReactNode }) {
   };
   return (
     <div className="relative min-w-0" role="radiogroup" aria-label={label}>
-      <div ref={row} className="flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain pb-2 [--swatch-scale:0.5] [--thumb-scale:0.441] [scrollbar-width:none] sm:[--swatch-scale:0.567] sm:[--thumb-scale:0.503] [&::-webkit-scrollbar]:hidden">
+      <div ref={row} className="flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain pb-2 [--swatch-scale:0.5] [--thumb-scale:0.441] [--thumb-inner:0.4] [scrollbar-width:none] sm:[--swatch-scale:0.567] sm:[--thumb-scale:0.503] sm:[--thumb-inner:0.462] [&::-webkit-scrollbar]:hidden">
         {children}
       </div>
       {edge.left && (

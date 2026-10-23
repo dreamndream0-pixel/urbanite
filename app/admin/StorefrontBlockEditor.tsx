@@ -38,13 +38,13 @@ export default function StorefrontBlockEditor({ blocks, onChange, categories, pr
   }
   return <fieldset disabled={uploading} className="min-w-0 space-y-3">
     <legend className="sr-only">首頁板塊</legend>
-    <ol ref={listRef} className="space-y-2">
+    <ol ref={listRef} className="space-y-3">
       {blocks.map((block, index) => {
         const open = active === block.id;
         const dragging = sorting === block.id;
         return <li key={block.id} data-editor-block={block.id} onClickCapture={swallowClick}
           className={`select-none rounded-xl border bg-white transition-shadow [-webkit-touch-callout:none] ${open ? 'border-[#1f1b19]/40 shadow-sm' : 'border-[#e5ded4]'} ${dragging ? 'relative z-10 scale-[1.02] shadow-lg ring-2 ring-[#1f1b19]/30' : ''} ${block.visible ? '' : 'opacity-60'}`}>
-          <div className="flex items-center gap-1 px-1.5 py-1.5" onPointerDown={(e) => startSort(e, block.id, false)}>
+          <div className="flex items-center gap-1.5 px-3 py-2" onPointerDown={(e) => startSort(e, block.id, false)}>
             <span aria-hidden="true" title="按住拖曳排序" onPointerDown={(e) => { e.stopPropagation(); startSort(e, block.id, true); }} className="flex h-9 w-6 shrink-0 cursor-grab touch-none items-center justify-center text-[#b8ad9f]"><GripVertical size={18} /></span>
             <button type="button" onClick={() => setActive(open ? null : block.id)} aria-expanded={open} className="flex min-w-0 flex-1 items-center gap-2 py-1.5 text-left">
               <span className="shrink-0 rounded-full bg-[#efe8dd] px-2 py-0.5 text-[11px] text-[#6b6156]">{typeLabel(block.type)}</span>
