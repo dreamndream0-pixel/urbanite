@@ -387,8 +387,8 @@ export default function Storefront({ campaign = null, preview = false, initialDa
         (p) => p.name.toLowerCase().includes(q) || plainText(p.tagline).toLowerCase().includes(q),
       );
     }
-    // 完售不下架的商品排在後面(可買的先顯示)
-    return [...list.filter((p) => !isProductSoldOut(p)), ...list.filter((p) => isProductSoldOut(p))];
+    // 完售不下架的商品照後台的商品順序顯示(全部商品、分類都看得到)
+    return list;
   })();
 
   const shown = visibleProducts.slice(0, displayCount);
