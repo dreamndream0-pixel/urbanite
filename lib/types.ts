@@ -47,6 +47,7 @@ export type Product = {
   variants: Variant[];
   unit?: string;
   sale_mode?: string; // 現貨 / 預購 / 預購+現貨
+  keep_when_sold_out?: boolean; // 完售不下架:賣完仍顯示(標示已售完、不能購買)
   color_images?: Record<string, string>; // 顏色名稱 → 圖片網址
   is_featured: boolean;
   sort_order: number;

@@ -4,7 +4,7 @@ import { useEffect, useState, type CSSProperties, type MouseEvent, type ReactNod
 import { ArrowRight, ChevronRight } from 'lucide-react';
 import type { StorefrontBlock } from '@/lib/storefront-blocks';
 import type { Banner, CategoryImageStyle, Product } from '@/lib/types';
-import { isVisibleInStore } from '@/lib/product-status';
+import { isProductSoldOut, isVisibleInStore } from '@/lib/product-status';
 import type { DesignCategory } from './StorefrontDesign';
 import styles from './storefront-blocks.module.css';
 import CategoryNavigation from './CategoryNavigation';
@@ -12,7 +12,9 @@ import HeroCarousel from './HeroCarousel';
 import { bannerRatioForGroup, type BannerRatios } from '@/lib/banner-ratio';
 
 export function blockProducts(block: StorefrontBlock, products: Product[]) {
-  const live = products.filter(isVisibleInStore);
+  // 完售不下架的商品排在後面
+  const visible = products.filter(isVisibleInStore);
+  const live = [...visible.filter((p) => !isProductSoldOut(p)), ...visible.filter((p) => isProductSoldOut(p))];
   const selected = block.source === 'selected' ? block.productIds.flatMap((id) => live.find((p) => p.id === id) ?? []) : block.source === 'category' ? live.filter((p) => p.category === block.category) : live;
   return selected.slice(0, block.limit);
 }

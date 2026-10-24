@@ -1,6 +1,6 @@
 import type { Product } from '@/lib/types';
 
-type StockFields = Pick<Product, 'status' | 'sale_mode' | 'inventory' | 'variants'>;
+type StockFields = Pick<Product, 'status' | 'sale_mode' | 'inventory' | 'variants'> & { keep_when_sold_out?: boolean };
 
 // 後台「未上架」狀態(資料庫值沿用 '已下架')
 export const UNLISTED_STATUS = '已下架';
@@ -19,8 +19,9 @@ export function isProductSoldOut(product: StockFields) {
 }
 
 // 純現貨商品售完即自動下架(補貨後自動恢復);預購 / 預購+現貨售完仍繼續顯示
+// 勾了「完售不下架」的商品:售完仍顯示在前台(標示已售完、不能購買)
 export function isAutoDelisted(product: StockFields) {
-  return !isPreorder(product) && isProductSoldOut(product);
+  return !product.keep_when_sold_out && !isPreorder(product) && isProductSoldOut(product);
 }
 
 // 前台是否顯示
@@ -34,6 +35,7 @@ export const ADMIN_PRODUCT_TABS: AdminProductTab[] = ['上架中', '未上架', 
 
 export function adminProductTab(product: StockFields): AdminProductTab {
   if (product.status === UNLISTED_STATUS) return '未上架';
-  if (isAutoDelisted(product)) return '已售完';
+  // 完售不下架的商品也歸在「已售完」,方便看哪些要補貨
+  if (!isPreorder(product) && isProductSoldOut(product)) return '已售完';
   return '上架中';
 }

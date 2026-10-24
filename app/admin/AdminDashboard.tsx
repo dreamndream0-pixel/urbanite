@@ -150,6 +150,7 @@ type Draft = {
   sizes: string;
   unit: string;
   sale_mode: string;
+  keep_when_sold_out: boolean;
   colorImages: Record<string, string>;
   specs: { name: string; optionsText: string; display?: 'text' | 'image' }[];
   variantStock: Record<string, number>; // key = 各選項用 ' / ' 串起來
@@ -396,6 +397,7 @@ function blankDraft(campaignId: string | null = null, products: Pick<Product, 'i
     sizes: '',
     unit: '',
     sale_mode: '現貨',
+    keep_when_sold_out: false,
     colorImages: {},
     specs: [],
     variantStock: {},
@@ -433,6 +435,7 @@ function toDraft(p: Product): Draft {
     sizes: p.sizes.join(', '),
     unit: p.unit ?? '',
     sale_mode: p.sale_mode ?? '現貨',
+    keep_when_sold_out: Boolean(p.keep_when_sold_out),
     colorImages: p.color_images ?? {},
     specs,
     variantStock,
@@ -6999,6 +7002,11 @@ function ProductModal({
                 ))}
               </select>
             </Field>
+            {/* 完售不下架:現貨商品賣完時預設會自動從前台下架;勾選後仍顯示(標示已售完、不能購買),補貨後自動恢復可購買 */}
+            <label className="mt-3 flex items-start gap-2 text-sm">
+              <input type="checkbox" className="mt-0.5" checked={draft.keep_when_sold_out} onChange={(e) => set('keep_when_sold_out', e.target.checked)} />
+              <span>完售不下架<span className="block text-xs text-[#8a7f72]">賣完後商品仍顯示在前台,標示「已售完」、不能加入購物車;補貨後自動恢復可購買。沒勾的現貨商品賣完會自動下架。</span></span>
+            </label>
           </div>
           <div className="mt-4">
           <Field label="商品名稱">
