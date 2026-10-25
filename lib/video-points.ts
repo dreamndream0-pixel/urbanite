@@ -1,6 +1,6 @@
-// Seedance Studio 影片點數:點數方案、購買訂單(VP 開頭)入帳,以及與影片網站之間的簽章。
-// 影片網站(Cloudflare Worker)與本站共用 VIDEO_STUDIO_SECRET;金流金鑰只留在本站。
-import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
+// Seedance Studio 影片點數:點數方案、購買訂單(VP 開頭)入帳。影片網站以同一套 Supabase 會員登入,
+// 點數與金流在本站處理;影片網站(Cloudflare Worker)與本站共用 VIDEO_STUDIO_SECRET,金流金鑰只留在本站。
+import { randomBytes, timingSafeEqual } from 'node:crypto';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { matchesPaymentAmount } from '@/lib/payment-amount';
 
@@ -17,7 +17,6 @@ const studioSecret = () => {
   const secret = process.env.VIDEO_STUDIO_SECRET?.trim() ?? '';
   return secret.length >= 32 ? secret : '';
 };
-export const videoStudioConfigured = () => Boolean(studioSecret());
 
 export const isVideoOrderNo = (orderNo: string) => /^VP\d/.test(orderNo);
 export function newVideoOrderNo() {
@@ -32,16 +31,7 @@ export async function videoPointsReady(): Promise<boolean> {
   } catch { return false; }
 }
 
-const b64url = (value: Buffer | string) => Buffer.from(value).toString('base64url');
-const sign = (value: string) => createHmac('sha256', studioSecret()).update(value).digest('base64url');
-
-// 一次性登入連結:影片網站驗證簽章、到期時間與 nonce 後建立自己的工作階段。
-export function videoConnectToken(user: { id: string; email?: string | null }) {
-  const payload = b64url(JSON.stringify({ uid: user.id, email: user.email ?? '', exp: Date.now() + 5 * 60 * 1000, nonce: randomBytes(12).toString('hex') }));
-  return `${payload}.${sign(`connect:${payload}`)}`;
-}
-
-// 影片網站呼叫本站扣點/退點時,以共用密鑰驗證(Authorization: Bearer <secret>)。
+// 影片網站呼叫本站(點數、扣點、退點、建立付款)時,以共用密鑰驗證(Authorization: Bearer <secret>)。
 export function isVideoStudioRequest(request: Request) {
   const secret = studioSecret();
   const header = request.headers.get('authorization') ?? '';

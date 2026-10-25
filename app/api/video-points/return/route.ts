@@ -1,7 +1,7 @@
 import { aesDecrypt, getNewebpayConfig, verifyTradeSha } from '@/lib/newebpay';
-import { settleVideoPayment } from '@/lib/video-points';
+import { settleVideoPayment, videoStudioUrl } from '@/lib/video-points';
 
-// POST /api/video-points/return — 藍新付款後瀏覽器導回;背景通知延遲時這裡也會補做入帳
+// POST /api/video-points/return — 藍新付款後瀏覽器導回;背景通知延遲時這裡也會補做入帳,再回到影片網站
 export async function POST(request: Request) {
   const cfg = await getNewebpayConfig();
   let result = 'pending';
@@ -17,5 +17,5 @@ export async function POST(request: Request) {
   } catch {
     /* 無法確認時不宣稱扣款失敗,避免重複付款。 */
   }
-  return new Response(null, { status: 303, headers: { Location: `${cfg.siteUrl}/video/points?result=${result}` } });
+  return new Response(null, { status: 303, headers: { Location: `${videoStudioUrl()}/?points=${result}` } });
 }
