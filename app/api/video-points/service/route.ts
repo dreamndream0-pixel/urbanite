@@ -10,7 +10,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 // POST /api/video-points/service — 僅供影片網站(伺服器對伺服器)使用,以共用密鑰驗證。
 // actions: summary / balance / debit / refund / trial / checkout
 export async function POST(request: Request) {
-  if (!isVideoStudioRequest(request)) return NextResponse.json({ error: 'FORBIDDEN' }, { status: 403 });
+  if (!(await isVideoStudioRequest(request))) return NextResponse.json({ error: 'FORBIDDEN' }, { status: 403 });
   const body = (await request.json().catch(() => ({}))) as { action?: string; userId?: string; points?: number; ref?: string; package?: string; email?: string };
   if (!body.userId || !UUID.test(body.userId)) return NextResponse.json({ error: 'INVALID_USER' }, { status: 400 });
   const ref = typeof body.ref === 'string' && /^[A-Za-z0-9:_-]{1,100}$/.test(body.ref) ? body.ref : '';
