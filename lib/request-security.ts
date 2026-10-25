@@ -2,6 +2,8 @@
 const CALLBACKS = new Set([
   '/api/payment/newebpay/notify', '/api/payment/newebpay/return',
   '/api/card-plan/return', '/api/line/webhook',
+  // Video points: NewebPay return (TradeSha) and the Seedance Studio server (shared secret).
+  '/api/video-points/return', '/api/video-points/service',
   '/api/logistics/newebpay/notify', '/api/logistics/newebpay/store-map/return',
   '/api/logistics/cvs-map/return',
 ]);

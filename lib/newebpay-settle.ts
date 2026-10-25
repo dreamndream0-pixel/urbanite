@@ -1,4 +1,5 @@
 import { isCardOrderNo, settleCardPayment } from '@/lib/card-payment';
+import { isVideoOrderNo, settleVideoPayment } from '@/lib/video-points';
 import { scopedClient, URBANITE_SHOP_ID } from '@/lib/shop';
 import { matchesPaymentAmount } from '@/lib/payment-amount';
 
@@ -18,6 +19,8 @@ export async function settleNewebpayPayment(payload: NewebpayPayload): Promise<{
   if (!orderNo) return { ok: false, orderNo: '', reason: '缺少訂單編號' };
   // 名片 Pro 方案付款(CP 開頭)另外處理
   if (isCardOrderNo(orderNo)) return settleCardPayment(payload);
+  // 影片點數購買(VP 開頭)另外處理
+  if (isVideoOrderNo(orderNo)) return settleVideoPayment(payload);
   if (payload.Status !== 'SUCCESS') return { ok: false, orderNo, reason: payload.Message || '付款未成功' };
 
   const supabase = scopedClient(URBANITE_SHOP_ID);
