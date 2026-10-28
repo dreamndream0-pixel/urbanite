@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { buildMPGParams, getNewebpayConfig } from '@/lib/newebpay';
-import { reconcileVideoPayments } from '@/lib/video-payment-reconcile';
+import { reconcileVideoPayments, reconcileVideoPaymentBatch } from '@/lib/video-payment-reconcile';
 import { isVideoStudioRequest, newVideoOrderNo, VIDEO_POINT_PACKAGES, VIDEO_TRIAL_POINTS, videoPointsReady, videoStudioUrl } from '@/lib/video-points';
 
 export const dynamic = 'force-dynamic';
@@ -12,7 +12,12 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 // actions: summary / balance / debit / refund / trial / checkout
 export async function POST(request: Request) {
   if (!(await isVideoStudioRequest(request))) return NextResponse.json({ error: 'FORBIDDEN' }, { status: 403 });
-  const body = (await request.json().catch(() => ({}))) as { action?: string; userId?: string; points?: number; ref?: string; package?: string; email?: string };
+  const body = (await request.json().catch(() => ({}))) as { action?: string; userId?: string; points?: number; ref?: string; package?: string; email?: string; cursor?: string };
+  if (body?.action === 'reconcile-batch') {
+    if (body.cursor !== undefined && (typeof body.cursor !== 'string' || (body.cursor !== '' && !/^VP\d[A-Za-z0-9]{1,45}$/.test(body.cursor)))) return NextResponse.json({ error: 'INVALID_CURSOR' }, { status: 400 });
+    try { return NextResponse.json(await reconcileVideoPaymentBatch(body.cursor || '')); }
+    catch { return NextResponse.json({ error: 'RECONCILIATION_UNAVAILABLE' }, { status: 503 }); }
+  }
   if (!body.userId || !UUID.test(body.userId)) return NextResponse.json({ error: 'INVALID_USER' }, { status: 400 });
   const ref = typeof body.ref === 'string' && /^[A-Za-z0-9:_-]{1,100}$/.test(body.ref) ? body.ref : '';
   const db = createAdminClient();
