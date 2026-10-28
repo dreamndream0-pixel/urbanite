@@ -14,7 +14,7 @@ export async function queryNewebpayPayment(orderNo: string, amount: number) {
   });
   if (!response.ok) throw new Error('PAYMENT_QUERY_UNAVAILABLE');
   const payload = await response.json();
-  if (payload?.Status !== 'SUCCESS') throw new Error('PAYMENT_QUERY_UNCONFIRMED');
+  if (payload?.Status !== 'SUCCESS') throw new Error('PAYMENT_QUERY_UNCONFIRMED_' + (/^[A-Z0-9_]{1,30}$/.test(payload?.Status || '') ? payload.Status : 'UNKNOWN'));
   const result = typeof payload.Result === 'string' ? JSON.parse(payload.Result) : payload.Result;
   if (!result || result.MerchantID !== cfg.merchantId || result.MerchantOrderNo !== orderNo || String(result.Amt) !== String(amount) || typeof result.TradeNo !== 'string' || !/^[A-Za-z0-9_-]{1,100}$/.test(result.TradeNo)) throw new Error('PAYMENT_QUERY_MISMATCH');
   const checkFields = new URLSearchParams({ Amt: String(result.Amt), MerchantID: result.MerchantID, MerchantOrderNo: result.MerchantOrderNo, TradeNo: result.TradeNo });

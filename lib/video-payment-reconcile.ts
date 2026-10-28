@@ -5,13 +5,13 @@ import { settleVideoPayment } from '@/lib/video-points';
 // Deduplicate concurrent summary reads; crediting still uses the database's atomic,
 // idempotent settlement transaction shared with provider callbacks.
 const checks = new Map<string, { at: number; result: Promise<{ checked: number; settled: number; unconfirmed: number }> }>();
-async function checkPayment(payment: { order_no: string; amount: number }) {
+async function checkPayment(payment: { order_no: string; amount: number }, onError?: (code: string) => void) {
   try {
     const proof = await queryNewebpayPayment(payment.order_no, payment.amount);
     if (!proof.paid) return 'not_paid';
     const settlement = await settleVideoPayment({ Status: 'SUCCESS', Result: { MerchantOrderNo: payment.order_no, Amt: payment.amount, TradeNo: proof.tradeNo } });
     return settlement.ok ? 'settled' : 'unconfirmed';
-  } catch { return 'unconfirmed'; }
+  } catch (error) { onError?.(error instanceof Error && /^[A-Z0-9_]{1,80}$/.test(error.message) ? error.message : 'QUERY_UNAVAILABLE'); return 'unconfirmed'; }
 }
 const summarize = (outcomes: string[]) => ({ checked: outcomes.length, settled: outcomes.filter(value => value === 'settled').length, unconfirmed: outcomes.filter(value => value === 'unconfirmed').length });
 
@@ -24,8 +24,10 @@ export async function reconcileVideoPaymentBatch(cursor = '') {
   if (error) throw new Error('PAYMENT_BATCH_UNAVAILABLE');
   const rows = data || [];
   const outcomes: string[] = [];
-  for (let i = 0; i < rows.length; i += 3) outcomes.push(...await Promise.all(rows.slice(i, i + 3).map(checkPayment)));
-  return { ...summarize(outcomes), nextCursor: rows.length === 6 ? rows[rows.length - 1].order_no : '' };
+  const errorCounts: Record<string, number> = {};
+  const onError = (code: string) => { errorCounts[code] = (errorCounts[code] || 0) + 1; };
+  for (let i = 0; i < rows.length; i += 3) outcomes.push(...await Promise.all(rows.slice(i, i + 3).map(payment => checkPayment(payment, onError))));
+  return { ...summarize(outcomes), errorCounts, nextCursor: rows.length === 6 ? rows[rows.length - 1].order_no : '' };
 }
 export function reconcileVideoPayments(userId: string) {
   const cached = checks.get(userId);
@@ -35,7 +37,7 @@ export function reconcileVideoPayments(userId: string) {
       .select('order_no,amount').eq('user_id', userId).eq('status', 'pending')
       .gte('created_at', new Date(Date.now() - 7 * 86400000).toISOString()).order('created_at', { ascending: false }).limit(3);
     if (error) return { checked: 0, settled: 0, unconfirmed: 1 };
-    return summarize(await Promise.all((data || []).map(checkPayment)));
+    return summarize(await Promise.all((data || []).map(payment => checkPayment(payment))));
   })().catch(() => ({ checked: 0, settled: 0, unconfirmed: 1 }));
   if (checks.size >= 1000) checks.delete(checks.keys().next().value!);
   checks.set(userId, { at: Date.now(), result });

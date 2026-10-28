@@ -31,8 +31,8 @@ async function main() {
   const [a,b]=await Promise.all([reconcile.reconcileVideoPayments('member-a'),reconcile.reconcileVideoPayments('member-a')]);
   assert.deepEqual(a,{checked:3,settled:1,unconfirmed:1});assert.deepEqual(b,a);assert.equal(settlements,1);assert.equal(queries,3);assert.ok(filters.some(([k,v])=>k==='user_id'&&v==='member-a'));assert.ok(filters.some(([k,v])=>k==='status'&&v==='pending'));
   batchRows=Array.from({length:6},(_,n)=>({order_no:'VP123'+n,amount:100}));
-  assert.deepEqual(await reconcile.reconcileVideoPaymentBatch(),{checked:6,settled:0,unconfirmed:0,nextCursor:'VP1235'});
-  batchRows=[];assert.deepEqual(await reconcile.reconcileVideoPaymentBatch('VP1235'),{checked:0,settled:0,unconfirmed:0,nextCursor:''});
+  assert.deepEqual(await reconcile.reconcileVideoPaymentBatch(),{checked:6,settled:0,unconfirmed:0,errorCounts:{},nextCursor:'VP1235'});
+  batchRows=[];assert.deepEqual(await reconcile.reconcileVideoPaymentBatch('VP1235'),{checked:0,settled:0,unconfirmed:0,errorCounts:{},nextCursor:''});
   assert.ok(filters.some(([k,v])=>k==='order_no'&&v==='VP1235'));assert.equal(settlements,1);
   let authorized=false,batches=0;
   const route=load('app/api/video-points/service/route.ts',{
