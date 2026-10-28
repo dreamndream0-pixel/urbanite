@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { buildMPGParams, getNewebpayConfig } from '@/lib/newebpay';
+import { reconcileVideoPayments } from '@/lib/video-payment-reconcile';
 import { isVideoStudioRequest, newVideoOrderNo, VIDEO_POINT_PACKAGES, VIDEO_TRIAL_POINTS, videoPointsReady, videoStudioUrl } from '@/lib/video-points';
 
 export const dynamic = 'force-dynamic';
@@ -24,8 +25,9 @@ export async function POST(request: Request) {
   try {
     if (body.action === 'balance') return NextResponse.json({ balance: await balanceOf() });
     if (body.action === 'summary') {
+      const reconciliation = await reconcileVideoPayments(body.userId);
       const { data: ledger } = await db.from('video_point_ledger').select('delta, reason, created_at').eq('user_id', body.userId).order('created_at', { ascending: false }).limit(20);
-      return NextResponse.json({ balance: await balanceOf(), packages: VIDEO_POINT_PACKAGES, ledger: ledger ?? [] });
+      return NextResponse.json({ balance: await balanceOf(), packages: VIDEO_POINT_PACKAGES, ledger: ledger ?? [], reconciliation });
     }
     if (body.action === 'debit') {
       if (!ref || !Number.isInteger(body.points) || (body.points ?? 0) <= 0 || (body.points ?? 0) > 100000) return NextResponse.json({ error: 'INVALID_DEBIT' }, { status: 400 });

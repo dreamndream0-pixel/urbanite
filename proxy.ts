@@ -32,6 +32,9 @@ export async function proxy(request: NextRequest) {
   const done = (res: NextResponse) => { if (wantsMain && promoHome) res.cookies.delete('promo_home'); return res; };
 
   let response = NextResponse.next({ request });
+  // These POST handlers validate the provider signature or studio shared secret.
+  // Payment delivery must not depend on refreshing an unrelated browser session.
+  if (request.method === 'POST' && ['/api/payment/newebpay/notify', '/api/payment/newebpay/return', '/api/video-points/return', '/api/video-points/service'].includes(request.nextUrl.pathname.replace(/\/$/, ''))) return done(response);
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
