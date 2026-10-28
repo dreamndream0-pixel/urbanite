@@ -17,17 +17,27 @@ const summarize = (outcomes: string[]) => ({ checked: outcomes.length, settled: 
 
 // A server-authenticated minute job rotates through ALL pending orders, including
 // abandoned and older orders. Advancing across unpaid orders avoids starvation.
-export async function reconcileVideoPaymentBatch(cursor = '') {
-  let query = createAdminClient().from('video_point_payments').select('order_no,amount').eq('status', 'pending');
+export async function reconcileVideoPaymentBatch(cursor = '', deferred: string[] = []) {
+  let query = createAdminClient().from('video_point_payments').select('order_no,amount,created_at').eq('status', 'pending')
+    .lte('created_at', new Date(Date.now() - 90000).toISOString());
   if (cursor) query = query.gt('order_no', cursor);
+  if (deferred.length) query = query.not('order_no', 'in', '(' + deferred.join(',') + ')');
   const { data, error } = await query.order('order_no', { ascending: true }).limit(6);
   if (error) throw new Error('PAYMENT_BATCH_UNAVAILABLE');
   const rows = data || [];
   const outcomes: string[] = [];
   const errorCounts: Record<string, number> = {};
-  const onError = (code: string) => { errorCounts[code] = (errorCounts[code] || 0) + 1; };
-  for (let i = 0; i < rows.length; i += 3) outcomes.push(...await Promise.all(rows.slice(i, i + 3).map(payment => checkPayment(payment, onError))));
-  return { ...summarize(outcomes), errorCounts, nextCursor: rows.length === 6 ? rows[rows.length - 1].order_no : '' };
+  const deferrals: { orderNo: string; until: number }[] = [];
+  for (let i = 0; i < rows.length; i += 3) outcomes.push(...await Promise.all(rows.slice(i, i + 3).map(async payment => {
+    const onError = (code: string) => { errorCounts[code] = (errorCounts[code] || 0) + 1; };
+    const outcome = await checkPayment(payment, onError);
+    if (outcome !== 'settled') {
+      const age = Date.now() - Date.parse(payment.created_at);
+      deferrals.push({ orderNo: payment.order_no, until: Date.now() + (age > 3600000 ? 6 * 3600000 : age > 900000 ? 600000 : 120000) });
+    }
+    return outcome;
+  })));
+  return { ...summarize(outcomes), errorCounts, deferrals, pauseUntil: errorCounts.PAYMENT_QUERY_UNCONFIRMED_TRA10071 ? Date.now() + 4 * 3600000 : 0, nextCursor: rows.length === 6 ? rows[rows.length - 1].order_no : '' };
 }
 export function reconcileVideoPayments(userId: string) {
   const cached = checks.get(userId);

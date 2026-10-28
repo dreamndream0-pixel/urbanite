@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { buildMPGParams, getNewebpayConfig } from '@/lib/newebpay';
-import { reconcileVideoPayments, reconcileVideoPaymentBatch } from '@/lib/video-payment-reconcile';
+import { reconcileVideoPaymentBatch } from '@/lib/video-payment-reconcile';
 import { isVideoStudioRequest, newVideoOrderNo, VIDEO_POINT_PACKAGES, VIDEO_TRIAL_POINTS, videoPointsReady, videoStudioUrl } from '@/lib/video-points';
 
 export const dynamic = 'force-dynamic';
@@ -12,10 +12,11 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 // actions: summary / balance / debit / refund / trial / checkout
 export async function POST(request: Request) {
   if (!(await isVideoStudioRequest(request))) return NextResponse.json({ error: 'FORBIDDEN' }, { status: 403 });
-  const body = (await request.json().catch(() => ({}))) as { action?: string; userId?: string; points?: number; ref?: string; package?: string; email?: string; cursor?: string };
+  const body = (await request.json().catch(() => ({}))) as { action?: string; userId?: string; points?: number; ref?: string; package?: string; email?: string; cursor?: string; deferred?: string[] };
   if (body?.action === 'reconcile-batch') {
     if (body.cursor !== undefined && (typeof body.cursor !== 'string' || (body.cursor !== '' && !/^VP\d[A-Za-z0-9]{1,45}$/.test(body.cursor)))) return NextResponse.json({ error: 'INVALID_CURSOR' }, { status: 400 });
-    try { return NextResponse.json(await reconcileVideoPaymentBatch(body.cursor || '')); }
+    if (body.deferred !== undefined && (!Array.isArray(body.deferred) || body.deferred.length > 1000 || !body.deferred.every(value => typeof value === 'string' && /^VP\d[A-Za-z0-9]{1,45}$/.test(value)))) return NextResponse.json({ error: 'INVALID_DEFERRED' }, { status: 400 });
+    try { return NextResponse.json(await reconcileVideoPaymentBatch(body.cursor || '', body.deferred || [])); }
     catch { return NextResponse.json({ error: 'RECONCILIATION_UNAVAILABLE' }, { status: 503 }); }
   }
   if (!body.userId || !UUID.test(body.userId)) return NextResponse.json({ error: 'INVALID_USER' }, { status: 400 });
@@ -30,9 +31,8 @@ export async function POST(request: Request) {
   try {
     if (body.action === 'balance') return NextResponse.json({ balance: await balanceOf() });
     if (body.action === 'summary') {
-      const reconciliation = await reconcileVideoPayments(body.userId);
       const { data: ledger } = await db.from('video_point_ledger').select('delta, reason, created_at').eq('user_id', body.userId).order('created_at', { ascending: false }).limit(20);
-      return NextResponse.json({ balance: await balanceOf(), packages: VIDEO_POINT_PACKAGES, ledger: ledger ?? [], reconciliation });
+      return NextResponse.json({ balance: await balanceOf(), packages: VIDEO_POINT_PACKAGES, ledger: ledger ?? [] });
     }
     if (body.action === 'debit') {
       if (!ref || !Number.isInteger(body.points) || (body.points ?? 0) <= 0 || (body.points ?? 0) > 100000) return NextResponse.json({ error: 'INVALID_DEBIT' }, { status: 400 });

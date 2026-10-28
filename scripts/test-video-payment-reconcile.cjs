@@ -22,7 +22,7 @@ async function main() {
   const prior=calls;await assert.rejects(()=>query.queryNewebpayPayment(order,0));assert.equal(calls,prior);
   let settlements=0,queries=0;const filters=[];
   let batchRows=null;
-  const db={from:()=>{const q={select:()=>q,eq:(...args)=>{filters.push(args);return q;},gt:(...args)=>{filters.push(args);return q;},gte:()=>q,order:()=>q,limit:async n=>{assert.equal(n,batchRows?6:3);return{data:batchRows||[{order_no:'paid',amount:300},{order_no:'pending',amount:100},{order_no:'uncertain',amount:100}],error:null};}};return q;}};
+  const db={from:()=>{const q={select:()=>q,eq:(...args)=>{filters.push(args);return q;},gt:(...args)=>{filters.push(args);return q;},gte:()=>q,lte:()=>q,not:()=>q,order:()=>q,limit:async n=>{assert.equal(n,batchRows?6:3);return{data:batchRows||[{order_no:'paid',amount:300},{order_no:'pending',amount:100},{order_no:'uncertain',amount:100}],error:null};}};return q;}};
   const reconcile=load('lib/video-payment-reconcile.ts',{
     '@/lib/supabase/admin':{createAdminClient:()=>db},
     '@/lib/newebpay-query':{queryNewebpayPayment:async no=>{queries++;if(no==='uncertain')throw Error('timeout');return{paid:no==='paid',tradeNo:'VERIFIED'};}},
@@ -31,8 +31,8 @@ async function main() {
   const [a,b]=await Promise.all([reconcile.reconcileVideoPayments('member-a'),reconcile.reconcileVideoPayments('member-a')]);
   assert.deepEqual(a,{checked:3,settled:1,unconfirmed:1});assert.deepEqual(b,a);assert.equal(settlements,1);assert.equal(queries,3);assert.ok(filters.some(([k,v])=>k==='user_id'&&v==='member-a'));assert.ok(filters.some(([k,v])=>k==='status'&&v==='pending'));
   batchRows=Array.from({length:6},(_,n)=>({order_no:'VP123'+n,amount:100}));
-  assert.deepEqual(await reconcile.reconcileVideoPaymentBatch(),{checked:6,settled:0,unconfirmed:0,errorCounts:{},nextCursor:'VP1235'});
-  batchRows=[];assert.deepEqual(await reconcile.reconcileVideoPaymentBatch('VP1235'),{checked:0,settled:0,unconfirmed:0,errorCounts:{},nextCursor:''});
+  const batch=await reconcile.reconcileVideoPaymentBatch();assert.equal(batch.checked,6);assert.equal(batch.settled,0);assert.equal(batch.nextCursor,'VP1235');assert.equal(batch.deferrals.length,6);assert.ok(batch.deferrals.every(item=>item.until>Date.now()));
+  batchRows=[];assert.deepEqual(await reconcile.reconcileVideoPaymentBatch('VP1235'),{checked:0,settled:0,unconfirmed:0,errorCounts:{},deferrals:[],pauseUntil:0,nextCursor:''});
   assert.ok(filters.some(([k,v])=>k==='order_no'&&v==='VP1235'));assert.equal(settlements,1);
   let authorized=false,batches=0;
   const route=load('app/api/video-points/service/route.ts',{
