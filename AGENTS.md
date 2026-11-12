@@ -2,7 +2,7 @@
 
 ## Project
 
-This repository is the production codebase for the Urbanite / Goodnight Girls shopping cart site.
+This repository is the production codebase for the Urbanite shopping cart site.
 
 GitHub repository:
 https://github.com/dreamndream0-pixel/urbanite
