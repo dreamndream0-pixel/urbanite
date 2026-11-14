@@ -31,6 +31,7 @@
 .price > span:last-child { font-size: 14px; }
 .priceNote { min-height: 32px; font-size: 11px; color: #726e65; line-height: 1.7; margin: 7px 0; }
 .audience { font-size: 13px; min-height: 44px; line-height: 1.7; margin: 10px 0 15px; }
+.product { font-size: 13px; min-height: 22px; line-height: 1.7; margin: -8px 0 15px; color: #726e65; }
 .action { min-height: 44px; display: flex; align-items: center; justify-content: center; text-align: center; gap: 7px; border: 1px solid #aaa294; border-radius: 30px; font-size: 13px; padding: 9px; transition: background 180ms; }
 @media (hover: hover) {
 .action:hover { background: #e9e4db; } }
@@ -44,7 +45,7 @@
 .pro { background: #eee6da; border-color: #c9b49c; }
 .pro .action { background: #8a684e; color: #fff; border-color: #8a684e; }
 .max { background: #262824; color: #faf7f1; }
-.max .caption,.max .priceNote { color: #c9c8bd; }
+.max .caption,.max .priceNote,.max .product { color: #c9c8bd; }
 .max .action { background: #f2ebdf; color: #242521; }
 .max ul { border-color: #55574f; }
 .comparisonTrigger { display: flex; width: 100%; align-items: center; justify-content: space-between; margin-top: 30px; border-block: 1px solid #d5cec2; padding: 22px 4px; cursor: pointer; font-size: 15px; }

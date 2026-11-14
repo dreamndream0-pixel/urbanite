@@ -12,6 +12,7 @@ import styles from './pricing.module.css';
 
 const audiences = ['適合想先體驗的人', '適合個人品牌與創作者', '適合品牌、店家與自媒體', '適合企業、工作室與多元經營者'];
 const captions = ['輕鬆開始', '進階實用', '品牌進階', '全方位品牌'];
+const products = ['連結樹、個人名片', '連結樹、個人名片', '', ''];
 const features = TIER_FEATURES.flatMap(group => group.rows).filter(row => [
   '專屬網址 /@代稱', '連結與區塊', '樣板', '數據分析', '隱藏頁尾 URBANLINKS 標誌',
   '子網域官網(你的名字.urbanite.com.tw)', '商品上架', '自訂網域',
@@ -72,6 +73,7 @@ export default function PricingPlans({ promo, initialNow, loggedIn }: {
             <div className={styles.price} aria-live="polite"><span>NT$</span><strong>{covered ? '0' : price.toLocaleString()}</strong><span>/{period === 'month' ? '月' : '年'}</span></div>
             <p className={styles.priceNote}>{covered ? <><s>NT${price.toLocaleString()} / {period === 'month' ? '月' : '年'}</s>　活動期間免費</> : period === 'year' && tier.prices ? `年繳省 NT$${(tier.prices.month * 12 - price).toLocaleString()}` : free ? '不需信用卡' : '預付制，不自動扣款'}</p>
             <p className={styles.audience}>{audiences[index]}</p>
+            <p className={styles.product} aria-hidden={products[index] ? undefined : true}>{products[index] ? <>產品說明：{products[index]}</> : null}</p>
             <Link className={styles.action} href={href} target={contact ? '_blank' : undefined} rel={contact ? 'noopener noreferrer' : undefined}>
               {selfServe ? '免費開通官網' : contact ? '聯絡專員建立官網' : free || covered ? '免費使用' : site ? '立即開通官網' : '立即升級'}<ArrowRight size={16} />
             </Link>
