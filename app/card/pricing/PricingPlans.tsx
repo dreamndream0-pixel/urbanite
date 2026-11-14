@@ -7,16 +7,11 @@ import { ArrowLeft, ArrowRight, Check, Minus } from 'lucide-react';
 import { CONTACT_LINE_URL, TIERS, TIER_FEATURES, tierRank, type CardPeriod } from '@/lib/card-plan';
 import type { CardPromo } from '@/lib/card-promo';
 import { promoActive } from '@/lib/card-promo-state';
-import ComparisonDialog from './ComparisonDialog';
 import styles from './pricing.module.css';
 
 const audiences = ['適合想先體驗的人', '適合個人品牌與創作者', '適合品牌、店家與自媒體', '適合企業、工作室與多元經營者'];
 const captions = ['輕鬆開始', '進階實用', '品牌進階', '全方位品牌'];
 const products = ['連結樹、個人名片', '連結樹、個人名片', '官網、商店', '官網、商店'];
-const features = TIER_FEATURES.flatMap(group => group.rows).filter(row => [
-  '專屬網址 /@代稱', '連結與區塊', '樣板', '數據分析', '隱藏頁尾 URBANLINKS 標誌',
-  '子網域官網(你的名字.urbanite.com.tw)', '商品上架', '自訂網域',
-].includes(row.label));
 
 export default function PricingPlans({ promo, initialNow, loggedIn }: {
   promo: CardPromo; initialNow: number; loggedIn: boolean;
@@ -78,14 +73,16 @@ export default function PricingPlans({ promo, initialNow, loggedIn }: {
               {selfServe ? '免費開通官網' : contact ? '聯絡專員建立官網' : free || covered ? '免費使用' : site ? '立即開通官網' : '立即升級'}<ArrowRight size={16} />
             </Link>
             {site && !contact ? <a className={styles.assist} href={CONTACT_LINE_URL} target="_blank" rel="noopener noreferrer">想請專員協助建立?加入官方 LINE</a> : null}
-            <ul>{features.map(row => <li key={row.label} className={row.values[index] === '—' ? styles.unavailable : ''}>
-              {row.values[index] === '—' ? <Minus size={16} /> : <Check size={16} />}
-              <span>{row.label}{!['✓', '—'].includes(row.values[index]) && <small>{row.values[index]}</small>}</span>
-            </li>)}</ul>
+            <div className={styles.features}>{TIER_FEATURES.map(group => <div key={group.group} className={styles.featureGroup}>
+              <h4 className={styles.groupTitle}>{group.group}</h4>
+              <ul>{group.rows.map(row => <li key={row.label} className={`${row.values[index] === '—' ? styles.unavailable : ''} ${row.label.length > 12 ? styles.tall : ''}`}>
+                {row.values[index] === '—' ? <Minus size={16} /> : <Check size={16} />}
+                <span>{row.label}{!['✓', '—'].includes(row.values[index]) && <small>{row.values[index]}</small>}</span>
+              </li>)}</ul>
+            </div>)}</div>
           </article>;
         })}
       </div>
-      <ComparisonDialog promoTier={active ? promo.tier : undefined} />
       <footer className={styles.footer}>
         <Link href={startHref}>立即建立你的 URBANLINKS <ArrowRight size={22} /></Link>
         <p>MORE THAN A LINK</p>

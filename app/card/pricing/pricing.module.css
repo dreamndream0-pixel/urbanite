@@ -37,8 +37,12 @@
 .action:hover { background: #e9e4db; } }
 .action svg { flex-shrink: 0; }
 .assist { display: block; margin-top: 10px; text-align: center; font-size: 12px; opacity: .75; text-decoration: underline; text-underline-offset: 3px; }
-.plan ul { list-style: none; padding: 22px 0 0; margin: 24px 0 0; border-top: 1px solid #d8d1c5; display: grid; gap: 17px; }
-.plan li { display: flex; gap: 9px; font-size: 12px; line-height: 1.6; }
+.features { margin-top: 24px; padding-top: 22px; border-top: 1px solid #d8d1c5; }
+.featureGroup + .featureGroup { margin-top: 18px; }
+.groupTitle { margin: 0 0 12px; font-size: 11px; font-weight: 400; letter-spacing: .12em; color: #726e65; }
+.plan ul { list-style: none; padding: 0; margin: 0; display: grid; gap: 17px; }
+.plan li { display: flex; gap: 9px; font-size: 12px; line-height: 1.6; min-height: 38px; }
+.plan li.tall { min-height: 58px; }
 .plan li svg { flex-shrink: 0; margin-top: 2px; }
 .plan li small { display: block; font-size: 11px; opacity: .75; }
 .unavailable { opacity: .45; }
@@ -47,7 +51,8 @@
 .max { background: #262824; color: #faf7f1; }
 .max .caption,.max .priceNote,.max .product { color: #c9c8bd; }
 .max .action { background: #f2ebdf; color: #242521; }
-.max ul { border-color: #55574f; }
+.max .features { border-color: #55574f; }
+.max .groupTitle { color: #c9c8bd; }
 .comparisonTrigger { display: flex; width: 100%; align-items: center; justify-content: space-between; margin-top: 30px; border-block: 1px solid #d5cec2; padding: 22px 4px; cursor: pointer; font-size: 15px; }
 .comparisonDialog { margin: auto; padding: 0; border: 1px solid #d5cec2; border-radius: 8px; width: min(1160px, calc(100% - 24px)); max-width: none; max-height: none; overflow: hidden; background: #faf7f2; color: #242521; }
 .comparisonDialog::backdrop { background: #17171399; backdrop-filter: blur(4px); }
