@@ -22,6 +22,7 @@ export default function PullToRefresh() {
     let pulling = false;
 
     const locked = () => body.style.overflow === 'hidden' || document.documentElement.style.overflow === 'hidden';
+    const memberForm = () => document.documentElement.getAttribute('data-document-form') === 'membership';
     // 手指下面有其他已經往下捲過的區塊(例如商品圖、橫向列表以外的內層捲動)→ 不攔截
     const innerScrolled = (target: EventTarget | null) => {
       for (let el = target as HTMLElement | null; el && el !== body && el !== document.documentElement; el = el.parentElement) {
@@ -33,7 +34,7 @@ export default function PullToRefresh() {
     const set = (v: number) => { pullRef.current = v; setPull(v); };
 
     const onStart = (e: TouchEvent) => {
-      if (!(bodyScrolls() || standalone()) || (e.target instanceof Element && e.target.closest('input,textarea,select,[contenteditable]')) || e.touches.length !== 1 || getScrollY() > 0 || locked() || innerScrolled(e.target)) { startY = null; return; }
+      if (!(bodyScrolls() || standalone()) || (e.target instanceof Element && e.target.closest('input,textarea,select,[contenteditable]')) || e.touches.length !== 1 || getScrollY() > 0 || locked() || memberForm() || innerScrolled(e.target)) { startY = null; return; }
       startY = e.touches[0].clientY;
       pulling = false;
     };
