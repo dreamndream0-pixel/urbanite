@@ -12,7 +12,7 @@ import styles from './pricing.module.css';
 
 const audiences = ['適合想先體驗的人', '適合個人品牌與創作者', '適合品牌、店家與自媒體', '適合企業、工作室與多元經營者'];
 const captions = ['輕鬆開始', '進階實用', '品牌進階', '全方位品牌'];
-const products = ['連結樹、個人名片', '連結樹、個人名片', '', ''];
+const products = ['連結樹、個人名片', '連結樹、個人名片', '官網、商店', '官網、商店'];
 const features = TIER_FEATURES.flatMap(group => group.rows).filter(row => [
   '專屬網址 /@代稱', '連結與區塊', '樣板', '數據分析', '隱藏頁尾 URBANLINKS 標誌',
   '子網域官網(你的名字.urbanite.com.tw)', '商品上架', '自訂網域',
