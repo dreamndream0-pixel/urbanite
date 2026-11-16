@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getAdminUser } from '@/lib/supabase/server';
-import { shopAdminClient } from '@/lib/shop';
+import { getCurrentShop, shopAdminClient } from '@/lib/shop';
+import { adjustLevel, ensureLocations, pickLocation } from '@/lib/stock-locations';
 import { applyStockLines, nextRefundNo, openSession } from '@/lib/pos-server';
 import { CASH, type PosMeta, type PosRefundEntry, type PosSessionRefund } from '@/lib/pos';
 import type { Order, Product } from '@/lib/types';
@@ -8,7 +9,7 @@ import type { Order, Product } from '@/lib/types';
 export const dynamic = 'force-dynamic';
 
 // POST /api/pos/orders/[id]/refund — POS 退貨 / 作廢(限管理員 / 店員)
-// { items:[{ index, quantity }], method?, restock?: boolean, reason? }
+// { items:[{ index, quantity }], method?, restock?: boolean, reason?, location_id? }
 // 退款金額依實付比例計算;restock = true 時回補庫存並寫入庫紀錄。全部退完 → 訂單改為「退貨」。
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const admin = await getAdminUser();
@@ -57,7 +58,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const reason = String(body?.reason ?? '').trim().slice(0, 200);
   const actor = admin.email ?? 'POS';
   const now = new Date().toISOString();
-  const session = await openSession(supabase);
+  // 退回來的商品加到目前這台 POS 所在的據點(沒帶就用原本結帳的據點)
+  const locations = await ensureLocations(supabase);
+  const location = pickLocation(locations, String(body?.location_id ?? '') || order.pos_location_id);
+  const shop = await getCurrentShop();
+  const session = await openSession(supabase, location);
 
   if (restock && stockLines.length) {
     const { data: products } = await supabase.from('products').select('*').in('id', [...new Set(stockLines.map((l) => l.productId))]);
@@ -68,10 +73,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       return p && (p.variants?.length ? p.variants.some((v) => v.options.join(' / ') === l.variant) : l.variant === '');
     });
     await applyStockLines(supabase, byId, valid, 1);
+    if (shop) for (const l of valid) await adjustLevel(shop.id, location, l.productId, l.variant, l.quantity);
     if (valid.length) await supabase.from('stock_movements').insert(valid.map((l) => ({
       product_id: l.productId, variant_key: l.variant, type: 'in', quantity: l.quantity,
       unit_price: items.find((i) => i.productId === l.productId && (i.variant === l.variant || (l.variant === '' && i.variant === '標準款')))?.price ?? 0,
-      location: order.customer_name ?? '', handler: `POS(${actor})`, note: `POS 退貨 ${order.order_no}`,
+      location: order.customer_name ?? '', handler: `POS(${actor})`, note: `POS 退貨 ${order.order_no}${locations.length > 1 ? ` @${location.name}` : ''}`,
     })));
   }
 

@@ -8,13 +8,15 @@ import { isValidPrice, productPrice } from '@/lib/product-price';
 import { applyStockLines, nextOrderNo, openSession } from '@/lib/pos-server';
 import { manualDiscountAmount, POS_SHIPPING_METHOD, resolvePosSettings, settlePayments, variantKey, type PosDiscount, type PosMeta } from '@/lib/pos';
 import type { Customer, Discount, Order, OrderItem, Product } from '@/lib/types';
+import { adjustLevel, ensureLocations, loadLevels, locationStockReader, pickLocation } from '@/lib/stock-locations';
+import { createAdminClient } from '@/lib/supabase/admin';
 
 export const dynamic = 'force-dynamic';
 
 type InputItem = { productId?: unknown; variant?: unknown; quantity?: unknown; price?: unknown };
 
 // POST /api/pos/checkout — POS 結帳(限管理員 / 店員)
-// { items:[{ productId, variant, quantity, price? }], discount?, discount_code?, customer?, use_credit?, payments:[{ method, amount }], note?, client_id?, preview? }
+// { location_id?, buyer_tax_id?, items:[{ productId, variant, quantity, price? }], discount?, discount_code?, customer?, use_credit?, payments:[{ method, amount }], note?, client_id?, preview? }
 // 訂單當場成交:已付款、已完成;扣庫存並寫出庫紀錄,後台訂單 / 庫存 / 報表共用。
 export async function POST(request: Request) {
   const admin = await getAdminUser();
@@ -37,14 +39,20 @@ export async function POST(request: Request) {
     if (dup) return NextResponse.json(dup as Order, { status: 200 });
   }
 
-  const [{ data: settingsRow }, { data: productRows, error: prodErr }] = await Promise.all([
+  const productIds = [...new Set(input.map((i) => String(i.productId ?? '')))];
+  const [{ data: settingsRow }, { data: productRows, error: prodErr }, locations, levels] = await Promise.all([
     supabase.from('site_settings').select('pos_settings').maybeSingle(),
-    supabase.from('products').select('*').in('id', [...new Set(input.map((i) => String(i.productId ?? '')))]),
+    supabase.from('products').select('*').in('id', productIds),
+    ensureLocations(supabase),
+    loadLevels(supabase, productIds),
   ]);
   if (prodErr) return NextResponse.json({ error: prodErr.message }, { status: 500 });
   const settings = resolvePosSettings(settingsRow?.pos_settings);
   const products = (productRows ?? []) as Product[];
   const byId = new Map(products.map((p) => [p.id, p]));
+  // 這台 POS 所在的分店 / 倉庫:庫存以這個據點為準
+  const location = pickLocation(locations, body?.location_id);
+  const stockHere = locationStockReader(products, levels, location);
 
   // 明細:價格以資料庫為準;店員改價(price)另外記下原定價
   const orderItems: OrderItem[] = [];
@@ -58,17 +66,13 @@ export async function POST(request: Request) {
     if (!Number.isSafeInteger(quantity) || quantity <= 0 || quantity > 9999) return NextResponse.json({ error: `「${product.name}」數量不正確` }, { status: 400 });
     const variants = Array.isArray(product.variants) ? product.variants : [];
     const label = String(item.variant ?? '');
-    let stock = product.inventory ?? 0;
-    if (variants.length > 0) {
-      const matches = variants.filter((v) => variantKey(v.options) === label);
-      if (matches.length !== 1) return NextResponse.json({ error: `請選擇「${product.name}」的規格` }, { status: 400 });
-      stock = matches[0].inventory ?? 0;
-    }
+    if (variants.length > 0 && variants.filter((v) => variantKey(v.options) === label).length !== 1) return NextResponse.json({ error: `請選擇「${product.name}」的規格` }, { status: 400 });
+    const stock = Math.max(0, stockHere(product.id, variants.length ? label : ''));
     const stockKey = `${product.id}::${variants.length ? label : ''}`;
     const wanted = (need.get(stockKey) ?? 0) + quantity;
     need.set(stockKey, wanted);
     if (!preview && !settings.allowOversell && wanted > stock) {
-      return NextResponse.json({ error: `「${product.name}」${variants.length ? label : ''} 庫存不足(剩 ${stock})`, code: 'OUT_OF_STOCK' }, { status: 409 });
+      return NextResponse.json({ error: `「${product.name}」${variants.length ? label : ''} 在「${location.name}」庫存不足(剩 ${stock})`, code: 'OUT_OF_STOCK' }, { status: 409 });
     }
     const listPrice = productPrice(product, label);
     if (!isValidPrice(listPrice)) return NextResponse.json({ error: `「${product.name}」售價設定有誤` }, { status: 409 });
@@ -135,11 +139,22 @@ export async function POST(request: Request) {
   const applied = total > 0 ? pay.applied : [];
   const paymentMethod = applied.map((p) => p.method).join('+') || '免付款';
 
-  const session = await openSession(supabase);
+  const session = await openSession(supabase, location);
+
+  // 買方統編(選填)與發票號碼(這個據點有啟用才取號;號碼用完要先到設定更新字軌)
+  const taxId = String(body?.buyer_tax_id ?? '').trim();
+  if (taxId && !/^\d{8}$/.test(taxId)) return NextResponse.json({ error: '統一編號是 8 位數字' }, { status: 400 });
+  let invoiceNo = '';
+  if (location.invoice_enabled && total > 0) {
+    const { data: no, error: invErr } = await createAdminClient().rpc('pos_next_invoice', { p_shop: shop.id, p_location: location.id });
+    if (invErr) return NextResponse.json({ error: invErr.message }, { status: 500 });
+    if (!no) return NextResponse.json({ error: `「${location.name}」的發票號碼已經用完,請到 POS 設定更新字軌與號碼`, code: 'INVOICE_EXHAUSTED' }, { status: 409 });
+    invoiceNo = String(no);
+  }
   const now = new Date().toISOString();
   const pos: PosMeta & { client_id?: string } = {
     cashier, payments: applied, tendered: total > 0 ? pay.tendered : 0, change: total > 0 ? pay.change : 0,
-    manual_discount: manualDiscount,
+    manual_discount: manualDiscount, location_id: location.id, location_name: location.name,
     ...(manualDiscount && rawDiscount ? { discount_label: rawDiscount.type === 'percent' ? `折 ${Number(rawDiscount.value)}%` : '折讓' } : {}),
     ...(clientId ? { client_id: clientId } : {}),
   };
@@ -157,7 +172,7 @@ export async function POST(request: Request) {
       total, paid_amount: total, refund_amount: 0, net_amount: total,
       status: '已完成', paid: true, stock_committed: true, ...deriveStatuses('已完成', true), completed_at: now,
       user_id: member?.user_id ?? null, credit_used: creditUsed, credit_rate: quote?.tier.rate ?? 0, tier_at_order: quote?.tier.name ?? '',
-      channel: 'pos', pos, pos_session_id: session?.id ?? null,
+      channel: 'pos', pos, pos_session_id: session?.id ?? null, pos_location_id: location.id, invoice_no: invoiceNo, buyer_tax_id: taxId,
     }).select().single();
     if (data) order = data as Order;
     else if (error?.code !== '23505') return NextResponse.json({ error: error?.message ?? '建立訂單失敗' }, { status: 400 });
@@ -178,16 +193,17 @@ export async function POST(request: Request) {
   // 扣庫存、寫出庫紀錄
   try {
     await applyStockLines(supabase, byId, stockLines, -1);
+    for (const line of stockLines) await adjustLevel(shop.id, location, line.productId, line.variant, -line.quantity);
   } catch (error) {
     console.error('pos stock', error);
   }
   try {
     await supabase.from('stock_movements').insert(stockLines.map((line, i) => ({
       product_id: line.productId, variant_key: line.variant, type: 'out', quantity: line.quantity,
-      unit_price: orderItems[i].price, location: customerName, handler: `POS(${cashier})`, note: `POS 銷售 ${order!.order_no}`,
+      unit_price: orderItems[i].price, location: customerName, handler: `POS(${cashier})`, note: `POS 銷售 ${order!.order_no}${locations.length > 1 ? ` @${location.name}` : ''}`,
     })));
     if (applied.length) await supabase.from('payments').insert(applied.map((p) => ({ order_id: order!.id, provider: 'POS', payment_method: p.method, amount: p.amount, status: 'PAID', paid_at: now })));
-    await supabase.from('order_status_history').insert({ order_id: order.id, type: 'order', from_status: '', to_status: 'COMPLETED', note: `POS 門市結帳(${paymentMethod})`, created_by: cashier || 'POS' });
+    await supabase.from('order_status_history').insert({ order_id: order.id, type: 'order', from_status: '', to_status: 'COMPLETED', note: `POS 門市結帳(${paymentMethod})${locations.length > 1 ? ` @${location.name}` : ''}${invoiceNo ? ` 發票 ${invoiceNo}` : ''}`, created_by: cashier || 'POS' });
     if (coupon) await supabase.from('coupon_usages').insert({ coupon_id: coupon.id, user_id: member?.user_id ?? null, order_id: order.id, original_amount: subtotal, discount_amount: couponDiscount, final_amount: total });
   } catch (error) {
     console.error('pos records', error);

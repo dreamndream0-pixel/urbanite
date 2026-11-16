@@ -100,6 +100,7 @@ export type SiteSettings = {
   checkout_fields?: unknown; // 結帳自訂欄位(lib/checkout-fields)
   order_complete_texts?: unknown; // 訂單完成頁文字(lib/order-complete-texts)
   pos_settings?: unknown; // POS 設定(lib/pos)
+  pos_buttons?: unknown; // POS 首頁按鈕(lib/pos)
   // 網頁頁籤圖示(512×512 PNG);空白 = 預設圖示
   favicon_url?: string;
   updated_at?: string;
@@ -316,6 +317,9 @@ export type Order = {
   channel?: string;
   pos?: import('./pos').PosMeta | null;
   pos_session_id?: string | null;
+  pos_location_id?: string | null; // POS 結帳的分店 / 倉庫
+  invoice_no?: string; // POS 發票號碼
+  buyer_tax_id?: string; // 買方統編
   created_at?: string;
 };
 

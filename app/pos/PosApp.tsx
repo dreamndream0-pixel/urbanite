@@ -4,14 +4,17 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { createPortal } from 'react-dom';
 import Image from 'next/image';
 import { canOptimizeStoreImage } from '@/lib/store-image';
-import { findByCode, manualDiscountAmount, posMoney, variantKey, type PosDiscount, type PosProduct, type PosSettings } from '@/lib/pos';
+import { findByCode, manualDiscountAmount, posMoney, variantKey, type PosButton, type PosDiscount, type PosProduct, type PosSettings } from '@/lib/pos';
+import type { StockLocation } from '@/lib/stock-locations';
+import { ButtonGrid, ButtonModal, LocationPicker } from './PosButtons';
 import type { Order } from '@/lib/types';
 import { uiConfirm } from '@/lib/ui-dialog';
 import { uiToast } from '@/lib/ui-toast';
 import { DiscountEditor, DoneModal, LineEditor, MemberPicker, Modal, OrdersPanel, PayModal, Receipt, SessionPanel, SettingsPanel, VariantPicker } from './PosPanels';
-import { api, btn, btnDark, chip, errMsg, input, timeLabel, uid, type Boot, type CartLine, type Hold, type Member, type Quote, type SessionView } from './ui';
+import { api, btn, btnDark, chip, errMsg, input, setPosLocation, timeLabel, uid, type Boot, type CartLine, type Hold, type Member, type Quote, type SessionView } from './ui';
 
-type Panel = 'pay' | 'orders' | 'session' | 'settings' | 'holds' | 'member' | 'discount' | null;
+type Panel = 'pay' | 'orders' | 'session' | 'settings' | 'holds' | 'member' | 'discount' | 'location' | null;
+const LOCATION_KEY = 'pos_location';
 
 const stockOf = (p: PosProduct, variant: string) => (p.variants?.length ? p.variants.find((v) => variantKey(v.options) === variant)?.inventory ?? 0 : p.inventory ?? 0);
 const priceOf = (p: PosProduct, variant: string) => p.variants?.find((v) => variantKey(v.options) === variant)?.price ?? p.price;
@@ -35,6 +38,10 @@ export default function PosApp() {
   const [note, setNote] = useState('');
   const [holds, setHolds] = useState<Hold[]>([]);
   const [search, setSearch] = useState('');
+  // 首頁:有設定按鈕就先顯示按鈕畫面;「全部商品」才是商品格
+  const [view, setView] = useState<'buttons' | 'all'>('buttons');
+  const [openButton, setOpenButton] = useState<PosButton | null>(null);
+  const locationId = useRef('');
   const [category, setCategory] = useState('all');
   const [panel, setPanel] = useState<Panel>(null);
   const [picker, setPicker] = useState<PosProduct | null>(null);
@@ -52,7 +59,9 @@ export default function PosApp() {
 
   const load = useCallback(async () => {
     try {
-      const data = await api<Boot>('/api/pos/bootstrap');
+      const data = await api<Boot>(`/api/pos/bootstrap?location=${encodeURIComponent(locationId.current)}`);
+      locationId.current = data.location.id;
+      setPosLocation(data.location.id);
       setBoot(data);
       setLoadError('');
       return data;
@@ -60,6 +69,7 @@ export default function PosApp() {
   }, []);
 
   useEffect(() => {
+    try { locationId.current = localStorage.getItem(LOCATION_KEY) ?? ''; } catch { /* 讀不到就用預設據點 */ }
     void load().then((data) => {
       if (!data) return;
       holdsKey.current = `pos_holds:${location.host}`;
@@ -186,7 +196,7 @@ export default function PosApp() {
     setPanel(null);
   }
 
-  async function pay(payments: { method: string; amount: number }[]) {
+  async function pay(payments: { method: string; amount: number }[], taxId = '') {
     setPaying(true);
     try {
       const order = await api<Order>('/api/pos/checkout', {
@@ -195,6 +205,7 @@ export default function PosApp() {
           client_id: clientId.current,
           items: saleItems,
           discount, discount_code: code, customer: member ? { user_id: member.user_id } : null, use_credit: credit, payments, note,
+          location_id: locationId.current, buyer_tax_id: taxId,
         }),
       });
       setPanel(null);
@@ -221,7 +232,21 @@ export default function PosApp() {
     );
   }
 
-  const { settings, shop, session } = boot;
+  const { settings, shop, session, buttons, locations } = boot;
+  const here = boot.location;
+  const showButtons = buttons.length > 0 && view === 'buttons' && !search.trim() && !bindCode;
+  const nextInvoice = here.invoice_enabled ? (here.invoice_next <= here.invoice_end ? `${here.invoice_prefix}${String(here.invoice_next).padStart(8, '0')}` : '號碼已用完') : '';
+  const lineQty = (productId: string, variant?: string) => lines.filter((l) => l.productId === productId && (variant === undefined || l.variant === variant)).reduce((n, l) => n + l.quantity, 0);
+
+  async function switchLocation(id: string) {
+    if (id === here.id) { setPanel(null); return; }
+    if (lines.length && !(await uiConfirm('切換據點會清空目前的購物車,確定切換?'))) return;
+    locationId.current = id;
+    try { localStorage.setItem(LOCATION_KEY, id); } catch { /* 無法記住時只有這次有效 */ }
+    resetSale();
+    setPanel(null);
+    await load();
+  }
   const editingLine = lines.find((l) => l.id === editing) ?? null;
 
   const cart = (
@@ -292,6 +317,7 @@ export default function PosApp() {
     { key: 'orders', label: '訂單 / 退貨', onClick: () => setPanel('orders') },
     { key: 'session', label: session ? '班別 / 交班' : '開班', onClick: () => setPanel('session') },
     { key: 'settings', label: '設定', onClick: () => setPanel('settings') },
+    ...(locations.length > 1 ? [{ key: 'location', label: `據點:${here.name}`, onClick: () => setPanel('location') }] : []),
   ];
 
   return (
@@ -300,7 +326,7 @@ export default function PosApp() {
         {/* 頂列 */}
         <header className="flex shrink-0 items-center gap-2 border-b border-[#e5ded4] bg-white px-3 py-2">
           <div className="min-w-0 flex-1">
-            <p className="truncate text-sm! font-bold! tracking-wide">{shop.name} <span className="font-medium! text-[#8a7f72]">POS</span></p>
+            <p className="truncate text-sm! font-bold! tracking-wide">{shop.name} <span className="font-medium! text-[#8a7f72]">POS{locations.length > 1 ? ` · ${here.name}` : ''}</span></p>
             <button type="button" onClick={() => setPanel('session')} className="flex items-center gap-1.5 text-xs! text-[#8a7f72]">
               <span className={`h-2 w-2 rounded-full ${session ? 'bg-[#2fa866]' : 'bg-[#d0c6b8]'}`} />
               {session ? `營業中 · ${session.summary.orders} 筆 · ${posMoney(session.summary.gross - session.summary.refunds)}` : '尚未開班'}
@@ -333,14 +359,16 @@ export default function PosApp() {
                   <span className="flex shrink-0 gap-3"><button type="button" className="underline" onClick={() => { setBindCode(unknownCode); setUnknownCode(''); }}>綁定到商品</button><button type="button" className="underline" onClick={() => setUnknownCode('')}>關閉</button></span>
                 </div>
               ) : null}
-              <div className="-mx-3 flex gap-2 overflow-x-auto px-3 pb-1 [scrollbar-width:none]">
+              <div className={`-mx-3 flex gap-2 overflow-x-auto px-3 pb-1 [scrollbar-width:none] ${showButtons ? 'hidden' : ''}`}>
+                {buttons.length ? <button type="button" onClick={() => { setView('buttons'); setSearch(''); }} className={`${chip} border-[#1f1b19] bg-white`}>← 按鈕</button> : null}
                 <button type="button" onClick={() => setCategory('all')} className={`${chip} ${category === 'all' ? 'border-[#1f1b19] bg-[#1f1b19] text-white' : 'border-[#d7c9bd] bg-white'}`}>全部</button>
                 {categories.map((c) => <button key={c.slug} type="button" onClick={() => setCategory(c.slug)} className={`${chip} ${category === c.slug ? 'border-[#1f1b19] bg-[#1f1b19] text-white' : 'border-[#d7c9bd] bg-white'}`}>{c.name}</button>)}
               </div>
             </div>
             <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-24 pt-2 lg:pb-4">
-              {!shown.length ? <p className="py-16 text-center text-sm! text-[#a99e8f]">{products.length ? '找不到商品' : '還沒有商品,請先到後台新增'}</p> : null}
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
+              {showButtons ? <ButtonGrid buttons={buttons} qtyOf={(b) => b.productIds.reduce((n, id) => n + lineQty(id), 0)} onOpen={setOpenButton} onAll={() => setView('all')} /> : null}
+              {!showButtons && !shown.length ? <p className="py-16 text-center text-sm! text-[#a99e8f]">{products.length ? '找不到商品' : '還沒有商品,請先到後台新增'}</p> : null}
+              <div className={`grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 ${showButtons ? 'hidden' : ''}`}>
                 {shown.map((p) => {
                   const out = (p.inventory ?? 0) <= 0;
                   const qty = lines.filter((l) => l.productId === p.id).reduce((n, l) => n + l.quantity, 0);
@@ -403,10 +431,12 @@ export default function PosApp() {
           }} /> : null}
         {panel === 'discount' ? <DiscountEditor subtotal={subtotal} discount={discount} code={code} onClose={() => setPanel(null)} onSave={(d, c) => { setDiscount(d); setCode(c); setPanel(null); }} /> : null}
         {panel === 'member' ? <MemberPicker current={member} onClose={() => setPanel(null)} onPick={(m) => { setMember(m); setUseCredit(false); setPanel(null); }} /> : null}
-        {panel === 'pay' ? <PayModal total={total} methods={settings.paymentMethods} busy={paying} onPay={pay} onClose={() => { if (!paying) setPanel(null); }} /> : null}
+        {panel === 'pay' ? <PayModal total={total} methods={settings.paymentMethods} busy={paying} invoice={nextInvoice} onPay={pay} onClose={() => { if (!paying) setPanel(null); }} /> : null}
         {panel === 'orders' ? <OrdersPanel settings={settings} shopName={shop.name} onClose={() => setPanel(null)} onChanged={() => void load()} onPrint={(o) => print(<Receipt order={o} settings={settings} shopName={shop.name} />)} /> : null}
         {panel === 'session' ? <SessionPanel session={session} shopName={shop.name} onClose={() => setPanel(null)} onPrint={print} onChange={(s: SessionView | null) => setBoot((b) => (b ? { ...b, session: s } : b))} /> : null}
-        {panel === 'settings' ? <SettingsPanel settings={settings} onClose={() => setPanel(null)} onSaved={(s: PosSettings) => setBoot((b) => (b ? { ...b, settings: s } : b))} /> : null}
+        {openButton ? <ButtonModal button={openButton} products={openButton.productIds.map((id) => byId.get(id)).filter((p): p is PosProduct => Boolean(p))} lineQty={lineQty} onAdd={addToCart} onClose={() => setOpenButton(null)} /> : null}
+        {panel === 'location' ? <LocationPicker locations={locations} current={here.id} onClose={() => setPanel(null)} onPick={(id) => void switchLocation(id)} /> : null}
+        {panel === 'settings' ? <SettingsPanel settings={settings} location={here} onLocations={(list: StockLocation[]) => setBoot((b) => (b ? { ...b, locations: list.filter((l) => l.active), location: list.find((l) => l.id === b.location.id) ?? b.location } : b))} onClose={() => setPanel(null)} onSaved={(s: PosSettings) => setBoot((b) => (b ? { ...b, settings: s } : b))} /> : null}
         {panel === 'holds' ? (
           <Modal title="掛單" onClose={() => setPanel(null)}>
             {!holds.length ? <p className="py-8 text-center text-sm! text-[#8a7f72]">沒有掛單。購物車按「掛單」可以先保留這筆,先幫下一位結帳。</p> : null}

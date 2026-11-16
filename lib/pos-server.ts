@@ -43,8 +43,10 @@ export async function nextRefundNo() {
   return `${prefix}${String((count ?? 0) + 1).padStart(4, '0')}`;
 }
 
-export async function openSession(supabase: SupabaseClient) {
-  const { data } = await supabase.from('pos_sessions').select('*').eq('status', 'open').order('opened_at', { ascending: false }).limit(1).maybeSingle();
+// 某個據點目前營業中的班別(每個據點各自一班;預設據點也包含還沒有據點時開的班)
+export async function openSession(supabase: SupabaseClient, location: { id: string; is_default: boolean }) {
+  const base = supabase.from('pos_sessions').select('*').eq('status', 'open');
+  const { data } = await (location.is_default ? base.or(`location_id.eq.${location.id},location_id.is.null`) : base.eq('location_id', location.id)).order('opened_at', { ascending: false }).limit(1).maybeSingle();
   return (data as PosSession | null) ?? null;
 }
 

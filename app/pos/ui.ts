@@ -1,5 +1,6 @@
 // POS 畫面共用樣式與小工具
-import type { PosDiscount, PosProduct, PosSession, PosSessionSummary, PosSettings } from '@/lib/pos';
+import type { PosButton, PosDiscount, PosProduct, PosSession, PosSessionSummary, PosSettings } from '@/lib/pos';
+import type { StockLocation } from '@/lib/stock-locations';
 
 export const input = 'w-full rounded-xl border border-[#e5ded4] bg-white px-3 py-2.5 text-base! text-[#1f1b19] outline-none focus:border-[#1f1b19]/50';
 export const btn = 'rounded-xl border border-[#d7c9bd] bg-white px-4 py-2.5 text-sm! font-semibold! text-[#1f1b19] whitespace-nowrap active:bg-[#f3ede4] disabled:opacity-40';
@@ -19,10 +20,18 @@ export type Boot = {
   cashier: string;
   products: PosProduct[];
   categories: { slug: string; name: string; parent_id?: string | null; campaign_id?: string | null }[];
+  locations: StockLocation[];
+  location: StockLocation;
+  buttons: PosButton[];
   settings: PosSettings;
   session: SessionView | null;
   loyalty: boolean;
 };
+
+// 這台 POS 目前所在的分店 / 倉庫(班別、退貨等 API 都要帶)
+let currentLocation = '';
+export const setPosLocation = (id: string) => { currentLocation = id; };
+export const posLocation = () => currentLocation;
 
 export async function api<T>(url: string, init?: RequestInit): Promise<T> {
   const res = await fetch(url, { cache: 'no-store', ...init, headers: init?.body ? { 'Content-Type': 'application/json', ...(init.headers ?? {}) } : init?.headers });

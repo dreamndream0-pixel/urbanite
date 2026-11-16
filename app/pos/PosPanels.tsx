@@ -5,7 +5,8 @@ import { CASH, posMoney, settlePayments, variantKey, type PosDiscount, type PosP
 import type { Order } from '@/lib/types';
 import { uiConfirm } from '@/lib/ui-dialog';
 import { uiToast } from '@/lib/ui-toast';
-import { api, btn, btnDanger, btnDark, chip, errMsg, fullTime, input, label, timeLabel, toInt, todayTaipei, type CartLine, type Member, type SessionView } from './ui';
+import type { StockLocation } from '@/lib/stock-locations';
+import { api, btn, btnDanger, btnDark, chip, errMsg, fullTime, input, label, posLocation, timeLabel, toInt, todayTaipei, type CartLine, type Member, type SessionView } from './ui';
 
 // ---------- 彈窗外框(手機從下方滑出、桌機置中) ----------
 export function Modal({ title, onClose, children, footer, wide }: { title: string; onClose: () => void; children: ReactNode; footer?: ReactNode; wide?: boolean }) {
@@ -44,6 +45,9 @@ export function Receipt({ order, settings, shopName }: { order: Order; settings:
       <div className="my-1.5 border-t border-dashed border-black" />
       <Row k="單號" v={order.order_no} />
       <Row k="時間" v={fullTime(order.created_at)} />
+      {order.invoice_no ? <Row k="發票號碼" v={order.invoice_no} strong /> : null}
+      {order.buyer_tax_id ? <Row k="買方統編" v={order.buyer_tax_id} /> : null}
+      {pos?.location_name ? <Row k="門市" v={pos.location_name} /> : null}
       {pos?.cashier ? <Row k="收銀" v={pos.cashier.split('@')[0]} /> : null}
       {order.customer_name && order.customer_name !== '門市顧客' ? <Row k="顧客" v={order.customer_name} /> : null}
       <div className="my-1.5 border-t border-dashed border-black" />
@@ -97,22 +101,24 @@ export function ShiftReport({ session, summary, shopName }: { session: PosSessio
 }
 
 // ---------- 規格選擇(兩個以上的規格維度:先選第一個,例如顏色,再選其餘) ----------
-export function VariantPicker({ product, binding, onPick, onClose }: { product: PosProduct; binding: string; onPick: (variant: string) => void; onClose: () => void }) {
+// qtyOf:購物車裡已經有幾件(顯示在格子右上角)
+export function VariantChooser({ product, onPick, qtyOf }: { product: PosProduct; onPick: (variant: string) => void; qtyOf?: (variant: string) => number }) {
   const twoStep = product.variants.length > 6 && product.variants.every((v) => v.options.length >= 2);
   const firsts = useMemo(() => [...new Set(product.variants.map((v) => v.options[0]))], [product]);
   const [first, setFirst] = useState(twoStep && firsts.length > 1 ? '' : firsts[0] ?? '');
   const list = twoStep ? product.variants.filter((v) => v.options[0] === first) : product.variants;
   const dim = product.specs?.[0]?.name || '規格';
   return (
-    <Modal title={binding ? `綁定條碼到:${product.name}` : product.name} onClose={onClose}>
-      {binding ? <p className="mb-3 text-sm! text-[#8a7f72]">條碼 {binding} 要綁到哪個規格?</p> : null}
+    <>
       {twoStep ? (
         <>
           <p className={label}>{dim}</p>
           <div className="mb-4 flex max-h-[30dvh] flex-wrap gap-2 overflow-y-auto overscroll-contain">
             {firsts.map((o) => {
-              const stock = product.variants.filter((v) => v.options[0] === o).reduce((n, v) => n + (v.inventory ?? 0), 0);
-              return <button key={o} type="button" onClick={() => setFirst(o)} className={`${chip} ${first === o ? 'border-[#1f1b19] bg-[#1f1b19] text-white' : stock <= 0 ? 'border-[#eee6da] text-[#b3a99b]' : 'border-[#d7c9bd]'}`}>{o}</button>;
+              const group = product.variants.filter((v) => v.options[0] === o);
+              const stock = group.reduce((n, v) => n + (v.inventory ?? 0), 0);
+              const picked = qtyOf ? group.reduce((n, v) => n + qtyOf(variantKey(v.options)), 0) : 0;
+              return <button key={o} type="button" onClick={() => setFirst(o)} className={`${chip} ${first === o ? 'border-[#1f1b19] bg-[#1f1b19] text-white' : stock <= 0 ? 'border-[#eee6da] text-[#b3a99b]' : 'border-[#d7c9bd]'}`}>{o}{picked ? ` ·${picked}` : ''}</button>;
             })}
           </div>
           {first ? <p className={label}>{product.specs?.slice(1).map((d) => d.name).join(' / ') || '規格'}</p> : <p className="text-sm! text-[#8a7f72]">先選{dim}</p>}
@@ -122,15 +128,26 @@ export function VariantPicker({ product, binding, onPick, onClose }: { product: 
         {list.map((v) => {
           const key = variantKey(v.options);
           const out = (v.inventory ?? 0) <= 0;
+          const picked = qtyOf?.(key) ?? 0;
           return (
             <button key={key} type="button" onClick={() => onPick(key)}
-              className={`rounded-xl border px-3 py-3 text-left active:bg-[#f3ede4] ${out ? 'border-[#eee6da] text-[#b3a99b]' : 'border-[#d7c9bd]'}`}>
+              className={`relative rounded-xl border px-3 py-3 text-left active:bg-[#f3ede4] ${picked ? 'border-[#1f1b19]' : out ? 'border-[#eee6da] text-[#b3a99b]' : 'border-[#d7c9bd]'}`}>
               <span className="block text-sm! font-semibold!">{twoStep ? v.options.slice(1).join(' / ') : key}</span>
               <span className="mt-0.5 flex justify-between gap-1 text-xs! tabular-nums!"><span>{posMoney(v.price ?? product.price)}</span><span className={out ? 'text-[#c84767]' : 'text-[#8a7f72]'}>庫存 {v.inventory ?? 0}</span></span>
+              {picked ? <span className="absolute -right-1.5 -top-1.5 grid h-6 min-w-6 place-items-center rounded-full bg-[#1f1b19] px-1.5 text-xs! font-bold! text-white">{picked}</span> : null}
             </button>
           );
         })}
       </div>
+    </>
+  );
+}
+
+export function VariantPicker({ product, binding, onPick, onClose }: { product: PosProduct; binding: string; onPick: (variant: string) => void; onClose: () => void }) {
+  return (
+    <Modal title={binding ? `綁定條碼到:${product.name}` : product.name} onClose={onClose}>
+      {binding ? <p className="mb-3 text-sm! text-[#8a7f72]">條碼 {binding} 要綁到哪個規格?</p> : null}
+      <VariantChooser product={product} onPick={onPick} />
     </Modal>
   );
 }
@@ -221,7 +238,8 @@ export function MemberPicker({ current, onPick, onClose }: { current: Member | n
 }
 
 // ---------- 收款 ----------
-export function PayModal({ total, methods, busy, onPay, onClose }: { total: number; methods: string[]; busy: boolean; onPay: (payments: { method: string; amount: number }[]) => void; onClose: () => void }) {
+export function PayModal({ total, methods, busy, invoice, onPay, onClose }: { total: number; methods: string[]; busy: boolean; invoice: string; onPay: (payments: { method: string; amount: number }[], taxId: string) => void; onClose: () => void }) {
+  const [taxId, setTaxId] = useState('');
   const [amounts, setAmounts] = useState<Record<string, string>>({ [CASH]: '' });
   const [active, setActive] = useState(CASH);
   const payments = useMemo(() => methods.map((m) => ({ method: m, amount: toInt(amounts[m] ?? '') })), [methods, amounts]);
@@ -237,7 +255,7 @@ export function PayModal({ total, methods, busy, onPay, onClose }: { total: numb
   const ok = total === 0 || !settle.error;
   return (
     <Modal title="收款" onClose={onClose} footer={
-      <button type="button" disabled={busy || !ok} className={`${btnDark} w-full py-3.5 text-base!`} onClick={() => onPay(settle.list)}>
+      <button type="button" disabled={busy || !ok} className={`${btnDark} w-full py-3.5 text-base!`} onClick={() => { if (taxId && !/^\d{8}$/.test(taxId)) { uiToast('統一編號是 8 位數字'); return; } onPay(settle.list, taxId); }}>
         {busy ? '結帳中…' : settle.change > 0 ? `完成結帳(找零 ${posMoney(settle.change)})` : '完成結帳'}
       </button>
     }>
@@ -271,6 +289,12 @@ export function PayModal({ total, methods, busy, onPay, onClose }: { total: numb
           {settle.error && settle.tendered > 0 && settle.error !== '收款金額不足' ? <p className="mt-2 text-sm! text-[#c84767]">{settle.error}</p> : null}
         </>
       ) : <p className="mt-3 text-sm! text-[#8a7f72]">這筆不需要收款,直接完成結帳。</p>}
+      {invoice && total > 0 ? (
+        <div className="mt-3 flex items-center gap-2 rounded-xl border border-[#e5ded4] px-3 py-2">
+          <span className="min-w-0 flex-1 text-sm!"><span className="block text-xs! text-[#8a7f72]">發票號碼</span><b className="tabular-nums!">{invoice}</b></span>
+          <input className="w-32 shrink-0 rounded-lg border border-[#e5ded4] px-2 py-2 text-base! tabular-nums! outline-none" inputMode="numeric" maxLength={8} placeholder="統編(選填)" value={taxId} onChange={(e) => setTaxId(e.target.value.replace(/[^\d]/g, '').slice(0, 8))} />
+        </div>
+      ) : null}
     </Modal>
   );
 }
@@ -307,7 +331,7 @@ function RefundModal({ order, methods, onDone, onClose }: { order: Order; method
     if (!(await uiConfirm(`確定退貨並退款 ${posMoney(estimate)}(${method})?${restock ? '\n商品會加回庫存。' : '\n商品不加回庫存。'}`))) return;
     setBusy(true);
     try {
-      const r = await api<{ order: Order; amount: number }>(`/api/pos/orders/${order.id}/refund`, { method: 'POST', body: JSON.stringify({ items: qty.map((quantity, index) => ({ index, quantity })).filter((x) => x.quantity > 0), method, restock, reason }) });
+      const r = await api<{ order: Order; amount: number }>(`/api/pos/orders/${order.id}/refund`, { method: 'POST', body: JSON.stringify({ location_id: posLocation(), items: qty.map((quantity, index) => ({ index, quantity })).filter((x) => x.quantity > 0), method, restock, reason }) });
       uiToast(`已退款 ${posMoney(r.amount)}`);
       onDone(r.order);
     } catch (e) { uiToast(errMsg(e)); } finally { setBusy(false); }
@@ -374,7 +398,7 @@ export function OrdersPanel({ settings, shopName, onPrint, onChanged, onClose }:
               <button type="button" onClick={() => setOpen(open === o.id ? null : o.id)} className="flex w-full items-center gap-3 px-3 py-2.5 text-left">
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm! font-semibold!">{o.order_no}{returned ? <span className="ml-2 rounded bg-[#fbeef1] px-1.5 py-0.5 text-[11px]! text-[#c84767]">已退貨</span> : o.refund_amount ? <span className="ml-2 rounded bg-[#fff6e5] px-1.5 py-0.5 text-[11px]! text-[#9a6412]">部分退</span> : null}</p>
-                  <p className="truncate text-xs! text-[#8a7f72]">{timeLabel(o.created_at)} · {o.payment_method} · {o.items.reduce((n, i) => n + i.quantity, 0)} 件{o.customer_name && o.customer_name !== '門市顧客' ? ` · ${o.customer_name}` : ''}</p>
+                  <p className="truncate text-xs! text-[#8a7f72]">{timeLabel(o.created_at)}{o.pos?.location_name ? ` · ${o.pos.location_name}` : ''} · {o.payment_method}{o.invoice_no ? ` · ${o.invoice_no}` : ''} · {o.items.reduce((n, i) => n + i.quantity, 0)} 件{o.customer_name && o.customer_name !== '門市顧客' ? ` · ${o.customer_name}` : ''}</p>
                 </div>
                 <span className={`shrink-0 text-sm! font-semibold! tabular-nums! ${returned ? 'text-[#b3a99b] line-through' : ''}`}>{posMoney(o.total)}</span>
               </button>
@@ -418,10 +442,10 @@ export function SessionPanel({ session, shopName, onChange, onPrint, onClose }: 
 
   if (!session) {
     return (
-      <Modal title="開班" onClose={onClose} footer={<button type="button" disabled={busy} className={`${btnDark} w-full`} onClick={() => run(async () => { const r = await api<{ session: SessionView }>('/api/pos/session', { method: 'POST', body: JSON.stringify({ opening_cash: toInt(opening) }) }); onChange(r.session); uiToast('已開班'); onClose(); })}>開始營業</button>}>
+      <Modal title="開班" onClose={onClose} footer={<button type="button" disabled={busy} className={`${btnDark} w-full`} onClick={() => run(async () => { const r = await api<{ session: SessionView }>('/api/pos/session', { method: 'POST', body: JSON.stringify({ location_id: posLocation(), opening_cash: toInt(opening) }) }); onChange(r.session); uiToast('已開班'); onClose(); })}>開始營業</button>}>
         <p className="mb-3 text-sm! text-[#8a7f72]">開班後,每一筆 POS 銷售都會記在這一班,交班時核對現金。不開班也可以結帳,只是不會有交班表。</p>
         <label><span className={label}>錢櫃零用金(元)</span><input className={input} inputMode="numeric" value={opening} onChange={(e) => setOpening(e.target.value)} placeholder="0" autoFocus /></label>
-        <button type="button" className="mt-4 text-sm! text-[#8a7f72] underline" onClick={() => run(async () => { const r = await api<{ history: PosSession[] }>('/api/pos/session?history=1'); setHistory(r.history); })}>查看過去的交班紀錄</button>
+        <button type="button" className="mt-4 text-sm! text-[#8a7f72] underline" onClick={() => run(async () => { const r = await api<{ history: PosSession[] }>(`/api/pos/session?history=1&location=${posLocation()}`); setHistory(r.history); })}>查看過去的交班紀錄</button>
         {history ? <HistoryList history={history} shopName={shopName} onPrint={onPrint} /> : null}
       </Modal>
     );
@@ -435,7 +459,7 @@ export function SessionPanel({ session, shopName, onChange, onPrint, onClose }: 
         <button type="button" className={btn} onClick={() => setClosing(false)}>返回</button>
         <button type="button" disabled={busy || counted === ''} className={`${btnDark} flex-1`} onClick={() => run(async () => {
           if (!(await uiConfirm(`確定交班?\n應有現金 ${posMoney(s.expectedCash)},點鈔 ${posMoney(toInt(counted))},差額 ${diff > 0 ? '+' : ''}${posMoney(diff)}`))) return;
-          const r = await api<{ closed: PosSession }>('/api/pos/session', { method: 'PATCH', body: JSON.stringify({ action: 'close', counted_cash: toInt(counted), note }) });
+          const r = await api<{ closed: PosSession }>('/api/pos/session', { method: 'PATCH', body: JSON.stringify({ location_id: posLocation(), action: 'close', counted_cash: toInt(counted), note }) });
           onChange(null); setClosed(r.closed);
         })}>確認交班</button>
       </div>
@@ -459,7 +483,7 @@ export function SessionPanel({ session, shopName, onChange, onPrint, onClose }: 
           <input className={input} value={move.note} onChange={(e) => setMove({ ...move, note: e.target.value })} placeholder={move.type === 'in' ? '原因(例:補零錢)' : '原因(例:買文具、存銀行)'} />
           <div className="flex gap-2">
             <button type="button" className={btn} onClick={() => setMove(null)}>取消</button>
-            <button type="button" disabled={busy || !toInt(move.amount)} className={`${btnDark} flex-1`} onClick={() => run(async () => { const r = await api<{ session: SessionView }>('/api/pos/session', { method: 'PATCH', body: JSON.stringify({ action: 'move', type: move.type, amount: toInt(move.amount), note: move.note }) }); onChange(r.session); setMove(null); uiToast('已記錄'); })}>記錄</button>
+            <button type="button" disabled={busy || !toInt(move.amount)} className={`${btnDark} flex-1`} onClick={() => run(async () => { const r = await api<{ session: SessionView }>('/api/pos/session', { method: 'PATCH', body: JSON.stringify({ location_id: posLocation(), action: 'move', type: move.type, amount: toInt(move.amount), note: move.note }) }); onChange(r.session); setMove(null); uiToast('已記錄'); })}>記錄</button>
           </div>
         </div>
       ) : (
@@ -494,14 +518,17 @@ function HistoryList({ history, shopName, onPrint }: { history: PosSession[]; sh
 }
 
 // ---------- POS 設定 ----------
-export function SettingsPanel({ settings, onSaved, onClose }: { settings: PosSettings; onSaved: (s: PosSettings) => void; onClose: () => void }) {
+export function SettingsPanel({ settings, location, onSaved, onLocations, onClose }: { settings: PosSettings; location: StockLocation; onSaved: (s: PosSettings) => void; onLocations: (list: StockLocation[]) => void; onClose: () => void }) {
   const [draft, setDraft] = useState(settings);
+  const [inv, setInv] = useState({ enabled: location.invoice_enabled, prefix: location.invoice_prefix, next: String(location.invoice_next), end: String(location.invoice_end) });
   const [methods, setMethods] = useState(settings.paymentMethods.filter((m) => m !== CASH).join('、'));
   const [busy, setBusy] = useState(false);
   async function save() {
     setBusy(true);
     try {
       const saved = await api<PosSettings>('/api/pos/settings', { method: 'PUT', body: JSON.stringify({ ...draft, paymentMethods: [CASH, ...methods.split(/[、,,\n]/).map((m) => m.trim()).filter(Boolean)] }) });
+      const r = await api<{ locations: StockLocation[] }>('/api/admin/stock-locations', { method: 'PATCH', body: JSON.stringify({ id: location.id, invoice_enabled: inv.enabled, invoice_prefix: inv.prefix, invoice_next: toInt(inv.next), invoice_end: toInt(inv.end) }) });
+      onLocations(r.locations);
       onSaved(saved); uiToast('已儲存'); onClose();
     } catch (e) { uiToast(errMsg(e)); } finally { setBusy(false); }
   }
@@ -510,6 +537,17 @@ export function SettingsPanel({ settings, onSaved, onClose }: { settings: PosSet
       <div className="space-y-4">
         <label className="block"><span className={label}>現金以外的付款方式(用「、」分開)</span><input className={input} value={methods} onChange={(e) => setMethods(e.target.value)} placeholder="刷卡、LINE Pay、轉帳" /></label>
         <label className="flex items-start gap-2 text-sm!"><input type="checkbox" className="mt-1" checked={draft.allowOversell} onChange={(e) => setDraft({ ...draft, allowOversell: e.target.checked })} /><span>庫存不足也可以賣<span className="block text-xs! text-[#8a7f72]">沒勾:系統庫存不夠時不能結帳。勾了:照樣結帳,庫存扣到 0 為止。</span></span></label>
+        <div className="rounded-xl border border-[#e5ded4] p-3">
+          <label className="flex items-start gap-2 text-sm!"><input type="checkbox" className="mt-1" checked={inv.enabled} onChange={(e) => setInv({ ...inv, enabled: e.target.checked })} /><span>結帳自動帶發票號碼<span className="block text-xs! text-[#8a7f72]">「{location.name}」專用。每結一筆自動用下一張號碼,印在收據上;號碼用完要回來更新。</span></span></label>
+          {inv.enabled ? (
+            <div className="mt-3 grid grid-cols-3 gap-2">
+              <label><span className={label}>字軌</span><input className={input} value={inv.prefix} maxLength={2} placeholder="AB" autoCapitalize="characters" onChange={(e) => setInv({ ...inv, prefix: e.target.value.toUpperCase().replace(/[^A-Z]/g, '') })} /></label>
+              <label><span className={label}>下一張號碼</span><input className={input} inputMode="numeric" maxLength={8} value={inv.next} onChange={(e) => setInv({ ...inv, next: e.target.value.replace(/[^\d]/g, '') })} /></label>
+              <label><span className={label}>結束號碼</span><input className={input} inputMode="numeric" maxLength={8} value={inv.end} onChange={(e) => setInv({ ...inv, end: e.target.value.replace(/[^\d]/g, '') })} /></label>
+              <p className="col-span-3 text-xs! text-[#8a7f72]">下一張:{inv.prefix || '??'}{String(toInt(inv.next)).padStart(8, '0')},還有 {Math.max(0, toInt(inv.end) - toInt(inv.next) + 1)} 張</p>
+            </div>
+          ) : null}
+        </div>
         <label className="block"><span className={label}>收據抬頭(空白 = 店名)</span><input className={input} value={draft.receiptTitle} onChange={(e) => setDraft({ ...draft, receiptTitle: e.target.value })} /></label>
         <label className="block"><span className={label}>抬頭下方文字(地址、電話、統編)</span><textarea className={input} rows={3} value={draft.receiptHeader} onChange={(e) => setDraft({ ...draft, receiptHeader: e.target.value })} /></label>
         <label className="block"><span className={label}>收據頁尾</span><textarea className={input} rows={2} value={draft.receiptFooter} onChange={(e) => setDraft({ ...draft, receiptFooter: e.target.value })} /></label>

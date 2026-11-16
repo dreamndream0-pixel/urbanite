@@ -62,6 +62,7 @@ import { resolveSiteTheme } from '@/lib/site-theme';
 import { resolveStockMovementTarget } from '@/lib/stock-movement-target';
 import LineBotManager from './line-bot/LineBotManager';
 import LoyaltyManager from './LoyaltyManager';
+import PosAdmin from './PosAdmin';
 import StocktakeManager, { type StocktakeApplied } from './StocktakeManager';
 import PromoActivitiesManager from './PromoActivitiesManager';
 import CheckoutFieldsManager from './CheckoutFieldsManager';
@@ -115,6 +116,7 @@ const NAV = [
   { key: 'orders', label: '訂單管理', Icon: IconReceipt },
   { key: 'products', label: '商品及分類', Icon: IconTag },
   { key: 'inventory', label: '庫存管理', Icon: IconBox },
+  { key: 'pos', label: 'POS・分店調貨', Icon: IconReceipt },
   { key: 'customers', label: '顧客管理', Icon: IconUsers },
   { key: 'loyalty', label: '會員回饋', Icon: IconGift },
   { key: 'promotions', label: '促銷管理', Icon: IconGift },
@@ -2985,6 +2987,8 @@ export default function AdminDashboard({
           {/* ===== 報表及分析 ===== */}
           {section === 'line-bot' && <LineBotManager products={products} coupons={discounts} logoUrl={logoUrl} platform={platform} campaigns={initialCampaigns} />}
           {section === 'loyalty' && <LoyaltyManager />}
+          {/* POS・分店:據點、各據點庫存、調貨、POS 首頁按鈕 */}
+          {section === 'pos' && <PosAdmin products={products} categories={categories} />}
           {section === 'card-members' && <CardMembersManager />}
           {section === 'shops' && platform && <ShopsManager />}
           {section === 'profile-card' && (platform

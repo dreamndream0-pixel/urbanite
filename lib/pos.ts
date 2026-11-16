@@ -39,6 +39,29 @@ export function resolvePosSettings(raw: unknown): PosSettings {
   };
 }
 
+// POS 首頁按鈕:按下去跳出底下的商品(例:品牌 → 型號 → 顏色 / 尺寸)
+export type PosButton = { id: string; name: string; color: string; productIds: string[] };
+export const POS_BUTTON_COLORS = ['#1f1b19', '#8a6d3b', '#3f6b57', '#3b5b8a', '#8a3b55', '#6b4f9a', '#b0562c', '#5f5852'];
+
+export function resolvePosButtons(raw: unknown): PosButton[] {
+  if (!Array.isArray(raw)) return [];
+  const seen = new Set<string>();
+  const out: PosButton[] = [];
+  for (const item of raw.slice(0, 60)) {
+    const r = item && typeof item === 'object' ? (item as Record<string, unknown>) : null;
+    const name = String(r?.name ?? '').trim().slice(0, 20);
+    const id = String(r?.id ?? '').slice(0, 40);
+    if (!r || !name || !id || seen.has(id)) continue;
+    seen.add(id);
+    const color = String(r.color ?? '');
+    out.push({
+      id, name, color: /^#[0-9a-fA-F]{6}$/.test(color) ? color : POS_BUTTON_COLORS[0],
+      productIds: Array.isArray(r.productIds) ? [...new Set(r.productIds.map((p) => String(p)).filter(Boolean))].slice(0, 500) : [],
+    });
+  }
+  return out;
+}
+
 // 整筆折扣:折金額或打折(percent = 折掉的百分比,例:10 = 九折)
 export type PosDiscount = { type: 'amount' | 'percent'; value: number };
 
@@ -73,6 +96,8 @@ export type PosMeta = {
   change: number;
   manual_discount: number;
   discount_label?: string;
+  location_id?: string; // 結帳的分店 / 倉庫
+  location_name?: string;
   refunds?: PosRefundEntry[];
 };
 
@@ -81,6 +106,7 @@ export type PosSessionRefund = { at: string; order_no: string; amount: number; m
 
 export type PosSession = {
   id: string;
+  location_id?: string | null;
   status: 'open' | 'closed';
   opened_by: string;
   opened_at: string;
