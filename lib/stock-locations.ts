@@ -93,3 +93,21 @@ export async function adjustLevel(shopId: string, location: StockLocation, produ
   const { error } = await createAdminClient().rpc('stock_level_add', { p_shop: shopId, p_location: location.id, p_product: productId, p_variant: variantKey, p_delta: delta });
   if (error) throw new Error(error.message);
 }
+
+// 發票號碼設定的檢查:字軌是兩個大寫英文字母;號碼 8 位數以內
+export function invoicePatch(body: Record<string, unknown>): { patch?: Record<string, unknown>; error?: string } {
+  const patch: Record<string, unknown> = {};
+  if ('invoice_enabled' in body) patch.invoice_enabled = body.invoice_enabled === true;
+  if ('invoice_prefix' in body) {
+    const prefix = String(body.invoice_prefix ?? '').trim().toUpperCase();
+    if (prefix && !/^[A-Z]{2}$/.test(prefix)) return { error: '發票字軌是兩個英文字母(例:AB)' };
+    patch.invoice_prefix = prefix;
+  }
+  for (const key of ['invoice_next', 'invoice_end'] as const) {
+    if (!(key in body)) continue;
+    const n = Math.floor(Number(body[key]));
+    if (!Number.isSafeInteger(n) || n < 0 || n > 99_999_999) return { error: '發票號碼是 8 位數以內的數字' };
+    patch[key] = n;
+  }
+  return { patch };
+}

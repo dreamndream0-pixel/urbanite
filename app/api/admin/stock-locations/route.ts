@@ -1,27 +1,9 @@
 import { NextResponse } from 'next/server';
 import { getAdminUser } from '@/lib/supabase/server';
 import { shopAdminClient } from '@/lib/shop';
-import { ensureLocations, loadLevels } from '@/lib/stock-locations';
+import { ensureLocations, invoicePatch, loadLevels } from '@/lib/stock-locations';
 
 export const dynamic = 'force-dynamic';
-
-// 發票字軌:兩個大寫英文字母;號碼 1 ~ 99999999
-function invoicePatch(body: Record<string, unknown>) {
-  const patch: Record<string, unknown> = {};
-  if ('invoice_enabled' in body) patch.invoice_enabled = body.invoice_enabled === true;
-  if ('invoice_prefix' in body) {
-    const prefix = String(body.invoice_prefix ?? '').trim().toUpperCase();
-    if (prefix && !/^[A-Z]{2}$/.test(prefix)) return { error: '發票字軌是兩個英文字母(例:AB)' };
-    patch.invoice_prefix = prefix;
-  }
-  for (const key of ['invoice_next', 'invoice_end'] as const) {
-    if (!(key in body)) continue;
-    const n = Math.floor(Number(body[key]));
-    if (!Number.isSafeInteger(n) || n < 0 || n > 99_999_999) return { error: '發票號碼是 8 位數以內的數字' };
-    patch[key] = n;
-  }
-  return { patch };
-}
 
 // GET /api/admin/stock-locations — 據點列表;?levels=1 另外帶各據點庫存(非預設據點)
 export async function GET(request: Request) {

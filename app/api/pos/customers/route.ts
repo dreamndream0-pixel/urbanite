@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getAdminUser } from '@/lib/supabase/server';
+import { getPosUser } from '@/lib/pos-auth';
 import { getCurrentShop, shopAdminClient } from '@/lib/shop';
 import { creditQuote } from '@/lib/loyalty';
 
@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic';
 // GET /api/pos/customers?q=姓名/電話/Email — 找會員(最多 12 筆)
 // GET /api/pos/customers?quote=<user_id>&amount=<商品金額> — 這位會員的回饋金餘額、本筆最多可折抵、等級
 export async function GET(request: Request) {
-  if (!(await getAdminUser())) return NextResponse.json({ error: '未授權' }, { status: 401 });
+  if (!(await getPosUser())) return NextResponse.json({ error: '未授權' }, { status: 401 });
   const url = new URL(request.url);
   const supabase = await shopAdminClient();
 

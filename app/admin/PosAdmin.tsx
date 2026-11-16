@@ -1,7 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { POS_BUTTON_COLORS, type PosButton } from '@/lib/pos';
+import { POS_BUTTON_COLORS, POS_PERMISSIONS, type PosButton, type PosPermission } from '@/lib/pos';
+import type { PosStaff } from '@/lib/pos-auth';
 import type { StockLevel, StockLocation, StockTransfer, TransferLine } from '@/lib/stock-locations';
 import type { Category, Product } from '@/lib/types';
 import { uiAlert, uiConfirm } from '@/lib/ui-dialog';
@@ -46,7 +47,7 @@ function useStockReader(levels: StockLevel[], locations: StockLocation[]) {
 
 // 後台「POS・分店」:分店 / 倉庫、各據點庫存、調貨、POS 首頁按鈕
 export default function PosAdmin({ products, categories }: { products: Product[]; categories: Category[] }) {
-  const [tab, setTab] = useState<'locations' | 'stock' | 'transfer' | 'buttons'>('locations');
+  const [tab, setTab] = useState<'locations' | 'stock' | 'transfer' | 'buttons' | 'staff'>('locations');
   const [locations, setLocations] = useState<StockLocation[] | null>(null);
   const [levels, setLevels] = useState<StockLevel[]>([]);
   const [error, setError] = useState('');
@@ -59,7 +60,7 @@ export default function PosAdmin({ products, categories }: { products: Product[]
   }, []);
   useEffect(() => { const t = setTimeout(() => void reload(), 0); return () => clearTimeout(t); }, [reload]);
 
-  const tabs = [['locations', '分店 / 倉庫'], ['stock', '各據點庫存'], ['transfer', '調貨'], ['buttons', 'POS 按鈕']] as const;
+  const tabs = [['locations', '分店 / 倉庫'], ['stock', '各據點庫存'], ['transfer', '調貨'], ['buttons', 'POS 按鈕'], ['staff', 'POS 員工']] as const;
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -77,6 +78,7 @@ export default function PosAdmin({ products, categories }: { products: Product[]
           {tab === 'stock' && <StockByLocation products={products} locations={locations} levels={levels} />}
           {tab === 'transfer' && <Transfers products={products} locations={locations} levels={levels} onLevels={setLevels} />}
           {tab === 'buttons' && <Buttons products={products} categories={categories} />}
+          {tab === 'staff' && <Staff locations={locations} />}
         </>
       )}
     </div>
@@ -404,6 +406,68 @@ function Buttons({ products, categories }: { products: Product[]; categories: Ca
           <p className="mt-2 text-xs text-[#8a7f72]">彈窗裡的商品順序 = 勾選的先後順序。改完記得按上方「儲存」。</p>
         </div>
       ) : null}
+    </div>
+  );
+}
+
+// ---------- POS 員工:帳號與權限 ----------
+function Staff({ locations }: { locations: StockLocation[] }) {
+  const [list, setList] = useState<PosStaff[] | null>(null);
+  const [email, setEmail] = useState('');
+  const [name, setName] = useState('');
+  const [busy, setBusy] = useState(false);
+  useEffect(() => { const t = setTimeout(() => { api<PosStaff[]>('/api/admin/pos-staff').then(setList).catch(() => setList([])); }, 0); return () => clearTimeout(t); }, []);
+  const run = async (fn: () => Promise<PosStaff[]>, done?: string) => {
+    setBusy(true);
+    try { setList(await fn()); if (done) uiToast(done); return true; } catch (e) { void uiAlert(errMsg(e)); return false; } finally { setBusy(false); }
+  };
+  const patch = (id: string, body: Record<string, unknown>, done?: string) => run(() => api('/api/admin/pos-staff', { method: 'PATCH', body: JSON.stringify({ id, ...body }) }), done);
+  const toggle = <T,>(arr: T[], v: T) => (arr.includes(v) ? arr.filter((x) => x !== v) : [...arr, v]);
+  const places = locations.filter((l) => l.active);
+
+  return (
+    <div className="space-y-4">
+      <div className={card}>
+        <p className="text-sm font-semibold">新增 POS 員工</p>
+        <p className="mt-1 text-xs text-[#8a7f72]">員工先在官網註冊會員(或用 Google / LINE 登入),把他的會員 Email 填在這裡。之後他用自己的帳號打開 <b>/pos</b> 就能結帳,但進不了後台。每一筆單、每一次退貨都會記下是誰做的。</p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <input className={`${input} max-w-xs flex-1`} type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="員工的會員 Email" />
+          <input className={`${input} max-w-[180px] flex-1`} value={name} onChange={(e) => setName(e.target.value)} placeholder="姓名(印在收據)" maxLength={30} />
+          <button type="button" className={btnDark} disabled={busy || !email.trim()} onClick={async () => { if (await run(() => api('/api/admin/pos-staff', { method: 'POST', body: JSON.stringify({ email, name, permissions: ['orders'] }) }), '已新增')) { setEmail(''); setName(''); } }}>新增</button>
+        </div>
+      </div>
+
+      {!list ? <p className="text-sm text-[#8a7f72]">讀取中…</p> : !list.length ? <div className={card}><p className="text-sm text-[#6b6156]">還沒有 POS 員工。沒有加員工時,只有能進後台的管理員可以用 POS。</p></div> : list.map((s) => (
+        <div key={s.id} className={`${card} ${s.active ? '' : 'opacity-60'}`}>
+          <div className="flex flex-wrap items-center gap-2">
+            <input className={`${input} max-w-[180px] flex-1 font-semibold!`} defaultValue={s.name} placeholder="姓名" maxLength={30} onBlur={(e) => { const v = e.target.value.trim(); if (v !== s.name) void patch(s.id, { name: v }, '已更新'); }} />
+            <span className="min-w-0 flex-1 truncate text-sm text-[#6b6156]">{s.email}</span>
+            <button type="button" className={btn} disabled={busy} onClick={() => void patch(s.id, { active: !s.active }, s.active ? '已停用' : '已啟用')}>{s.active ? '停用' : '啟用'}</button>
+            <button type="button" className={`${btn} text-[#c84767]`} disabled={busy} onClick={async () => { if (await uiConfirm(`移除「${s.name || s.email}」?移除後他馬上不能再進 POS。`)) void run(() => api(`/api/admin/pos-staff?id=${s.id}`, { method: 'DELETE' }), '已移除'); }}>移除</button>
+          </div>
+          <p className="mt-4 text-xs font-medium text-[#8a7f72]">可以做的事(結帳、找會員、掛單不用勾,每個員工都可以)</p>
+          <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            {POS_PERMISSIONS.map((p) => (
+              <label key={p.key} className="flex items-start gap-2 rounded-lg border border-[#efe8dd] px-3 py-2 text-sm">
+                <input type="checkbox" className="mt-0.5" disabled={busy} checked={s.permissions.includes(p.key)} onChange={() => void patch(s.id, { permissions: toggle<PosPermission>(s.permissions, p.key) })} />
+                <span>{p.label}<span className="block text-xs text-[#8a7f72]">{p.hint}</span></span>
+              </label>
+            ))}
+          </div>
+          {places.length > 1 ? (
+            <>
+              <p className="mt-4 text-xs font-medium text-[#8a7f72]">可以用的據點(都不勾 = 全部據點)</p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {places.map((l) => (
+                  <label key={l.id} className="flex items-center gap-2 rounded-lg border border-[#efe8dd] px-3 py-2 text-sm">
+                    <input type="checkbox" disabled={busy} checked={s.location_ids.includes(l.id)} onChange={() => void patch(s.id, { location_ids: toggle(s.location_ids, l.id) })} />{l.name}
+                  </label>
+                ))}
+              </div>
+            </>
+          ) : null}
+        </div>
+      ))}
     </div>
   );
 }

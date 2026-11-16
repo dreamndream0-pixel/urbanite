@@ -39,6 +39,17 @@ export function resolvePosSettings(raw: unknown): PosSettings {
   };
 }
 
+// POS 員工可以勾選的權限(管理員全部都有);基本結帳、找會員不用勾
+export const POS_PERMISSIONS = [
+  { key: 'discount', label: '改價與折扣', hint: '改單價、贈品、整筆折金額或折 %' },
+  { key: 'refund', label: '退貨 / 作廢', hint: '把已結帳的訂單退款' },
+  { key: 'session', label: '開班 / 交班', hint: '開班、現金存入取出、交班點鈔' },
+  { key: 'orders', label: '查看 POS 訂單', hint: '看當天與過去的訂單、重印收據' },
+  { key: 'settings', label: 'POS 設定', hint: '付款方式、發票號碼、收據文字' },
+  { key: 'barcode', label: '綁定條碼', hint: '掃到沒登記的條碼時綁到商品' },
+] as const;
+export type PosPermission = (typeof POS_PERMISSIONS)[number]['key'];
+
 // POS 首頁按鈕:按下去跳出底下的商品(例:品牌 → 型號 → 顏色 / 尺寸)
 export type PosButton = { id: string; name: string; color: string; productIds: string[] };
 export const POS_BUTTON_COLORS = ['#1f1b19', '#8a6d3b', '#3f6b57', '#3b5b8a', '#8a3b55', '#6b4f9a', '#b0562c', '#5f5852'];

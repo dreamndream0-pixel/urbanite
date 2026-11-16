@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getAdminUser } from '@/lib/supabase/server';
+import { can, getPosUser } from '@/lib/pos-auth';
 import { shopAdminClient } from '@/lib/shop';
 import { taipeiDayRange } from '@/lib/pos-server';
 
@@ -7,7 +7,9 @@ export const dynamic = 'force-dynamic';
 
 // GET /api/pos/orders?date=YYYY-MM-DD | ?q=單號或電話 — POS 訂單(預設今天,台灣時間)
 export async function GET(request: Request) {
-  if (!(await getAdminUser())) return NextResponse.json({ error: '未授權' }, { status: 401 });
+  const me = await getPosUser();
+  if (!me) return NextResponse.json({ error: '未授權' }, { status: 401 });
+  if (!can(me, 'orders')) return NextResponse.json({ error: '這個帳號沒有「查看 POS 訂單」的權限' }, { status: 403 });
   const url = new URL(request.url);
   const q = (url.searchParams.get('q') ?? '').trim().replace(/[%,()]/g, '');
   const supabase = await shopAdminClient();

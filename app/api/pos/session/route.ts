@@ -1,9 +1,13 @@
 import { NextResponse } from 'next/server';
-import { getAdminUser } from '@/lib/supabase/server';
+import { allowedLocations, can, getPosUser, type PosUser } from '@/lib/pos-auth';
 import { shopAdminClient } from '@/lib/shop';
 import { openSession, sessionWithSummary } from '@/lib/pos-server';
 import type { PosCashMove, PosSession } from '@/lib/pos';
 import { ensureLocations, pickLocation } from '@/lib/stock-locations';
+import type { SupabaseClient } from '@supabase/supabase-js';
+
+// 這個人可以用的據點裡,選到的那一個
+const locationFor = async (db: SupabaseClient, me: PosUser, id: unknown) => pickLocation(allowedLocations(me, await ensureLocations(db)), typeof id === 'string' ? id : null);
 
 export const dynamic = 'force-dynamic';
 
@@ -15,10 +19,11 @@ const cashAmount = (v: unknown) => {
 // 每個據點(分店 / 倉庫)各自一班:GET 用 ?location=,POST / PATCH 用 body.location_id
 // GET /api/pos/session — 目前營業中的班別(含即時摘要);?history=1 另外帶最近 30 筆交班紀錄
 export async function GET(request: Request) {
-  if (!(await getAdminUser())) return NextResponse.json({ error: '未授權' }, { status: 401 });
+  const me = await getPosUser();
+  if (!me) return NextResponse.json({ error: '未授權' }, { status: 401 });
   const supabase = await shopAdminClient();
   const url = new URL(request.url);
-  const location = pickLocation(await ensureLocations(supabase), url.searchParams.get('location'));
+  const location = await locationFor(supabase, me, url.searchParams.get('location'));
   const session = await openSession(supabase, location);
   const current = session ? await sessionWithSummary(supabase, session) : null;
   let history: PosSession[] = [];
@@ -32,15 +37,16 @@ export async function GET(request: Request) {
 
 // POST /api/pos/session { opening_cash } — 開班
 export async function POST(request: Request) {
-  const admin = await getAdminUser();
-  if (!admin) return NextResponse.json({ error: '未授權' }, { status: 401 });
+  const me = await getPosUser();
+  if (!me) return NextResponse.json({ error: '未授權' }, { status: 401 });
+  if (!can(me, 'session')) return NextResponse.json({ error: '這個帳號沒有「開班 / 交班」的權限' }, { status: 403 });
   const body = await request.json().catch(() => null);
   const opening = cashAmount(body?.opening_cash ?? 0);
   if (opening === null) return NextResponse.json({ error: '零用金金額不正確' }, { status: 400 });
   const supabase = await shopAdminClient();
-  const location = pickLocation(await ensureLocations(supabase), body?.location_id);
+  const location = await locationFor(supabase, me, body?.location_id);
   if (await openSession(supabase, location)) return NextResponse.json({ error: '已經有營業中的班別,請先交班' }, { status: 409 });
-  const { data, error } = await supabase.from('pos_sessions').insert({ opened_by: admin.email ?? '', opening_cash: opening, location_id: location.id }).select().single();
+  const { data, error } = await supabase.from('pos_sessions').insert({ opened_by: me.label, opening_cash: opening, location_id: location.id }).select().single();
   if (error) return NextResponse.json({ error: error.code === '23505' ? '已經有營業中的班別,請先交班' : error.message }, { status: 409 });
   return NextResponse.json({ session: await sessionWithSummary(supabase, data as PosSession) }, { status: 201 });
 }
@@ -49,13 +55,14 @@ export async function POST(request: Request) {
 // { action:'move', type:'in'|'out', amount, note } — 現金存入 / 取出
 // { action:'close', counted_cash, note } — 交班:記下點鈔金額、應有現金與差額
 export async function PATCH(request: Request) {
-  const admin = await getAdminUser();
-  if (!admin) return NextResponse.json({ error: '未授權' }, { status: 401 });
+  const me = await getPosUser();
+  if (!me) return NextResponse.json({ error: '未授權' }, { status: 401 });
+  if (!can(me, 'session')) return NextResponse.json({ error: '這個帳號沒有「開班 / 交班」的權限' }, { status: 403 });
   const body = await request.json().catch(() => null);
   const supabase = await shopAdminClient();
-  const session = await openSession(supabase, pickLocation(await ensureLocations(supabase), body?.location_id));
+  const session = await openSession(supabase, await locationFor(supabase, me, body?.location_id));
   if (!session) return NextResponse.json({ error: '目前沒有營業中的班別' }, { status: 409 });
-  const actor = admin.email ?? '';
+  const actor = me.label;
 
   if (body?.action === 'move') {
     const amount = cashAmount(body?.amount);

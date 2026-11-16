@@ -1,8 +1,8 @@
 // POS 畫面共用樣式與小工具
-import type { PosButton, PosDiscount, PosProduct, PosSession, PosSessionSummary, PosSettings } from '@/lib/pos';
+import type { PosButton, PosDiscount, PosPermission, PosProduct, PosSession, PosSessionSummary, PosSettings } from '@/lib/pos';
 import type { StockLocation } from '@/lib/stock-locations';
 
-export const input = 'w-full rounded-xl border border-[#e5ded4] bg-white px-3 py-2.5 text-base! text-[#1f1b19] outline-none focus:border-[#1f1b19]/50';
+export const input = 'w-full rounded-xl border border-[#e5ded4] bg-white px-3 py-2.5 text-base! text-[#1f1b19] outline-none focus:border-[#1f1b19]/50 disabled:bg-[#f3ede4] disabled:text-[#8a7f72]';
 export const btn = 'rounded-xl border border-[#d7c9bd] bg-white px-4 py-2.5 text-sm! font-semibold! text-[#1f1b19] whitespace-nowrap active:bg-[#f3ede4] disabled:opacity-40';
 export const btnDark = 'rounded-xl border border-[#1f1b19] bg-[#1f1b19] px-4 py-2.5 text-sm! font-semibold! text-white whitespace-nowrap active:opacity-80 disabled:opacity-40';
 export const btnDanger = 'rounded-xl border border-[#e3b8c2] bg-white px-4 py-2.5 text-sm! font-semibold! text-[#c84767] whitespace-nowrap active:bg-[#fbeef1] disabled:opacity-40';
@@ -18,6 +18,7 @@ export type SessionView = PosSession & { summary: PosSessionSummary };
 export type Boot = {
   shop: { name: string; logo: string };
   cashier: string;
+  me: { email: string; name: string; isAdmin: boolean; permissions: PosPermission[] };
   products: PosProduct[];
   categories: { slug: string; name: string; parent_id?: string | null; campaign_id?: string | null }[];
   locations: StockLocation[];

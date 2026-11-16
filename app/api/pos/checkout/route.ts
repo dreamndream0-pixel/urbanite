@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getAdminUser } from '@/lib/supabase/server';
+import { allowedLocations, can, getPosUser } from '@/lib/pos-auth';
 import { getCurrentShop, shopAdminClient } from '@/lib/shop';
 import { evaluateCoupon } from '@/lib/discount';
 import { consumeCredit, creditQuote } from '@/lib/loyalty';
@@ -19,8 +19,8 @@ type InputItem = { productId?: unknown; variant?: unknown; quantity?: unknown; p
 // { location_id?, buyer_tax_id?, items:[{ productId, variant, quantity, price? }], discount?, discount_code?, customer?, use_credit?, payments:[{ method, amount }], note?, client_id?, preview? }
 // 訂單當場成交:已付款、已完成;扣庫存並寫出庫紀錄,後台訂單 / 庫存 / 報表共用。
 export async function POST(request: Request) {
-  const admin = await getAdminUser();
-  if (!admin) return NextResponse.json({ error: '未授權' }, { status: 401 });
+  const me = await getPosUser();
+  if (!me) return NextResponse.json({ error: '未授權' }, { status: 401 });
   const shop = await getCurrentShop();
   if (!shop) return NextResponse.json({ error: '找不到這家店' }, { status: 404 });
   const body = await request.json().catch(() => null);
@@ -29,7 +29,7 @@ export async function POST(request: Request) {
   if (input.length > 200) return NextResponse.json({ error: '品項太多,請分開結帳' }, { status: 400 });
 
   const supabase = await shopAdminClient();
-  const cashier = admin.email ?? '';
+  const cashier = me.label;
   const clientId = String(body?.client_id ?? '').slice(0, 64);
   const preview = body?.preview === true; // 只試算金額(折扣碼、回饋金),不成立訂單
 
@@ -51,7 +51,7 @@ export async function POST(request: Request) {
   const products = (productRows ?? []) as Product[];
   const byId = new Map(products.map((p) => [p.id, p]));
   // 這台 POS 所在的分店 / 倉庫:庫存以這個據點為準
-  const location = pickLocation(locations, body?.location_id);
+  const location = pickLocation(allowedLocations(me, locations), body?.location_id);
   const stockHere = locationStockReader(products, levels, location);
 
   // 明細:價格以資料庫為準;店員改價(price)另外記下原定價
@@ -77,6 +77,7 @@ export async function POST(request: Request) {
     const listPrice = productPrice(product, label);
     if (!isValidPrice(listPrice)) return NextResponse.json({ error: `「${product.name}」售價設定有誤` }, { status: 409 });
     const override = item.price == null || item.price === '' ? null : Math.floor(Number(item.price));
+    if (override !== null && override !== listPrice && !can(me, 'discount')) return NextResponse.json({ error: '這個帳號沒有「改價與折扣」的權限' }, { status: 403 });
     if (override !== null && !isValidPrice(override)) return NextResponse.json({ error: `「${product.name}」改價金額不正確` }, { status: 400 });
     const price = override ?? listPrice;
     subtotal += price * quantity;
@@ -104,6 +105,7 @@ export async function POST(request: Request) {
 
   // 整筆折扣(店員手動)+ 折扣碼
   const rawDiscount = body?.discount as PosDiscount | null | undefined;
+  if (rawDiscount && Number(rawDiscount.value) > 0 && !can(me, 'discount')) return NextResponse.json({ error: '這個帳號沒有「改價與折扣」的權限' }, { status: 403 });
   const manualDiscount = manualDiscountAmount(subtotal, rawDiscount && (rawDiscount.type === 'percent' || rawDiscount.type === 'amount') ? { type: rawDiscount.type, value: Number(rawDiscount.value) } : null);
   let couponDiscount = 0;
   let coupon: Discount | null = null;

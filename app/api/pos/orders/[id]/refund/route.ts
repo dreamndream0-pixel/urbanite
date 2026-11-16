@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getAdminUser } from '@/lib/supabase/server';
+import { allowedLocations, can, getPosUser } from '@/lib/pos-auth';
 import { getCurrentShop, shopAdminClient } from '@/lib/shop';
 import { adjustLevel, ensureLocations, pickLocation } from '@/lib/stock-locations';
 import { applyStockLines, nextRefundNo, openSession } from '@/lib/pos-server';
@@ -12,8 +12,9 @@ export const dynamic = 'force-dynamic';
 // { items:[{ index, quantity }], method?, restock?: boolean, reason?, location_id? }
 // 退款金額依實付比例計算;restock = true 時回補庫存並寫入庫紀錄。全部退完 → 訂單改為「退貨」。
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const admin = await getAdminUser();
-  if (!admin) return NextResponse.json({ error: '未授權' }, { status: 401 });
+  const me = await getPosUser();
+  if (!me) return NextResponse.json({ error: '未授權' }, { status: 401 });
+  if (!can(me, 'refund')) return NextResponse.json({ error: '這個帳號沒有「退貨 / 作廢」的權限' }, { status: 403 });
   const { id } = await params;
   const body = await request.json().catch(() => null);
   const supabase = await shopAdminClient();
@@ -56,11 +57,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const method = String(body?.method ?? '').trim().slice(0, 20) || order.pos?.payments?.[0]?.method || CASH;
   const restock = body?.restock !== false;
   const reason = String(body?.reason ?? '').trim().slice(0, 200);
-  const actor = admin.email ?? 'POS';
+  const actor = me.label || 'POS';
   const now = new Date().toISOString();
   // 退回來的商品加到目前這台 POS 所在的據點(沒帶就用原本結帳的據點)
   const locations = await ensureLocations(supabase);
-  const location = pickLocation(locations, String(body?.location_id ?? '') || order.pos_location_id);
+  const location = pickLocation(allowedLocations(me, locations), String(body?.location_id ?? '') || order.pos_location_id);
   const shop = await getCurrentShop();
   const session = await openSession(supabase, location);
 

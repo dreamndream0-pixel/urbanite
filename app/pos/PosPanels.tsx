@@ -153,7 +153,7 @@ export function VariantPicker({ product, binding, onPick, onClose }: { product: 
 }
 
 // ---------- 單一品項:改數量 / 改價 ----------
-export function LineEditor({ line, onSave, onRemove, onClose }: { line: CartLine; onSave: (patch: Partial<CartLine>) => void; onRemove: () => void; onClose: () => void }) {
+export function LineEditor({ line, canPrice, onSave, onRemove, onClose }: { line: CartLine; canPrice: boolean; onSave: (patch: Partial<CartLine>) => void; onRemove: () => void; onClose: () => void }) {
   const [price, setPrice] = useState(String(line.price));
   const [qty, setQty] = useState(String(line.quantity));
   const off = (pct: number) => setPrice(String(Math.round((line.listPrice * (100 - pct)) / 100)));
@@ -167,9 +167,10 @@ export function LineEditor({ line, onSave, onRemove, onClose }: { line: CartLine
       {line.variant ? <p className="mb-3 text-sm! text-[#8a7f72]">{line.variant}</p> : null}
       <div className="grid grid-cols-2 gap-3">
         <label><span className={label}>數量</span><input className={input} inputMode="numeric" value={qty} onChange={(e) => setQty(e.target.value)} onFocus={(e) => e.target.select()} /></label>
-        <label><span className={label}>單價(定價 {posMoney(line.listPrice)})</span><input className={input} inputMode="numeric" value={price} onChange={(e) => setPrice(e.target.value)} onFocus={(e) => e.target.select()} /></label>
+        <label><span className={label}>單價(定價 {posMoney(line.listPrice)})</span><input className={input} inputMode="numeric" value={price} disabled={!canPrice} onChange={(e) => setPrice(e.target.value)} onFocus={(e) => e.target.select()} /></label>
       </div>
-      <div className="mt-3 flex flex-wrap gap-2">
+      {!canPrice ? <p className="mt-2 text-xs! text-[#8a7f72]">這個帳號不能改價。</p> : null}
+      <div className={`mt-3 flex flex-wrap gap-2 ${canPrice ? '' : 'hidden'}`}>
         {[5, 10, 15, 20, 30, 50].map((p) => <button key={p} type="button" className={`${chip} border-[#d7c9bd]`} onClick={() => off(p)}>{100 - p === 50 ? '5 折' : `${(100 - p) / 10} 折`}</button>)}
         <button type="button" className={`${chip} border-[#d7c9bd]`} onClick={() => setPrice(String(line.listPrice))}>原價</button>
         <button type="button" className={`${chip} border-[#d7c9bd]`} onClick={() => setPrice('0')}>贈品</button>
@@ -179,7 +180,7 @@ export function LineEditor({ line, onSave, onRemove, onClose }: { line: CartLine
 }
 
 // ---------- 整筆折扣 / 折扣碼 ----------
-export function DiscountEditor({ subtotal, discount, code, onSave, onClose }: { subtotal: number; discount: PosDiscount | null; code: string; onSave: (d: PosDiscount | null, code: string) => void; onClose: () => void }) {
+export function DiscountEditor({ subtotal, discount, code, canManual, onSave, onClose }: { subtotal: number; canManual: boolean; discount: PosDiscount | null; code: string; onSave: (d: PosDiscount | null, code: string) => void; onClose: () => void }) {
   const [type, setType] = useState<PosDiscount['type']>(discount?.type ?? 'amount');
   const [value, setValue] = useState(discount ? String(discount.value) : '');
   const [coupon, setCoupon] = useState(code);
@@ -188,9 +189,10 @@ export function DiscountEditor({ subtotal, discount, code, onSave, onClose }: { 
     <Modal title="整筆折扣" onClose={onClose} footer={
       <div className="flex gap-2">
         <button type="button" className={btn} onClick={() => onSave(null, '')}>清除</button>
-        <button type="button" className={`${btnDark} flex-1`} onClick={() => onSave(n > 0 ? { type, value: type === 'percent' ? Math.min(100, n) : Math.floor(n) } : null, coupon.trim().toUpperCase())}>套用</button>
+        <button type="button" className={`${btnDark} flex-1`} onClick={() => onSave(!canManual ? discount : n > 0 ? { type, value: type === 'percent' ? Math.min(100, n) : Math.floor(n) } : null, coupon.trim().toUpperCase())}>套用</button>
       </div>
     }>
+      {canManual ? <>
       <div className="mb-3 flex gap-2">
         <button type="button" className={`${chip} ${type === 'amount' ? 'border-[#1f1b19] bg-[#1f1b19] text-white' : 'border-[#d7c9bd]'}`} onClick={() => setType('amount')}>折金額</button>
         <button type="button" className={`${chip} ${type === 'percent' ? 'border-[#1f1b19] bg-[#1f1b19] text-white' : 'border-[#d7c9bd]'}`} onClick={() => setType('percent')}>折 %</button>
@@ -199,6 +201,7 @@ export function DiscountEditor({ subtotal, discount, code, onSave, onClose }: { 
         <input className={input} inputMode="decimal" value={value} onChange={(e) => setValue(e.target.value)} placeholder="0" autoFocus /></label>
       {type === 'percent' ? <div className="mt-2 flex flex-wrap gap-2">{[5, 10, 15, 20, 30].map((p) => <button key={p} type="button" className={`${chip} border-[#d7c9bd]`} onClick={() => setValue(String(p))}>{(100 - p) / 10} 折</button>)}</div> : null}
       <p className="mt-2 text-xs! text-[#8a7f72]">小計 {posMoney(subtotal)}</p>
+      </> : <p className="text-sm! text-[#8a7f72]">這個帳號不能手動折扣,只能輸入折扣碼。</p>}
       <label className="mt-4 block"><span className={label}>折扣碼(選填)</span>
         <input className={input} value={coupon} onChange={(e) => setCoupon(e.target.value)} placeholder="輸入折扣碼" autoCapitalize="characters" /></label>
     </Modal>
@@ -367,7 +370,7 @@ function RefundModal({ order, methods, onDone, onClose }: { order: Order; method
 }
 
 // ---------- POS 訂單(今日 / 指定日期 / 搜尋) ----------
-export function OrdersPanel({ settings, shopName, onPrint, onChanged, onClose }: { settings: PosSettings; shopName: string; onPrint: (o: Order) => void; onChanged: () => void; onClose: () => void }) {
+export function OrdersPanel({ settings, shopName, canRefund, onPrint, onChanged, onClose }: { settings: PosSettings; shopName: string; canRefund: boolean; onPrint: (o: Order) => void; onChanged: () => void; onClose: () => void }) {
   const [date, setDate] = useState(todayTaipei());
   const [q, setQ] = useState('');
   const [orders, setOrders] = useState<Order[] | null>(null);
@@ -407,7 +410,7 @@ export function OrdersPanel({ settings, shopName, onPrint, onChanged, onClose }:
                   <div className="mx-auto max-w-[300px]"><Receipt order={o} settings={settings} shopName={shopName} /></div>
                   <div className="mt-3 flex gap-2">
                     <button type="button" className={`${btn} flex-1`} onClick={() => onPrint(o)}>重印收據</button>
-                    <button type="button" disabled={returned} className={`${btnDanger} flex-1`} onClick={() => setRefund(o)}>退貨 / 作廢</button>
+                    {canRefund ? <button type="button" disabled={returned} className={`${btnDanger} flex-1`} onClick={() => setRefund(o)}>退貨 / 作廢</button> : null}
                   </div>
                 </div>
               ) : null}
@@ -526,10 +529,12 @@ export function SettingsPanel({ settings, location, onSaved, onLocations, onClos
   async function save() {
     setBusy(true);
     try {
-      const saved = await api<PosSettings>('/api/pos/settings', { method: 'PUT', body: JSON.stringify({ ...draft, paymentMethods: [CASH, ...methods.split(/[、,,\n]/).map((m) => m.trim()).filter(Boolean)] }) });
-      const r = await api<{ locations: StockLocation[] }>('/api/admin/stock-locations', { method: 'PATCH', body: JSON.stringify({ id: location.id, invoice_enabled: inv.enabled, invoice_prefix: inv.prefix, invoice_next: toInt(inv.next), invoice_end: toInt(inv.end) }) });
+      const r = await api<{ settings: PosSettings; locations: StockLocation[] }>('/api/pos/settings', { method: 'PUT', body: JSON.stringify({
+        ...draft, paymentMethods: [CASH, ...methods.split(/[、,,\n]/).map((m) => m.trim()).filter(Boolean)],
+        invoice: { location_id: location.id, invoice_enabled: inv.enabled, invoice_prefix: inv.prefix, invoice_next: toInt(inv.next), invoice_end: toInt(inv.end) },
+      }) });
       onLocations(r.locations);
-      onSaved(saved); uiToast('已儲存'); onClose();
+      onSaved(r.settings); uiToast('已儲存'); onClose();
     } catch (e) { uiToast(errMsg(e)); } finally { setBusy(false); }
   }
   return (

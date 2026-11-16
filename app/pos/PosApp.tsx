@@ -7,6 +7,8 @@ import { canOptimizeStoreImage } from '@/lib/store-image';
 import { findByCode, manualDiscountAmount, posMoney, variantKey, type PosButton, type PosDiscount, type PosProduct, type PosSettings } from '@/lib/pos';
 import type { StockLocation } from '@/lib/stock-locations';
 import { ButtonGrid, ButtonModal, LocationPicker } from './PosButtons';
+import { posSignOut } from './PosSignOut';
+import type { PosPermission } from '@/lib/pos';
 import type { Order } from '@/lib/types';
 import { uiConfirm } from '@/lib/ui-dialog';
 import { uiToast } from '@/lib/ui-toast';
@@ -234,6 +236,8 @@ export default function PosApp() {
 
   const { settings, shop, session, buttons, locations } = boot;
   const here = boot.location;
+  // 員工只看得到、用得到被勾選的功能(伺服器也會再檢查一次)
+  const can = (p: PosPermission) => boot.me.isAdmin || boot.me.permissions.includes(p);
   const showButtons = buttons.length > 0 && view === 'buttons' && !search.trim() && !bindCode;
   const nextInvoice = here.invoice_enabled ? (here.invoice_next <= here.invoice_end ? `${here.invoice_prefix}${String(here.invoice_next).padStart(8, '0')}` : '號碼已用完') : '';
   const lineQty = (productId: string, variant?: string) => lines.filter((l) => l.productId === productId && (variant === undefined || l.variant === variant)).reduce((n, l) => n + l.quantity, 0);
@@ -314,10 +318,11 @@ export default function PosApp() {
 
   const menu: { key: string; label: string; onClick: () => void }[] = [
     { key: 'holds', label: `取單${holds.length ? `(${holds.length})` : ''}`, onClick: () => setPanel('holds') },
-    { key: 'orders', label: '訂單 / 退貨', onClick: () => setPanel('orders') },
-    { key: 'session', label: session ? '班別 / 交班' : '開班', onClick: () => setPanel('session') },
-    { key: 'settings', label: '設定', onClick: () => setPanel('settings') },
+    ...(can('orders') ? [{ key: 'orders', label: can('refund') ? '訂單 / 退貨' : '訂單', onClick: () => setPanel('orders') }] : []),
+    ...(can('session') ? [{ key: 'session', label: session ? '班別 / 交班' : '開班', onClick: () => setPanel('session') }] : []),
+    ...(can('settings') ? [{ key: 'settings', label: '設定', onClick: () => setPanel('settings') }] : []),
     ...(locations.length > 1 ? [{ key: 'location', label: `據點:${here.name}`, onClick: () => setPanel('location') }] : []),
+    { key: 'logout', label: `登出(${boot.me.name})`, onClick: () => { void uiConfirm(lines.length ? '登出會清空目前的購物車,確定登出?' : `登出 ${boot.me.name}?`).then((ok) => { if (ok) void posSignOut(); }); } },
   ];
 
   return (
@@ -327,14 +332,14 @@ export default function PosApp() {
         <header className="flex shrink-0 items-center gap-2 border-b border-[#e5ded4] bg-white px-3 py-2">
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm! font-bold! tracking-wide">{shop.name} <span className="font-medium! text-[#8a7f72]">POS{locations.length > 1 ? ` · ${here.name}` : ''}</span></p>
-            <button type="button" onClick={() => setPanel('session')} className="flex items-center gap-1.5 text-xs! text-[#8a7f72]">
+            <button type="button" onClick={() => { if (can('session')) setPanel('session'); }} className="flex items-center gap-1.5 text-xs! text-[#8a7f72]">
               <span className={`h-2 w-2 rounded-full ${session ? 'bg-[#2fa866]' : 'bg-[#d0c6b8]'}`} />
               {session ? `營業中 · ${session.summary.orders} 筆 · ${posMoney(session.summary.gross - session.summary.refunds)}` : '尚未開班'}
             </button>
           </div>
           <nav className="hidden items-center gap-1.5 md:flex">
             {menu.map((m) => <button key={m.key} type="button" onClick={m.onClick} className="rounded-lg px-3 py-2 text-sm! font-medium! text-[#5f5852] hover:bg-[#f3ede4]">{m.label}</button>)}
-            <a href="/admin" className="rounded-lg px-3 py-2 text-sm! font-medium! text-[#5f5852] hover:bg-[#f3ede4]">後台</a>
+            {boot.me.isAdmin ? <a href="/admin" className="rounded-lg px-3 py-2 text-sm! font-medium! text-[#5f5852] hover:bg-[#f3ede4]">後台</a> : null}
           </nav>
           <button type="button" aria-label="選單" onClick={() => setMenuOpen(true)} className="grid h-10 w-10 shrink-0 place-items-center rounded-lg border border-[#e5ded4] md:hidden">
             <span className="block w-4 space-y-1"><i className="block h-0.5 bg-[#1f1b19]" /><i className="block h-0.5 bg-[#1f1b19]" /><i className="block h-0.5 bg-[#1f1b19]" /></span>
@@ -356,7 +361,7 @@ export default function PosApp() {
               ) : unknownCode ? (
                 <div className="flex items-center justify-between gap-2 rounded-xl bg-[#fbeef1] px-3 py-2 text-sm! text-[#a13552]">
                   <span className="min-w-0">找不到 <b className="break-all">{unknownCode}</b></span>
-                  <span className="flex shrink-0 gap-3"><button type="button" className="underline" onClick={() => { setBindCode(unknownCode); setUnknownCode(''); }}>綁定到商品</button><button type="button" className="underline" onClick={() => setUnknownCode('')}>關閉</button></span>
+                  <span className="flex shrink-0 gap-3">{can('barcode') ? <button type="button" className="underline" onClick={() => { setBindCode(unknownCode); setUnknownCode(''); }}>綁定到商品</button> : null}<button type="button" className="underline" onClick={() => setUnknownCode('')}>關閉</button></span>
                 </div>
               ) : null}
               <div className={`-mx-3 flex gap-2 overflow-x-auto px-3 pb-1 [scrollbar-width:none] ${showButtons ? 'hidden' : ''}`}>
@@ -410,16 +415,16 @@ export default function PosApp() {
         {menuOpen ? (
           <div className="fixed inset-0 z-[46] bg-black/40 md:hidden" onClick={() => setMenuOpen(false)}>
             <div className="absolute right-0 top-0 flex h-full w-64 max-w-[80vw] flex-col gap-1 bg-white p-3 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-              <p className="truncate px-3 py-2 text-xs! text-[#8a7f72]">{boot.cashier}</p>
+              <p className="truncate px-3 py-2 text-xs! text-[#8a7f72]">{boot.me.name} · {boot.me.isAdmin ? '管理員' : '員工'}</p>
               {menu.map((m) => <button key={m.key} type="button" onClick={() => { setMenuOpen(false); m.onClick(); }} className="rounded-lg px-3 py-3 text-left text-sm! font-medium! active:bg-[#f3ede4]">{m.label}</button>)}
-              <a href="/admin" className="rounded-lg px-3 py-3 text-sm! font-medium! active:bg-[#f3ede4]">回後台</a>
+              {boot.me.isAdmin ? <a href="/admin" className="rounded-lg px-3 py-3 text-sm! font-medium! active:bg-[#f3ede4]">回後台</a> : null}
             </div>
           </div>
         ) : null}
 
         {/* 彈窗 */}
         {picker ? <VariantPicker product={picker} binding={bindCode} onClose={() => setPicker(null)} onPick={(v) => { if (bindCode) void bindBarcode(picker, v); else addToCart(picker, v); setPicker(null); }} /> : null}
-        {editingLine ? <LineEditor line={editingLine} onClose={() => setEditing(null)} onRemove={() => { setLines((l) => l.filter((x) => x.id !== editingLine.id)); setEditing(null); }}
+        {editingLine ? <LineEditor line={editingLine} canPrice={can('discount')} onClose={() => setEditing(null)} onRemove={() => { setLines((l) => l.filter((x) => x.id !== editingLine.id)); setEditing(null); }}
           onSave={(patch) => {
             const product = byId.get(editingLine.productId);
             const others = inCart(editingLine.productId, editingLine.variant) - editingLine.quantity;
@@ -429,10 +434,10 @@ export default function PosApp() {
             setLines((l) => (quantity <= 0 ? l.filter((x) => x.id !== editingLine.id) : l.map((x) => (x.id === editingLine.id ? { ...x, ...patch, quantity } : x))));
             setEditing(null);
           }} /> : null}
-        {panel === 'discount' ? <DiscountEditor subtotal={subtotal} discount={discount} code={code} onClose={() => setPanel(null)} onSave={(d, c) => { setDiscount(d); setCode(c); setPanel(null); }} /> : null}
+        {panel === 'discount' ? <DiscountEditor subtotal={subtotal} discount={discount} code={code} canManual={can('discount')} onClose={() => setPanel(null)} onSave={(d, c) => { setDiscount(d); setCode(c); setPanel(null); }} /> : null}
         {panel === 'member' ? <MemberPicker current={member} onClose={() => setPanel(null)} onPick={(m) => { setMember(m); setUseCredit(false); setPanel(null); }} /> : null}
         {panel === 'pay' ? <PayModal total={total} methods={settings.paymentMethods} busy={paying} invoice={nextInvoice} onPay={pay} onClose={() => { if (!paying) setPanel(null); }} /> : null}
-        {panel === 'orders' ? <OrdersPanel settings={settings} shopName={shop.name} onClose={() => setPanel(null)} onChanged={() => void load()} onPrint={(o) => print(<Receipt order={o} settings={settings} shopName={shop.name} />)} /> : null}
+        {panel === 'orders' ? <OrdersPanel settings={settings} shopName={shop.name} canRefund={can('refund')} onClose={() => setPanel(null)} onChanged={() => void load()} onPrint={(o) => print(<Receipt order={o} settings={settings} shopName={shop.name} />)} /> : null}
         {panel === 'session' ? <SessionPanel session={session} shopName={shop.name} onClose={() => setPanel(null)} onPrint={print} onChange={(s: SessionView | null) => setBoot((b) => (b ? { ...b, session: s } : b))} /> : null}
         {openButton ? <ButtonModal button={openButton} products={openButton.productIds.map((id) => byId.get(id)).filter((p): p is PosProduct => Boolean(p))} lineQty={lineQty} onAdd={addToCart} onClose={() => setOpenButton(null)} /> : null}
         {panel === 'location' ? <LocationPicker locations={locations} current={here.id} onClose={() => setPanel(null)} onPick={(id) => void switchLocation(id)} /> : null}
