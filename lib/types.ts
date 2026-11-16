@@ -10,6 +10,7 @@ export type Variant = {
   price?: number | null; // 未設定時沿用商品基本售價
   cost?: number; // 單位成本
   safety?: number; // 安全庫存
+  barcode?: string; // 條碼(POS 掃描用)
   location?: string; // 儲位
 };
 
@@ -52,6 +53,7 @@ export type Product = {
   is_featured: boolean;
   sort_order: number;
   campaign_id?: string | null; // 屬於某個一頁式活動頁;null = 主站商品
+  barcode?: string; // 條碼(沒有規格的商品;有規格的放在 variants[].barcode)
   created_at?: string;
 };
 
@@ -97,6 +99,7 @@ export type SiteSettings = {
   promo_notices?: unknown;
   checkout_fields?: unknown; // 結帳自訂欄位(lib/checkout-fields)
   order_complete_texts?: unknown; // 訂單完成頁文字(lib/order-complete-texts)
+  pos_settings?: unknown; // POS 設定(lib/pos)
   // 網頁頁籤圖示(512×512 PNG);空白 = 預設圖示
   favicon_url?: string;
   updated_at?: string;
@@ -237,6 +240,8 @@ export type OrderItem = {
   item_status?: string; // NORMAL / RETURNING / RETURNED / REFUNDED
   image?: string;
   original_price?: number | null;
+  list_price?: number; // POS 改價前的定價
+  returned_qty?: number; // POS 已退貨數量
 };
 
 export type Order = {
@@ -307,6 +312,10 @@ export type Order = {
   payment_proof_url?: string;
   payment_proof_note?: string;
   user_id?: string | null;
+  // 訂單來源:online(官網)/ pos(門市);POS 明細見 lib/pos.ts PosMeta
+  channel?: string;
+  pos?: import('./pos').PosMeta | null;
+  pos_session_id?: string | null;
   created_at?: string;
 };
 

@@ -1800,6 +1800,11 @@ export default function AdminDashboard({
             ))}
           </nav>
           <div className="mt-auto border-t border-[#e5ded4] p-3">
+            {/* POS 門市結帳:銷售會寫進同一份訂單與庫存 */}
+            <a href="/pos" className="mb-1 flex items-center justify-between rounded-lg bg-[#1f1b19] px-3 py-3 text-sm font-semibold text-white hover:opacity-90">
+              <span>POS 門市結帳</span>
+              <span aria-hidden>→</span>
+            </a>
             <button
               onClick={signOut}
               className="block w-full rounded-lg px-3 py-3 text-left text-sm font-semibold text-[#c84767] hover:bg-[#f3ede4]"
@@ -1971,7 +1976,7 @@ export default function AdminDashboard({
                         className="grid w-full grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-3 border-b border-[#efe8dd] px-4 py-3 text-left last:border-b-0 hover:bg-[#fbf8f3]"
                       >
                         <span className="min-w-0">
-                          <span className="block truncate text-sm font-bold tracking-[0.04em] text-[#1f1b19]">{o.order_no}</span>
+                          <span className="block truncate text-sm font-bold tracking-[0.04em] text-[#1f1b19]">{o.order_no}{o.channel === 'pos' ? <span className="ml-1.5 rounded bg-[#1f1b19] px-1.5 py-0.5 align-middle text-[10px] font-semibold tracking-wider text-white">POS</span> : null}</span>
                           <span className="mt-0.5 block truncate text-xs text-[#8a7f72]">{o.customer_name || o.email}</span>
                         </span>
                         <AdminOverviewStatus status={o.status} />
@@ -2065,6 +2070,7 @@ export default function AdminDashboard({
                               <p className="flex items-center gap-1.5 text-lg font-bold">
                                 {orderNeedsAttention(order, 'admin') ? <AttentionDot /> : null}
                                 {order.order_no}
+                                {order.channel === 'pos' ? <span className="rounded bg-[#1f1b19] px-1.5 py-0.5 text-[10px] font-semibold tracking-wider text-white">POS</span> : null}
                               </p>
                               <p className="mt-0.5 text-xs text-[#8a7f72]">{dateShort}</p>
                             </div>
@@ -4963,7 +4969,7 @@ ${order.note ? `<div class="sec"><h2>備註</h2><p class="muted">${escapeHtml(or
           <div className="min-w-0">
             <p className="text-[11px] font-semibold tracking-[0.28em] text-[#b3a897]">ORDER DETAIL</p>
             <h2 className="mt-1 text-2xl font-bold leading-tight">訂單詳情</h2>
-            <p className="mt-0.5 text-sm text-[#8a7f72]">{order.order_no}</p>
+            <p className="mt-0.5 text-sm text-[#8a7f72]">{order.order_no}{order.channel === 'pos' ? ' · POS 門市' : ''}</p>
           </div>
           <div className="flex items-center gap-2">
             <div className="hidden rounded-xl bg-[#f3ede4] px-3 py-1.5 text-right sm:block">

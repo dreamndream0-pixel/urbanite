@@ -43,7 +43,9 @@ export async function restoreOrderStock(
           (v: { options: string[]; inventory: number }) => ({ ...v }),
         ),
       } as WorkProduct);
-    const quantity = Math.max(1, Math.floor(Number(item.quantity) || 1));
+    // POS 部分退貨時已回補的數量不再回補
+    const quantity = Math.max(1, Math.floor(Number(item.quantity) || 1)) - Math.max(0, Math.floor(Number(item.returned_qty) || 0));
+    if (quantity <= 0) continue;
     const hasVariants = w.variants.length > 0;
     if (hasVariants) {
       const label = String(item.variant ?? '');
