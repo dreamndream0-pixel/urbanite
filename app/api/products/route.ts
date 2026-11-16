@@ -14,7 +14,8 @@ export async function GET(request: NextRequest) {
   const supabase = (await shopAdminClient());
   const campaignId = request.nextUrl.searchParams.get('campaign') ?? '';
   const forCart = request.nextUrl.searchParams.get('cart') === '1';
-  let query = supabase.from('products').select('*').order('sort_order', { ascending: true }).order('created_at', { ascending: false });
+  // 僅門市銷售的商品不提供給官網(後台另外從伺服器讀取)
+  let query = supabase.from('products').select('*').eq('store_only', false).order('sort_order', { ascending: true }).order('created_at', { ascending: false });
   if (campaignId) query = query.eq('campaign_id', campaignId);
   else if (!forCart) query = query.is('campaign_id', null);
   const { data, error } = await query;
@@ -86,6 +87,7 @@ export async function POST(request: Request) {
       unit: body.unit ?? '',
       sale_mode: body.sale_mode ?? '現貨',
       keep_when_sold_out: Boolean(body.keep_when_sold_out),
+      store_only: Boolean(body.store_only),
       color_images: body.color_images ?? {},
       is_featured: body.is_featured ?? false,
       sort_order: sortOrder,

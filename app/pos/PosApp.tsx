@@ -7,7 +7,7 @@ import { canOptimizeStoreImage } from '@/lib/store-image';
 import { findByCode, manualDiscountAmount, posMoney, variantKey, type PosButton, type PosDiscount, type PosProduct, type PosSettings } from '@/lib/pos';
 import type { StockLocation } from '@/lib/stock-locations';
 import { ButtonGrid, ButtonModal, LocationPicker } from './PosButtons';
-import { posSignOut } from './PosSignOut';
+import { posSignOut, posSwitchUser } from './PosSignOut';
 import type { PosPermission } from '@/lib/pos';
 import type { Order } from '@/lib/types';
 import { uiConfirm } from '@/lib/ui-dialog';
@@ -322,7 +322,9 @@ export default function PosApp() {
     ...(can('session') ? [{ key: 'session', label: session ? '班別 / 交班' : '開班', onClick: () => setPanel('session') }] : []),
     ...(can('settings') ? [{ key: 'settings', label: '設定', onClick: () => setPanel('settings') }] : []),
     ...(locations.length > 1 ? [{ key: 'location', label: `據點:${here.name}`, onClick: () => setPanel('location') }] : []),
-    { key: 'logout', label: `登出(${boot.me.name})`, onClick: () => { void uiConfirm(lines.length ? '登出會清空目前的購物車,確定登出?' : `登出 ${boot.me.name}?`).then((ok) => { if (ok) void posSignOut(); }); } },
+    // 管理員的裝置:讓員工用自己的編號登入,銷售才會記在員工名下
+    ...(boot.me.isAdmin ? [{ key: 'switch', label: '員工登入', onClick: () => { void (lines.length ? uiConfirm('換人登入會清空目前的購物車,確定?') : Promise.resolve(true)).then((ok) => { if (ok) posSwitchUser(); }); } }] : []),
+    { key: 'logout', label: `登出(${boot.me.name})`, onClick: () => { void uiConfirm(lines.length ? '登出會清空目前的購物車,確定登出?' : `登出 ${boot.me.name}?`).then((ok) => { if (ok) void posSignOut(boot.me.isAdmin); }); } },
   ];
 
   return (
@@ -382,6 +384,7 @@ export default function PosApp() {
                       className={`relative flex min-w-0 flex-col overflow-hidden rounded-xl border bg-white text-left active:scale-[0.98] ${qty ? 'border-[#1f1b19]' : 'border-[#e5ded4]'} ${out && !settings.allowOversell ? 'opacity-55' : ''}`}>
                       <span className="relative block aspect-square w-full bg-[#f3ede4]">
                         {p.image ? <Image src={p.image} alt="" fill sizes="(min-width: 1024px) 180px, 45vw" className="object-cover" unoptimized={!canOptimizeStoreImage(p.image)} /> : null}
+                        {p.store_only ? <span className="absolute left-1.5 top-1.5 rounded bg-white/90 px-1.5 py-0.5 text-[10px]! font-semibold! text-[#6b6156]">門市限定</span> : null}
                         {qty ? <span className="absolute right-1.5 top-1.5 grid h-6 min-w-6 place-items-center rounded-full bg-[#1f1b19] px-1.5 text-xs! font-bold! text-white">{qty}</span> : null}
                       </span>
                       <span className="block px-2 pb-2 pt-1.5">
@@ -415,7 +418,7 @@ export default function PosApp() {
         {menuOpen ? (
           <div className="fixed inset-0 z-[46] bg-black/40 md:hidden" onClick={() => setMenuOpen(false)}>
             <div className="absolute right-0 top-0 flex h-full w-64 max-w-[80vw] flex-col gap-1 bg-white p-3 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-              <p className="truncate px-3 py-2 text-xs! text-[#8a7f72]">{boot.me.name} · {boot.me.isAdmin ? '管理員' : '員工'}</p>
+              <p className="truncate px-3 py-2 text-xs! text-[#8a7f72]">{boot.me.name} · {boot.me.isAdmin ? '管理員' : `員工 ${boot.me.code}`}</p>
               {menu.map((m) => <button key={m.key} type="button" onClick={() => { setMenuOpen(false); m.onClick(); }} className="rounded-lg px-3 py-3 text-left text-sm! font-medium! active:bg-[#f3ede4]">{m.label}</button>)}
               {boot.me.isAdmin ? <a href="/admin" className="rounded-lg px-3 py-3 text-sm! font-medium! active:bg-[#f3ede4]">回後台</a> : null}
             </div>

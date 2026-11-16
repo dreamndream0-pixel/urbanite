@@ -29,7 +29,7 @@ export default async function AccountPage() {
   ] = await Promise.all([
     supabase.from('orders').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
     supabase.from('customers').select('*').eq('user_id', user.id).maybeSingle(),
-    supabase.from('products').select('*').order('sort_order', { ascending: true }),
+    supabase.from('products').select('*').eq('store_only', false).order('sort_order', { ascending: true }),
     supabase.from('favorites').select('product_id').eq('user_id', user.id),
     supabase.from('discounts').select('*').eq('active', true).order('created_at', { ascending: false }),
   ]);

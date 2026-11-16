@@ -153,6 +153,7 @@ type Draft = {
   unit: string;
   sale_mode: string;
   keep_when_sold_out: boolean;
+  store_only: boolean;
   colorImages: Record<string, string>;
   specs: { name: string; optionsText: string; display?: 'text' | 'image' }[];
   variantStock: Record<string, number>; // key = 各選項用 ' / ' 串起來
@@ -400,6 +401,7 @@ function blankDraft(campaignId: string | null = null, products: Pick<Product, 'i
     unit: '',
     sale_mode: '現貨',
     keep_when_sold_out: false,
+    store_only: false,
     colorImages: {},
     specs: [],
     variantStock: {},
@@ -438,6 +440,7 @@ function toDraft(p: Product): Draft {
     unit: p.unit ?? '',
     sale_mode: p.sale_mode ?? '現貨',
     keep_when_sold_out: Boolean(p.keep_when_sold_out),
+    store_only: Boolean(p.store_only),
     colorImages: p.color_images ?? {},
     specs,
     variantStock,
@@ -2174,7 +2177,7 @@ export default function AdminDashboard({
                   </div>
                 }
               >
-                {/* 商品分類標籤:上架中 / 未上架 / 已售完(純現貨售完自動歸到已售完,補貨後自動回到上架中) */}
+                {/* 商品分類標籤:上架中 / 門市限定(僅門市銷售) / 未上架 / 已售完(純現貨售完自動歸到已售完,補貨後自動回到上架中) */}
                 <div className="mb-4 flex gap-2 overflow-x-auto overflow-y-hidden">
                   {ADMIN_PRODUCT_TABS.map((tab) => {
                     const count = products.filter((product) => !product.campaign_id && adminProductTab(product) === tab).length;
@@ -4973,7 +4976,7 @@ ${order.note ? `<div class="sec"><h2>備註</h2><p class="muted">${escapeHtml(or
           <div className="min-w-0">
             <p className="text-[11px] font-semibold tracking-[0.28em] text-[#b3a897]">ORDER DETAIL</p>
             <h2 className="mt-1 text-2xl font-bold leading-tight">訂單詳情</h2>
-            <p className="mt-0.5 text-sm text-[#8a7f72]">{order.order_no}{order.channel === 'pos' ? ' · POS 門市' : ''}</p>
+            <p className="mt-0.5 text-sm text-[#8a7f72]">{order.order_no}{order.channel === 'pos' ? ` · POS ${order.pos?.location_name || '門市'}${order.pos?.cashier ? ` · 銷售人員 ${order.pos.cashier}` : ''}${order.invoice_no ? ` · 發票 ${order.invoice_no}` : ''}` : ''}</p>
           </div>
           <div className="flex items-center gap-2">
             <div className="hidden rounded-xl bg-[#f3ede4] px-3 py-1.5 text-right sm:block">
@@ -7012,6 +7015,11 @@ function ProductModal({
                 ))}
               </select>
             </Field>
+            {/* 僅門市銷售:官網看不到、不能下單,只有 POS 可以賣(後台商品列表在「門市限定」分頁) */}
+            <label className="mt-3 flex items-start gap-2 text-sm">
+              <input type="checkbox" className="mt-0.5" checked={draft.store_only} onChange={(e) => set('store_only', e.target.checked)} />
+              <span>僅門市銷售<span className="block text-xs text-[#8a7f72]">勾選後這個商品不會出現在官網、也不能在官網下單,只有 POS 可以賣。庫存、進貨、盤點、調貨和一般商品一樣。</span></span>
+            </label>
             {/* 完售不下架:現貨商品賣完時預設會自動從前台下架;勾選後仍顯示(標示已售完、不能購買),補貨後自動恢復可購買 */}
             <label className="mt-3 flex items-start gap-2 text-sm">
               <input type="checkbox" className="mt-0.5" checked={draft.keep_when_sold_out} onChange={(e) => set('keep_when_sold_out', e.target.checked)} />

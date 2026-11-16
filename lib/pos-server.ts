@@ -56,7 +56,7 @@ export async function sessionWithSummary(supabase: SupabaseClient, session: PosS
   return { ...session, summary: summarizeSession(session, (data ?? []) as Pick<Order, 'items' | 'total' | 'pos'>[]) };
 }
 
-export const POS_PRODUCT_COLUMNS = 'id,name,price,inventory,status,category,image,specs,variants,unit,campaign_id,barcode,sort_order,created_at';
+export const POS_PRODUCT_COLUMNS = 'id,name,price,inventory,status,category,image,specs,variants,unit,campaign_id,barcode,store_only,sort_order,created_at';
 
 export async function loadPosProducts(supabase: SupabaseClient) {
   const { data, error } = await supabase.from('products').select(POS_PRODUCT_COLUMNS).order('sort_order', { ascending: true }).order('created_at', { ascending: false });

@@ -5,7 +5,7 @@ import { POS_BUTTON_COLORS, POS_PERMISSIONS, type PosButton, type PosPermission 
 import type { PosStaff } from '@/lib/pos-auth';
 import type { StockLevel, StockLocation, StockTransfer, TransferLine } from '@/lib/stock-locations';
 import type { Category, Product } from '@/lib/types';
-import { uiAlert, uiConfirm } from '@/lib/ui-dialog';
+import { uiAlert, uiConfirm, uiPrompt } from '@/lib/ui-dialog';
 import { uiToast } from '@/lib/ui-toast';
 
 const card = 'rounded-xl border border-[#e5ded4] bg-white p-4 sm:p-5';
@@ -410,11 +410,12 @@ function Buttons({ products, categories }: { products: Product[]; categories: Ca
   );
 }
 
-// ---------- POS 員工:帳號與權限 ----------
+// ---------- POS 員工:員工編號、密碼與權限 ----------
 function Staff({ locations }: { locations: StockLocation[] }) {
   const [list, setList] = useState<PosStaff[] | null>(null);
-  const [email, setEmail] = useState('');
+  const [code, setCode] = useState('');
   const [name, setName] = useState('');
+  const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
   useEffect(() => { const t = setTimeout(() => { api<PosStaff[]>('/api/admin/pos-staff').then(setList).catch(() => setList([])); }, 0); return () => clearTimeout(t); }, []);
   const run = async (fn: () => Promise<PosStaff[]>, done?: string) => {
@@ -424,27 +425,38 @@ function Staff({ locations }: { locations: StockLocation[] }) {
   const patch = (id: string, body: Record<string, unknown>, done?: string) => run(() => api('/api/admin/pos-staff', { method: 'PATCH', body: JSON.stringify({ id, ...body }) }), done);
   const toggle = <T,>(arr: T[], v: T) => (arr.includes(v) ? arr.filter((x) => x !== v) : [...arr, v]);
   const places = locations.filter((l) => l.active);
+  const money = (n: number) => `NT$${Math.round(n).toLocaleString('en-US')}`;
+
+  async function resetPassword(staff: PosStaff) {
+    const next = await uiPrompt(`幫「${staff.name || staff.code}」設定新密碼(至少 4 個字)`);
+    if (next === null) return;
+    void patch(staff.id, { password: next }, '密碼已更新');
+  }
 
   return (
     <div className="space-y-4">
       <div className={card}>
         <p className="text-sm font-semibold">新增 POS 員工</p>
-        <p className="mt-1 text-xs text-[#8a7f72]">員工先在官網註冊會員(或用 Google / LINE 登入),把他的會員 Email 填在這裡。之後他用自己的帳號打開 <b>/pos</b> 就能結帳,但進不了後台。每一筆單、每一次退貨都會記下是誰做的。</p>
+        <p className="mt-1 text-xs text-[#8a7f72]">在這裡幫員工建立「員工編號」和「密碼」。員工打開 <b>/pos</b>,用員工編號和密碼登入就能結帳,不需要會員帳號,也進不了後台。每一筆 POS 訂單都會記下是哪位員工賣的。</p>
         <div className="mt-3 flex flex-wrap gap-2">
-          <input className={`${input} max-w-xs flex-1`} type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="員工的會員 Email" />
-          <input className={`${input} max-w-[180px] flex-1`} value={name} onChange={(e) => setName(e.target.value)} placeholder="姓名(印在收據)" maxLength={30} />
-          <button type="button" className={btnDark} disabled={busy || !email.trim()} onClick={async () => { if (await run(() => api('/api/admin/pos-staff', { method: 'POST', body: JSON.stringify({ email, name, permissions: ['orders'] }) }), '已新增')) { setEmail(''); setName(''); } }}>新增</button>
+          <input className={`${input} max-w-[160px] flex-1`} value={code} onChange={(e) => setCode(e.target.value)} placeholder="員工編號(例:A01)" maxLength={20} autoComplete="off" />
+          <input className={`${input} max-w-[180px] flex-1`} value={name} onChange={(e) => setName(e.target.value)} placeholder="姓名(印在收據)" maxLength={30} autoComplete="off" />
+          <input className={`${input} max-w-[180px] flex-1`} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="密碼(至少 4 個字)" maxLength={64} autoComplete="new-password" />
+          <button type="button" className={btnDark} disabled={busy || !code.trim() || password.length < 4} onClick={async () => { if (await run(() => api('/api/admin/pos-staff', { method: 'POST', body: JSON.stringify({ code, name, password, permissions: ['orders'] }) }), '已新增')) { setCode(''); setName(''); setPassword(''); } }}>新增</button>
         </div>
+        <p className="mt-2 text-xs text-[#8a7f72]">密碼存進系統後就看不到了;員工忘記密碼時,按「重設密碼」幫他設新的。連續輸錯 5 次會鎖 5 分鐘,重設密碼可以馬上解鎖。</p>
       </div>
 
-      {!list ? <p className="text-sm text-[#8a7f72]">讀取中…</p> : !list.length ? <div className={card}><p className="text-sm text-[#6b6156]">還沒有 POS 員工。沒有加員工時,只有能進後台的管理員可以用 POS。</p></div> : list.map((s) => (
+      {!list ? <p className="text-sm text-[#8a7f72]">讀取中…</p> : !list.length ? <div className={card}><p className="text-sm text-[#6b6156]">還沒有 POS 員工。沒有員工時,只有能進後台的管理員可以用 POS。</p></div> : list.map((s) => (
         <div key={s.id} className={`${card} ${s.active ? '' : 'opacity-60'}`}>
           <div className="flex flex-wrap items-center gap-2">
-            <input className={`${input} max-w-[180px] flex-1 font-semibold!`} defaultValue={s.name} placeholder="姓名" maxLength={30} onBlur={(e) => { const v = e.target.value.trim(); if (v !== s.name) void patch(s.id, { name: v }, '已更新'); }} />
-            <span className="min-w-0 flex-1 truncate text-sm text-[#6b6156]">{s.email}</span>
+            <label className="flex items-center gap-1.5 text-xs text-[#8a7f72]">編號<input className={`${input} w-24 font-semibold!`.replace('w-full ', '')} defaultValue={s.code} maxLength={20} onBlur={(e) => { const v = e.target.value.trim(); if (v && v !== s.code) void patch(s.id, { code: v }, '已更新').then((ok) => { if (!ok) e.target.value = s.code; }); else e.target.value = s.code; }} /></label>
+            <label className="flex min-w-[140px] flex-1 items-center gap-1.5 text-xs text-[#8a7f72]">姓名<input className={`${input} font-semibold!`} defaultValue={s.name} placeholder="姓名" maxLength={30} onBlur={(e) => { const v = e.target.value.trim(); if (v !== s.name) void patch(s.id, { name: v }, '已更新'); }} /></label>
+            <button type="button" className={btn} disabled={busy} onClick={() => void resetPassword(s)}>重設密碼</button>
             <button type="button" className={btn} disabled={busy} onClick={() => void patch(s.id, { active: !s.active }, s.active ? '已停用' : '已啟用')}>{s.active ? '停用' : '啟用'}</button>
-            <button type="button" className={`${btn} text-[#c84767]`} disabled={busy} onClick={async () => { if (await uiConfirm(`移除「${s.name || s.email}」?移除後他馬上不能再進 POS。`)) void run(() => api(`/api/admin/pos-staff?id=${s.id}`, { method: 'DELETE' }), '已移除'); }}>移除</button>
+            <button type="button" className={`${btn} text-[#c84767]`} disabled={busy} onClick={async () => { if (await uiConfirm(`移除「${s.name || s.code}」?移除後他馬上不能再登入 POS;已經賣出的訂單仍會保留銷售人員。`)) void run(() => api(`/api/admin/pos-staff?id=${s.id}`, { method: 'DELETE' }), '已移除'); }}>移除</button>
           </div>
+          <p className="mt-2 text-xs text-[#8a7f72]">本月銷售 {s.stats?.orders ?? 0} 筆 · {money(s.stats?.net ?? 0)}{s.last_login_at ? ` · 上次登入 ${dateTime(s.last_login_at)}` : ' · 還沒登入過'}</p>
           <p className="mt-4 text-xs font-medium text-[#8a7f72]">可以做的事(結帳、找會員、掛單不用勾,每個員工都可以)</p>
           <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
             {POS_PERMISSIONS.map((p) => (

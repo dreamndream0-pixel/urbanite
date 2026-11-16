@@ -18,7 +18,7 @@ export type SessionView = PosSession & { summary: PosSessionSummary };
 export type Boot = {
   shop: { name: string; logo: string };
   cashier: string;
-  me: { email: string; name: string; isAdmin: boolean; permissions: PosPermission[] };
+  me: { code: string; name: string; isAdmin: boolean; permissions: PosPermission[] };
   products: PosProduct[];
   categories: { slug: string; name: string; parent_id?: string | null; campaign_id?: string | null }[];
   locations: StockLocation[];

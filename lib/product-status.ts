@@ -1,6 +1,6 @@
 import type { Product } from '@/lib/types';
 
-type StockFields = Pick<Product, 'status' | 'sale_mode' | 'inventory' | 'variants'> & { keep_when_sold_out?: boolean };
+type StockFields = Pick<Product, 'status' | 'sale_mode' | 'inventory' | 'variants'> & { keep_when_sold_out?: boolean; store_only?: boolean };
 
 // 後台「未上架」狀態(資料庫值沿用 '已下架')
 export const UNLISTED_STATUS = '已下架';
@@ -24,17 +24,19 @@ export function isAutoDelisted(product: StockFields) {
   return !product.keep_when_sold_out && !isPreorder(product) && isProductSoldOut(product);
 }
 
-// 前台是否顯示
+// 前台是否顯示(僅門市銷售的商品官網一律不顯示)
 export function isVisibleInStore(product: StockFields) {
-  return product.status !== UNLISTED_STATUS && !isAutoDelisted(product);
+  return !product.store_only && product.status !== UNLISTED_STATUS && !isAutoDelisted(product);
 }
 
 // 後台商品分類標籤
-export type AdminProductTab = '上架中' | '未上架' | '已售完';
-export const ADMIN_PRODUCT_TABS: AdminProductTab[] = ['上架中', '未上架', '已售完'];
+export type AdminProductTab = '上架中' | '門市限定' | '未上架' | '已售完';
+export const ADMIN_PRODUCT_TABS: AdminProductTab[] = ['上架中', '門市限定', '未上架', '已售完'];
 
 export function adminProductTab(product: StockFields): AdminProductTab {
   if (product.status === UNLISTED_STATUS) return '未上架';
+  // 僅門市銷售:不在官網,另外一個分頁(售完也留在這裡,方便補貨)
+  if (product.store_only) return '門市限定';
   // 完售不下架的商品也歸在「已售完」,方便看哪些要補貨
   if (!isPreorder(product) && isProductSoldOut(product)) return '已售完';
   return '上架中';

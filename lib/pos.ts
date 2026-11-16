@@ -107,6 +107,8 @@ export type PosMeta = {
   change: number;
   manual_discount: number;
   discount_label?: string;
+  staff_id?: string; // 銷售人員(POS 員工;管理員結帳時沒有)
+  staff_code?: string;
   location_id?: string; // 結帳的分店 / 倉庫
   location_name?: string;
   refunds?: PosRefundEntry[];
@@ -170,7 +172,7 @@ export function summarizeSession(session: Pick<PosSession, 'opening_cash' | 'cas
 }
 
 // POS 前台用的精簡商品資料
-export type PosProduct = Pick<Product, 'id' | 'name' | 'price' | 'inventory' | 'status' | 'category' | 'image' | 'specs' | 'variants' | 'unit' | 'campaign_id'> & { barcode: string };
+export type PosProduct = Pick<Product, 'id' | 'name' | 'price' | 'inventory' | 'status' | 'category' | 'image' | 'specs' | 'variants' | 'unit' | 'campaign_id' | 'store_only'> & { barcode: string };
 
 export const variantKey = (options: string[]) => options.join(' / ');
 

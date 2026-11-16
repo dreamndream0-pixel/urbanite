@@ -25,6 +25,7 @@ const EDITABLE: (keyof Product)[] = [
   'unit',
   'sale_mode',
   'keep_when_sold_out',
+  'store_only',
   'color_images',
   'is_featured',
   'sort_order',

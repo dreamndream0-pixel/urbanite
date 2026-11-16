@@ -132,6 +132,7 @@ export async function POST(request: Request) {
     if (!product) {
       return NextResponse.json({ error: `找不到商品:${item.productId}` }, { status: 400 });
     }
+    if (product.store_only) return NextResponse.json({ error: `「${product.name}」僅在門市販售,無法在官網訂購` }, { status: 409 });
     const quantity = Math.max(1, Math.floor(Number(item.quantity) || 1));
     // 有規格的商品:檢查對應規格組合的庫存;否則檢查總庫存
     const variants = Array.isArray(product.variants) ? product.variants : [];

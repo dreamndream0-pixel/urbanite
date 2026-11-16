@@ -2,12 +2,14 @@
 
 import { createBrowserSupabase } from '@/lib/supabase/client';
 
-// 登出並回到 POS 登入頁(換另一個帳號)
-export async function posSignOut() {
-  await createBrowserSupabase().auth.signOut();
-  window.location.href = '/login?next=/pos';
+// POS 登出:員工清掉員工登入;管理員另外登出後台帳號。之後回到 POS 員工登入頁。
+export async function posSignOut(isAdmin: boolean) {
+  await fetch('/api/pos/login', { method: 'DELETE' }).catch(() => {});
+  if (isAdmin) await createBrowserSupabase().auth.signOut().catch(() => {});
+  window.location.href = '/pos';
 }
 
-export default function PosSignOut() {
-  return <button type="button" onClick={() => void posSignOut()} className="mt-5 rounded-xl border border-[#1f1b19] bg-[#1f1b19] px-5 py-2.5 text-sm! font-semibold! text-white">換一個帳號登入</button>;
+// 換人登入:管理員的裝置上讓員工用自己的編號登入(不登出管理員的後台)
+export function posSwitchUser() {
+  window.location.href = '/pos?login=1';
 }

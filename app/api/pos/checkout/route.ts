@@ -157,6 +157,7 @@ export async function POST(request: Request) {
   const pos: PosMeta & { client_id?: string } = {
     cashier, payments: applied, tendered: total > 0 ? pay.tendered : 0, change: total > 0 ? pay.change : 0,
     manual_discount: manualDiscount, location_id: location.id, location_name: location.name,
+    ...(me.staffId ? { staff_id: me.staffId, staff_code: me.code } : {}),
     ...(manualDiscount && rawDiscount ? { discount_label: rawDiscount.type === 'percent' ? `折 ${Number(rawDiscount.value)}%` : '折讓' } : {}),
     ...(clientId ? { client_id: clientId } : {}),
   };

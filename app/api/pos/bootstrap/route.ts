@@ -29,7 +29,7 @@ export async function GET(request: Request) {
     return NextResponse.json({
       shop: { name: shop?.name ?? 'URBANITE', logo: settings?.logo_url ?? '' },
       cashier: me.name,
-      me: { email: me.email, name: me.name, isAdmin: me.isAdmin, permissions: me.permissions },
+      me: { code: me.code, name: me.name, isAdmin: me.isAdmin, permissions: me.permissions },
       locations,
       location,
       products: withLocationStock(products, levels, location),
