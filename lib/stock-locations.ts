@@ -81,9 +81,9 @@ export function withLocationStock<T extends StockShape>(products: T[], levels: S
   return products.map((p) => {
     if (p.variants?.length) {
       const variants = p.variants.map((v) => ({ ...v, inventory: Math.max(0, read(p.id, v.options.join(' / '))) }));
-      return { ...p, variants, inventory: variants.reduce((n, v) => n + v.inventory, 0) };
+      return { ...p, variants, inventory: variants.reduce((n, v) => n + v.inventory, 0), total_inventory: p.inventory ?? 0 };
     }
-    return { ...p, inventory: Math.max(0, read(p.id, '')) };
+    return { ...p, inventory: Math.max(0, read(p.id, '')), total_inventory: p.inventory ?? 0 };
   });
 }
 

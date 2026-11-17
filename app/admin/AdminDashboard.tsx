@@ -546,6 +546,7 @@ export default function AdminDashboard({
     payment_status: '',
     payment_no: '',
     location: '',
+    location_id: '', // 分店 / 倉庫(空 = 預設據點)
     handler: '',
     note: '',
   });
@@ -1040,6 +1041,7 @@ export default function AdminDashboard({
           quantity: line.quantity,
           unit_price: line.unit_price,
           location: mvForm.location,
+          location_id: mvForm.location_id,
           handler: mvForm.handler,
           note: documentNote,
         }),
@@ -2537,6 +2539,7 @@ export default function AdminDashboard({
               movementLines={movementLines}
               setMovementLines={setMovementLines}
               onAddMovement={addMovement}
+              multiLocation={shopFeatures.multi_location}
               onUpdateVariantMeta={updateVariantMeta}
               onDeleteProduct={deleteProduct}
               onDeleteStockRow={deleteStockRow}
@@ -5377,6 +5380,7 @@ function historyLabel(h: OrderStatusHistory): string {
 }
 
 type MvForm = {
+  location_id: string;
   document_no: string;
   document_date: string;
   type: 'in' | 'out';
@@ -5624,7 +5628,9 @@ function InventorySection({
   onStocktakeApplied,
   onEditProduct,
   onCreateProduct,
+  multiLocation,
 }: {
+  multiLocation: boolean;
   products: Product[];
   categories: Category[];
   movements: StockMovement[];
@@ -5646,6 +5652,16 @@ function InventorySection({
   onEditProduct: (product: Product) => void;
   onCreateProduct: () => void;
 }) {
+  // 分店 / 倉庫(有開通才讀):進出庫單選據點用
+  const [stockPlaces, setStockPlaces] = useState<{ id: string; name: string; is_default: boolean; active: boolean }[]>([]);
+  useEffect(() => {
+    if (!multiLocation) return;
+    const t = setTimeout(() => {
+      fetch('/api/admin/stock-locations', { cache: 'no-store' }).then((r) => r.json()).then((d) => setStockPlaces((d.locations ?? []).filter((l: { active: boolean }) => l.active))).catch(() => {});
+    }, 0);
+    return () => clearTimeout(t);
+  }, [multiLocation]);
+  const placeName = (id?: string | null) => stockPlaces.find((l) => l.id === id)?.name ?? '';
   const [inventoryFilters, setInventoryFilters] = useState({
     query: '',
     category: 'all',
@@ -5765,6 +5781,7 @@ function InventorySection({
       payment_status: '',
       payment_no: '',
       location: '',
+      location_id: mvForm.location_id,
       handler: '',
       note: '',
     });
@@ -6238,8 +6255,20 @@ function InventorySection({
                 className="w-full rounded-lg border border-[#e5ded4] bg-white px-3 py-2"
               />
             </label>
+            {stockPlaces.length > 1 ? (
+              <label className="block">
+                <span className="mb-1 block text-sm font-semibold text-[#8a7f72]">* {mvForm.type === 'in' ? '入庫到哪個據點' : '從哪個據點出庫'}</span>
+                <select
+                  value={mvForm.location_id || stockPlaces.find((l) => l.is_default)?.id || ''}
+                  onChange={(e) => setMvForm({ ...mvForm, location_id: e.target.value })}
+                  className="w-full rounded-lg border border-[#e5ded4] bg-white px-3 py-2"
+                >
+                  {stockPlaces.map((l) => <option key={l.id} value={l.id}>{l.name}{l.is_default ? '(預設)' : ''}</option>)}
+                </select>
+              </label>
+            ) : null}
             <label className="block">
-              <span className="mb-1 block text-sm font-semibold text-[#8a7f72]">倉別 / 對象</span>
+              <span className="mb-1 block text-sm font-semibold text-[#8a7f72]">{stockPlaces.length > 1 ? '對象 / 廠商' : '倉別 / 對象'}</span>
               <input
                 value={mvForm.location}
                 onChange={(e) => setMvForm({ ...mvForm, location: e.target.value })}
@@ -6448,7 +6477,7 @@ function InventorySection({
                       <td className="px-2 py-2 text-right">{m.unit_price}</td>
                       <td className="px-2 py-2 text-[#8a7f72]">{doc.payment_status || '—'}</td>
                       <td className="px-2 py-2 text-[#8a7f72]">{doc.payment_no || '—'}</td>
-                      <td className="px-2 py-2 text-[#8a7f72]">{m.location || '—'}</td>
+                      <td className="px-2 py-2 text-[#8a7f72]">{[placeName(m.location_id), m.location].filter(Boolean).join(' · ') || '—'}</td>
                       <td className="px-2 py-2 text-[#8a7f72]">{m.handler || '—'}</td>
                       <td className="px-2 py-2 text-[#8a7f72]">{doc.note || '—'}</td>
                       <td className="px-2 py-2 text-right">
@@ -6501,6 +6530,7 @@ function InventorySection({
                       payment_status: doc.payment_status || '',
                       payment_no: doc.payment_no || '',
                       location: first?.location || '',
+                      location_id: first?.location_id || '',
                       handler: first?.handler || '',
                       note: doc.note || '',
                     });
@@ -6552,7 +6582,7 @@ function InventorySection({
                       </td>
                       <td className="px-3 py-3 text-right">{movement.unit_price}</td>
                       <td className="px-3 py-3 text-right">{(movement.quantity * movement.unit_price).toLocaleString()}</td>
-                      <td className="px-3 py-3 text-[#8a7f72]">{movement.location || '—'}</td>
+                      <td className="px-3 py-3 text-[#8a7f72]">{[placeName(movement.location_id), movement.location].filter(Boolean).join(' · ') || '—'}</td>
                       <td className="px-3 py-3 text-[#8a7f72]">{movement.handler || '—'}</td>
                       <td className="px-3 py-3 text-right">
                         <button

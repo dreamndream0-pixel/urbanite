@@ -23,6 +23,7 @@ export type StockMovement = {
   quantity: number;
   unit_price: number;
   location: string;
+  location_id?: string | null; // 分店 / 倉庫(lib/stock-locations)
   handler: string;
   note: string;
   created_at?: string;

@@ -77,7 +77,7 @@ export function ButtonModal({ button, products, lineQty, onAdd, onClose }: {
                   <span className="line-clamp-2 min-h-[2.5em] text-[13px]! font-medium! leading-tight">{p.name}</span>
                   <span className="mt-1 flex items-baseline justify-between gap-1">
                     <span className="truncate text-sm! font-bold! tabular-nums!">{priceLabel(p)}</span>
-                    <span className={`shrink-0 text-[11px]! tabular-nums! ${out ? 'text-[#c84767]' : 'text-[#8a7f72]'}`}>{out ? '無庫存' : `庫存 ${p.inventory}`}</span>
+                    <span className={`shrink-0 text-[11px]! tabular-nums! ${out ? 'text-[#c84767]' : 'text-[#8a7f72]'}`}>{out ? ((p.total_inventory ?? 0) > 0 ? `此店 0・他店 ${p.total_inventory}` : '無庫存') : `庫存 ${p.inventory}`}</span>
                   </span>
                 </span>
               </button>

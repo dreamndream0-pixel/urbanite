@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 import { getAdminUser } from '@/lib/supabase/server';
 import type { StockMovement, Variant } from '@/lib/types';
-import { shopAdminClient } from '@/lib/shop';
+import { getCurrentShop, shopAdminClient } from '@/lib/shop';
+import { adjustLevel, ensureLocations, loadLevels, locationStockReader, pickLocation } from '@/lib/stock-locations';
 import { resolveStockMovementTarget } from '@/lib/stock-movement-target';
 
 // GET /api/stock-movements — 進出庫紀錄(限管理員)
@@ -21,6 +22,7 @@ export async function GET() {
 }
 
 // POST /api/stock-movements — 新增一筆入庫/出庫,並自動更新庫存(限管理員)
+// location_id:入庫到 / 從哪個分店、倉庫出庫(沒帶 = 預設據點)
 export async function POST(request: Request) {
   const admin = await getAdminUser();
   if (!admin) return NextResponse.json({ error: '未授權' }, { status: 401 });
@@ -47,6 +49,14 @@ export async function POST(request: Request) {
   if (!target.ok) return NextResponse.json({ error: target.error }, { status: 400 });
   const variantKey = target.variantKey;
 
+  // 據點:出庫時這個據點的數量要夠
+  const shop = await getCurrentShop();
+  const place = pickLocation(await ensureLocations(supabase), String(body?.location_id ?? ''));
+  if (type === 'out' && !place.is_default) {
+    const have = locationStockReader([product], await loadLevels(supabase, [productId]), place)(productId, variantKey);
+    if (quantity > have) return NextResponse.json({ error: `「${product.name}」${variantKey} 在「${place.name}」只有 ${Math.max(0, have)} 件` }, { status: 409 });
+  }
+
   const delta = type === 'in' ? quantity : -quantity;
   const variants: Variant[] = Array.isArray(product.variants) ? product.variants : [];
 
@@ -64,6 +74,7 @@ export async function POST(request: Request) {
     stockUpdate = await supabase.from('products').update({ inventory: inv }).eq('id', productId);
   }
   if (stockUpdate.error) return NextResponse.json({ error: stockUpdate.error.message }, { status: 500 });
+  if (shop) await adjustLevel(shop.id, place, productId, variantKey, delta);
 
   const { data: movement, error: mvErr } = await supabase
     .from('stock_movements')
@@ -74,6 +85,7 @@ export async function POST(request: Request) {
       quantity,
       unit_price: unitPrice,
       location: String(body?.location ?? '').trim(),
+      location_id: place.id,
       handler: String(body?.handler ?? '').trim(),
       note: String(body?.note ?? '').trim(),
     })
@@ -130,6 +142,10 @@ export async function DELETE(request: Request) {
       stockUpdate = await supabase.from('products').update({ inventory: inv }).eq('id', product.id);
     }
     if (stockUpdate.error) return NextResponse.json({ error: stockUpdate.error.message }, { status: 500 });
+    // 當初記在哪個據點就從那裡退回(舊紀錄沒有據點 = 預設據點,不用動)
+    const shop = await getCurrentShop();
+    const place = movement.location_id ? (await ensureLocations(supabase)).find((l) => l.id === movement.location_id) : null;
+    if (shop && place) await adjustLevel(shop.id, place, product.id, variantKey, delta);
   }
 
   const { error } = await supabase.from('stock_movements').delete().eq('id', id);

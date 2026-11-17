@@ -172,7 +172,7 @@ export function summarizeSession(session: Pick<PosSession, 'opening_cash' | 'cas
 }
 
 // POS 前台用的精簡商品資料
-export type PosProduct = Pick<Product, 'id' | 'name' | 'price' | 'inventory' | 'status' | 'category' | 'image' | 'specs' | 'variants' | 'unit' | 'campaign_id' | 'store_only'> & { barcode: string };
+export type PosProduct = Pick<Product, 'id' | 'name' | 'price' | 'inventory' | 'status' | 'category' | 'image' | 'specs' | 'variants' | 'unit' | 'campaign_id' | 'store_only'> & { barcode: string; total_inventory?: number };
 
 export const variantKey = (options: string[]) => options.join(' / ');
 
