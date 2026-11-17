@@ -18,7 +18,7 @@ export async function PUT(request: Request) {
 
   let locations = await ensureLocations(supabase);
   const inv = body?.invoice && typeof body.invoice === 'object' ? (body.invoice as Record<string, unknown>) : null;
-  if (inv) {
+  if (inv && me.features.invoice) {
     const target = allowedLocations(me, locations).find((l) => l.id === inv.location_id);
     if (!target) return NextResponse.json({ error: '找不到據點' }, { status: 404 });
     const checked = invoicePatch(inv);

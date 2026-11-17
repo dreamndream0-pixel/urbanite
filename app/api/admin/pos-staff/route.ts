@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getAdminUser } from '@/lib/supabase/server';
+import { featureDenied } from '@/lib/pos-auth';
 import { shopAdminClient } from '@/lib/shop';
 import { cleanPermissions, type PosStaff } from '@/lib/pos-auth';
 import { hashPassword, passwordError, STAFF_CODE_PATTERN } from '@/lib/pos-staff-session';
@@ -41,12 +42,16 @@ const duplicate = (error: { code?: string; message: string }) => NextResponse.js
 // GET /api/admin/pos-staff — POS 員工列表(限管理員)
 export async function GET() {
   if (!(await getAdminUser())) return NextResponse.json({ error: '未授權' }, { status: 401 });
+  const denied = await featureDenied('staff');
+  if (denied) return denied;
   return NextResponse.json(await list(await shopAdminClient()), { headers: { 'Cache-Control': 'private, no-store' } });
 }
 
 // POST /api/admin/pos-staff { code, name, password, permissions?, location_ids? } — 新增 POS 員工
 export async function POST(request: Request) {
   if (!(await getAdminUser())) return NextResponse.json({ error: '未授權' }, { status: 401 });
+  const denied = await featureDenied('staff');
+  if (denied) return denied;
   const body = await request.json().catch(() => null);
   const code = String(body?.code ?? '').trim();
   const password = String(body?.password ?? '');
@@ -64,6 +69,8 @@ export async function POST(request: Request) {
 // PATCH /api/admin/pos-staff { id, code?, name?, password?, permissions?, location_ids?, active? } — 修改 / 重設密碼 / 停用
 export async function PATCH(request: Request) {
   if (!(await getAdminUser())) return NextResponse.json({ error: '未授權' }, { status: 401 });
+  const denied = await featureDenied('staff');
+  if (denied) return denied;
   const body = await request.json().catch(() => null);
   const id = String(body?.id ?? '');
   const db = await shopAdminClient();
@@ -93,6 +100,8 @@ export async function PATCH(request: Request) {
 // DELETE /api/admin/pos-staff?id= — 移除 POS 員工(馬上不能再進 POS;已經賣出的訂單仍保留銷售人員)
 export async function DELETE(request: Request) {
   if (!(await getAdminUser())) return NextResponse.json({ error: '未授權' }, { status: 401 });
+  const denied = await featureDenied('staff');
+  if (denied) return denied;
   const id = new URL(request.url).searchParams.get('id') ?? '';
   const db = await shopAdminClient();
   const { error } = await db.from('pos_staff').delete().eq('id', id);

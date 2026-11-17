@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { uiAlert, uiConfirm } from '@/lib/ui-dialog';
+import { planDefaults, resolveShopFeatures, SHOP_FEATURES, type ShopFeature } from '@/lib/shop-features';
 
 type ShopRow = {
   id: string;
@@ -9,6 +10,7 @@ type ShopRow = {
   name: string;
   plan: string;
   status: string;
+  features?: Record<string, boolean>;
   owner_email: string;
   products: number;
   orders: number;
@@ -22,7 +24,7 @@ const day = (iso: string) => {
   return `${d.getUTCFullYear()}/${d.getUTCMonth() + 1}/${d.getUTCDate()}`;
 };
 
-// 平台後台:所有店家(停用 / 恢復、方案)
+// 平台後台:所有店家(停用 / 恢復、方案、POS 功能開通)
 export default function ShopsManager() {
   const [shops, setShops] = useState<ShopRow[] | null>(null);
   const [error, setError] = useState('');
@@ -42,7 +44,7 @@ export default function ShopsManager() {
     Promise.resolve().then(load);
   }, []);
 
-  async function patch(shop: ShopRow, update: Partial<Pick<ShopRow, 'status' | 'plan'>>) {
+  async function patch(shop: ShopRow, update: Partial<Pick<ShopRow, 'status' | 'plan'>> & { features?: Record<string, boolean> | null }) {
     if (update.status === 'suspended' && !(await uiConfirm(`停用「${shop.name || shop.slug}」?停用後客人打開會看到「這家店暫停營業中」,店主也無法進後台。`, { danger: true }))) return;
     const res = await fetch('/api/admin/shops', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: shop.id, ...update }) });
     const d = await res.json();
@@ -65,12 +67,13 @@ export default function ShopsManager() {
         <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="搜尋店名、網址、店主 email" className="ml-auto w-full rounded-full border border-[#e5ded4] bg-white px-4 py-2 text-sm outline-none focus:border-[#1f1b19] sm:w-72" />
       </div>
       <div className="overflow-x-auto rounded-2xl border border-[#e5ded4] bg-white">
-        <table className="w-full min-w-[760px] text-sm">
+        <table className="w-full min-w-[960px] text-sm">
           <thead className="bg-[#faf7f2] text-left text-xs text-[#8a7f72]">
             <tr>
               <th className="px-4 py-3 font-medium">店家</th>
               <th className="px-4 py-3 font-medium">店主</th>
               <th className="px-4 py-3 font-medium">方案</th>
+              <th className="px-4 py-3 font-medium">POS 功能</th>
               <th className="px-4 py-3 text-right font-medium">商品</th>
               <th className="px-4 py-3 text-right font-medium">訂單</th>
               <th className="px-4 py-3 font-medium">開店日</th>
@@ -99,6 +102,9 @@ export default function ShopsManager() {
                       </select>
                     )}
                   </td>
+                  <td className="px-4 py-3">
+                    {platform ? <span className="text-xs text-[#8a7f72]">全部開通</span> : <FeatureSwitches shop={s} onChange={(features) => void patch(s, { features })} />}
+                  </td>
                   <td className="px-4 py-3 text-right tabular-nums">{s.products}</td>
                   <td className="px-4 py-3 text-right tabular-nums">{s.orders}</td>
                   <td className="px-4 py-3 text-xs text-[#8a7f72]">{day(s.created_at)}</td>
@@ -121,6 +127,34 @@ export default function ShopsManager() {
           </tbody>
         </table>
       </div>
+    </div>
+  );
+}
+
+// 一家店的 POS 功能開關:沒有特別設定的項目依方案預設(U Max 全開、U Pro 全關);「POS 門市結帳」關掉時其他也一起失效
+function FeatureSwitches({ shop, onChange }: { shop: ShopRow; onChange: (features: Record<string, boolean> | null) => void }) {
+  const overrides = shop.features ?? {};
+  const effective = resolveShopFeatures(shop);
+  const defaults = planDefaults(shop.plan);
+  const custom = Object.keys(overrides).length > 0;
+  const toggle = (key: ShopFeature) => {
+    const next = { ...defaults, ...overrides, [key]: !effective[key] };
+    // 開任何 POS 功能時,POS 本身也一起開(灰色的項目也可以直接勾)
+    if (key !== 'pos' && next[key]) next.pos = true;
+    onChange(next);
+  };
+  return (
+    <div className="space-y-1">
+      {SHOP_FEATURES.map((f) => {
+        const disabled = f.key !== 'pos' && !effective.pos;
+        return (
+          <label key={f.key} title={f.hint} className={`flex items-center gap-1.5 whitespace-nowrap text-xs ${disabled ? 'text-[#b3a99b]' : 'text-[#3f3a35]'}`}>
+            <input type="checkbox" checked={effective[f.key]} onChange={() => toggle(f.key)} />
+            {f.label}
+          </label>
+        );
+      })}
+      {custom ? <button type="button" onClick={() => onChange(null)} className="text-[11px] text-[#8a7f72] underline">恢復方案預設</button> : <span className="text-[11px] text-[#a99e8f]">依方案預設</span>}
     </div>
   );
 }

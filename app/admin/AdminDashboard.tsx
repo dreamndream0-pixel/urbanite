@@ -63,6 +63,7 @@ import { resolveStockMovementTarget } from '@/lib/stock-movement-target';
 import LineBotManager from './line-bot/LineBotManager';
 import LoyaltyManager from './LoyaltyManager';
 import PosAdmin from './PosAdmin';
+import { resolveShopFeatures, type ShopFeatures } from '@/lib/shop-features';
 import StocktakeManager, { type StocktakeApplied } from './StocktakeManager';
 import PromoActivitiesManager from './PromoActivitiesManager';
 import CheckoutFieldsManager from './CheckoutFieldsManager';
@@ -467,6 +468,7 @@ export default function AdminDashboard({
   userEmail,
   platform = true,
   shopName = 'URBANITE',
+  features,
 }: {
   initialProducts: Product[];
   initialOrders: Order[];
@@ -483,9 +485,11 @@ export default function AdminDashboard({
   userEmail: string;
   platform?: boolean; // 主網站(URBANITE)= 平台;店家子網域 = false
   shopName?: string;
+  features?: ShopFeatures; // 這家店開通的 POS 功能(平台在店家管理設定)
 }) {
-  // 店家後台不顯示平台功能(名片會員、LINE 機器人、店家管理)
-  const nav = platform ? NAV : NAV.filter((n) => !PLATFORM_SECTIONS.has(n.key));
+  const shopFeatures = features ?? resolveShopFeatures(null, Boolean(platform));
+  // 店家後台不顯示平台功能(名片會員、LINE 機器人、店家管理);沒開通 POS 不顯示 POS・分店
+  const nav = (platform ? NAV : NAV.filter((n) => !PLATFORM_SECTIONS.has(n.key))).filter((n) => n.key !== 'pos' || shopFeatures.pos);
   const router = useRouter();
   const [section, setSection] = useState<SectionKey>('overview');
   // 重新整理停留在目前分頁:進頁時讀網址 ?section=,切換時寫回網址
@@ -1724,7 +1728,7 @@ export default function AdminDashboard({
   const activeNav = nav.find((n) => n.key === section) ?? nav[0];
 
   return (
-    <div className="admin-root min-h-screen bg-[#f6f2ec] text-[#1f1b19]">
+    <div className={`admin-root min-h-screen bg-[#f6f2ec] text-[#1f1b19] ${shopFeatures.pos ? '' : '[&_.pos-feature]:hidden'}`}>
       <header className="page-header sticky top-0 z-30 border-b border-[#e5ded4] bg-[#faf7f2]">
         <nav className="mx-auto grid max-w-7xl grid-cols-[1fr_auto_1fr] items-center px-4 py-4 sm:px-6">
           <div className="flex items-center">
@@ -1805,11 +1809,11 @@ export default function AdminDashboard({
             ))}
           </nav>
           <div className="mt-auto border-t border-[#e5ded4] p-3">
-            {/* POS 門市結帳:銷售會寫進同一份訂單與庫存 */}
-            <a href="/pos" className="mb-1 flex items-center justify-between rounded-lg bg-[#1f1b19] px-3 py-3 text-sm font-semibold text-white hover:opacity-90">
+            {/* POS 門市結帳:銷售會寫進同一份訂單與庫存(這家店有開通才顯示) */}
+            {shopFeatures.pos ? <a href="/pos" className="mb-1 flex items-center justify-between rounded-lg bg-[#1f1b19] px-3 py-3 text-sm font-semibold text-white hover:opacity-90">
               <span>POS 門市結帳</span>
               <span aria-hidden>→</span>
-            </a>
+            </a> : null}
             <button
               onClick={signOut}
               className="block w-full rounded-lg px-3 py-3 text-left text-sm font-semibold text-[#c84767] hover:bg-[#f3ede4]"
@@ -2991,7 +2995,7 @@ export default function AdminDashboard({
           {section === 'line-bot' && <LineBotManager products={products} coupons={discounts} logoUrl={logoUrl} platform={platform} campaigns={initialCampaigns} />}
           {section === 'loyalty' && <LoyaltyManager />}
           {/* POS・分店:據點、各據點庫存、調貨、POS 首頁按鈕 */}
-          {section === 'pos' && <PosAdmin products={products} categories={categories} />}
+          {section === 'pos' && shopFeatures.pos && <PosAdmin products={products} categories={categories} features={shopFeatures} />}
           {section === 'card-members' && <CardMembersManager />}
           {section === 'shops' && platform && <ShopsManager />}
           {section === 'profile-card' && (platform
@@ -7015,8 +7019,8 @@ function ProductModal({
                 ))}
               </select>
             </Field>
-            {/* 僅門市銷售:官網看不到、不能下單,只有 POS 可以賣(後台商品列表在「門市限定」分頁) */}
-            <label className="mt-3 flex items-start gap-2 text-sm">
+            {/* 僅門市銷售:官網看不到、不能下單,只有 POS 可以賣(後台商品列表在「門市限定」分頁);這家店沒開通 POS 時隱藏 */}
+            <label className="pos-feature mt-3 flex items-start gap-2 text-sm">
               <input type="checkbox" className="mt-0.5" checked={draft.store_only} onChange={(e) => set('store_only', e.target.checked)} />
               <span>僅門市銷售<span className="block text-xs text-[#8a7f72]">勾選後這個商品不會出現在官網、也不能在官網下單,只有 POS 可以賣。庫存、進貨、盤點、調貨和一般商品一樣。</span></span>
             </label>

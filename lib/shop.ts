@@ -19,6 +19,7 @@ export type Shop = {
   plan: 'pro' | 'max' | string;
   status: 'active' | 'suspended' | string;
   custom_domain: string | null;
+  features?: unknown; // 功能開關覆寫(lib/shop-features)
   created_at?: string;
 };
 

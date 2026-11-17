@@ -521,7 +521,7 @@ function HistoryList({ history, shopName, onPrint }: { history: PosSession[]; sh
 }
 
 // ---------- POS 設定 ----------
-export function SettingsPanel({ settings, location, onSaved, onLocations, onClose }: { settings: PosSettings; location: StockLocation; onSaved: (s: PosSettings) => void; onLocations: (list: StockLocation[]) => void; onClose: () => void }) {
+export function SettingsPanel({ settings, location, invoiceEnabled, onSaved, onLocations, onClose }: { settings: PosSettings; location: StockLocation; invoiceEnabled: boolean; onSaved: (s: PosSettings) => void; onLocations: (list: StockLocation[]) => void; onClose: () => void }) {
   const [draft, setDraft] = useState(settings);
   const [inv, setInv] = useState({ enabled: location.invoice_enabled, prefix: location.invoice_prefix, next: String(location.invoice_next), end: String(location.invoice_end) });
   const [methods, setMethods] = useState(settings.paymentMethods.filter((m) => m !== CASH).join('、'));
@@ -531,7 +531,7 @@ export function SettingsPanel({ settings, location, onSaved, onLocations, onClos
     try {
       const r = await api<{ settings: PosSettings; locations: StockLocation[] }>('/api/pos/settings', { method: 'PUT', body: JSON.stringify({
         ...draft, paymentMethods: [CASH, ...methods.split(/[、,,\n]/).map((m) => m.trim()).filter(Boolean)],
-        invoice: { location_id: location.id, invoice_enabled: inv.enabled, invoice_prefix: inv.prefix, invoice_next: toInt(inv.next), invoice_end: toInt(inv.end) },
+        invoice: !invoiceEnabled ? undefined : { location_id: location.id, invoice_enabled: inv.enabled, invoice_prefix: inv.prefix, invoice_next: toInt(inv.next), invoice_end: toInt(inv.end) },
       }) });
       onLocations(r.locations);
       onSaved(r.settings); uiToast('已儲存'); onClose();
@@ -542,7 +542,7 @@ export function SettingsPanel({ settings, location, onSaved, onLocations, onClos
       <div className="space-y-4">
         <label className="block"><span className={label}>現金以外的付款方式(用「、」分開)</span><input className={input} value={methods} onChange={(e) => setMethods(e.target.value)} placeholder="刷卡、LINE Pay、轉帳" /></label>
         <label className="flex items-start gap-2 text-sm!"><input type="checkbox" className="mt-1" checked={draft.allowOversell} onChange={(e) => setDraft({ ...draft, allowOversell: e.target.checked })} /><span>庫存不足也可以賣<span className="block text-xs! text-[#8a7f72]">沒勾:系統庫存不夠時不能結帳。勾了:照樣結帳,庫存扣到 0 為止。</span></span></label>
-        <div className="rounded-xl border border-[#e5ded4] p-3">
+        <div className={`rounded-xl border border-[#e5ded4] p-3 ${invoiceEnabled ? '' : 'hidden'}`}>
           <label className="flex items-start gap-2 text-sm!"><input type="checkbox" className="mt-1" checked={inv.enabled} onChange={(e) => setInv({ ...inv, enabled: e.target.checked })} /><span>結帳自動帶發票號碼<span className="block text-xs! text-[#8a7f72]">「{location.name}」專用。每結一筆自動用下一張號碼,印在收據上;號碼用完要回來更新。</span></span></label>
           {inv.enabled ? (
             <div className="mt-3 grid grid-cols-3 gap-2">

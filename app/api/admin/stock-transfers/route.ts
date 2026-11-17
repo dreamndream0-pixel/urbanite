@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getAdminUser } from '@/lib/supabase/server';
+import { featureDenied } from '@/lib/pos-auth';
 import { getCurrentShop, shopAdminClient } from '@/lib/shop';
 import { adjustLevel, ensureLocations, loadLevels, locationStockReader, type TransferLine } from '@/lib/stock-locations';
 import type { Product } from '@/lib/types';
@@ -9,6 +10,8 @@ export const dynamic = 'force-dynamic';
 // GET /api/admin/stock-transfers — 調貨紀錄(最新 100 筆)
 export async function GET() {
   if (!(await getAdminUser())) return NextResponse.json({ error: '未授權' }, { status: 401 });
+  const denied = await featureDenied('multi_location');
+  if (denied) return denied;
   const db = await shopAdminClient();
   const { data, error } = await db.from('stock_transfers').select('*').order('created_at', { ascending: false }).limit(100);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -20,6 +23,8 @@ export async function GET() {
 export async function POST(request: Request) {
   const admin = await getAdminUser();
   if (!admin) return NextResponse.json({ error: '未授權' }, { status: 401 });
+  const denied = await featureDenied('multi_location');
+  if (denied) return denied;
   const shop = await getCurrentShop();
   if (!shop) return NextResponse.json({ error: '找不到這家店' }, { status: 404 });
   const body = await request.json().catch(() => null);

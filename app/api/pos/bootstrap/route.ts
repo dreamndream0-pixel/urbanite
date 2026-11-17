@@ -30,6 +30,7 @@ export async function GET(request: Request) {
       shop: { name: shop?.name ?? 'URBANITE', logo: settings?.logo_url ?? '' },
       cashier: me.name,
       me: { code: me.code, name: me.name, isAdmin: me.isAdmin, permissions: me.permissions },
+      features: me.features,
       locations,
       location,
       products: withLocationStock(products, levels, location),

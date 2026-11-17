@@ -17,6 +17,7 @@ import type {
   Campaign,
 } from '@/lib/types';
 import { getCurrentShop, isPlatformShop, shopAdminClient } from '@/lib/shop';
+import { resolveShopFeatures } from '@/lib/shop-features';
 
 export const dynamic = 'force-dynamic';
 
@@ -87,6 +88,7 @@ export default async function AdminPage() {
       initialSettings={settings as SiteSettings | null}
       userEmail={user.email ?? ''}
       platform={isPlatformShop(shop)}
+      features={resolveShopFeatures(shop, isPlatformShop(shop))}
       shopName={shop?.name || 'URBANITE'}
     />
   );

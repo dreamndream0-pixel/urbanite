@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getAdminUser } from '@/lib/supabase/server';
+import { featureDenied } from '@/lib/pos-auth';
 import { shopAdminClient } from '@/lib/shop';
 import { ensureLocations, invoicePatch, loadLevels } from '@/lib/stock-locations';
 
@@ -8,6 +9,8 @@ export const dynamic = 'force-dynamic';
 // GET /api/admin/stock-locations — 據點列表;?levels=1 另外帶各據點庫存(非預設據點)
 export async function GET(request: Request) {
   if (!(await getAdminUser())) return NextResponse.json({ error: '未授權' }, { status: 401 });
+  const denied = await featureDenied('pos');
+  if (denied) return denied;
   const db = await shopAdminClient();
   const locations = await ensureLocations(db);
   const levels = new URL(request.url).searchParams.has('levels') ? await loadLevels(db) : [];
@@ -17,6 +20,8 @@ export async function GET(request: Request) {
 // POST /api/admin/stock-locations { name, kind } — 新增分店 / 倉庫
 export async function POST(request: Request) {
   if (!(await getAdminUser())) return NextResponse.json({ error: '未授權' }, { status: 401 });
+  const denied = await featureDenied('multi_location');
+  if (denied) return denied;
   const body = await request.json().catch(() => null);
   const name = String(body?.name ?? '').trim().slice(0, 30);
   if (!name) return NextResponse.json({ error: '請輸入名稱' }, { status: 400 });
@@ -32,6 +37,8 @@ export async function POST(request: Request) {
 // PATCH /api/admin/stock-locations { id, name?, kind?, active?, note?, invoice_* } — 修改據點、發票號碼設定
 export async function PATCH(request: Request) {
   if (!(await getAdminUser())) return NextResponse.json({ error: '未授權' }, { status: 401 });
+  const denied = await featureDenied('pos');
+  if (denied) return denied;
   const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
   const id = String(body?.id ?? '');
   const db = await shopAdminClient();
@@ -65,6 +72,8 @@ export async function PATCH(request: Request) {
 // DELETE /api/admin/stock-locations?id= — 刪除據點(還有庫存或是預設據點不能刪)
 export async function DELETE(request: Request) {
   if (!(await getAdminUser())) return NextResponse.json({ error: '未授權' }, { status: 401 });
+  const denied = await featureDenied('multi_location');
+  if (denied) return denied;
   const id = new URL(request.url).searchParams.get('id') ?? '';
   const db = await shopAdminClient();
   const locations = await ensureLocations(db);

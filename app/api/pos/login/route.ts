@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getCurrentShop, scopedClient } from '@/lib/shop';
+import { featureDenied } from '@/lib/pos-auth';
 import { createStaffToken, LOCK_MINUTES, MAX_FAILED, POS_STAFF_COOKIE, POS_STAFF_MAX_AGE, verifyPassword } from '@/lib/pos-staff-session';
 
 export const dynamic = 'force-dynamic';
@@ -11,6 +12,8 @@ const cookieOptions = { httpOnly: true, secure: process.env.NODE_ENV === 'produc
 export async function POST(request: Request) {
   const shop = await getCurrentShop();
   if (!shop || shop.status === 'suspended') return NextResponse.json({ error: '找不到這家店' }, { status: 404 });
+  const denied = await featureDenied('staff');
+  if (denied) return denied;
   const body = await request.json().catch(() => null);
   const code = String(body?.code ?? '').trim();
   const password = String(body?.password ?? '');

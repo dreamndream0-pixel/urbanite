@@ -19,6 +19,7 @@ export type Boot = {
   shop: { name: string; logo: string };
   cashier: string;
   me: { code: string; name: string; isAdmin: boolean; permissions: PosPermission[] };
+  features: import('@/lib/shop-features').ShopFeatures;
   products: PosProduct[];
   categories: { slug: string; name: string; parent_id?: string | null; campaign_id?: string | null }[];
   locations: StockLocation[];

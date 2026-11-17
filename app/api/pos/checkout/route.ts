@@ -147,7 +147,7 @@ export async function POST(request: Request) {
   const taxId = String(body?.buyer_tax_id ?? '').trim();
   if (taxId && !/^\d{8}$/.test(taxId)) return NextResponse.json({ error: '統一編號是 8 位數字' }, { status: 400 });
   let invoiceNo = '';
-  if (location.invoice_enabled && total > 0) {
+  if (me.features.invoice && location.invoice_enabled && total > 0) {
     const { data: no, error: invErr } = await createAdminClient().rpc('pos_next_invoice', { p_shop: shop.id, p_location: location.id });
     if (invErr) return NextResponse.json({ error: invErr.message }, { status: 500 });
     if (!no) return NextResponse.json({ error: `「${location.name}」的發票號碼已經用完,請到 POS 設定更新字軌與號碼`, code: 'INVOICE_EXHAUSTED' }, { status: 409 });

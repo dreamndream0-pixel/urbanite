@@ -5,6 +5,7 @@ import { POS_BUTTON_COLORS, POS_PERMISSIONS, type PosButton, type PosPermission 
 import type { PosStaff } from '@/lib/pos-auth';
 import type { StockLevel, StockLocation, StockTransfer, TransferLine } from '@/lib/stock-locations';
 import type { Category, Product } from '@/lib/types';
+import type { ShopFeatures } from '@/lib/shop-features';
 import { uiAlert, uiConfirm, uiPrompt } from '@/lib/ui-dialog';
 import { uiToast } from '@/lib/ui-toast';
 
@@ -46,8 +47,8 @@ function useStockReader(levels: StockLevel[], locations: StockLocation[]) {
 }
 
 // 後台「POS・分店」:分店 / 倉庫、各據點庫存、調貨、POS 首頁按鈕
-export default function PosAdmin({ products, categories }: { products: Product[]; categories: Category[] }) {
-  const [tab, setTab] = useState<'locations' | 'stock' | 'transfer' | 'buttons' | 'staff'>('locations');
+export default function PosAdmin({ products, categories, features }: { products: Product[]; categories: Category[]; features: ShopFeatures }) {
+  const [tab, setTab] = useState<'locations' | 'stock' | 'transfer' | 'buttons' | 'staff'>(features.multi_location ? 'locations' : 'buttons');
   const [locations, setLocations] = useState<StockLocation[] | null>(null);
   const [levels, setLevels] = useState<StockLevel[]>([]);
   const [error, setError] = useState('');
@@ -60,7 +61,9 @@ export default function PosAdmin({ products, categories }: { products: Product[]
   }, []);
   useEffect(() => { const t = setTimeout(() => void reload(), 0); return () => clearTimeout(t); }, [reload]);
 
-  const tabs = [['locations', '分店 / 倉庫'], ['stock', '各據點庫存'], ['transfer', '調貨'], ['buttons', 'POS 按鈕'], ['staff', 'POS 員工']] as const;
+  // 沒開通的功能不顯示分頁(平台在「店家管理」開通)
+  const tabs = ([['locations', '分店 / 倉庫'], ['stock', '各據點庫存'], ['transfer', '調貨'], ['buttons', 'POS 按鈕'], ['staff', 'POS 員工']] as const)
+    .filter(([k]) => (['locations', 'stock', 'transfer'].includes(k) ? features.multi_location : k === 'staff' ? features.staff : true));
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">

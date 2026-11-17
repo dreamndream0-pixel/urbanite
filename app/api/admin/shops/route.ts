@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getPlatformAdmin } from '@/lib/supabase/server';
 import { URBANITE_SHOP_ID } from '@/lib/shop';
+import { cleanFeatureOverrides } from '@/lib/shop-features';
 
 export const dynamic = 'force-dynamic';
 
@@ -33,15 +34,18 @@ export async function GET() {
   });
 }
 
-// PATCH /api/admin/shops { id, status?, plan? } — 停用 / 恢復、調整方案
+// PATCH /api/admin/shops { id, status?, plan?, features? } — 停用 / 恢復、調整方案、開關 POS 功能
+// features:{ pos, multi_location, invoice, staff } 的覆寫;null = 清除覆寫,回到方案預設
 export async function PATCH(request: Request) {
   if (!(await getPlatformAdmin())) return NextResponse.json({ error: '未授權' }, { status: 401 });
   const body = await request.json().catch(() => ({}));
   const id = String(body.id ?? '');
   if (!id || id === URBANITE_SHOP_ID) return NextResponse.json({ error: 'URBANITE 不能調整' }, { status: 400 });
-  const update: Record<string, string> = {};
+  const update: Record<string, unknown> = {};
   if (body.status === 'active' || body.status === 'suspended') update.status = body.status;
   if (body.plan === 'pro' || body.plan === 'max') update.plan = body.plan;
+  if (body.features === null) update.features = {};
+  else if (body.features && typeof body.features === 'object') update.features = cleanFeatureOverrides(body.features);
   if (!Object.keys(update).length) return NextResponse.json({ error: '沒有要更新的欄位' }, { status: 400 });
   const { data, error } = await createAdminClient().from('shops').update(update).eq('id', id).select().single();
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });

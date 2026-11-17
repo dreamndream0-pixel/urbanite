@@ -239,7 +239,7 @@ export default function PosApp() {
   // 員工只看得到、用得到被勾選的功能(伺服器也會再檢查一次)
   const can = (p: PosPermission) => boot.me.isAdmin || boot.me.permissions.includes(p);
   const showButtons = buttons.length > 0 && view === 'buttons' && !search.trim() && !bindCode;
-  const nextInvoice = here.invoice_enabled ? (here.invoice_next <= here.invoice_end ? `${here.invoice_prefix}${String(here.invoice_next).padStart(8, '0')}` : '號碼已用完') : '';
+  const nextInvoice = boot.features.invoice && here.invoice_enabled ? (here.invoice_next <= here.invoice_end ? `${here.invoice_prefix}${String(here.invoice_next).padStart(8, '0')}` : '號碼已用完') : '';
   const lineQty = (productId: string, variant?: string) => lines.filter((l) => l.productId === productId && (variant === undefined || l.variant === variant)).reduce((n, l) => n + l.quantity, 0);
 
   async function switchLocation(id: string) {
@@ -323,7 +323,7 @@ export default function PosApp() {
     ...(can('settings') ? [{ key: 'settings', label: '設定', onClick: () => setPanel('settings') }] : []),
     ...(locations.length > 1 ? [{ key: 'location', label: `據點:${here.name}`, onClick: () => setPanel('location') }] : []),
     // 管理員的裝置:讓員工用自己的編號登入,銷售才會記在員工名下
-    ...(boot.me.isAdmin ? [{ key: 'switch', label: '員工登入', onClick: () => { void (lines.length ? uiConfirm('換人登入會清空目前的購物車,確定?') : Promise.resolve(true)).then((ok) => { if (ok) posSwitchUser(); }); } }] : []),
+    ...(boot.me.isAdmin && boot.features.staff ? [{ key: 'switch', label: '員工登入', onClick: () => { void (lines.length ? uiConfirm('換人登入會清空目前的購物車,確定?') : Promise.resolve(true)).then((ok) => { if (ok) posSwitchUser(); }); } }] : []),
     { key: 'logout', label: `登出(${boot.me.name})`, onClick: () => { void uiConfirm(lines.length ? '登出會清空目前的購物車,確定登出?' : `登出 ${boot.me.name}?`).then((ok) => { if (ok) void posSignOut(boot.me.isAdmin); }); } },
   ];
 
@@ -444,7 +444,7 @@ export default function PosApp() {
         {panel === 'session' ? <SessionPanel session={session} shopName={shop.name} onClose={() => setPanel(null)} onPrint={print} onChange={(s: SessionView | null) => setBoot((b) => (b ? { ...b, session: s } : b))} /> : null}
         {openButton ? <ButtonModal button={openButton} products={openButton.productIds.map((id) => byId.get(id)).filter((p): p is PosProduct => Boolean(p))} lineQty={lineQty} onAdd={addToCart} onClose={() => setOpenButton(null)} /> : null}
         {panel === 'location' ? <LocationPicker locations={locations} current={here.id} onClose={() => setPanel(null)} onPick={(id) => void switchLocation(id)} /> : null}
-        {panel === 'settings' ? <SettingsPanel settings={settings} location={here} onLocations={(list: StockLocation[]) => setBoot((b) => (b ? { ...b, locations: list.filter((l) => l.active), location: list.find((l) => l.id === b.location.id) ?? b.location } : b))} onClose={() => setPanel(null)} onSaved={(s: PosSettings) => setBoot((b) => (b ? { ...b, settings: s } : b))} /> : null}
+        {panel === 'settings' ? <SettingsPanel settings={settings} location={here} invoiceEnabled={boot.features.invoice} onLocations={(list: StockLocation[]) => setBoot((b) => (b ? { ...b, locations: list.filter((l) => l.active), location: list.find((l) => l.id === b.location.id) ?? b.location } : b))} onClose={() => setPanel(null)} onSaved={(s: PosSettings) => setBoot((b) => (b ? { ...b, settings: s } : b))} /> : null}
         {panel === 'holds' ? (
           <Modal title="掛單" onClose={() => setPanel(null)}>
             {!holds.length ? <p className="py-8 text-center text-sm! text-[#8a7f72]">沒有掛單。購物車按「掛單」可以先保留這筆,先幫下一位結帳。</p> : null}
