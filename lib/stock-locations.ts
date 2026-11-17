@@ -111,3 +111,70 @@ export function invoicePatch(body: Record<string, unknown>): { patch?: Record<st
   }
   return { patch };
 }
+
+// 建立調貨單(後台與 POS 共用):從一個據點搬到另一個據點,總庫存不變;調出據點數量不夠會擋下
+// allowed:額外的權限檢查(例:POS 員工只能調自己負責的據點),回傳錯誤訊息或空字串
+export async function createTransfer(
+  db: SupabaseClient,
+  shopId: string,
+  input: { from: unknown; to: unknown; lines: unknown; note?: unknown; handler: string },
+  allowed?: (from: StockLocation, to: StockLocation) => string,
+): Promise<{ transfer?: StockTransfer; error?: string; status?: number }> {
+  const locations = await ensureLocations(db);
+  const from = locations.find((l) => l.id === input.from && l.active);
+  const to = locations.find((l) => l.id === input.to && l.active);
+  if (!from || !to) return { error: '請選擇調出與調入的據點', status: 400 };
+  if (from.id === to.id) return { error: '調出與調入不能是同一個據點', status: 400 };
+  const denied = allowed?.(from, to);
+  if (denied) return { error: denied, status: 403 };
+
+  // 同品項合併
+  const wanted = new Map<string, { product_id: string; variant_key: string; quantity: number }>();
+  for (const l of (Array.isArray(input.lines) ? input.lines : []) as { product_id?: unknown; variant_key?: unknown; quantity?: unknown }[]) {
+    const quantity = Math.floor(Number(l.quantity));
+    const product_id = String(l.product_id ?? '');
+    const variant_key = String(l.variant_key ?? '');
+    if (!product_id || !Number.isSafeInteger(quantity) || quantity <= 0) continue;
+    const k = levelKey(product_id, variant_key);
+    wanted.set(k, { product_id, variant_key, quantity: (wanted.get(k)?.quantity ?? 0) + quantity });
+  }
+  if (!wanted.size) return { error: '請加入要調的商品與數量', status: 400 };
+  if (wanted.size > 500) return { error: '一張調貨單最多 500 個品項', status: 400 };
+
+  const ids = [...new Set([...wanted.values()].map((l) => l.product_id))];
+  const [{ data: productRows, error }, levels] = await Promise.all([db.from('products').select('id,name,inventory,variants').in('id', ids), loadLevels(db, ids)]);
+  if (error) return { error: error.message, status: 500 };
+  const products = (productRows ?? []) as (StockShape & { name: string })[];
+  const byId = new Map(products.map((p) => [p.id, p]));
+  const available = locationStockReader(products, levels, from);
+
+  const lines: TransferLine[] = [];
+  for (const l of wanted.values()) {
+    const p = byId.get(l.product_id);
+    if (!p) return { error: `找不到商品:${l.product_id}`, status: 400 };
+    const hasVariant = p.variants?.length ? p.variants.some((v) => v.options.join(' / ') === l.variant_key) : l.variant_key === '';
+    if (!hasVariant) return { error: `「${p.name}」沒有這個規格:${l.variant_key || '(未選)'}`, status: 400 };
+    const have = available(l.product_id, l.variant_key);
+    if (l.quantity > have) return { error: `「${p.name}」${l.variant_key} 在「${from.name}」只有 ${Math.max(0, have)} 件`, status: 409 };
+    lines.push({ ...l, name: p.name });
+  }
+
+  try {
+    for (const l of lines) {
+      await adjustLevel(shopId, from, l.product_id, l.variant_key, -l.quantity);
+      await adjustLevel(shopId, to, l.product_id, l.variant_key, l.quantity);
+    }
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : '調貨失敗', status: 500 };
+  }
+
+  const tw = new Date(Date.now() + 8 * 3600 * 1000);
+  const prefix = `TR${tw.toISOString().slice(0, 10).replace(/-/g, '')}`;
+  const { count } = await db.from('stock_transfers').select('id', { count: 'exact', head: true }).like('doc_no', `${prefix}%`);
+  const { data: saved, error: saveError } = await db.from('stock_transfers').insert({
+    doc_no: `${prefix}${String((count ?? 0) + 1).padStart(3, '0')}`, from_location: from.id, to_location: to.id, from_name: from.name, to_name: to.name,
+    lines, handler: input.handler, note: String(input.note ?? '').trim().slice(0, 200),
+  }).select().single();
+  if (saveError) return { error: `庫存已調整,但調貨單沒有存成功:${saveError.message}`, status: 500 };
+  return { transfer: saved as StockTransfer };
+}

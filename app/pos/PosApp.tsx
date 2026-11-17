@@ -7,6 +7,7 @@ import { canOptimizeStoreImage } from '@/lib/store-image';
 import { findByCode, manualDiscountAmount, posMoney, variantKey, type PosButton, type PosDiscount, type PosProduct, type PosSettings } from '@/lib/pos';
 import type { StockLocation } from '@/lib/stock-locations';
 import { ButtonGrid, ButtonModal, LocationPicker } from './PosButtons';
+import { TransferPanel } from './PosTransfer';
 import { posSignOut, posSwitchUser } from './PosSignOut';
 import type { PosPermission } from '@/lib/pos';
 import type { Order } from '@/lib/types';
@@ -15,7 +16,7 @@ import { uiToast } from '@/lib/ui-toast';
 import { DiscountEditor, DoneModal, LineEditor, MemberPicker, Modal, OrdersPanel, PayModal, Receipt, SessionPanel, SettingsPanel, VariantPicker } from './PosPanels';
 import { api, btn, btnDark, chip, errMsg, input, setPosLocation, timeLabel, uid, type Boot, type CartLine, type Hold, type Member, type Quote, type SessionView } from './ui';
 
-type Panel = 'pay' | 'orders' | 'session' | 'settings' | 'holds' | 'member' | 'discount' | 'location' | null;
+type Panel = 'pay' | 'orders' | 'session' | 'settings' | 'holds' | 'member' | 'discount' | 'location' | 'transfer' | null;
 const LOCATION_KEY = 'pos_location';
 
 const stockOf = (p: PosProduct, variant: string) => (p.variants?.length ? p.variants.find((v) => variantKey(v.options) === variant)?.inventory ?? 0 : p.inventory ?? 0);
@@ -319,6 +320,7 @@ export default function PosApp() {
   const menu: { key: string; label: string; onClick: () => void }[] = [
     { key: 'holds', label: `取單${holds.length ? `(${holds.length})` : ''}`, onClick: () => setPanel('holds') },
     ...(can('orders') ? [{ key: 'orders', label: can('refund') ? '訂單 / 退貨' : '訂單', onClick: () => setPanel('orders') }] : []),
+    ...(can('transfer') && boot.features.multi_location ? [{ key: 'transfer', label: '調撥', onClick: () => setPanel('transfer') }] : []),
     ...(can('session') ? [{ key: 'session', label: session ? '班別 / 交班' : '開班', onClick: () => setPanel('session') }] : []),
     ...(can('settings') ? [{ key: 'settings', label: '設定', onClick: () => setPanel('settings') }] : []),
     ...(locations.length > 1 ? [{ key: 'location', label: `據點:${here.name}`, onClick: () => setPanel('location') }] : []),
@@ -443,6 +445,7 @@ export default function PosApp() {
         {panel === 'orders' ? <OrdersPanel settings={settings} shopName={shop.name} canRefund={can('refund')} onClose={() => setPanel(null)} onChanged={() => void load()} onPrint={(o) => print(<Receipt order={o} settings={settings} shopName={shop.name} />)} /> : null}
         {panel === 'session' ? <SessionPanel session={session} shopName={shop.name} onClose={() => setPanel(null)} onPrint={print} onChange={(s: SessionView | null) => setBoot((b) => (b ? { ...b, session: s } : b))} /> : null}
         {openButton ? <ButtonModal button={openButton} products={openButton.productIds.map((id) => byId.get(id)).filter((p): p is PosProduct => Boolean(p))} lineQty={lineQty} onAdd={addToCart} onClose={() => setOpenButton(null)} /> : null}
+        {panel === 'transfer' ? <TransferPanel here={here} products={products} onDone={() => void load()} onClose={() => setPanel(null)} /> : null}
         {panel === 'location' ? <LocationPicker locations={locations} current={here.id} onClose={() => setPanel(null)} onPick={(id) => void switchLocation(id)} /> : null}
         {panel === 'settings' ? <SettingsPanel settings={settings} location={here} invoiceEnabled={boot.features.invoice} onLocations={(list: StockLocation[]) => setBoot((b) => (b ? { ...b, locations: list.filter((l) => l.active), location: list.find((l) => l.id === b.location.id) ?? b.location } : b))} onClose={() => setPanel(null)} onSaved={(s: PosSettings) => setBoot((b) => (b ? { ...b, settings: s } : b))} /> : null}
         {panel === 'holds' ? (

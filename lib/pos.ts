@@ -47,6 +47,7 @@ export const POS_PERMISSIONS = [
   { key: 'orders', label: '查看 POS 訂單', hint: '看當天與過去的訂單、重印收據' },
   { key: 'settings', label: 'POS 設定', hint: '付款方式、發票號碼、收據文字' },
   { key: 'barcode', label: '綁定條碼', hint: '掃到沒登記的條碼時綁到商品' },
+  { key: 'transfer', label: '調撥', hint: '在 POS 把商品調到別的分店 / 倉庫,或從別店調進來' },
 ] as const;
 export type PosPermission = (typeof POS_PERMISSIONS)[number]['key'];
 
