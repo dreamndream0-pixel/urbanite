@@ -1,18 +1,11 @@
 'use client';
 
-import { useState } from 'react';
 import Image from 'next/image';
 import { canOptimizeStoreImage } from '@/lib/store-image';
 import { posMoney, variantKey, type PosButton, type PosProduct } from '@/lib/pos';
 import type { StockLocation } from '@/lib/stock-locations';
-import { Modal, VariantChooser } from './PosPanels';
+import { Modal } from './PosPanels';
 import { btnDark } from './ui';
-
-const priceLabel = (p: PosProduct) => {
-  const prices = p.variants?.length ? p.variants.map((v) => v.price ?? p.price) : [p.price];
-  const min = Math.min(...prices);
-  return `${posMoney(min)}${prices.some((x) => x !== min) ? ' 起' : ''}`;
-};
 
 // POS 首頁的按鈕(後台「POS・分店」→「POS 按鈕」設定):例如一個品牌一顆
 export function ButtonGrid({ buttons, qtyOf, onOpen, onAll }: { buttons: PosButton[]; qtyOf: (b: PosButton) => number; onOpen: (b: PosButton) => void; onAll: () => void }) {
@@ -37,7 +30,8 @@ export function ButtonGrid({ buttons, qtyOf, onOpen, onAll }: { buttons: PosButt
   );
 }
 
-// 按下按鈕後的彈窗:先選型號(商品),再選顏色 / 尺寸;加入後不關閉,可以連續加
+// 按下按鈕後的彈窗:直接列出每個商品的所有品項(規格),點一下就加入;不關閉,可以連續加
+// 品項很多(例:顏色 × 尺寸)的商品,一個顏色一列,後面接尺寸
 export function ButtonModal({ button, products, lineQty, onAdd, onClose }: {
   button: PosButton;
   products: PosProduct[];
@@ -45,47 +39,75 @@ export function ButtonModal({ button, products, lineQty, onAdd, onClose }: {
   onAdd: (product: PosProduct, variant: string) => void;
   onClose: () => void;
 }) {
-  const [product, setProduct] = useState<PosProduct | null>(null);
   const total = products.reduce((n, p) => n + lineQty(p.id), 0);
-  // 商品資料更新(庫存)後用最新的
-  const current = product ? products.find((p) => p.id === product.id) ?? product : null;
   return (
-    <Modal wide title={current ? current.name : button.name} onClose={onClose} footer={
-      <div className="flex gap-2">
-        {current ? <button type="button" className="rounded-xl border border-[#d7c9bd] bg-white px-4 py-2.5 text-sm! font-semibold!" onClick={() => setProduct(null)}>← 回{button.name}</button> : null}
-        <button type="button" className={`${btnDark} flex-1`} onClick={onClose}>{total ? `完成(已加入 ${total} 件)` : '關閉'}</button>
-      </div>
+    <Modal wide title={button.name} onClose={onClose} footer={
+      <button type="button" className={`${btnDark} w-full`} onClick={onClose}>{total ? `完成(已加入 ${total} 件)` : '關閉'}</button>
     }>
-      {current ? (
-        <VariantChooser product={current} qtyOf={(v) => lineQty(current.id, v)} onPick={(v) => onAdd(current, v)} />
-      ) : !products.length ? (
-        <p className="py-10 text-center text-sm! text-[#8a7f72]">這顆按鈕還沒有加入商品,請到後台「POS・分店」→「POS 按鈕」設定。</p>
+      {!products.length ? (
+        <p className="py-10 text-center text-sm! text-[#8a7f72]">這顆按鈕還沒有加入商品,請到後台「POS・分店調貨」→「POS 按鈕」設定。</p>
       ) : (
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-          {products.map((p) => {
-            const qty = lineQty(p.id);
-            const out = (p.inventory ?? 0) <= 0;
-            const single = !p.variants?.length || p.variants.length === 1;
-            return (
-              <button key={p.id} type="button" onClick={() => (single ? onAdd(p, p.variants?.length ? variantKey(p.variants[0].options) : '') : setProduct(p))}
-                className={`relative flex min-w-0 flex-col overflow-hidden rounded-xl border bg-white text-left active:scale-[0.98] ${qty ? 'border-[#1f1b19]' : 'border-[#e5ded4]'} ${out ? 'opacity-55' : ''}`}>
-                <span className="relative block aspect-[4/3] w-full bg-[#f3ede4]">
-                  {p.image ? <Image src={p.image} alt="" fill sizes="(min-width: 640px) 200px, 45vw" className="object-cover" unoptimized={!canOptimizeStoreImage(p.image)} /> : null}
-                  {qty ? <span className="absolute right-1.5 top-1.5 grid h-6 min-w-6 place-items-center rounded-full bg-[#1f1b19] px-1.5 text-xs! font-bold! text-white">{qty}</span> : null}
-                </span>
-                <span className="block px-2 pb-2 pt-1.5">
-                  <span className="line-clamp-2 min-h-[2.5em] text-[13px]! font-medium! leading-tight">{p.name}</span>
-                  <span className="mt-1 flex items-baseline justify-between gap-1">
-                    <span className="truncate text-sm! font-bold! tabular-nums!">{priceLabel(p)}</span>
-                    <span className={`shrink-0 text-[11px]! tabular-nums! ${out ? 'text-[#c84767]' : 'text-[#8a7f72]'}`}>{out ? ((p.total_inventory ?? 0) > 0 ? `此店 0・他店 ${p.total_inventory}` : '無庫存') : `庫存 ${p.inventory}`}</span>
-                  </span>
-                </span>
-              </button>
-            );
-          })}
+        <div className="space-y-5">
+          {products.map((p) => <ProductItems key={p.id} product={p} showName={products.length > 1} lineQty={lineQty} onAdd={onAdd} />)}
         </div>
       )}
     </Modal>
+  );
+}
+
+function ProductItems({ product: p, showName, lineQty, onAdd }: { product: PosProduct; showName: boolean; lineQty: (productId: string, variant?: string) => number; onAdd: (product: PosProduct, variant: string) => void }) {
+  const variants = p.variants ?? [];
+  // 一個品項的按鈕:名稱、價格、庫存、已加入數量
+  // compact:顏色 × 尺寸的小格子,只放尺寸和庫存(價格和商品不同才顯示)
+  const cell = (key: string, label: string, price: number, stock: number, compact = false) => {
+    const qty = lineQty(p.id, key);
+    const out = stock <= 0;
+    return (
+      <button key={key || p.id} type="button" onClick={() => onAdd(p, key)}
+        className={`relative min-w-0 rounded-xl border text-left active:bg-[#f3ede4] ${compact ? 'px-2 py-2' : 'px-3 py-2.5'} ${qty ? 'border-[#1f1b19] bg-[#faf7f2]' : out ? 'border-[#eee6da] text-[#b3a99b]' : 'border-[#d7c9bd] bg-white'}`}>
+        <span className="block break-words text-[15px]! font-semibold! leading-snug">{label}</span>
+        {compact ? (
+          <span className="mt-0.5 block text-[11px]! leading-tight tabular-nums!">
+            {price !== p.price ? <span className="block">{posMoney(price)}</span> : null}
+            <span className={out ? 'text-[#c84767]' : 'text-[#8a7f72]'}>{out ? '無庫存' : `剩 ${stock}`}</span>
+          </span>
+        ) : (
+          <span className="mt-1 flex justify-between gap-1 text-xs! tabular-nums!"><span>{posMoney(price)}</span><span className={out ? 'text-[#c84767]' : 'text-[#8a7f72]'}>{out ? '無庫存' : `庫存 ${stock}`}</span></span>
+        )}
+        {qty ? <span className="absolute -right-1.5 -top-1.5 grid h-6 min-w-6 place-items-center rounded-full bg-[#1f1b19] px-1.5 text-xs! font-bold! text-white">{qty}</span> : null}
+      </button>
+    );
+  };
+  // 顏色 × 尺寸這種多維、品項多的:一個顏色一列
+  const grouped = variants.length > 6 && variants.every((v) => v.options.length >= 2);
+  const firsts = grouped ? [...new Set(variants.map((v) => v.options[0]))] : [];
+  return (
+    <section>
+      {showName || !variants.length ? (
+        <div className="mb-2 flex items-center gap-2">
+          {p.image ? <span className="relative h-9 w-9 shrink-0 overflow-hidden rounded-lg bg-[#f3ede4]"><Image src={p.image} alt="" fill sizes="36px" className="object-cover" unoptimized={!canOptimizeStoreImage(p.image)} /></span> : null}
+          <p className="min-w-0 truncate text-sm! font-semibold!">{p.name}</p>
+        </div>
+      ) : null}
+      {!variants.length ? (
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">{cell('', p.name, p.price, p.inventory ?? 0)}</div>
+      ) : grouped ? (
+        <div className="space-y-3">
+          {firsts.map((first) => (
+            <div key={first}>
+              <p className="mb-1 text-sm! font-semibold! text-[#5f5852]">{first}</p>
+              <div className="grid grid-cols-4 gap-1.5 sm:grid-cols-6 md:grid-cols-8">
+                {variants.filter((v) => v.options[0] === first).map((v) => cell(variantKey(v.options), v.options.slice(1).join(' / '), v.price ?? p.price, v.inventory ?? 0, true))}
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
+          {variants.map((v) => cell(variantKey(v.options), variantKey(v.options), v.price ?? p.price, v.inventory ?? 0))}
+        </div>
+      )}
+    </section>
   );
 }
 
