@@ -94,6 +94,11 @@ if(ios){b=has('CriOS/')?'ios-chrome':has('FxiOS/','EdgiOS/','Line/','Instagram',
 else if(has('Android')){b=has('Chrome/')&&!has('; wv)','Line/','Instagram','FBAN','FBAV')?'android-chrome':'android-other';}
 d.setAttribute('data-browser',b);}catch(e){}})();`;
 
+// Google Analytics 4(資源「Urbanite 都市人文創」)。只在平台主站(www.urbanite.com.tw 與 /card 名片)載入,其他店家的網站不追蹤。
+// Search Console 也靠這段碼驗證網站擁有權,所以要放在 <head> 裡。
+const GA_MEASUREMENT_ID = 'G-KZNFSVL6VS';
+const GA_INIT = `window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','${GA_MEASUREMENT_ID}');`;
+
 export default async function RootLayout({
   children,
 }: Readonly<{
@@ -122,6 +127,12 @@ export default async function RootLayout({
           rel="stylesheet"
           href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;500;600;700;900&family=Parisienne&display=swap"
         />
+        {isPlatformShop(shop) ? (
+          <>
+            <script async src={`https://www.googletagmanager.com/gtag/js?id=${GA_MEASUREMENT_ID}`} />
+            <script dangerouslySetInnerHTML={{ __html: GA_INIT }} />
+          </>
+        ) : null}
       </head>
       <body>
         <ScrollLockGuard />
