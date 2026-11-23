@@ -13,6 +13,13 @@ import { requestSecurityError } from '@/lib/request-security';
 const PLATFORM_ONLY = /^\/(card|mycard|staff\/|api\/staff\/|line(?!\/bind)|shop\/new|@|api\/card-import|api\/admin\/card|api\/admin\/shops|api\/video-points\/)/;
 
 export async function proxy(request: NextRequest) {
+  // KAZU 唯讀銷售統計:只對這條精確路徑,在來源檢查之前處理。非 GET 回 405,GET 由 route 自己驗鑰匙
+  if (request.nextUrl.pathname.replace(/\/$/, '') === '/api/kazu/sales') {
+    if (request.method !== 'GET') {
+      return NextResponse.json({ error: 'METHOD_NOT_ALLOWED' }, { status: 405, headers: { Allow: 'GET', 'Cache-Control': 'no-store' } });
+    }
+    return NextResponse.next();
+  }
   const rejected = requestSecurityError(request);
   if (rejected) return NextResponse.json({ error: rejected === 413 ? 'Request too large' : 'Forbidden origin' }, { status: rejected });
   const slug = shopSlugFromHost(request.headers.get('x-forwarded-host') || request.headers.get('host'));

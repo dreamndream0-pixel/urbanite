@@ -22,6 +22,15 @@ npm run dev
 5. Install Command 使用 `npm install`。
 6. Production Branch 使用 `main`。
 
+### KAZU 銷售統計 API
+
+`GET /api/kazu/sales?from=YYYY-MM-DD&to=YYYY-MM-DD`(唯讀,Asia/Taipei,最多 92 天,不帶日期 = 最近 7 天)。
+請求需帶 `Authorization: Bearer <KAZU_SALES_KEY>`。
+
+- `KAZU_SALES_KEY` 要在 Vercel **Production** 環境變數設定(至少 32 字,不與管理員登入或其他任何 secret 共用)。
+- 設定後**必須 redeploy** 才會生效;沒設或少於 32 字時一律回 503 `NOT_CONFIGURED`。
+- 本機測試:`npm test`。
+
 ## 目前範圍
 
 - 前台商品頁
