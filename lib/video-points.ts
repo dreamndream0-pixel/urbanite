@@ -7,6 +7,7 @@ import { matchesPaymentAmount } from '@/lib/payment-amount';
 export const VIDEO_POINT_PACKAGES = [
   { key: 'p100', amount: 100, points: 100, label: '100 點' },
   { key: 'p300', amount: 300, points: 320, label: '320 點', note: '多送 20 點' },
+  { key: 'p500', amount: 500, points: 540, label: '540 點', note: '多送 40 點' },
   { key: 'p1000', amount: 1000, points: 1100, label: '1,100 點', note: '多送 100 點' },
 ] as const;
 export type VideoPointPackage = (typeof VIDEO_POINT_PACKAGES)[number]['key'];
