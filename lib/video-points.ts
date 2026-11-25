@@ -6,9 +6,25 @@ import { matchesPaymentAmount } from '@/lib/payment-amount';
 
 export const VIDEO_POINT_PACKAGES = [
   { key: 'p100', amount: 100, points: 100, label: '100 點' },
-  { key: 'p300', amount: 300, points: 320, label: '320 點', note: '多送 20 點' },
-  { key: 'p1000', amount: 1000, points: 1100, label: '1,100 點', note: '多送 100 點' },
+  { key: 'p300', amount: 300, points: 300, label: '300 點' },
+  { key: 'p500', amount: 500, points: 520, label: '520 點', note: '多送 20 點' },
+  { key: 'p1000', amount: 1000, points: 1050, label: '1,050 點', note: '多送 50 點' },
+  { key: 'p3000', amount: 3000, points: 3200, label: '3,200 點', note: '多送 200 點' },
+  { key: 'p5000', amount: 5000, points: 5300, label: '5,300 點', note: '多送 300 點' },
 ] as const;
+// 首儲優惠:會員第一次儲值,加送付款金額 10% 的點數。加送點數寫進訂單,付款入帳時一起入帳。
+export const FIRST_PURCHASE_BONUS_RATE = 0.1;
+export const firstPurchaseBonus = (amount: number) => Math.floor(amount * FIRST_PURCHASE_BONUS_RATE);
+// 套用首儲加送後的方案(只給還沒有任何付款成功紀錄的會員)。
+export function packagesFor(firstPurchase: boolean) {
+  if (!firstPurchase) return VIDEO_POINT_PACKAGES.map((p) => ({ ...p }));
+  return VIDEO_POINT_PACKAGES.map((p) => {
+    const bonus = firstPurchaseBonus(p.amount);
+    const points = p.points + bonus;
+    const extra = 'note' in p ? `${p.note}、` : '';
+    return { ...p, points, label: `${points.toLocaleString('en-US')} 點`, note: `${extra}首儲再送 ${bonus} 點`, firstPurchaseBonus: bonus };
+  });
+}
 export type VideoPointPackage = (typeof VIDEO_POINT_PACKAGES)[number]['key'];
 export const VIDEO_TRIAL_POINTS = 30;
 

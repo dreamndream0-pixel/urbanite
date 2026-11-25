@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { buildMPGParams, getNewebpayConfig } from '@/lib/newebpay';
 import { reconcileVideoPaymentBatch } from '@/lib/video-payment-reconcile';
-import { isVideoStudioRequest, newVideoOrderNo, VIDEO_POINT_PACKAGES, VIDEO_TRIAL_POINTS, videoPointsReady, videoStudioUrl } from '@/lib/video-points';
+import { firstPurchaseBonus, isVideoStudioRequest, newVideoOrderNo, packagesFor, VIDEO_POINT_PACKAGES, VIDEO_TRIAL_POINTS, videoPointsReady, videoStudioUrl } from '@/lib/video-points';
 
 export const dynamic = 'force-dynamic';
 
@@ -22,6 +22,12 @@ export async function POST(request: Request) {
   if (!body.userId || !UUID.test(body.userId)) return NextResponse.json({ error: 'INVALID_USER' }, { status: 400 });
   const ref = typeof body.ref === 'string' && /^[A-Za-z0-9:_-]{1,100}$/.test(body.ref) ? body.ref : '';
   const db = createAdminClient();
+  // 首儲優惠只給還沒有任何付款成功紀錄的會員。
+  const isFirstPurchase = async () => {
+    const { count, error } = await db.from('video_point_payments').select('order_no', { count: 'exact', head: true }).eq('user_id', body.userId).eq('status', 'paid');
+    if (error) throw error;
+    return (count ?? 0) === 0;
+  };
   const balanceOf = async () => {
     const { data, error } = await db.from('video_point_accounts').select('balance').eq('user_id', body.userId).maybeSingle();
     if (error) throw error;
@@ -32,7 +38,8 @@ export async function POST(request: Request) {
     if (body.action === 'balance') return NextResponse.json({ balance: await balanceOf() });
     if (body.action === 'summary') {
       const { data: ledger } = await db.from('video_point_ledger').select('delta, reason, created_at').eq('user_id', body.userId).order('created_at', { ascending: false }).limit(20);
-      return NextResponse.json({ balance: await balanceOf(), packages: VIDEO_POINT_PACKAGES, ledger: ledger ?? [] });
+      const firstPurchase = await isFirstPurchase();
+      return NextResponse.json({ balance: await balanceOf(), packages: packagesFor(firstPurchase), firstPurchase, ledger: ledger ?? [] });
     }
     if (body.action === 'debit') {
       if (!ref || !Number.isInteger(body.points) || (body.points ?? 0) <= 0 || (body.points ?? 0) > 100000) return NextResponse.json({ error: 'INVALID_DEBIT' }, { status: 400 });
@@ -63,12 +70,13 @@ export async function POST(request: Request) {
       const cfg = await getNewebpayConfig();
       if (!cfg.merchantId || !cfg.hashKey || !cfg.hashIv || !(await videoPointsReady())) return NextResponse.json({ error: 'UNAVAILABLE' }, { status: 503 });
       const orderNo = newVideoOrderNo();
-      const { error } = await db.from('video_point_payments').insert({ order_no: orderNo, user_id: body.userId, package: pack.key, points: pack.points, amount: pack.amount });
+      const points = pack.points + ((await isFirstPurchase()) ? firstPurchaseBonus(pack.amount) : 0);
+      const { error } = await db.from('video_point_payments').insert({ order_no: orderNo, user_id: body.userId, package: pack.key, points, amount: pack.amount });
       if (error) throw error;
       const email = typeof body.email === 'string' && /^[^\s@]+@[^\s@]+$/.test(body.email) && !body.email.endsWith('@line.urbanite.com.tw') ? body.email : '';
       const { params, action } = await buildMPGParams({
         order_no: orderNo, total: pack.amount, email, items: [],
-        itemDesc: `Seedance Studio 點數 ${pack.points} 點`,
+        itemDesc: `Seedance Studio 點數 ${points} 點`,
         returnUrl: `${cfg.siteUrl}/api/video-points/return`,
         clientBackUrl: videoStudioUrl(),
       });
