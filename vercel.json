@@ -1,6 +1,7 @@
 {
   "regions": ["hnd1"],
   "crons": [
-    { "path": "/api/cron/expire-orders", "schedule": "0 16 * * *" }
+    { "path": "/api/cron/expire-orders", "schedule": "0 16 * * *" },
+    { "path": "/api/cron/cleanup-assets", "schedule": "0 19 * * 0" }
   ]
 }
