@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { getAdminUser } from '@/lib/supabase/server';
 import { sanitizeImage } from '@/lib/safe-image';
 import { limitedFormData } from '@/lib/limited-form';
+import { shrinkForWeb, type WebImage } from '@/lib/web-image';
 
 const MAX_SIZE = 5 * 1024 * 1024; // 5MB
 const ALLOWED = ['image/png', 'image/jpeg', 'image/webp', 'image/gif'];
@@ -37,16 +38,18 @@ export async function POST(request: Request) {
   }
 
   const supabase = createAdminClient();
-  const ext = EXT_BY_TYPE[file.type] ?? 'jpg';
+  let image: WebImage;
+  try {
+    const clean = await sanitizeImage(new Uint8Array(await file.arrayBuffer()), file.type);
+    // LINE 圖文選單需要精準尺寸，原樣保存；其他圖片縮到網頁大小以節省空間。
+    image = folder === 'line-bot' ? { bytes: clean, mime: file.type, ext: EXT_BY_TYPE[file.type] ?? 'jpg' } : await shrinkForWeb(clean, file.type);
+  } catch { return NextResponse.json({ error: '圖片格式無效、尺寸過大或內容損壞' }, { status: 400 }); }
   const rand = Math.random().toString(36).slice(2, 8);
-  const path = `${folder}/${productId || 'new'}-${Date.now()}-${rand}.${ext}`;
-  let bytes: Buffer;
-  try { bytes = await sanitizeImage(new Uint8Array(await file.arrayBuffer()), file.type); }
-  catch { return NextResponse.json({ error: '圖片格式無效、尺寸過大或內容損壞' }, { status: 400 }); }
+  const path = `${folder}/${productId || 'new'}-${Date.now()}-${rand}.${image.ext}`;
 
   const { error } = await supabase.storage
     .from('assets')
-    .upload(path, bytes, { contentType: file.type, upsert: true });
+    .upload(path, image.bytes, { contentType: image.mime, upsert: true });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
 
